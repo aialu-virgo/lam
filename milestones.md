@@ -19,7 +19,7 @@ related:
 | Tue 20:00 | Wireframes of all pages sent for approval | Product Designer | published 17:25 (D12); awaiting SP Sir |
 | Tue 21:00 | Written design approval | Principals | interim approval by Vijay 18:08 (D13); SP Sir confirms Wed 11:30 |
 | Wed 07:00 | desk-v0.9 on real data | Full-Stack Engineer | published Tue ~19:30 on demo data (D14); real data not yet loaded |
-| Wed 10:00 | QA + blind second check passed, fixes done | Engineering QA | open |
+| Wed 10:00 | QA + blind second check passed, fixes done | Engineering QA | passed Tue ~20:00 on v0.9 version 11 (demo data, stubbed runtime); open: live sign-in, real-data volume, visual match to reference |
 | Wed 11:30 | Acceptance walk-through | SP Sir | open |
 | Wed 12:00 | desk-v1.0 published, tagged, link sent | Delivery Lead | open |
 
@@ -38,7 +38,7 @@ related:
 
 **M3 Build v0.1 (intake only)** — [x] Data Intake with historic mode and coverage grid · [x] Admin masters: users, plants, market potential with revisions · [ ] real data loaded by Tue 18:40
 
-**M4 Build v0.9** — [ ] all pages: target vs actual vs potential, 12-quarter trend, Action Center, Today, responses, follow-up drafts, escalation, action log, roles and row-level access, scorecard
+**M4 Build v0.9** — [x] all pages: target vs actual vs potential, 12-quarter trend, Action Center, Today, responses, follow-up drafts, escalation, action log, roles and row-level access, scorecard
 
 **M5 v1.0** — [ ] QA and acceptance fixes · [ ] published and tagged by Wed 12:00
 
