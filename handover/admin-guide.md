@@ -26,6 +26,11 @@ Only a Super admin sees Data Intake and Admin. SAP is the only source of transac
 6. Open **Admin > Tools**: the rules engine runs on each load; "Run the rules now" and "Rebuild roll-ups now" are there if a page looks stale.
 Which entities (orders, deliveries, receivables, collections, stock, credit notes) have an intake yet: check in the page; those pages show an empty state naming the export needed.
 
+## Item and sales-employee masters
+- **Admin > Item master:** upload the FG item master (XLSX). Laminate, Door, PVC sheet and Compact board items are kept; other categories are counted, not stored. Sizes convert to sq ft (8X4 = 32).
+- **Admin > Sales employees:** upload either the zone workbook (ZONE 1–5 sheets ticked) or the S/4 workforce CSV (`*WorkerID` layout). The CSV **merges**: it adds people and updates email/phone, keeping zone, plant and designation already loaded. Optional columns `B1 SlpCode`, `B1 Sales Employee Name` and `Reports To (Employee Code)` improve matching ([Data map — Sales employee](../data-map/sales-employee.md)).
+- After each load, read the match rate and the lists of unmatched B1 names and people needing a plant; fix them and re-upload. Unmatched sales show as "Unassigned".
+
 ## Coverage grid
 Rows are entities, columns the last 12 FY quarters (FY April to March; Q1 = Apr to Jun). Loaded = whole quarter, Partial = some months or plants, Missing = nothing. A partial quarter shows QoQ greyed with "incomplete history". Tap a cell to upload that entity and quarter.
 
