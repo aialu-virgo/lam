@@ -61,6 +61,7 @@ function bannersHtml(){
   if(S.err)h+='<div class="banner err">Database message: '+esc(S.err)+'</div>';
   return h;
 }
+function ctxPlants(f,sc){return f.plant?new Set([f.plant]):sc.plants}
 function ctrlBar(pg){
   var f=S.f,sc=SC(),tYm=TODAY().slice(0,7),cur=curQuarterKey(),res=resolvePeriod(f,TODAY());
   var qs=closedQuarters().concat([cur]).reverse(),h='<section class="ctrl card">';
@@ -78,6 +79,10 @@ function ctrlBar(pg){
     if(pg==='sales'||pg==='overview'||pg==='team')h+='<div class="fld"><label for="f-group">Product group</label><select id="f-group" data-chg="flt" data-k="group"><option value="">All</option>'+GROUPS.map(function(g){return '<option'+(f.group===g?' selected':'')+'>'+g+'</option>'}).join('')+'</select></div>';
     if(f.plant||f.sp||f.group||f.search)h+='<button class="btn sm" data-act="clear-f">Clear filters</button>';
     h+='<div class="fld"><label for="f-search">Search</label><input id="f-search" class="in" data-in="fsearch" value="'+esc(f.search||'')+'" placeholder="customer, branch, person"></div>';
+  }
+  if(f.mode==='MTD'&&PERIOD_PAGES.indexOf(pg)>=0&&DS.plants.length){
+    var rq=resolvePeriod({mode:'QTD',q:res.q},TODAY()),ff={plants:ctxPlants(f,sc)},A=sumF(ff,rq.cur).n,P=sumF(ff,rq.prior).n,inc=!monthsLoaded(rq.curMonths,ff.plants)||!monthsLoaded(rq.priorMonths,ff.plants);
+    h+='<span class="chip">Quarter QoQ ('+esc(qLabel(res.q))+'): '+qoqCell(qoqOf(A,P,{incomplete:inc}))+'</span>';
   }
   if(PERIOD_PAGES.indexOf(pg)>=0)h+='<span class="chip">Compared with: '+esc(res.priorLabel||'previous quarter')+'</span>'+(res.pro?'<span class="chip">To-date plan and previous quarter pro-rated by working days ('+res.N+' elapsed)</span>':'');
   return h+'</section>';

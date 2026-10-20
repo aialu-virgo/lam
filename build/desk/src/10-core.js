@@ -88,7 +88,7 @@ function resolvePeriod(f,today){
     var from=f.from||shiftYm(tYm,-1),to=f.to||tYm;if(to<from)to=from;var ms=ymRange(from,to);
     var open3=to>=tYm,N3=open3?wdBetween(ms[0]+'-01',today):Infinity;if(ms[0]>tYm)N3=0;
     R.from=from;R.to=to;R.N=N3;R.label=ymLabel(from)+(from===to?'':' to '+ymLabel(to))+(open3?' (to date)':'');R.cur=walk(ms,N3);R.prior=walk(ms.map(priorQuarterMonth),N3);
-    R.priorLabel=ymLabel(priorQuarterMonth(from))+(from===to?'':' to '+ymLabel(priorQuarterMonth(to)));R.pro=open3;R.q=qKeyOfYm(to);
+    R.priorLabel=ymLabel(priorQuarterMonth(from))+(from===to?'':' to '+ymLabel(priorQuarterMonth(to)));R.pro=open3;R.q=qKeyOfYm(to);R.wdTot=ms.reduce(function(a,m){return a+WD(m)},0);R.wdN=open3?N3:null;
   }
   R.curMonths=R.cur.filter(function(x){return x.frac>0}).map(function(x){return x.ym});
   R.priorMonths=R.prior?R.prior.map(function(x){return x.ym}):[];

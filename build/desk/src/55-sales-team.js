@@ -14,7 +14,7 @@ function custFigs(code,A,P,ctx,incomplete){
 }
 function pageSales(){
   var ctx=viewCtx();if(noData())return emptyData();
-  var res=ctx.res,sc=ctx.sc,coord=sc.role==='Coordinator (sales / CRR)';
+  var res=ctx.res,sc=ctx.sc,coord=sc.role==='Coordinator (sales / CRR)'||(sc.role==='HOD'&&norm(sc.dept)==='crr');
   var allM=res.curMonths.concat(res.priorMonths).concat(qMonths(prevQ(curQuarterKey())));
   var haveCust=needCust(ctx,Array.from(new Set(allM)));
   var h='';
@@ -216,13 +216,13 @@ function teamPeople(u){
 }
 function pageTeam(){
   var ctx=viewCtx(),u=effUser(),people=teamPeople(u).sort(function(a,b){return a.role<b.role?-1:a.role>b.role?1:a.name<b.name?-1:1});
-  var q=(S.f.search||'').toLowerCase();people=people.filter(function(p){return !q||(p.name+' '+p.role).toLowerCase().indexOf(q)>=0});
+  var q=(S.f.search||'').toLowerCase();people=people.filter(function(p){return !q||(p.name+' '+p.role).toLowerCase().indexOf(q)>=0});var allPeople=people.length;people=people.slice(0,60);
   var who=S.team.who&&people.find(function(p){return p.email===S.team.who})?S.team.who:(u.role==='Sales executive'||people.length===1?people[0]&&people[0].email:'');
   /* make sure customer detail is loaded for K8 */
   if(!noData())needCust(ctx,Array.from(new Set(ctx.res.curMonths.concat(ctx.res.priorMonths).concat(qMonths(prevQ(curQuarterKey()))))));
   var h='<section class="card"><div class="hd"><h2>Team · KRA / KPI plan vs actual</h2><span class="note">'+(u.role==='Sales executive'?'Your own scorecard.':u.role==='Branch / depot manager'?'Your own team.':u.role==='HOD'?'Your department.':'All people.')+'</span></div>'
    +'<div class="tw"><table><thead><tr><th>Person</th><th>Role</th><th>Dept</th><th class="num">KPIs on plan</th><th class="num">On-time closure</th><th class="num">Overdue actions</th><th></th></tr></thead><tbody>'
-   +people.map(function(p){var kt=kpiTable(p,ctx),as=actionStats(p,ctx.res.q||curQuarterKey());return '<tr class="clk'+(who===p.email?' sel':'')+'" data-act="team-who" data-e="'+esc(p.email)+'"><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.role)+'</td><td>'+esc(p.department)+'</td><td class="num">'+kt.on+' of '+kt.scored+' scored · '+kt.total+' KPIs</td><td class="num">'+(as.done?fmtPct(as.onTime/as.done*100):'—')+'</td><td class="num">'+as.overdue+'</td><td>›</td></tr>'}).join('')+'</tbody></table></div><p class="note">The scorecard informs. It shows no composite score and no ranking label; disciplinary or incentive action on results is SP Sir\'s decision alone. A KPI whose plan is missing shows "No plan" and is never scored zero.</p></section>';
+   +people.map(function(p){var kt=kpiTable(p,ctx),as=actionStats(p,ctx.res.q||curQuarterKey());return '<tr class="clk'+(who===p.email?' sel':'')+'" data-act="team-who" data-e="'+esc(p.email)+'"><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.role)+'</td><td>'+esc(p.department)+'</td><td class="num">'+kt.on+' of '+kt.scored+' scored · '+kt.total+' KPIs</td><td class="num">'+(as.done?fmtPct(as.onTime/as.done*100):'—')+'</td><td class="num">'+as.overdue+'</td><td>›</td></tr>'}).join('')+'</tbody></table></div><p class="note">'+(allPeople>people.length?'Showing the first '+people.length+' of '+allPeople+' people. Use Search to find someone. ':'')+'The scorecard informs. It shows no composite score and no ranking label; disciplinary or incentive action on results is SP Sir\'s decision alone. A KPI whose plan is missing shows "No plan" and is never scored zero.</p></section>';
   if(who){
     var p=people.find(function(x){return x.email===who}),kt2=kpiTable(p,ctx);
     h+='<section class="card"><div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(p.role)+'</h2><span class="note">'+kt2.on+' of '+kt2.scored+' scored KPIs on plan · '+esc(ctx.res.label)+'</span></div>'+kt2.html+'</section>';

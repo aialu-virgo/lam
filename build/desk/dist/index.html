@@ -927,6 +927,7 @@ async function demoLoad(){
   if(effRole()!=='Super admin'||readOnly()){toast('Only a Super admin can load demo data');return}
   if(!window.DemoGen){toast('Demo generator not loaded');return}
   if(S.uploads.some(function(u){return u.demo})){toast('Demo data is already loaded');return}
+  S.engBlock=true;/* the rules engine waits until the demo plans, people and stores are written */
   var codes=['1001','1011','1012','1013'];
   var plants=[];
   for(var i=0;i<codes.length;i++){
@@ -948,7 +949,7 @@ async function demoLoad(){
   await runValidation();await runLoad({demo:true});
   toast('Writing demo plans, people, actions and open-item stores...');
   await demoExtras(S.demoFacts||{});
-  U=newU();renderUpload();toast('Demo data loaded');
+  S.engBlock=false;S.engSig=null;U=newU();renderUpload();toast('Demo data loaded');
 }
 async function demoClear(){
   if(effRole()!=='Super admin'||readOnly()){toast('Only a Super admin can clear demo data');return}
@@ -995,7 +996,7 @@ function transfersHtml(){
 }
 function potStatusPill(s){return '<span class="pill '+({Draft:'mute',Discussed:'info',Approved:'ok',Locked:'part'}[s]||'mute')+'">'+esc(s)+'</span>'}
 function potentialHtml(){
-  var f=S.potFilter,g=gridQuarters(),qs=[];var k=g.cur;for(var i=0;i<5;i++){qs.push(k);k=nextQ(k)}
+  var f=S.potFilter,g=gridQuarters(),qs=[];if(f.q===''&&!f.init){f.init=1;f.q=g.cur}var k=g.cur;for(var i=0;i<5;i++){qs.push(k);k=nextQ(k)}
   var all=S.potential.filter(planVisible);
   var quarters=Array.from(new Set(all.map(function(x){return x.fy_quarter}).concat(qs))).sort().reverse();
   var rows=all.filter(function(x){return (!f.q||x.fy_quarter===f.q)&&(!f.plant||(x.plant_code||x.territory)===f.plant)&&(!f.group||x.product_group===f.group)&&(!f.seg||x.customer_segment===f.seg)}).sort(function(a,b){return a.fy_quarter<b.fy_quarter?1:a.fy_quarter>b.fy_quarter?-1:(a.plant_code||'')<(b.plant_code||'')?-1:1});
@@ -1006,8 +1007,8 @@ function potentialHtml(){
   var locked=function(q){return S.periods[q]&&S.periods[q].plan_locked};
   return '<section class="card"><div class="hd"><h2>Market potential &middot; revisions</h2><div class="row"><button class="btn pri sm" data-act="pot-add">Add figure</button><label class="btn sm" for="up-pot" style="cursor:pointer">Upload potential (CSV)</label><input id="up-pot" data-file="potential" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="potential">Download template</button><label class="btn sm" for="up-ph" style="cursor:pointer">Upload phasing (CSV)</label><input id="up-ph" data-file="phasing" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="phasing">Phasing template</button></div></div>'
   +'<div class="row">'+sel('pf-q',f.q,quarters.map(function(x){return x}),'Quarter')+sel('pf-plant',f.plant,plantsOpt,'Branch / territory')+sel('pf-group',f.group,groupOpt,'Product group')+sel('pf-seg',f.seg,segOpt,'Segment')+'</div>'
-  +(rows.length?'<div class="tw"><table><thead><tr><th>Quarter</th><th>Branch / territory</th><th>Group</th><th>Segment</th><th class="num">Potential</th><th class="num">Potential sq ft</th><th class="num">Share %</th><th class="num">Target</th><th>Source &middot; owner</th><th>Rev</th><th>Status</th><th></th></tr></thead><tbody>'
-   +rows.map(function(x){var ap0=approvedOf(x),tg=x.share_pct!=null&&x.share_pct!==''?fmtMoney((+x.potential_value_inr||0)*(+x.share_pct)/100)+(ap0&&x.original&&Math.abs(leafTgt(x.original.potential_value_inr,x.original.share_pct)-leafTgt(ap0.potential_value_inr,ap0.share_pct))>1?'<div class="note">approved '+fmtMoney(leafTgt(ap0.potential_value_inr,ap0.share_pct))+' · orig '+fmtMoney(leafTgt(x.original.potential_value_inr,x.original.share_pct))+'</div>':''):'<span class="pill mute">pending</span>';return '<tr><td>'+qLabel(x.fy_quarter)+(locked(x.fy_quarter)?' <span class="pill part">Locked</span>':'')+'</td><td class="break">'+esc(x.plant_code||x.territory)+'</td><td>'+esc(x.product_group)+'</td><td>'+esc(x.customer_segment)+'</td><td class="num">'+fmtMoney(x.potential_value_inr)+'</td><td class="num">'+fmtN(x.potential_qty_sqft)+'</td><td class="num">'+(x.share_pct==null||x.share_pct===''?'-':x.share_pct)+'</td><td class="num">'+tg+'</td><td class="break">'+esc(x.source_type)+(x.owner_email?' &middot; '+esc(x.owner_email):'')+'</td><td class="mono">r'+(x.rev||1)+'</td><td>'+potStatusPill(x.status)+(x.demo?' <span class="pill part">DEMO</span>':'')+'</td><td><button class="btn sm" data-act="pot-edit" data-id="'+esc(x._id)+'">Open</button></td></tr>'}).join('')
+  +(rows.length>300?'<div class="note">Showing the first 300 of '+rows.length+' figures. Filter by quarter, branch or group to narrow.</div>':'')+(rows.length?'<div class="tw tall"><table><thead><tr><th>Quarter</th><th>Branch / territory</th><th>Group</th><th>Segment</th><th class="num">Potential</th><th class="num">Potential sq ft</th><th class="num">Share %</th><th class="num">Target</th><th>Source &middot; owner</th><th>Rev</th><th>Status</th><th></th></tr></thead><tbody>'
+   +rows.slice(0,300).map(function(x){var ap0=approvedOf(x),tg=x.share_pct!=null&&x.share_pct!==''?fmtMoney((+x.potential_value_inr||0)*(+x.share_pct)/100)+(ap0&&x.original&&Math.abs(leafTgt(x.original.potential_value_inr,x.original.share_pct)-leafTgt(ap0.potential_value_inr,ap0.share_pct))>1?'<div class="note">approved '+fmtMoney(leafTgt(ap0.potential_value_inr,ap0.share_pct))+' · orig '+fmtMoney(leafTgt(x.original.potential_value_inr,x.original.share_pct))+'</div>':''):'<span class="pill mute">pending</span>';return '<tr><td>'+qLabel(x.fy_quarter)+(locked(x.fy_quarter)?' <span class="pill part">Locked</span>':'')+'</td><td class="break">'+esc(x.plant_code||x.territory)+'</td><td>'+esc(x.product_group)+'</td><td>'+esc(x.customer_segment)+'</td><td class="num">'+fmtMoney(x.potential_value_inr)+'</td><td class="num">'+fmtN(x.potential_qty_sqft)+'</td><td class="num">'+(x.share_pct==null||x.share_pct===''?'-':x.share_pct)+'</td><td class="num">'+tg+'</td><td class="break">'+esc(x.source_type)+(x.owner_email?' &middot; '+esc(x.owner_email):'')+'</td><td class="mono">r'+(x.rev||1)+'</td><td>'+potStatusPill(x.status)+(x.demo?' <span class="pill part">DEMO</span>':'')+'</td><td><button class="btn sm" data-act="pot-edit" data-id="'+esc(x._id)+'">Open</button></td></tr>'}).join('')
    +'<tr><td colspan="4"><b>Total (target = potential &times; share %)</b></td><td class="num"><b>'+fmtMoney(tot.v)+'</b></td><td class="num"><b>'+fmtN(tot.s)+'</b></td><td></td><td class="num"><b>'+fmtMoney(tot.t)+'</b></td><td colspan="4"></td></tr></tbody></table></div>':'<div class="empty">No potential figures yet. Add one, or upload the template. Share % can stay empty until the discussion is done (target shows "pending").</div>')
   +'<div class="row"><span class="note">Lock quarter (freezes every Approved target; cannot be undone in v1.0):</span>'+qs.map(function(q){return '<button class="btn sm" data-act="plan-lock" data-q="'+q+'"'+(locked(q)||!['Super admin','Management / HO'].includes(effRole())||readOnly()?' disabled':'')+'>'+qLabel(q)+(locked(q)?' (locked)':' lock')+'</button>'}).join('')+'</div>'
   +'<p class="note">Values in ₹ with lakh/crore. Every change is a revision with reason, discussion date and participants. Status runs Draft, Discussed, Approved, Locked. A locked quarter cannot be edited. Open a row for the sense-check (QoQ needed vs 12-quarter average, Stretch flag). Approval is by SP Sir or a Management / HO user, never the proposer. Achievement counts only against the current approved target. '+SEGMENT_NOTE+'</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
@@ -1337,7 +1338,7 @@ function resolvePeriod(f,today){
     var from=f.from||shiftYm(tYm,-1),to=f.to||tYm;if(to<from)to=from;var ms=ymRange(from,to);
     var open3=to>=tYm,N3=open3?wdBetween(ms[0]+'-01',today):Infinity;if(ms[0]>tYm)N3=0;
     R.from=from;R.to=to;R.N=N3;R.label=ymLabel(from)+(from===to?'':' to '+ymLabel(to))+(open3?' (to date)':'');R.cur=walk(ms,N3);R.prior=walk(ms.map(priorQuarterMonth),N3);
-    R.priorLabel=ymLabel(priorQuarterMonth(from))+(from===to?'':' to '+ymLabel(priorQuarterMonth(to)));R.pro=open3;R.q=qKeyOfYm(to);
+    R.priorLabel=ymLabel(priorQuarterMonth(from))+(from===to?'':' to '+ymLabel(priorQuarterMonth(to)));R.pro=open3;R.q=qKeyOfYm(to);R.wdTot=ms.reduce(function(a,m){return a+WD(m)},0);R.wdN=open3?N3:null;
   }
   R.curMonths=R.cur.filter(function(x){return x.frac>0}).map(function(x){return x.ym});
   R.priorMonths=R.prior?R.prior.map(function(x){return x.ym}):[];
@@ -1896,7 +1897,7 @@ async function evalR7(){
   return {out:out,live:null};
 }
 async function runEngine(){
-  var u=effUser();if(!u||GLOBAL_ROLES.indexOf(u.role)<0||readOnly())return;
+  var u=effUser();if(!u||GLOBAL_ROLES.indexOf(u.role)<0||readOnly()||S.engBlock)return;
   if(!S.loaded.actions||!S.loaded.uploads||!S.loaded.potential||!S.loaded.settings||!DS.ready)return;
   var sig=[DS.ver,DS.custVer,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.orders.length,S.stock.length,S.users.length].join('|');
   if(S.engSig===sig||S.engBusy)return;
@@ -2394,6 +2395,7 @@ function docList(ctx,ym,cust,plant){
   var sc=ctx.sc,rows=st.rows;
   var h='<div class="hd"><h3 style="margin:0;font-size:13px">SAP documents · '+ymLabel(ym)+(cust?' · '+esc(cust):'')+'</h3><span class="note">'+fmtN(rows.length)+' documents'+(st.cut?' (first 300 by value shown)':'')+'</span></div>';
   if(st.noIndex)h+='<div class="banner warn">The document index was not kept for some of these plant-months (Data Intake option). Drill-down stops at the customer there.</div>';
+  if(sc.sp&&!st.legacy)h+='<div class="note">Documents of your customers, matched on your salesperson code.</div>';
   if(sc.sp&&st.legacy)h+='<div class="note">Documents of your customers: this period was loaded before the salesperson was added to the index, so the list can include a document sold under another salesperson.</div>';
   h+=rows.length?'<div class="tw tall"><table><thead><tr><th>System · type</th><th>Doc no</th><th>Date</th><th>Plant</th><th>Customer</th><th class="num">Lines</th><th class="num">Sheets</th><th class="num">Net</th></tr></thead><tbody>'+rows.slice(0,300).map(function(r){return '<tr><td class="mono">'+esc(r.sys)+' · INV</td><td class="mono">'+esc(r.doc)+'</td><td>'+esc(r.date)+'</td><td>'+esc(plantShort(r.plant))+'</td><td class="break">'+esc(r.cust)+'</td><td class="num">'+r.lines+'</td><td class="num">'+fmtN(r.sheets)+'</td><td class="num">'+fmtMoney(r.net)+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty sm">No documents.</div>';
   return h+'<p class="note">Drill-down stops at the SAP document (decision D9). Lines inside a document come from the SAP export. A document with two product groups appears once with its total.</p>';
@@ -2510,7 +2512,7 @@ function custFigs(code,A,P,ctx,incomplete){
 }
 function pageSales(){
   var ctx=viewCtx();if(noData())return emptyData();
-  var res=ctx.res,sc=ctx.sc,coord=sc.role==='Coordinator (sales / CRR)';
+  var res=ctx.res,sc=ctx.sc,coord=sc.role==='Coordinator (sales / CRR)'||(sc.role==='HOD'&&norm(sc.dept)==='crr');
   var allM=res.curMonths.concat(res.priorMonths).concat(qMonths(prevQ(curQuarterKey())));
   var haveCust=needCust(ctx,Array.from(new Set(allM)));
   var h='';
@@ -2712,13 +2714,13 @@ function teamPeople(u){
 }
 function pageTeam(){
   var ctx=viewCtx(),u=effUser(),people=teamPeople(u).sort(function(a,b){return a.role<b.role?-1:a.role>b.role?1:a.name<b.name?-1:1});
-  var q=(S.f.search||'').toLowerCase();people=people.filter(function(p){return !q||(p.name+' '+p.role).toLowerCase().indexOf(q)>=0});
+  var q=(S.f.search||'').toLowerCase();people=people.filter(function(p){return !q||(p.name+' '+p.role).toLowerCase().indexOf(q)>=0});var allPeople=people.length;people=people.slice(0,60);
   var who=S.team.who&&people.find(function(p){return p.email===S.team.who})?S.team.who:(u.role==='Sales executive'||people.length===1?people[0]&&people[0].email:'');
   /* make sure customer detail is loaded for K8 */
   if(!noData())needCust(ctx,Array.from(new Set(ctx.res.curMonths.concat(ctx.res.priorMonths).concat(qMonths(prevQ(curQuarterKey()))))));
   var h='<section class="card"><div class="hd"><h2>Team · KRA / KPI plan vs actual</h2><span class="note">'+(u.role==='Sales executive'?'Your own scorecard.':u.role==='Branch / depot manager'?'Your own team.':u.role==='HOD'?'Your department.':'All people.')+'</span></div>'
    +'<div class="tw"><table><thead><tr><th>Person</th><th>Role</th><th>Dept</th><th class="num">KPIs on plan</th><th class="num">On-time closure</th><th class="num">Overdue actions</th><th></th></tr></thead><tbody>'
-   +people.map(function(p){var kt=kpiTable(p,ctx),as=actionStats(p,ctx.res.q||curQuarterKey());return '<tr class="clk'+(who===p.email?' sel':'')+'" data-act="team-who" data-e="'+esc(p.email)+'"><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.role)+'</td><td>'+esc(p.department)+'</td><td class="num">'+kt.on+' of '+kt.scored+' scored · '+kt.total+' KPIs</td><td class="num">'+(as.done?fmtPct(as.onTime/as.done*100):'—')+'</td><td class="num">'+as.overdue+'</td><td>›</td></tr>'}).join('')+'</tbody></table></div><p class="note">The scorecard informs. It shows no composite score and no ranking label; disciplinary or incentive action on results is SP Sir\'s decision alone. A KPI whose plan is missing shows "No plan" and is never scored zero.</p></section>';
+   +people.map(function(p){var kt=kpiTable(p,ctx),as=actionStats(p,ctx.res.q||curQuarterKey());return '<tr class="clk'+(who===p.email?' sel':'')+'" data-act="team-who" data-e="'+esc(p.email)+'"><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.role)+'</td><td>'+esc(p.department)+'</td><td class="num">'+kt.on+' of '+kt.scored+' scored · '+kt.total+' KPIs</td><td class="num">'+(as.done?fmtPct(as.onTime/as.done*100):'—')+'</td><td class="num">'+as.overdue+'</td><td>›</td></tr>'}).join('')+'</tbody></table></div><p class="note">'+(allPeople>people.length?'Showing the first '+people.length+' of '+allPeople+' people. Use Search to find someone. ':'')+'The scorecard informs. It shows no composite score and no ranking label; disciplinary or incentive action on results is SP Sir\'s decision alone. A KPI whose plan is missing shows "No plan" and is never scored zero.</p></section>';
   if(who){
     var p=people.find(function(x){return x.email===who}),kt2=kpiTable(p,ctx);
     h+='<section class="card"><div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(p.role)+'</h2><span class="note">'+kt2.on+' of '+kt2.scored+' scored KPIs on plan · '+esc(ctx.res.label)+'</span></div>'+kt2.html+'</section>';
@@ -3101,6 +3103,7 @@ function bannersHtml(){
   if(S.err)h+='<div class="banner err">Database message: '+esc(S.err)+'</div>';
   return h;
 }
+function ctxPlants(f,sc){return f.plant?new Set([f.plant]):sc.plants}
 function ctrlBar(pg){
   var f=S.f,sc=SC(),tYm=TODAY().slice(0,7),cur=curQuarterKey(),res=resolvePeriod(f,TODAY());
   var qs=closedQuarters().concat([cur]).reverse(),h='<section class="ctrl card">';
@@ -3118,6 +3121,10 @@ function ctrlBar(pg){
     if(pg==='sales'||pg==='overview'||pg==='team')h+='<div class="fld"><label for="f-group">Product group</label><select id="f-group" data-chg="flt" data-k="group"><option value="">All</option>'+GROUPS.map(function(g){return '<option'+(f.group===g?' selected':'')+'>'+g+'</option>'}).join('')+'</select></div>';
     if(f.plant||f.sp||f.group||f.search)h+='<button class="btn sm" data-act="clear-f">Clear filters</button>';
     h+='<div class="fld"><label for="f-search">Search</label><input id="f-search" class="in" data-in="fsearch" value="'+esc(f.search||'')+'" placeholder="customer, branch, person"></div>';
+  }
+  if(f.mode==='MTD'&&PERIOD_PAGES.indexOf(pg)>=0&&DS.plants.length){
+    var rq=resolvePeriod({mode:'QTD',q:res.q},TODAY()),ff={plants:ctxPlants(f,sc)},A=sumF(ff,rq.cur).n,P=sumF(ff,rq.prior).n,inc=!monthsLoaded(rq.curMonths,ff.plants)||!monthsLoaded(rq.priorMonths,ff.plants);
+    h+='<span class="chip">Quarter QoQ ('+esc(qLabel(res.q))+'): '+qoqCell(qoqOf(A,P,{incomplete:inc}))+'</span>';
   }
   if(PERIOD_PAGES.indexOf(pg)>=0)h+='<span class="chip">Compared with: '+esc(res.priorLabel||'previous quarter')+'</span>'+(res.pro?'<span class="chip">To-date plan and previous quarter pro-rated by working days ('+res.N+' elapsed)</span>':'');
   return h+'</section>';

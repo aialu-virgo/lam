@@ -1,0 +1,13 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+Object.keys(store).forEach(k=>{if(k.startsWith('followups/'))delete store[k]});
+const browser = await chromium.launch();
+const {page,errs}=await open(browser,{store,viewer:{email:'coord.a@demo',name:'Coord'},today:'2026-10-26'});await page.waitForTimeout(3000);
+await page.evaluate(()=>{location.hash='#/actions'});await page.waitForTimeout(500);
+await page.click('[data-act="actab"][data-t="follow"]');await page.waitForTimeout(800);
+await page.screenshot({path:SP+'s-follow.png',fullPage:true});
+const t=await page.innerText('#pg');console.log(t.slice(0,900));
+console.log(errs.filter(e=>!/ERR_FAILED/.test(e)));
+await browser.close();

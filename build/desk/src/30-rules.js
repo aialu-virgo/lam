@@ -218,7 +218,7 @@ async function evalR7(){
   return {out:out,live:null};
 }
 async function runEngine(){
-  var u=effUser();if(!u||GLOBAL_ROLES.indexOf(u.role)<0||readOnly())return;
+  var u=effUser();if(!u||GLOBAL_ROLES.indexOf(u.role)<0||readOnly()||S.engBlock)return;
   if(!S.loaded.actions||!S.loaded.uploads||!S.loaded.potential||!S.loaded.settings||!DS.ready)return;
   var sig=[DS.ver,DS.custVer,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.orders.length,S.stock.length,S.users.length].join('|');
   if(S.engSig===sig||S.engBusy)return;
