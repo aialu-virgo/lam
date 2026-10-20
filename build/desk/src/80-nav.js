@@ -32,14 +32,36 @@ function dataChip(){
   var ups=S.uploads.slice().sort(function(a,b){return a.at<b.at?1:-1});var l=ups[0];
   return l?'<span class="chip">SAP '+esc(l.sys||'B1')+' · loaded '+esc(istStr(l.at))+'</span>':'<span class="chip">No SAP data loaded</span>';
 }
+/* line icons, 24x24, stroke 2, drawn at 17px like the reference (no icon library) */
+var NAV_ICON={overview:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+ sales:'<path d="M3 20h18M6 16l4-5 4 3 5-7"/>',orders:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',receivables:'<path d="M7 4h10M7 9h10M7 4c5 0 5 5 0 5l7 11"/>',inventory:'<path d="M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4"/>',
+ today:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>',actions:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+ team:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c2 .6 3.2 2.4 3.5 5.5"/>',
+ intake:'<path d="M12 16V4M7 9l5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',admin:'<path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/>'};
+function navIcon(k){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'+(NAV_ICON[k]||'')+'</svg>'}
+function openActionCount(u){try{return myActions(u).filter(function(a){return LIVE_ST.indexOf(a.status)>=0}).length}catch(e){return 0}}
+/* factual tags only: counts, load state, role scope */
+function navTags(u,open){
+  var sa=u.role==='Super admin',t={},mk=function(txt,cls,title){return '<span class="tag '+(cls||'')+'"'+(title?' title="'+esc(title)+'"':'')+'>'+txt+'</span>'};
+  if(open)t.today=mk(open,'cnt');
+  var oa=openActionCount(u);if(oa)t.actions=mk(oa,'red','Open actions in your scope');
+  t.team=mk('TEAM','teal');
+  if(sa){t.intake=mk('LIVE','ind');t.admin=mk('RULES','vio','Rules, settings and plans')}else t.intake=mk('VIEW','ind');
+  if(!S.orders.length&&!S.deliv.length)t.orders=mk('DATA','','Sales order and delivery exports not loaded');
+  if(!S.recv.length&&!S.coll.length)t.receivables=mk('DATA','','Receivable and collection exports not loaded');
+  if(!S.stock.length)t.inventory=mk('DATA','','Stock export not loaded');
+  return t;
+}
+function navTagSig(u){var t=navTags(u,0);return Object.keys(t).map(function(k){return k+t[k]}).join('')}
 function navHtml(u){
   var pages=pagesFor(u),open=0;try{open=todayCandidates(u).length}catch(e){}
   var groups={};PAGES.forEach(function(p){(groups[p[2]]=groups[p[2]]||[]).push(p)});
   return ['Overview','Team','Data'].map(function(g){
     var items=groups[g].filter(function(p){return pages.indexOf(p[0])>=0});if(!items.length)return '';
     var label=function(p){return p[0]==='admin'&&u.role!=='Super admin'?'Plans':p[1]};
-    return '<nav class="navg"><h4>'+g+'</h4>'+items.map(function(p){var tag=p[0]==='today'&&open?'<span class="tag">'+open+'</span>':(p[0]==='intake'||p[0]==='admin')&&u.role==='Super admin'?'<span class="tag">LIVE</span>':p[0]==='intake'&&u.role!=='Super admin'?'<span class="tag">VIEW</span>':'';
-      return '<a class="nav" href="#/'+p[0]+'" '+(S.tab===p[0]?'aria-current="page"':'')+'><span>'+esc(label(p))+'</span>'+tag+'</a>'}).join('')+'</nav>';
+    var tg=navTags(u,open);
+    return '<nav class="navg"><h4>'+g+'</h4>'+items.map(function(p){var t=tg[p[0]]||'';
+      return '<a class="nav" href="#/'+p[0]+'" '+(S.tab===p[0]?'aria-current="page"':'')+'>'+navIcon(p[0])+'<span class="nl">'+esc(label(p))+'</span>'+t+'</a>'}).join('')+'</nav>';
   }).join('');
 }
 function shellHtml(u){
@@ -118,7 +140,7 @@ function renderAll(){
   var sh=$('#shell');
   var sig=[S.role,S.viewAs||'',S.tab,S.demoMode,S.viewer&&S.viewer.email,S.users.length,u.role,S.threadId?1:0].join('|');
   var navOpen=(function(){try{return todayCandidates(u).length}catch(e){return 0}})();
-  sig+='|'+navOpen;
+  sig+='|'+navOpen+'|'+navTagSig(u);
   var rebuilt=false;
   if(sh.getAttribute('data-sig')!==sig){
     sh.setAttribute('data-sig',sig);sh.innerHTML=shellHtml(u);rebuilt=true;S.lastHtml='';
