@@ -1,4 +1,4 @@
-/* ================= v0.9+ Admin masters: item master and sales-employee master (D18) ================= */
+/* ================= v0.9+ Admin masters: item master and sales-employee master (D18, D18 follow-up: B1 name, SlpCode, reports-to, EndDate) ================= */
 S.itemMeta=null;S.salesMaster=null;S.mst={items:null,semp:null};
 var SM={list:[],byCode:{},byName:{},byBase:{},byB1:{},cache:{},ready:false};
 var ZONE_SHEET_RE=/^zone\s*\d/i;
@@ -15,7 +15,7 @@ function roleFromDesignation(d){
 function buildSM(list){
   SM.list=list||[];SM.byCode={};SM.byName={};SM.byBase={};SM.byB1={};SM.cache={};
   SM.list.forEach(function(p){
-    SM.byCode[norm(p.code)]=p;
+    SM.byCode[norm(p.code)]=p;if(p.alt&&!SM.byCode[norm(p.alt)])SM.byCode[norm(p.alt)]=p;
     if(p.b1name){var k1=nameKey(p.b1name);(SM.byB1[k1]=SM.byB1[k1]||[]).push(p)}
     var k=nameKey(p.name);(SM.byName[k]=SM.byName[k]||[]).push(p);
     var b=nameKey(splitSuffix(p.name)[0]);if(b!==k)(SM.byBase[b]=SM.byBase[b]||[]).push(p);else(SM.byBase[b]=SM.byBase[b]||[]).push(p);
@@ -52,7 +52,7 @@ function matchStats(){
 function onSalesMaster(doc){
   if(!doc||!doc.z){S.salesMaster=null;buildSM([]);S.smReady=true;DS.sig='';ingestRoll();return Promise.resolve()}
   return ungz(doc.z).then(function(t){
-    var arr=JSON.parse(t).map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12]}});
+    var arr=JSON.parse(t).map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12],alt:a[13]}});
     S.salesMaster=Object.assign({},doc,{n:arr.length});buildSM(arr);S.smReady=true;
     /* decode again so a Sales executive's rows that only match through the master are kept */
     if(SC().sp)DS.sig='';
@@ -162,12 +162,50 @@ async function sempPick(file){
     var src=await listSheets(file);st.src=src;
     st.sheets=src.names.filter(function(n){return !/^\s*read\s*me\s*$/i.test(n)}).map(function(n){return {name:n,ticked:src.csv||ZONE_SHEET_RE.test(n),zone:ZONE_SHEET_RE.test(n)}});
     st.stage='sheets';st.msg='';
+    if(src.csv&&isWorkerCsv(src.csvRows)){S.lastHtml='';schedule();return sempCheck()}
   }catch(e){st.stage='idle';st.msg='Could not read the file: '+((e&&e.message)||e)}
   S.lastHtml='';schedule();
+}
+function isWorkerCsv(rows){return !!(rows&&rows[0]&&rows[0].some(function(x){return norm(x)==='*workerid'}))}
+function waFrom(v){var mob=String(v==null?'':v).replace(/\D/g,'');if(mob.length===10)return '91'+mob;if(mob.length===12&&mob.indexOf('91')===0)return mob;if(mob.length===20)return '91'+mob.slice(0,10);return ''}
+/* S/4 workforce layout ("Lam Employee Master"): merge into the loaded master by FullName; keep zone, plant, role, B1 name, reports-to */
+async function sempCheckS4(st){
+  var rows=st.src.csvRows,hd=rows[0].map(function(x){return norm(x)});
+  var hx=function(pre){for(var i=0;i<hd.length;i++)if(hd[i].indexOf(pre)===0)return i;return -1};
+  var cW=hx('*workerid'),cFull=hx('fullname'),cFn=hx('*firstname'),cLn=hx('*lastname'),cMail=hx('email'),cPh=hx('phonenumber'),cMob=hx('mobilephonenumber'),cEnd=hx('*enddate');
+  var old=SM.list.slice(),oldBy=SM.byName,before=matchStats();
+  var res={sheets:['CSV (S/4 workforce layout)'],read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0},s4:true,needs:[],merge:{matched:0,added:0,kept:0,ambiguous:0}};
+  var seen={},used={},oldToNew={};
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i],code=cellStr(r[cW]),name=cellStr(cFull>=0?r[cFull]:'')||(cellStr(cFn>=0?r[cFn]:'')+' '+cellStr(cLn>=0?r[cLn]:'')).trim();
+    if(!code&&!name)continue;res.read++;
+    if(!code){res.rejected++;res.rejects.push([i+1,'','CSV','*WorkerID','Mandatory field empty','']);continue}
+    if(!name){res.rejected++;res.rejects.push([i+1,code,'CSV','FullName','Mandatory field empty','']);continue}
+    var k=norm(code);if(seen[k]){res.rejected++;res.rejects.push([i+1,code,'CSV','*WorkerID','Duplicate WorkerID (already read at row '+seen[k]+')','']);continue}seen[k]=i+1;
+    var mailRaw=cMail>=0?cellStr(r[cMail]).toLowerCase():'',mail='';
+    if(!mailRaw)res.warn.noEmail++;else if(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mailRaw))mail=mailRaw;else{res.warn.badEmail++;res.warned++}
+    var wa=waFrom(cPh>=0?r[cPh]:'')||waFrom(cMob>=0?r[cMob]:'');if(!wa&&((cPh>=0&&cellStr(r[cPh]))||(cMob>=0&&cellStr(r[cMob])))){res.warn.badMobile++;res.warned++}
+    var ed=cEnd>=0?cellStr(r[cEnd]).replace(/\.0$/,''):'';if(/^9999/.test(ed))ed='';
+    var cand=oldBy[nameKey(name)]||[],pick=cand.filter(function(c){return !used[norm(c.code)]});
+    var o=null;if(pick.length===1)o=pick[0];else if(pick.length>1){var byMail=mail&&pick.filter(function(c){return c.email===mail});o=byMail&&byMail.length===1?byMail[0]:null;if(!o)res.merge.ambiguous++}
+    if(o){used[norm(o.code)]=1;res.merge.matched++;oldToNew[norm(o.code)]=code;
+      res.people.push([code,o.name,o.zone,o.plant,o.plantRaw,o.designation,o.role,mail||o.email||'',wa||o.wa||'',o.slp||'',o.b1name||'',o.reportsTo||'',ed||o.ended||'',o.code])}
+    else{res.merge.added++;res.needs.push([i+1,code,name,pick.length>1?'Several people in the master share this name; add plant and designation':'New person: needs plant and designation']);
+      res.people.push([code,name.slice(0,80),'','','','','',mail,wa,'','','',ed,''])}
+  }
+  /* people in the master but not in the file are kept as they are */
+  old.forEach(function(o){if(used[norm(o.code)])return;res.merge.kept++;res.people.push([o.code,o.name,o.zone,o.plant,o.plantRaw,o.designation,o.role,o.email||'',o.wa||'',o.slp||'',o.b1name||'',o.reportsTo||'',o.ended||'',o.alt||''])});
+  res.people.forEach(function(a){if(a[11]&&oldToNew[norm(a[11])])a[11]=oldToNew[norm(a[11])]});
+  res.people.forEach(function(a){res.byZone[a[2]||'(none)']=(res.byZone[a[2]||'(none)']||0)+1;res.byRole[a[6]||'(no matching role)']=(res.byRole[a[6]||'(no matching role)']||0)+1});
+  res.loaded=res.people.length;res.ended=res.people.filter(function(a){return a[12]}).length;res.warned+=res.needs.length;
+  var save=SM.list;buildSM(res.people.map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12],alt:a[13]}}));
+  DS.cache={};res.match=matchStats();res.unmatched=unmatchedSp();res.matchBefore=before;buildSM(save);
+  return res;
 }
 async function sempCheck(){
   var st=S.mst.semp;st.stage='working';st.msg='Reading the ticked sheets...';schedule();await tick();
   try{
+    if(st.src.csv&&isWorkerCsv(st.src.csvRows)){st.res=await sempCheckS4(st);st.stage='checked';st.msg='';DS.cache={};S.lastHtml='';schedule();return}
     var ticked=st.sheets.filter(function(s){return s.ticked}).map(function(s){return s.name});
     if(!ticked.length)throw new Error('Tick at least one sheet.');
     var res={sheets:ticked,read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0}};
@@ -201,7 +239,7 @@ async function sempCheck(){
       }
     }
     /* match B1 names (all names in the loaded sales data) with the people just read */
-    var save=SM.list;buildSM(res.people.map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12]}}));
+    var save=SM.list;buildSM(res.people.map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12],alt:a[13]}}));
     DS.cache={};res.match=matchStats();res.unmatched=unmatchedSp();
     buildSM(save);/* the live master stays until Load */
     st.res=res;st.stage='checked';st.msg='';
@@ -214,18 +252,18 @@ async function sempLoad(){
   st.stage='loading';st.msg='Writing the master...';schedule();await tick();
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=(S.viewer&&S.viewer.email)||'unknown',failed=null;
   try{
-    await dset('salesmaster/main',{z:await gz(JSON.stringify(r.people)),n:r.people.length,at:nowISO(),by:by,file:st.name,sheets:r.sheets,read:r.read,rejected:r.rejected,upload:uid,demo:st.demo||undefined,fmt:'gz-json v2: [code,name,zone,plant,plantRaw,designation,role,email,whatsapp,slpCode,b1Name,reportsToCode,endDate]'});
+    await dset('salesmaster/main',{z:await gz(JSON.stringify(r.people)),n:r.people.length,at:nowISO(),by:by,file:st.name,sheets:r.sheets,read:r.read,rejected:r.rejected,upload:uid,demo:st.demo||undefined,fmt:'gz-json v3: [code,name,zone,plant,plantRaw,designation,role,email,whatsapp,slpCode,b1Name,reportsToCode,endDate,altCode]'});
     await dset('uploads/'+uid,{at:nowISO(),by:by,sys:'B1',entity:'SE',file:st.name,size:st.size||0,mode:'master',periodLabel:'Sales employees: '+r.sheets.join(', '),read:r.read,loaded:r.loaded,rejected:r.rejected+r.unmatched.length,warned:r.warned,status:(r.rejected||r.unmatched.length)?'Partial':'Loaded',demo:st.demo||undefined,match:{names:r.match.names,matched:r.match.matched,rate:r.match.rate}});
-    var rows=[];r.rejects.forEach(function(x){rows.push(x)});r.unmatched.forEach(function(u,i){rows.push([i+1,u.name,'','Salesperson (B1 name)',u.why,u.lines])});
+    var rows=[];r.rejects.forEach(function(x){rows.push(x)});r.unmatched.forEach(function(u,i){rows.push([i+1,u.name,'','Salesperson (B1 name)',u.why,u.lines])});(r.needs||[]).forEach(function(n){rows.push([n[0],n[1],'CSV','Plant and designation',n[3],n[2]])});
     if(rows.length){var rr=rows.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:rows.length,demo:st.demo||undefined})}
     if(r.unmatched.length&&S.users.length){
       var id='R8_'+uid,now=nowISO(),a={id:id,ref:hashRef(id),rule:'R8',title:'Match '+r.unmatched.length+' salesperson name'+(r.unmatched.length>1?'s':'')+' to the sales-employee master',source:{label:'Rule R8 · Admin › Sales employees · '+r.unmatched.length+' unmatched B1 names',page:'admin'},owner:by,assigner:'Desk rule R8',creator:'Desk rule R8',department:'HO',plant:'',group:'',customer:'',
         due:addWD(TODAY(),1),next_step:'Open Admin › Sales employees, download the unmatched list, and add or correct those people in the master (or fix the name in SAP), then upload the master again.',value:0,status:'Open',created:now,updated:now,dependents:0,period:uid,meta:{unmatched:r.unmatched.length},need_help:false,demo:st.demo||undefined,thread:[{at:now,by:'Desk rule R8',kind:'created',text:'Created after the sales-employee master upload '+uid+'.'}]};
       await dset('actions/'+id,a);
     }
-    var byCode={};r.people.forEach(function(p){byCode[norm(p[0])]=p});var filled=0;
+    var byCode={};r.people.forEach(function(p){byCode[norm(p[0])]=p;if(p[13])byCode[norm(p[13])]=p});var filled=0;
     for(var ui=0;ui<S.users.length;ui++){var uu=S.users[ui];if(uu.reports_to_email||uu.pseudo)continue;
-      var pp=r.people.find(function(p){return (p[7]&&p[7]===uu.email)||(uu.sales_employee_code&&norm(uu.sales_employee_code)===norm(p[0]))});
+      var pp=r.people.find(function(p){return (p[7]&&p[7]===uu.email)||(uu.sales_employee_code&&(norm(uu.sales_employee_code)===norm(p[0])||norm(uu.sales_employee_code)===norm(p[13]||'~')))});
       var mg=pp&&pp[11]?byCode[norm(pp[11])]:null;
       if(mg&&mg[7]&&mg[7]!==uu.email){var ud=Object.assign({},uu,{reports_to_email:mg[7],slp_code:pp[9]||uu.slp_code||'',reports_to_code:pp[11]});delete ud._id;await dset('users/'+uu._id,ud);filled++}}
     await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:by,event:'sales-employee master loaded',users_reports_to_filled:filled,rows:r.loaded,unmatched:r.unmatched.length});
@@ -235,7 +273,7 @@ async function sempLoad(){
 }
 function sempHtml(){
   var st=S.mst.semp,m=S.salesMaster,h='<section class="card"><div class="hd"><h2>Sales employees &middot; '+(m?fmtN(m.n)+' people':'not loaded')+'</h2><div class="row"><label class="btn pri sm" for="up-semp" style="cursor:pointer">Upload sales-employee master (XLSX or CSV)</label><input id="up-semp" data-mfile="semp" type="file" accept=".xlsx,.xls,.csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="mst-tmpl" data-t="semp">Download template</button></div></div>';
-  h+='<p class="note" style="margin:0">Workbook "Sales Employee Master": the zone sheets (ZONE 1 to ZONE 5) hold the laminate staff and are ticked by default; the product-line sheets (ACP, ALU, PVC, MDF, TAS IND, TAS ALU) repeat one zone-head row, and Plant is a plant list. Each person is linked to a plant and zone. B1 sales rows carry a name only, so names are matched to <b>FullName</b>, first exactly, then without the " - &lt;branch&gt;" suffix; a name shared by two people is matched only when the branch suffix settles it.</p>';
+  h+='<p class="note" style="margin:0"><b>S/4 workforce CSV</b> ("Lam Employee Master", *WorkerID header): upload it alone, no sheets to tick. It merges into the loaded master by FullName and adds new people. Otherwise, workbook "Sales Employee Master": the zone sheets (ZONE 1 to ZONE 5) hold the laminate staff and are ticked by default; the product-line sheets (ACP, ALU, PVC, MDF, TAS IND, TAS ALU) repeat one zone-head row, and Plant is a plant list. Each person is linked to a plant and zone. B1 sales rows carry a name only, so names are matched to <b>FullName</b>, first exactly, then without the " - &lt;branch&gt;" suffix; a name shared by two people is matched only when the branch suffix settles it.</p>';
   if(m){var ms=matchStats();h+='<div class="kpis"><div class="kpi"><small>People in the master</small><b>'+fmtN(m.n)+'</b><small>'+esc((m.sheets||[]).join(', '))+'</small></div><div class="kpi"><small>B1 names matched</small><b>'+(ms.rate!=null?ms.matched+' / '+ms.names:'—')+'</b><small>'+(ms.rate!=null?ms.rate.toFixed(1)+'% of names · '+(ms.lineRate||0).toFixed(1)+'% of invoice lines':'no sales data yet')+'</small></div><div class="kpi"><small>Loaded</small><b style="font-size:14px;font-family:var(--font)">'+esc(istStr(m.at))+'</b><small>'+esc((m.by||'').split('@')[0])+' · '+esc(m.file||'')+'</small></div></div>';
     var um=unmatchedSp();
     if(um.length)h+='<details class="strip" open><summary>Unmatched B1 salesperson names · '+um.length+'</summary><div class="tw" style="max-height:260px;overflow:auto"><table><thead><tr><th>Name in the sales data</th><th class="num">Invoice lines</th><th>Why</th></tr></thead><tbody>'+um.slice(0,200).map(function(u){return '<tr><td class="break">'+esc(u.name)+'</td><td class="num">'+fmtN(u.lines)+'</td><td>'+esc(u.why)+'</td></tr>'}).join('')+'</tbody></table></div><div class="row"><button class="btn sm" data-act="mst-unmatched-csv">Download unmatched list (CSV)</button></div><p class="note">Unmatched names keep their own name in every figure; nothing is dropped. The uploader gets action R8 to fix them.</p></details>';
@@ -247,9 +285,10 @@ function sempHtml(){
     var r=st.res;
     h+='<div class="hd"><h2>Check result · '+esc(st.name)+'</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?'Some rows rejected':'All rows pass')+'</span></div>'
      +'<div class="kpis"><div class="kpi"><small>People read</small><b>'+fmtN(r.read)+'</b><small>sheets '+esc(r.sheets.join(', '))+'</small></div><div class="kpi"><small>Loading</small><b>'+fmtN(r.loaded)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b><small>'+(r.ended?r.ended+' with an end date (inactive, still matched) · ':'')+r.warn.noPlant+' no plant · '+r.warn.unknownPlant+' plant not in master · '+r.warn.noEmail+' no email · '+r.warn.badMobile+' mobile not 10 digits</small></div>'
-     +'<div class="kpi"><small>Match rate to B1 names</small><b>'+(r.match.rate!=null?r.match.rate.toFixed(1)+'%':'—')+'</b><small>'+(r.match.rate!=null?r.match.matched+' of '+r.match.names+' names · '+(r.match.lineRate||0).toFixed(1)+'% of invoice lines':'no sales data loaded to match against')+'</small></div></div>'
+     +'<div class="kpi"><small>Match rate to B1 names</small><b>'+(r.match.rate!=null?r.match.rate.toFixed(1)+'%':'—')+'</b><small>'+(r.match.rate!=null?r.match.matched+' of '+r.match.names+' names · '+(r.match.lineRate||0).toFixed(1)+'% of invoice lines':'no sales data loaded to match against')+(r.matchBefore&&r.matchBefore.rate!=null?' · before this file: '+r.matchBefore.rate.toFixed(1)+'% ('+r.matchBefore.matched+' of '+r.matchBefore.names+')':'')+'</small></div></div>'+(r.s4?'<div class="banner info"><span>S/4 workforce layout merged into the loaded master by FullName: <b>'+r.merge.matched+'</b> matched (zone, plant, role, B1 name and reports-to kept; WorkerID is the new code, the old code is kept as alt code; email and phone updated) · <b>'+r.merge.added+'</b> new people · <b>'+r.merge.kept+'</b> in the master but not in this file, kept as they are.</span></div>':'')
      +'<div class="grid2"><div class="tw"><table><thead><tr><th>Zone</th><th class="num">People</th></tr></thead><tbody>'+Object.keys(r.byZone).sort().map(function(z){return '<tr><td>'+esc(z)+'</td><td class="num">'+fmtN(r.byZone[z])+'</td></tr>'}).join('')+'</tbody></table></div><div class="tw"><table><thead><tr><th>Desk role proposed from designation (Assumed)</th><th class="num">People</th></tr></thead><tbody>'+Object.keys(r.byRole).sort().map(function(z){return '<tr><td>'+esc(z)+'</td><td class="num">'+fmtN(r.byRole[z])+'</td></tr>'}).join('')+'</tbody></table></div></div>';
     if(Object.keys(r.unmappedDes).length)h+='<p class="note">Designations with no matching Desk role (set the role in Users when the person needs access): '+Object.keys(r.unmappedDes).map(function(d){return esc(d)+' ('+r.unmappedDes[d]+')'}).join(', ')+'.</p>';
+    if(r.needs&&r.needs.length)h+='<details class="strip" open><summary>New people · needs plant and designation · '+r.needs.length+'</summary><div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>WorkerID</th><th>Name</th><th>Note</th></tr></thead><tbody>'+r.needs.slice(0,200).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono">'+esc(x[1])+'</td><td>'+esc(x[2])+'</td><td>'+esc(x[3])+'</td></tr>'}).join('')+'</tbody></table></div><div class="row"><button class="btn sm" data-act="mst-needs-csv">Download this list (CSV)</button></div><p class="note">They load with a blank zone, plant and role. Add those in a later upload of the zone workbook (same names merge) or set the role in Users.</p></details>';
     if(r.rejected)h+='<div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Code</th><th>Sheet</th><th>Field</th><th>Reason</th></tr></thead><tbody>'+r.rejects.slice(0,100).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono">'+esc(x[1])+'</td><td>'+esc(x[2])+'</td><td>'+esc(x[3])+'</td><td>'+esc(x[4])+'</td></tr>'}).join('')+'</tbody></table></div>';
     if(r.unmatched.length)h+='<details class="strip"><summary>Unmatched B1 salesperson names · '+r.unmatched.length+'</summary><div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th>Name in the sales data</th><th class="num">Invoice lines</th><th>Why</th></tr></thead><tbody>'+r.unmatched.slice(0,100).map(function(u){return '<tr><td class="break">'+esc(u.name)+'</td><td class="num">'+fmtN(u.lines)+'</td><td>'+esc(u.why)+'</td></tr>'}).join('')+'</tbody></table></div></details>';
     if(st.stage==='checked')h+='<div class="row"><button class="btn pri" data-act="mst-semp-load"'+(r.loaded>0&&!readOnly()?'':' disabled')+'>Load '+fmtN(r.loaded)+' people</button><button class="btn" data-act="mst-reset" data-k="semp">Cancel</button></div>'+(st.msg?'<div class="banner err">'+esc(st.msg)+'</div>':'');
@@ -265,6 +304,7 @@ Object.assign(handlers,{
  'mst-semp-load':function(){return sempLoad()},
  'mst-tmpl':function(t){var k=t.getAttribute('data-t');return download(k==='items'?'item-master-template.csv':'sales-employee-template.csv',(k==='items'?'Item No.,Item Description,Inventory UoM,Active,Thickness,Size,Item Category':'Employee Code,*FirstName,*LastName,FullName,Mobile No.,Email,Designation,Zone,Plant Name,*CompanyCode,B1 SlpCode,B1 Sales Employee Name,Reports To (Employee Code),EndDate')+'\n')},
  'mst-rejcsv':function(t){var st=S.mst[t.getAttribute('data-k')];return download('rejected-rows.csv',csvLine(['row','code','','field','reason','value'])+'\n'+st.res.rejects.map(csvLine).join('\n'))},
+ 'mst-needs-csv':function(){var st=S.mst.semp;return download('people-needing-plant-and-designation.csv',csvLine(['row','worker_id','full_name','note'])+'\n'+(st.res.needs||[]).map(function(x){return csvLine([x[0],x[1],x[2],x[3]])}).join('\n'))},
  'mst-unmatched-csv':function(){return download('unmatched-salespeople.csv',csvLine(['b1_salesperson_name','invoice_lines','reason'])+'\n'+unmatchedSp().map(function(u){return csvLine([u.name,u.lines,u.why])}).join('\n'))}
 });
 document.addEventListener('change',function(ev){
