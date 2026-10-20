@@ -350,7 +350,7 @@ function renderUpload(){
   var steps=['Upload','Confirm mapping','Validate','Load'].map(function(s,i){return '<span class="'+(i+1<stepIdx?'ok':i+1===stepIdx?'on':'')+'">'+(i+1)+' '+s+'</span>'}).join('');
   var h='<div class="hd"><h2>Upload a SAP export</h2><div class="steps">'+steps+'</div></div>';
   var locked=st==='validating'||st==='loading'||st==='parsing';
-  h+='<div class="row"><div class="fld"><label for="u-ent">Entity</label><select id="u-ent" data-chg="u-ent" '+(locked?'disabled':'')+'>'+ENTITIES.map(function(e){return '<option value="'+e.k+'" '+(e.live?'':'disabled')+'>'+e.label+(e.live?'':' (after v0.1)')+'</option>'}).join('')+'</select></div>'
+  h+='<div class="row"><div class="fld"><label for="u-ent">Entity</label><select id="u-ent" data-chg="u-ent" '+(locked?'disabled':'')+'>'+ENTITIES.map(function(e){return '<option value="'+e.k+'" '+(e.live?'':'disabled')+'>'+e.label+(e.live?'':' (not built yet)')+'</option>'}).join('')+'</select></div>'
    +'<div class="fld"><label for="u-mode">Mode</label><select id="u-mode" data-chg="u-mode" '+(locked?'disabled':'')+'><option value="historic"'+(U.mode==='historic'?' selected':'')+'>Historic (one quarter, or many split by date)</option><option value="daily"'+(U.mode==='daily'?' selected':'')+'>Daily (replaces the open period)</option></select></div>'
    +'<div class="fld"><label for="u-period">Period</label><select id="u-period" data-chg="u-period" '+(locked?'disabled':'')+'>'+periodOptions()+'</select></div></div>';
   if(st==='idle'||st==='parsing'){
@@ -424,7 +424,7 @@ function rejectsHtml(){
   var f=U.rejFilter||'',q=(U.rejQ||'').toLowerCase();
   var list=r.rejects.filter(function(x){return (!f||x[4]===f)&&(!q||(x[1]+' '+x[5]).toLowerCase().indexOf(q)>=0)});
   return '<div class="hd"><h2>Rejected-rows report</h2><div class="row"><div class="fld"><label for="rj-f">Reason</label><select id="rj-f" data-chg="rejf"><option value="">All ('+fmtN(r.rejected)+')</option>'+reasons.map(function(x){return '<option value="'+esc(x)+'"'+(f===x?' selected':'')+'>'+esc(x)+' ('+fmtN(r.reasons[x])+')</option>'}).join('')+'</select></div><div class="fld"><label for="rj-q">Search doc no or value</label><input id="rj-q" class="in" data-chg="rejq" value="'+esc(U.rejQ||'')+'"></div></div></div>'
-   +'<div class="tw" style="max-height:340px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Doc no</th><th>Line</th><th>Field</th><th>Reason</th><th>Value</th></tr></thead><tbody>'+list.slice(0,100).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono break">'+esc(x[1])+'</td><td class="mono">'+esc(x[2])+'</td><td>'+esc(x[3])+'</td><td>'+esc(x[4])+'</td><td class="break mono">'+esc(String(x[5]).slice(0,80))+'</td></tr>'}).join('')+'</tbody></table></div><div class="note">Showing '+Math.min(100,list.length)+' of '+fmtN(list.length)+' matching. The CSV holds up to '+fmtN(r.rejects.length)+' rejected rows. Rejected rows also raise an action for the uploader once Today exists (desk-v0.9).</div>';
+   +'<div class="tw" style="max-height:340px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Doc no</th><th>Line</th><th>Field</th><th>Reason</th><th>Value</th></tr></thead><tbody>'+list.slice(0,100).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono break">'+esc(x[1])+'</td><td class="mono">'+esc(x[2])+'</td><td>'+esc(x[3])+'</td><td>'+esc(x[4])+'</td><td class="break mono">'+esc(String(x[5]).slice(0,80))+'</td></tr>'}).join('')+'</tbody></table></div><div class="note">Showing '+Math.min(100,list.length)+' of '+fmtN(list.length)+' matching. The CSV holds up to '+fmtN(r.rejects.length)+' rejected rows. Rejected rows also raise an action for the uploader once Today exists.</div>';
 }
 
 /* ---- coverage grid ---- */
@@ -439,7 +439,7 @@ function renderCov(){
   var g=gridQuarters();
   var head='<tr><th>Entity</th>'+g.list.map(function(k){return '<th class="'+(k===g.cur?'cur':'')+'" title="'+qMonths(k)[0]+' to '+qMonths(k)[2]+'">'+qLabel(k).replace(' ','<br>')+(k===g.cur?'<br>open':'')+'</th>'}).join('')+'</tr>';
   var body=ENTITIES.map(function(e){
-    if(!e.live)return '<tr><td>'+e.label+'</td>'+g.list.map(function(){return '<td><span class="cell na" title="Not in desk-v0.1">&ndash;</span></td>'}).join('')+'</tr>';
+    if(!e.live)return '<tr><td>'+e.label+'</td>'+g.list.map(function(){return '<td><span class="cell na" title="Not built yet">&ndash;</span></td>'}).join('')+'</tr>';
     return '<tr><td><b>'+e.label+'</b></td>'+g.list.map(function(k){var c=covStatus(e.k,k);var sym=glyph(c.st);var sel=S.covSel===e.k+'|'+k;return '<td><button class="cell '+c.st+'" data-act="cov" data-ent="'+e.k+'" data-q="'+k+'" aria-pressed="'+sel+'" aria-label="'+e.label+' '+qLabel(k)+': '+({ok:'loaded',part:'partial',miss:'missing'})[c.st]+(c.closed?', closed':'')+'">'+sym+(c.closed?'<sup style="font-size:8px">L</sup>':'')+'</button></td>'}).join('')+'</tr>';
   }).join('');
   var det='';
@@ -452,7 +452,7 @@ function renderCov(){
   }
   el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; last 12 FY quarters</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
    +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det
-   +'<p class="note">FY runs April to March; Q1 = Apr to Jun. A partial quarter greys its QoQ figures with "incomplete history" in the business views. Tap a cell for detail. Closed quarters are locked; reloading needs Super admin and is logged. Q3 FY27 is the current quarter, shown for reference. Other entities arrive after desk-v0.1.</p>';
+   +'<p class="note">FY runs April to March; Q1 = Apr to Jun. A partial quarter greys its QoQ figures with "incomplete history" in the business views. Tap a cell for detail. Closed quarters are locked; reloading needs Super admin and is logged. Q3 FY27 is the current quarter, shown for reference. Other entities arrive later.</p>';
 }
 function renderHist(){
   var el=$('#i-hist');if(!el)return;

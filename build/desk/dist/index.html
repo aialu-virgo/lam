@@ -124,7 +124,7 @@ tr:last-child td{border-bottom:0}
   .brand{flex:none}
   .main{padding:16px max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px))}
 }
-/* v0.9 additions (sidebar icons and tags follow the reference). Tokens come from the reference study; every colour is a token, light and dark. */
+/* v0.9 additions. Tokens come from the reference study; every colour is a token, light and dark. */
 .stack{display:flex;flex-direction:column;gap:12px}
 .ctrl{flex-direction:row;flex-wrap:wrap;gap:10px 14px;align-items:end;padding:12px 16px}
 .ctrl .seg{align-self:end}
@@ -521,7 +521,7 @@ function renderUpload(){
   var steps=['Upload','Confirm mapping','Validate','Load'].map(function(s,i){return '<span class="'+(i+1<stepIdx?'ok':i+1===stepIdx?'on':'')+'">'+(i+1)+' '+s+'</span>'}).join('');
   var h='<div class="hd"><h2>Upload a SAP export</h2><div class="steps">'+steps+'</div></div>';
   var locked=st==='validating'||st==='loading'||st==='parsing';
-  h+='<div class="row"><div class="fld"><label for="u-ent">Entity</label><select id="u-ent" data-chg="u-ent" '+(locked?'disabled':'')+'>'+ENTITIES.map(function(e){return '<option value="'+e.k+'" '+(e.live?'':'disabled')+'>'+e.label+(e.live?'':' (after v0.1)')+'</option>'}).join('')+'</select></div>'
+  h+='<div class="row"><div class="fld"><label for="u-ent">Entity</label><select id="u-ent" data-chg="u-ent" '+(locked?'disabled':'')+'>'+ENTITIES.map(function(e){return '<option value="'+e.k+'" '+(e.live?'':'disabled')+'>'+e.label+(e.live?'':' (not built yet)')+'</option>'}).join('')+'</select></div>'
    +'<div class="fld"><label for="u-mode">Mode</label><select id="u-mode" data-chg="u-mode" '+(locked?'disabled':'')+'><option value="historic"'+(U.mode==='historic'?' selected':'')+'>Historic (one quarter, or many split by date)</option><option value="daily"'+(U.mode==='daily'?' selected':'')+'>Daily (replaces the open period)</option></select></div>'
    +'<div class="fld"><label for="u-period">Period</label><select id="u-period" data-chg="u-period" '+(locked?'disabled':'')+'>'+periodOptions()+'</select></div></div>';
   if(st==='idle'||st==='parsing'){
@@ -595,7 +595,7 @@ function rejectsHtml(){
   var f=U.rejFilter||'',q=(U.rejQ||'').toLowerCase();
   var list=r.rejects.filter(function(x){return (!f||x[4]===f)&&(!q||(x[1]+' '+x[5]).toLowerCase().indexOf(q)>=0)});
   return '<div class="hd"><h2>Rejected-rows report</h2><div class="row"><div class="fld"><label for="rj-f">Reason</label><select id="rj-f" data-chg="rejf"><option value="">All ('+fmtN(r.rejected)+')</option>'+reasons.map(function(x){return '<option value="'+esc(x)+'"'+(f===x?' selected':'')+'>'+esc(x)+' ('+fmtN(r.reasons[x])+')</option>'}).join('')+'</select></div><div class="fld"><label for="rj-q">Search doc no or value</label><input id="rj-q" class="in" data-chg="rejq" value="'+esc(U.rejQ||'')+'"></div></div></div>'
-   +'<div class="tw" style="max-height:340px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Doc no</th><th>Line</th><th>Field</th><th>Reason</th><th>Value</th></tr></thead><tbody>'+list.slice(0,100).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono break">'+esc(x[1])+'</td><td class="mono">'+esc(x[2])+'</td><td>'+esc(x[3])+'</td><td>'+esc(x[4])+'</td><td class="break mono">'+esc(String(x[5]).slice(0,80))+'</td></tr>'}).join('')+'</tbody></table></div><div class="note">Showing '+Math.min(100,list.length)+' of '+fmtN(list.length)+' matching. The CSV holds up to '+fmtN(r.rejects.length)+' rejected rows. Rejected rows also raise an action for the uploader once Today exists (desk-v0.9).</div>';
+   +'<div class="tw" style="max-height:340px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Doc no</th><th>Line</th><th>Field</th><th>Reason</th><th>Value</th></tr></thead><tbody>'+list.slice(0,100).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono break">'+esc(x[1])+'</td><td class="mono">'+esc(x[2])+'</td><td>'+esc(x[3])+'</td><td>'+esc(x[4])+'</td><td class="break mono">'+esc(String(x[5]).slice(0,80))+'</td></tr>'}).join('')+'</tbody></table></div><div class="note">Showing '+Math.min(100,list.length)+' of '+fmtN(list.length)+' matching. The CSV holds up to '+fmtN(r.rejects.length)+' rejected rows. Rejected rows also raise an action for the uploader once Today exists.</div>';
 }
 
 /* ---- coverage grid ---- */
@@ -610,7 +610,7 @@ function renderCov(){
   var g=gridQuarters();
   var head='<tr><th>Entity</th>'+g.list.map(function(k){return '<th class="'+(k===g.cur?'cur':'')+'" title="'+qMonths(k)[0]+' to '+qMonths(k)[2]+'">'+qLabel(k).replace(' ','<br>')+(k===g.cur?'<br>open':'')+'</th>'}).join('')+'</tr>';
   var body=ENTITIES.map(function(e){
-    if(!e.live)return '<tr><td>'+e.label+'</td>'+g.list.map(function(){return '<td><span class="cell na" title="Not in desk-v0.1">&ndash;</span></td>'}).join('')+'</tr>';
+    if(!e.live)return '<tr><td>'+e.label+'</td>'+g.list.map(function(){return '<td><span class="cell na" title="Not built yet">&ndash;</span></td>'}).join('')+'</tr>';
     return '<tr><td><b>'+e.label+'</b></td>'+g.list.map(function(k){var c=covStatus(e.k,k);var sym=glyph(c.st);var sel=S.covSel===e.k+'|'+k;return '<td><button class="cell '+c.st+'" data-act="cov" data-ent="'+e.k+'" data-q="'+k+'" aria-pressed="'+sel+'" aria-label="'+e.label+' '+qLabel(k)+': '+({ok:'loaded',part:'partial',miss:'missing'})[c.st]+(c.closed?', closed':'')+'">'+sym+(c.closed?'<sup style="font-size:8px">L</sup>':'')+'</button></td>'}).join('')+'</tr>';
   }).join('');
   var det='';
@@ -623,7 +623,7 @@ function renderCov(){
   }
   el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; last 12 FY quarters</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
    +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det
-   +'<p class="note">FY runs April to March; Q1 = Apr to Jun. A partial quarter greys its QoQ figures with "incomplete history" in the business views. Tap a cell for detail. Closed quarters are locked; reloading needs Super admin and is logged. Q3 FY27 is the current quarter, shown for reference. Other entities arrive after desk-v0.1.</p>';
+   +'<p class="note">FY runs April to March; Q1 = Apr to Jun. A partial quarter greys its QoQ figures with "incomplete history" in the business views. Tap a cell for detail. Closed quarters are locked; reloading needs Super admin and is logged. Q3 FY27 is the current quarter, shown for reference. Other entities arrive later.</p>';
 }
 function renderHist(){
   var el=$('#i-hist');if(!el)return;
@@ -2478,7 +2478,7 @@ function pageOverview(){
     rows:[['Potential',sqPlan.pot>0?fmtSqft(sqPlan.pot):'—'],['Target',sqPlan.tgt>0?fmtSqft(sqPlan.tgt):'No plan'],['Var',sqPlan.tgt>0?(sqA-sqPlan.tgt>=0?'+':'−')+fmtSqft(Math.abs(sqA-sqPlan.tgt)):'—'],['Ach %',fmtAch(sqAch)],['Share of potential',sqPlan.pot>0?(sqA/sqPlan.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psq!=null?qoqCell(qoqOf(sqA,tot.Psq,{incomplete:tot.incomplete})):'—'],['12-qtr trend',trendWord(tot)]]}));
   var col=collectionFigs(ctx);
   cardsQ.push(col.card);
-  cardsQ.push(kpiCard({color:'orange',chip:'+',title:'K7 · New customers',value:'—',sub:'Needs the customer first-seen index (four earlier quarters).',pending:true,pendingTxt:'Pending',pendingMsg:'Not built in v0.9: the roll-up holds no customer history. Shown as pending, not zero.',
+  cardsQ.push(kpiCard({color:'orange',chip:'+',title:'K7 · New customers',value:'—',sub:'Needs the customer first-seen index (four earlier quarters).',pending:true,pendingTxt:'Pending',pendingMsg:'Needs four earlier quarters of history to find first-time customers; shown as pending, not zero.',
     rows:[['Addressable','pending rules'],['Target','No plan (P6)'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %','—'],['12-qtr trend','—']]}));
   var h='<div class="kpirow">'+cardsQ.join('')+'</div>';
   h+=trendCard('12-quarter trend · Net sales',{},ctx,undefined,'ov');
@@ -2821,7 +2821,7 @@ var NEED={
  coll:{name:'Collection export',how:'SAP B1 ORCT (DocNum, DocDate, CardCode, DocTotal) · S/4 ACDOCA incoming payment (DZ)',file:'data-map/collection.md'},
  stock:{name:'Stock export',how:'SAP B1 OITW (ItemCode, WhsCode, OnHand) · S/4 MARD / MATDOC (API_MATERIAL_STOCK_SRV)',file:'data-map/stock.md'}};
 function needPanel(keys,intro){
-  return '<div class="empty dashed"><b>'+esc(intro)+'</b>'+keys.map(function(k){var n=NEED[k];return '<div class="needrow"><b>'+esc(n.name)+' needed</b><div class="note">'+esc(n.how)+'</div><div class="note mono">'+esc(n.file)+'</div></div>'}).join('')+'<div class="note">Intake for this export is not part of desk-v0.9 (invoice history only). Nothing here is a zero: it is simply not loaded. Load demo data in Data Intake to see the page filled.</div></div>';
+  return '<div class="empty dashed"><b>'+esc(intro)+'</b>'+keys.map(function(k){var n=NEED[k];return '<div class="needrow"><b>'+esc(n.name)+' needed</b><div class="note">'+esc(n.how)+'</div><div class="note mono">'+esc(n.file)+'</div></div>'}).join('')+'<div class="note">Intake for this export is not built yet (invoice history only). Nothing here is a zero: it is simply not loaded. Load demo data in Data Intake to see the page filled.</div></div>';
 }
 function canEditPlan(u){return u&&['Super admin','Management / HO','HOD','Branch / depot manager'].indexOf(u.role)>=0}
 function inScopeDocs(list,ctx){return list.filter(function(d){return plantInScope(ctx.sc,d.plant)&&(!ctx.f.plant||d.plant===ctx.f.plant)})}
@@ -2959,7 +2959,7 @@ function drillColl(ctx){
   var h='<section class="card" id="drillp"><div class="hd"><h2>Drill-down · Collections · '+qLabel(q)+'</h2><button class="btn sm" data-act="drill-close">Close</button></div>'
    +'<div class="crumbs"><button class="chip" data-act="drill-close">Trend</button> › <button class="chip'+(d.m?'':' on')+'" data-act="drill-qonly">'+qLabel(q)+'</button>'+(d.m?' › <button class="chip" data-act="drill-m" data-m="'+d.m+'">'+ymLabel(d.m)+'</button> › <span class="chip on">Receipt documents</span>':'')+'</div>'
    +'<div class="tw"><table><thead><tr><th>Month</th><th class="num">Receipts</th><th class="num">Plan</th><th class="num">Same position, previous quarter</th><th class="num">QoQ %</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
-  if(d.m){var dl=collRows(plants,d.m);h+='<div class="hd"><h3 style="margin:0;font-size:13px">SAP receipts · '+ymLabel(d.m)+'</h3><span class="note">'+dl.length+' documents</span></div>'+(dl.length?'<div class="tw tall"><table><thead><tr><th>System</th><th>Doc type</th><th>Doc no</th><th>Date</th><th>Plant</th><th>Customer</th><th class="num">Amount</th></tr></thead><tbody>'+dl.slice(0,300).map(function(x){return '<tr><td class="mono">B1</td><td class="mono" title="Incoming payment (receipt)">RCT</td><td class="mono">'+esc(x.doc)+'</td><td>'+esc(x.date)+'</td><td>'+esc(plantShort(x.plant))+'</td><td class="break">'+esc(x.cust)+'</td><td class="num">'+fmtMoney(x.amount)+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty sm">'+(collMonths(plants,[{ym:d.m,frac:1}]).have?'This month has a receipts total but no receipt documents were stored with it (demo data loaded before v0.9 build 9: Clear demo, then Load demo data).':'No receipts loaded for this month.')+'</div>')}
+  if(d.m){var dl=collRows(plants,d.m);h+='<div class="hd"><h3 style="margin:0;font-size:13px">SAP receipts · '+ymLabel(d.m)+'</h3><span class="note">'+dl.length+' documents</span></div>'+(dl.length?'<div class="tw tall"><table><thead><tr><th>System</th><th>Doc type</th><th>Doc no</th><th>Date</th><th>Plant</th><th>Customer</th><th class="num">Amount</th></tr></thead><tbody>'+dl.slice(0,300).map(function(x){return '<tr><td class="mono">B1</td><td class="mono" title="Incoming payment (receipt)">RCT</td><td class="mono">'+esc(x.doc)+'</td><td>'+esc(x.date)+'</td><td>'+esc(plantShort(x.plant))+'</td><td class="break">'+esc(x.cust)+'</td><td class="num">'+fmtMoney(x.amount)+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty sm">'+(collMonths(plants,[{ym:d.m,frac:1}]).have?'This month has a receipts total but no receipt documents were stored with it (demo data loaded before receipt documents were stored: Clear demo, then Load demo data).':'No receipts loaded for this month.')+'</div>')}
   return h+'</section>';
 }
 
@@ -3046,7 +3046,7 @@ function toolsHtml(){
   return integrityHtml()+'<section class="card"><div class="hd"><h2>Tools</h2></div>'
    +'<div class="kpis"><div class="kpi"><small>Roll-up documents</small><b>'+fmtN(rc)+'</b><small>'+(miss?miss+' plant-months still to build':'all plant-months have one')+'</small></div><div class="kpi"><small>Rules engine</small><b style="font-size:13px;font-family:var(--font)">'+esc(S.engStatus||'not run yet')+'</b></div></div>'
    +'<div class="row"><button class="btn" data-act="rb-run"'+(S.rbBusy?' disabled':'')+'>Rebuild roll-ups now</button><button class="btn" data-act="rules-run">Run the rules now</button></div>'
-   +'<p class="note">Roll-ups are the small per plant × month summaries every business page reads. They are written on each upload; this rebuilds any that are missing (for example data loaded by desk-v0.1).</p>'
+   +'<p class="note">Roll-ups are the small per plant × month summaries every business page reads. They are written on each upload; this rebuilds any that are missing (for example data loaded earlier).</p>'
    +'<h3 style="margin:8px 0 0;font-size:13px">Test clock (this browser only)</h3><div class="row"><div class="fld"><label for="tc-d">Pretend today is</label><input id="tc-d" type="date" class="in" value="'+TODAY()+'"></div><button class="btn" data-act="clock-set">Set</button><button class="btn" data-act="clock-reset">Use the real date</button></div><p class="note">For the escalation walk-through: set a date, open Action Center, and the next ladder step is drafted. The real date is '+fmtDate(realToday())+'. The clock never changes stored data other than the drafts it causes.</p></section>';
 }
 function missingRolls(){
