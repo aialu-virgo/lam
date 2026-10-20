@@ -11,7 +11,7 @@ const cases=[['super@demo','Super admin',null,null],['data@virgoasia.com','Super
 for(const [email,role,plants,sp] of cases){
   const {page,errs}=await open(browser,{store,viewer:{email,name:email}});
   await page.waitForTimeout(2500);
-  const got=await page.evaluate((q2)=>{const d=window.__dbg;const u=d.effUser();return {role:u&&u.role,total:Math.round(d.sumF({plants:null},q2).n),plants:d.DS.plants.join(','),nav:[...document.querySelectorAll('.side .nav span:first-child')].map(x=>x.textContent).join(',')}},q2);
+  const got=await page.evaluate((q2)=>{const d=window.__dbg;const u=d.effUser();return {role:u&&u.role,total:Math.round(d.sumF({plants:null},q2).n),plants:d.DS.plants.join(','),nav:[...document.querySelectorAll('.side .nav .nl')].map(x=>x.textContent).join(',')}},q2);
   const exp=expected(plants,sp,q2);
   ok(`scope ${email} role`,got.role===role,got.role);
   ok(`scope ${email} Q2 total`,got.total===exp,`got ${got.total} exp ${exp}`);
@@ -32,7 +32,7 @@ for(const [email,role,plants,sp] of cases){
  const t3=await page.innerText('#pg');ok('bm.a admin shows plans only, no users tab',!/Users/.test(t3.slice(0,200)),t3.slice(0,100).replace(/\n/g,' '));
  await page.context().close()}
 {const {page}=await open(browser,{store,viewer:{email:'se.s1@demo',name:'S1'}});await page.waitForTimeout(2500);
- const nav=await page.evaluate(()=>[...document.querySelectorAll('.side .nav span:first-child')].map(x=>x.textContent).join(','));ok('se.s1 nav has no Admin/Assign',!/Admin|Intake/.test(nav),nav);
+ const nav=await page.evaluate(()=>[...document.querySelectorAll('.side .nav .nl')].map(x=>x.textContent).join(','));ok('se.s1 nav has no Admin/Assign',!/Admin|Intake/.test(nav),nav);
  await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(800);const t=await page.innerText('#pg');ok('se.s1 admin by URL denied',/Ask your admin/.test(t),'');
  await page.context().close()}
 console.log(res.join('\n'));

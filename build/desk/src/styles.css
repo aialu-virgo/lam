@@ -61,7 +61,7 @@ pre.draft{white-space:pre-wrap;word-break:break-word;font-family:var(--mono);fon
 .tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .card a:not(.btn):not(.nav){color:var(--indigo)}
 a.btn{text-decoration:none;display:inline-block}
-.navg .nav .tag{background:var(--indigo);color:#fff}
+.navg .nav .tag.cnt{background:var(--indigo);color:#fff}
 .side .me select{max-width:100%}
 .seg button{white-space:nowrap}
 @media (max-width:860px){.ctrl{align-items:stretch}.main .top h1{font-size:19px}}
