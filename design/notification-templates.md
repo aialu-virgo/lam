@@ -135,11 +135,11 @@ Escalation: {action_id} "{title}" ({owner}) is {days_overdue} days overdue, due 
 ```
 
 ## Worked example (invented, DEMO)
-Action ACT-DEMO-001, owner Demo User 4, due Sat 17 Oct 2026, L2 drafted on Tue 20 Oct (3 days overdue), recipient Demo User 3.
+Action ACT-DEMO-001, owner Demo User 7, due Sat 17 Oct 2026, L2 drafted on Tue 20 Oct (3 days overdue), recipient Demo User 3.
 
-WhatsApp text after substitution: `ACT-DEMO-001 "Collect overdue receivable, C-DEMO-05" (Demo User 4) is 3 days overdue, due Sat 17 Oct 2026. Next step: Call customer. Please help move it: https://example.test/desk#/action/ACT-DEMO-001`
+WhatsApp text after substitution: `ACT-DEMO-001 "Collect overdue receivable, C-DEMO-05" (Demo User 7) is 3 days overdue, due Sat 17 Oct 2026. Next step: Call customer. Please help move it: https://example.test/desk#/action/ACT-DEMO-001`
 
-Link: `https://wa.me/919000000003?text=ACT-DEMO-001%20%22Collect%20overdue%20receivable%2C%20C-DEMO-05%22%20(Demo%20User%204)%20is%203%20days%20overdue%2C%20due%20Sat%2017%20Oct%202026.%20Next%20step%3A%20Call%20customer.%20Please%20help%20move%20it%3A%20https%3A%2F%2Fexample.test%2Fdesk%23%2Faction%2FACT-DEMO-001`
+Link: `https://wa.me/919000000003?text=ACT-DEMO-001%20%22Collect%20overdue%20receivable%2C%20C-DEMO-05%22%20(Demo%20User%207)%20is%203%20days%20overdue%2C%20due%20Sat%2017%20Oct%202026.%20Next%20step%3A%20Call%20customer.%20Please%20help%20move%20it%3A%20https%3A%2F%2Fexample.test%2Fdesk%23%2Faction%2FACT-DEMO-001`
 
 ## Open
 - The action link route form is for the Full-Stack Engineer; the page must open the right thread from it.

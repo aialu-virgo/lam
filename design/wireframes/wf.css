@@ -58,3 +58,4 @@ tr.tot td{background:var(--k1);color:var(--card);font-weight:800;position:sticky
 .lvl{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px}.lvl span{border:1px solid var(--line);border-radius:99px;padding:2px 10px;color:var(--ink2)}.lvl .on{background:var(--k1);color:var(--card);border-color:var(--k1);font-weight:700}
 .sc{display:grid;grid-template-columns:90px 1fr 34px;gap:6px;align-items:center;font-size:12px;color:var(--ink2)}
 .kv span:last-child{text-align:right}.kv span:first-child{padding-right:6px}
+@media (max-width:520px){.kpi .kvs{grid-template-columns:1fr}}
