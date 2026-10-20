@@ -92,13 +92,17 @@ async function ensureRolls(force){
   var miss=missingRolls();if(!miss.length)return;if(!force&&S.rbSig===miss.length+'|'+Object.keys(S.rollDocs).length)return;
   S.rbBusy=true;S.rbSig=null;var n=0;
   try{
-    for(var i=0;i<miss.length;i++){
-      var m=miss[i];DS.status='Building roll-ups '+(i+1)+' of '+miss.length;schedule();
-      var rows=new Map();
-      for(var k=0;k<(m.info.chunks||0);k++){var snap=await dget('inv/'+m.info.sys+'-'+m.p+'-'+m.ym+'-'+k);if(!snap.exists)continue;var o=JSON.parse(await ungz(snap.data().z));o.a.forEach(function(a){var key=a[3]+'\u0001'+a[2]+'\u0001'+a[4];var r=rows.get(key);if(!r){r=[a[3],a[2],a[4],0,0,0,0,0];rows.set(key,r)}r[3]+=a[5];r[4]+=a[6];r[5]+=a[7];r[6]+=a[8];r[7]+=a[9]})}
-      var rr=Array.from(rows.values()).map(function(r){return [r[0],r[1],r[2],r[3],r[4],r[5],Math.round(r[6]),Math.round(r[7]*100)/100]});
-      await writeRoll(m.p,m.ym,m.info.sys,rr,m.info.at,m.info.demo);n++;
-    }
+    var q=miss.slice(),total=miss.length;
+    var worker=async function(){
+      while(q.length){
+        var m=q.shift();DS.status='Building roll-ups '+(total-q.length)+' of '+total;if(n%5===0)schedule();
+        var rows=new Map();
+        for(var k=0;k<(m.info.chunks||0);k++){var snap=await dget('inv/'+m.info.sys+'-'+m.p+'-'+m.ym+'-'+k);if(!snap.exists)continue;var o=JSON.parse(await ungz(snap.data().z));o.a.forEach(function(a){var key=a[3]+'\u0001'+a[2]+'\u0001'+a[4];var r=rows.get(key);if(!r){r=[a[3],a[2],a[4],0,0,0,0,0];rows.set(key,r)}r[3]+=a[5];r[4]+=a[6];r[5]+=a[7];r[6]+=a[8];r[7]+=a[9]})}
+        var rr=Array.from(rows.values()).map(function(r){return [r[0],r[1],r[2],r[3],r[4],r[5],Math.round(r[6]),Math.round(r[7]*100)/100]});
+        await writeRoll(m.p,m.ym,m.info.sys,rr,m.info.at,m.info.demo);n++;
+      }
+    };
+    await Promise.all([worker(),worker(),worker()]);
   }catch(e){S.err=(S.err||'')+'roll-up: '+dbErrText(e)+' '}
   S.rbBusy=false;DS.status='ready';S.rbSig=missingRolls().length+'|'+Object.keys(S.rollDocs).length;schedule();
 }
@@ -120,7 +124,7 @@ async function demoPeople(){
   for(var i=0;i<def.length;i++){var d=def[i];await dset('users/'+slug(d[0]),{email:d[0],name:d[1],role:d[2],department:d[3],plant_codes:d[4],reports_to_email:d[5],whatsapp_number:d[6],today_cap:5,active:true,sales_employee_code:d[2]==='Sales executive'?d[1]:'',demo:true})}
 }
 async function demoPlans(facts,cur){
-  var qs=closedQuarters().concat([cur]),plants=['1001','1011','1012','1013'],groups=['Laminate','Door'],segs=[['Dealer',0.6],['Project',0.4]],n=0,R=(function(){var a=7;return function(){a=(a*9301+49297)%233280;return a/233280}})();
+  var qs=closedQuarters().concat([cur]),plants=['1001','1011','1012','1013'],groups=['Laminate','Door','PVC sheet'],segs=[['Dealer',0.6],['Project',0.4]],n=0,R=(function(){var a=7;return function(){a=(a*9301+49297)%233280;return a/233280}})();
   for(var qi=0;qi<qs.length;qi++){
     var q=qs[qi],ms=qMonths(q),isCur=q===cur;
     for(var pi=0;pi<plants.length;pi++)for(var gi=0;gi<groups.length;gi++){

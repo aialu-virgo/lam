@@ -56,6 +56,7 @@ function bannersHtml(){
   var h='';
   if(S.viewAs){var vu=uByEmail(S.viewAs);h+='<div class="banner warn"><span><b>Viewing as '+esc(vu?vu.name+' · '+vu.role:S.viewAs)+'.</b> Read-only preview with that person\'s filter. Nothing can be saved. Logged.</span><button class="btn sm" data-act="va-exit">Exit view</button></div>'}
   if(lsGet('desk-today'))h+='<div class="banner info"><span>Test clock: today is set to <b>'+esc(fmtDate(TODAY()))+'</b> for this browser only (Admin › Settings).</span><button class="btn sm" data-act="clock-reset">Use the real date</button></div>';
+  if(DS.custJobs>0)h+='<div class="banner info">Reading customer detail '+DS.custDone+' of '+DS.custJobs+'...</div>';
   if(DS.status&&DS.status!=='ready'&&DS.status!=='idle')h+='<div class="banner info">'+esc(DS.status)+'</div>';
   if(S.err)h+='<div class="banner err">Database message: '+esc(S.err)+'</div>';
   return h;
@@ -74,6 +75,8 @@ function ctrlBar(pg){
     var plants=DS.plants.length?DS.plants:S.plants.map(function(p){return p.plant_code});plants=plants.filter(function(p){return plantInScope(sc,p)});
     if(plants.length>1||f.plant)h+='<div class="fld"><label for="f-plant">Branch / plant</label><select id="f-plant" data-chg="flt" data-k="plant"><option value="">All</option>'+plants.map(function(p){return '<option value="'+p+'"'+(f.plant===p?' selected':'')+'>'+esc(plantName(p))+'</option>'}).join('')+'</select></div>';
     if(!sc.sp&&(pg==='sales'||pg==='overview'||pg==='team')){var sps=distinct('sp');if(sps.length)h+='<div class="fld"><label for="f-sp">Salesperson</label><select id="f-sp" data-chg="flt" data-k="sp"><option value="">All</option>'+sps.slice(0,500).map(function(p){return '<option value="'+esc(p)+'"'+(f.sp===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'}
+    if(pg==='sales'||pg==='overview'||pg==='team')h+='<div class="fld"><label for="f-group">Product group</label><select id="f-group" data-chg="flt" data-k="group"><option value="">All</option>'+GROUPS.map(function(g){return '<option'+(f.group===g?' selected':'')+'>'+g+'</option>'}).join('')+'</select></div>';
+    if(f.plant||f.sp||f.group||f.search)h+='<button class="btn sm" data-act="clear-f">Clear filters</button>';
     h+='<div class="fld"><label for="f-search">Search</label><input id="f-search" class="in" data-in="fsearch" value="'+esc(f.search||'')+'" placeholder="customer, branch, person"></div>';
   }
   if(PERIOD_PAGES.indexOf(pg)>=0)h+='<span class="chip">Compared with: '+esc(res.priorLabel||'previous quarter')+'</span>'+(res.pro?'<span class="chip">To-date plan and previous quarter pro-rated by working days ('+res.N+' elapsed)</span>':'');
@@ -94,7 +97,7 @@ function renderAll(){
   if(S.dbState==='none'){root.innerHTML=gate('Database not available','Sign in to claude.ai and open this page again. The Desk stores its data in the shared database.');return}
   if(!S.loaded.users)return;
   S.role=viewerRole();
-  if(S.role===null||S.role==='inactive'){root.innerHTML=gate('Ask your admin for access','You are signed in as '+(S.viewer&&S.viewer.email||'an unknown user')+'. This page is not enabled for that address.');return}
+  if(S.role===null||S.role==='inactive'){root.innerHTML=gate('Ask your admin for access','You are signed in as '+(S.viewer&&S.viewer.email||'a user whose email this page cannot read')+'. This page is not enabled for that address.'+(S.viewer&&S.viewer.id?' Give your admin this viewer ID: '+S.viewer.id:''));return}
   if(S.role==='Super admin'&&!S.seeded&&S.loaded.users&&S.loaded.plants){S.seeded=true;seedDefaults()}
   var u=effUser();
   if(!u){root.innerHTML=gate('Ask your admin for access','Your user record could not be read.');return}
@@ -131,6 +134,7 @@ function renderAll(){
 /* ---- handlers ---- */
 function goto(pg,opt){opt=opt||{};if(opt.plant!=null)S.f.plant=opt.plant||'';if(opt.group!=null)S.f.group=opt.group||'';location.hash='#/'+pg}
 Object.assign(handlers,{
+ 'clear-f':function(){S.f.plant='';S.f.sp='';S.f.group='';S.f.search='';S.lastHtml='';schedule()},
  'goto':function(t){S.f.plant=t.getAttribute('data-plant')||S.f.plant;S.f.group=t.getAttribute('data-group')||''},
  'share':function(){var d=window.__clip;return copyText(PAGE_URL,'Link copied')},
  'mode':function(t){S.f.mode=t.getAttribute('data-m');S.lastHtml='';schedule()},

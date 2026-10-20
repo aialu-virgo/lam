@@ -200,9 +200,10 @@ async function evalR7(){
   var cms=qMonths(cq).filter(function(m){return m<tYm});
   if(cms.length){
     var need=[];cms.forEach(function(m){need.push(m,priorMonth(m))});
-    await loadCust(null,need.concat(qMonths(lq)));
+    /* customer-level checks need the customer detail; they run once it has been read (open Sales or Team) */
+    var allNeed=need.concat(qMonths(lq));
     cms.forEach(function(ym){
-      var pm=priorMonth(ym);if(!monthLoaded(ym,null)||!monthLoaded(pm,null))return;
+      var pm=priorMonth(ym);if(!monthLoaded(ym,null)||!monthLoaded(pm,null))return;if(!custLoaded([ym,pm].concat(qMonths(lq)),SC().plants))return;
       var A=custAgg({plants:SC().plants},[ym]),P=custAgg({plants:SC().plants},[pm]),cm=classMap();
       P.forEach(function(p,code){
         var cls=cm[code]||'C';if(CFG.qoq_classes.split(',').map(function(x){return x.trim()}).indexOf(cls)<0)return;
@@ -219,7 +220,7 @@ async function evalR7(){
 async function runEngine(){
   var u=effUser();if(!u||GLOBAL_ROLES.indexOf(u.role)<0||readOnly())return;
   if(!S.loaded.actions||!S.loaded.uploads||!S.loaded.potential||!S.loaded.settings||!DS.ready)return;
-  var sig=[DS.ver,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.orders.length,S.stock.length,S.users.length].join('|');
+  var sig=[DS.ver,DS.custVer,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.orders.length,S.stock.length,S.users.length].join('|');
   if(S.engSig===sig||S.engBusy)return;
   S.engBusy=true;S.engSig=sig;S.engStatus='Checking rules...';
   try{
@@ -307,7 +308,7 @@ async function raiseAction(o){
 /* ---- escalation ladder: drafts only, a person sends ---- */
 function senderOf(a){
   if(a.assigner&&a.assigner.indexOf('Desk rule')!==0)return a.assigner;
-  var c=a.plant?coordFor(a.plant):null;return c?c.email:'*super';
+  var c=a.plant?coordFor(a.plant):null;if(c)return c.email;var ow=uByEmail(a.owner),mg=ow&&ow.reports_to_email?uByEmail(ow.reports_to_email):null;return mg?mg.email:'*super';/* Q22 recommendation: plant Coordinator, else the owner's manager, else a Super admin */
 }
 function iAmSender(a,u){var s=senderOf(a);return s===u.email||(s==='*super'&&u.role==='Super admin')}
 function ladderRecipients(a,step){
@@ -324,8 +325,8 @@ function ladderRecipients(a,step){
 var TPL={
  Reminder:{subj:'Reminder: {action_id} due {when}, {title}',body:'Hi {recipient},\n\nA reminder that {action_id} "{title}" is due {when}, {due_date}.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\n\nPlease acknowledge or update it here: {link}\n\n{sender}',wa:'Reminder: {action_id} "{title}" is due {when} ({due_date}). Next step: {next_step}. Update here: {link}'},
  L1:{subj:'Overdue 1 day: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}" was due on {due_date} and is now {days_overdue} day(s) overdue.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\n\nPlease respond with an update and a new date, or mark it done with a closure note: {link}\n\n{sender}',wa:'{action_id} "{title}" is {days_overdue} day(s) overdue (was due {due_date}). Next step: {next_step}. Please update or close it here: {link}'},
- L2:{subj:'Overdue {days_overdue} days, for your attention: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}", owned by {owner}, was due on {due_date} and is {days_overdue} days overdue.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\n\nPlease speak with {owner} and help agree a date. Thread and responses: {link}\n\n{sender}',wa:'{action_id} "{title}" ({owner}) is {days_overdue} days overdue, due {due_date}. Next step: {next_step}. Please help move it: {link}'},
- L3:{subj:'Escalation, overdue {days_overdue} days: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}", owned by {owner} (reports to {reports_to}), was due on {due_date} and is {days_overdue} days overdue. It was reminded at 1 day and escalated to {reports_to} at 3 days.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\n\nYour decision is needed on whether to reassign, extend the date or close it. Thread, responses and log: {link}\n\n{sender}',wa:'Escalation: {action_id} "{title}" ({owner}) is {days_overdue} days overdue, due {due_date}. Reminded and escalated to {reports_to}. Please decide: reassign, extend or close. {link}'}
+ L2:{subj:'Overdue {days_overdue} days, for your attention: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}", owned by {owner}, was due on {due_date} and is {days_overdue} days overdue.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\nBlocked: {blocked}\n\nPlease speak with {owner} and help agree a date. Thread and responses: {link}\n\n{sender}',wa:'{action_id} "{title}" ({owner}) is {days_overdue} days overdue, due {due_date}. Next step: {next_step}. Please help move it: {link}'},
+ L3:{subj:'Escalation, overdue {days_overdue} days: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}", owned by {owner} (reports to {reports_to}), was due on {due_date} and is {days_overdue} days overdue. It was reminded at 1 day and escalated to {reports_to} at 3 days.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\nBlocked: {blocked}\n\nYour decision is needed on whether to reassign, extend the date or close it. Thread, responses and log: {link}\n\n{sender}',wa:'Escalation: {action_id} "{title}" ({owner}) is {days_overdue} days overdue, due {due_date}. Reminded and escalated to {reports_to}. Please decide: reassign, extend or close. {link}'}
 };
 function fillTpl(t,v){
   /* a line holding a placeholder with no value is dropped whole; text from data is inserted as plain text */
@@ -341,8 +342,8 @@ function buildDraft(a,step,today){
   var owner=uByEmail(a.owner),rep=owner&&owner.reports_to_email?uByEmail(owner.reports_to_email):null,sender=effUser();
   var od=diffDays(today,a.due);
   var vars={recipient:(rc.to.name||'').split(' ')[0],owner:owner?owner.name:a.owner,reports_to:rep?rep.name:'',action_id:a.ref,title:a.title,due_date:fmtDate(a.due),days_overdue:od>0?od:'',next_step:a.next_step,
-    value_at_risk:a.value>0?fmtMoney(a.value):'',source_ref:(a.source&&a.source.label)||'',last_update:lastUpdate(a),link:actionLink(a),sender:sender?sender.name:'',when:today<a.due?'tomorrow':'today'};
-  var t=TPL[step],subject=fillTpl(t.subj,vars),body=fillTpl(t.body,vars),wa=fillTpl(t.wa,vars);
+    value_at_risk:a.value>0?fmtMoney(a.value):'',source_ref:(a.source&&a.source.label)||'',last_update:lastUpdate(a),link:actionLink(a),blocked:a.status==='Blocked'?(a.blocked_reason||''):'',sender:sender?sender.name:'',when:today<a.due?'tomorrow':'today'};
+  var t=TPL[step],subject=fillTpl(t.subj,vars),body=fillTpl(t.body,vars),wa=fillTpl(t.wa,Object.assign({},vars,{next_step:String(vars.next_step||'').replace(/[.\s]+$/,'')}));
   var num=String(rc.to.whatsapp_number||'').replace(/\D/g,'');
   return {id:'f_'+a.id+'_'+step+'_'+a.due,action_id:a.id,ref:a.ref,title:a.title,step:step,due:a.due,to_name:rc.to.name,to_email:rc.to.email,to_whatsapp:num,cc_email:rc.cc.map(function(x){return x.email}).join(','),subject:subject,body:body,wa_text:num?wa:'',link:actionLink(a),
     days_overdue:od>0?od:0,created_day:today,created_at:nowISO(),status:'Drafted',sender:senderOf(a),demo:a.demo||undefined};

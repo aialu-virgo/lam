@@ -1,0 +1,11 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+const browser = await chromium.launch();
+const {page,errs}=await open(browser,{store,viewer:{email:'spa@virgoasia.com',name:'SP'}});await page.waitForTimeout(2500);
+await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(500);await page.click('[data-t="potential"]');await page.waitForTimeout(300);
+page.on('console',m=>console.log('C',m.text()));page.on('pageerror',e=>console.log('PE',e.message));await page.evaluate(()=>{const b=document.querySelector('[data-act="plan-lock"][data-q="FY27-Q3"]');console.log('btn',!!b);b.click()});await page.waitForTimeout(3000);
+console.log(await page.evaluate(()=>[document.querySelector('#toast').textContent,JSON.stringify(window.__dbg.S.periods['FY27-Q3']),document.querySelector('[data-act="plan-lock"][data-q="FY27-Q3"]').disabled]));
+console.log(errs);
+await browser.close();

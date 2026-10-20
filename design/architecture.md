@@ -63,5 +63,15 @@ Viewer email decides the role. v0.1 opens only for Super admin (seed: Vijay and 
 ## Demo mode
 "Load demo data" runs the synthetic generator ([demo-data generator](../build/demo-data/_index.md)) through the same validate and load path; every record carries `demo: true`; "Clear demo" deletes them. Ships empty.
 
+## desk-v0.9 additions
+- **Roll-ups.** One small document per plant × month (`roll/{plant}-{YYYY-MM}`): group × salesperson × transfer flag × documents, lines, sheets, sq ft, net ₹, gzip+base64. Written on every upload; rebuilt from the stored chunks by Admin › Tools (automatic for a Super admin when missing). Every business page reads roll-ups, never the chunks. Customer-level views and the document list read the chunks on demand, for the months on screen.
+- **Salesperson in the document index** (D10): index rows gain a 9th field. Older chunks have 8; the page handles both and says "Documents of your customers" for those.
+- **Scope before render.** The viewer's scope (plants, salesperson) is applied when roll-ups and chunks are decoded, so totals, ranks, trends and drill-down only ever hold in-scope rows. It is enforced in the page; the database rules are the artifact default.
+- **Collections added:** `actions` (thread inside the document), `followups`, `settings/main`, `phasing`, `roll`, and the open-item stores `orders`, `deliveries`, `receivables`, `collections`, `stock` (empty until their exports are wired; demo fills them).
+- **Rules engine.** Runs on load and when data or settings change, for Super admin, Management and HOD viewers (they hold the whole scope). One action per rule, key and period (deterministic document id), at most 20 new per rule per run. The escalation ladder runs for each sender on load: one step per action per day, drafts only.
+- **Target and revisions.** `potential` documents carry `approved` (current approved figures) and `original` (first approved); a new revision never changes the approved snapshot until it is approved by a Management or Super admin user who is not the proposer. Locking a quarter turns Approved into Locked and cannot be undone in v1.0.
+- **No comparison with last year.** The only period shift is three months (`priorQuarterMonth`); `month_compare` offers previous month, never last year.
+- **Customer-level R7 and class A/B/C** need the customer detail, read when Sales or Team is opened (and the last closed quarter when Today holds customer actions).
+
 ## Not built yet
-Rules engine, drill-down views, action store, row-level filtering, S/4 OData connector (card shown, disabled).
+S/4HANA OData connector (card shown, disabled). Intake for orders, deliveries, receivables, collections, stock and credit notes (pages show the empty state naming the export). New-customer KPI (K7) needs a customer first-seen index. Plans P2 (person split, default shown), P3 to P7 entry screens (defaults used). Segment is not an SAP field, so actuals compare with targets at plant × product group.

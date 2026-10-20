@@ -18,7 +18,7 @@ function userName(e){var u=uByEmail(e);return u?u.name:(e||'')}
 
 /* ---- effective user and scope ---- */
 function realUser(){
-  var em=(S.viewer&&S.viewer.email||'').toLowerCase(),u=uByEmail(em);
+  var em=(S.viewer&&S.viewer.email||'').toLowerCase(),u=viewerUser();
   if(u)return u;
   if(S.role==='Super admin')return {email:em,name:(S.viewer&&S.viewer.name)||em||'Super admin',role:'Super admin',department:'HO',plant_codes:'',reports_to_email:'',today_cap:5,active:true,pseudo:true};
   return null;

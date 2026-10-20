@@ -404,10 +404,16 @@ function dbErrText(e){
 }
 
 /* ================= access ================= */
+function viewerUser(){
+  var em=(S.viewer&&S.viewer.email||'').toLowerCase(),id=S.viewer&&S.viewer.id;
+  return S.users.find(function(x){return em&&x.email===em})||S.users.find(function(x){return id&&x.uid&&x.uid===id})||null;
+}
 function viewerRole(){
   var em=(S.viewer&&S.viewer.email||'').toLowerCase();
-  if(!em)return S.viewer&&S.viewer.owner?'Super admin':null;
-  var u=S.users.find(function(x){return x.email===em});
+  var u=viewerUser();
+  if(u&&!em&&S.viewer)S.viewer.email=u.email;
+  if(!em&&!u)return S.viewer&&S.viewer.owner?'Super admin':null;
+  if(!em)em=u.email;
   if(u&&u.active===false)return 'inactive';
   if(SEED_SUPER.indexOf(em)>=0)return 'Super admin';
   if(u)return u.role;
@@ -459,7 +465,7 @@ function storageStats(){
 function buildIntake(){
   $('#p-intake').innerHTML=
    '<div id="i-banner"></div>'
-  +'<section class="card" id="i-upload"></section>'
+  +(effRole()==='Super admin'&&!readOnly()?'<section class="card" id="i-upload"></section>':'')
   +'<section class="card" id="i-cov"></section>'
   +'<div class="grid2"><section class="card" id="i-hist"></section><section class="card" id="i-feed"></section></div>';
   renderUpload();
@@ -471,11 +477,14 @@ function renderBanner(){
   if(S.err)h+='<div class="banner err">Database message: '+esc(S.err)+'</div>';
   var st=storageStats();
   var none=!Object.keys(S.cells).length&&!S.uploads.length;
-  if(none)h+='<div class="empty"><b>No data loaded.</b> Upload a file below, or <button class="btn sm" data-act="demo-load">Load demo data</button> (labelled DEMO, removable with Clear demo).</div>';
+  var sa=effRole()==='Super admin'&&!readOnly();
+  if(none&&!sa)h+='<div class="empty"><b>No data loaded.</b> A Super admin loads SAP data here.</div>';
+  else if(none)h+='<div class="empty"><b>No data loaded.</b> Upload a file below, or <button class="btn sm" data-act="demo-load">Load demo data</button> (labelled DEMO, removable with Clear demo).</div>';
   else{
     h+='<div class="kpis"><div class="kpi"><small>Invoice lines stored</small><b>'+fmtN(st.lines)+'</b></div><div class="kpi"><small>Database documents (transactions)</small><b>'+fmtN(st.docs)+' / '+fmtN(DOC_CAP)+'</b></div><div class="kpi"><small>Transaction data stored</small><b>'+fmtBytes(st.bytes)+'</b></div>'
     +'<div class="kpi"><small>Closed quarters</small><b>'+Object.keys(S.periods).filter(function(k){return S.periods[k].status==='closed'}).length+'</b></div></div>';
-    if(S.uploads.some(function(u){return u.demo}))h+='<div class="banner warn"><span>DEMO data is in the database. Clear it before the real history load.</span><button class="btn sm" data-act="demo-clear">Clear demo</button></div>';
+    if(!sa){}
+    else if(S.uploads.some(function(u){return u.demo}))h+='<div class="banner warn"><span>DEMO data is in the database. Clear it before the real history load.</span><button class="btn sm" data-act="demo-clear">Clear demo</button></div>';
     else h+='<div class="row"><button class="btn sm" data-act="demo-load">Load demo data</button></div>';
   }
   el.innerHTML=h;
@@ -674,7 +683,7 @@ async function onFile(file){
     if(!rows.length)throw new Error('The file is empty.');
     var headers=rows[0].map(function(x){return x==null?'':String(x)});
     var d=detect(headers);
-    if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'target phasing is not in desk-v0.1',transfers:'Internal transfer'})[d.what]+').';renderUpload();return}
+    if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer'})[d.what]+').';renderUpload();return}
     if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;U.msg='The headers match no known file. Expected an invoice export from SAP B1 (docnum, CardCode, BPLName ...) or the S/4 sales register (Invoice Document Number, Plant ...).';renderUpload();return}
     U.headers=headers;U.rows=rows.slice(1);U.sys=d.sys;U.map=defaultMap(headers,d.sys);
     var sv=S.mappings[d.sys+'_invoice'];
@@ -995,7 +1004,7 @@ function potentialHtml(){
   var groupOpt=Array.from(new Set(GROUPS.concat(all.map(function(x){return x.product_group})))),segOpt=Array.from(new Set(all.map(function(x){return x.customer_segment}).filter(Boolean)));
   var sel=function(id,cur,opts,label){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="potf" data-k="'+id+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select></div>'};
   var locked=function(q){return S.periods[q]&&S.periods[q].plan_locked};
-  return '<section class="card"><div class="hd"><h2>Market potential &middot; revisions</h2><div class="row"><button class="btn pri sm" data-act="pot-add">Add figure</button><label class="btn sm" for="up-pot" style="cursor:pointer">Upload potential (CSV)</label><input id="up-pot" data-file="potential" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="potential">Download template</button></div></div>'
+  return '<section class="card"><div class="hd"><h2>Market potential &middot; revisions</h2><div class="row"><button class="btn pri sm" data-act="pot-add">Add figure</button><label class="btn sm" for="up-pot" style="cursor:pointer">Upload potential (CSV)</label><input id="up-pot" data-file="potential" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="potential">Download template</button><label class="btn sm" for="up-ph" style="cursor:pointer">Upload phasing (CSV)</label><input id="up-ph" data-file="phasing" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="phasing">Phasing template</button></div></div>'
   +'<div class="row">'+sel('pf-q',f.q,quarters.map(function(x){return x}),'Quarter')+sel('pf-plant',f.plant,plantsOpt,'Branch / territory')+sel('pf-group',f.group,groupOpt,'Product group')+sel('pf-seg',f.seg,segOpt,'Segment')+'</div>'
   +(rows.length?'<div class="tw"><table><thead><tr><th>Quarter</th><th>Branch / territory</th><th>Group</th><th>Segment</th><th class="num">Potential</th><th class="num">Potential sq ft</th><th class="num">Share %</th><th class="num">Target</th><th>Source &middot; owner</th><th>Rev</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(x){var ap0=approvedOf(x),tg=x.share_pct!=null&&x.share_pct!==''?fmtMoney((+x.potential_value_inr||0)*(+x.share_pct)/100)+(ap0&&x.original&&Math.abs(leafTgt(x.original.potential_value_inr,x.original.share_pct)-leafTgt(ap0.potential_value_inr,ap0.share_pct))>1?'<div class="note">approved '+fmtMoney(leafTgt(ap0.potential_value_inr,ap0.share_pct))+' · orig '+fmtMoney(leafTgt(x.original.potential_value_inr,x.original.share_pct))+'</div>':''):'<span class="pill mute">pending</span>';return '<tr><td>'+qLabel(x.fy_quarter)+(locked(x.fy_quarter)?' <span class="pill part">Locked</span>':'')+'</td><td class="break">'+esc(x.plant_code||x.territory)+'</td><td>'+esc(x.product_group)+'</td><td>'+esc(x.customer_segment)+'</td><td class="num">'+fmtMoney(x.potential_value_inr)+'</td><td class="num">'+fmtN(x.potential_qty_sqft)+'</td><td class="num">'+(x.share_pct==null||x.share_pct===''?'-':x.share_pct)+'</td><td class="num">'+tg+'</td><td class="break">'+esc(x.source_type)+(x.owner_email?' &middot; '+esc(x.owner_email):'')+'</td><td class="mono">r'+(x.rev||1)+'</td><td>'+potStatusPill(x.status)+(x.demo?' <span class="pill part">DEMO</span>':'')+'</td><td><button class="btn sm" data-act="pot-edit" data-id="'+esc(x._id)+'">Open</button></td></tr>'}).join('')
@@ -1010,7 +1019,7 @@ function userDlg(u){
   openDlg('<h3>'+(n?'Add user':'Edit user')+'</h3><div class="fgrid">'
    +fld('d-email','Email',u.email,n?'':'readonly')+fld('d-name','Name',u.name)
    +'<div class="fld"><label for="d-role">Role</label><select id="d-role">'+ROLES.map(function(r){return '<option'+(r===u.role?' selected':'')+'>'+r+'</option>'}).join('')+'</select></div>'
-   +fld('d-dept','Department',u.department)+fld('d-plants','Plant codes (; separated, blank = all)',u.plant_codes)+fld('d-rep','Reports to (email)',u.reports_to_email)+fld('d-wa','WhatsApp (91 + 10 digits)',u.whatsapp_number)+fld('d-cap','Today cap (1-20)',u.today_cap)+fld('d-sec','Sales employee code',u.sales_employee_code)
+   +fld('d-dept','Department',u.department)+fld('d-plants','Plant codes (; separated, blank = all)',u.plant_codes)+fld('d-rep','Reports to (email)',u.reports_to_email)+fld('d-wa','WhatsApp (91 + 10 digits)',u.whatsapp_number)+fld('d-cap','Today cap (1-20)',u.today_cap)+fld('d-sec','Sales employee code',u.sales_employee_code)+fld('d-uid','Viewer ID (only if the page cannot read emails; copy it from the person\'s access screen)',u.uid||'')
    +'<div class="fld"><label for="d-act">Active</label><select id="d-act"><option value="Y"'+(u.active!==false?' selected':'')+'>Yes</option><option value="N"'+(u.active===false?' selected':'')+'>No</option></select></div></div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="user-save" data-new="'+(n?1:0)+'">Save</button><button class="btn" data-act="dlg-close">Cancel</button></div>');
 }
 function fld(id,label,val,extra){return '<div class="fld"><label for="'+id+'">'+label+'</label><input id="'+id+'" class="in" value="'+esc(val==null?'':val)+'" '+(extra||'')+'></div>'}
@@ -1031,7 +1040,7 @@ function validateUser(u,isNew,ignoreId){
   return errs;
 }
 async function saveUser(isNew){
-  var u={email:gv('d-email').toLowerCase(),name:gv('d-name'),role:gv('d-role'),department:gv('d-dept'),plant_codes:gv('d-plants'),reports_to_email:gv('d-rep').toLowerCase(),whatsapp_number:gv('d-wa').replace(/[\s+\-]/g,''),today_cap:Number(gv('d-cap')),active:gv('d-act')!=='N',sales_employee_code:gv('d-sec')};
+  var u={email:gv('d-email').toLowerCase(),name:gv('d-name'),role:gv('d-role'),department:gv('d-dept'),plant_codes:gv('d-plants'),reports_to_email:gv('d-rep').toLowerCase(),whatsapp_number:gv('d-wa').replace(/[\s+\-]/g,''),today_cap:Number(gv('d-cap')),active:gv('d-act')!=='N',sales_employee_code:gv('d-sec'),uid:gv('d-uid')};
   var errs=validateUser(u,isNew);
   /* keep at least one active super admin */
   var after=S.users.filter(function(x){return x.email!==u.email}).concat([u]);
@@ -1119,6 +1128,14 @@ async function masterUpload(what,file){
         var p={plant_code:get(r,'plant_code').replace(/\.0$/,''),plant_name:get(r,'plant_name'),plant_type:get(r,'plant_type')||'Depot',zone:get(r,'zone'),state:get(r,'state'),b1_bpl_name:get(r,'b1_bpl_name')||get(r,'plant_name'),business:+get(r,'plant_code')>=1050?'ACP':'laminates',active:!/^(n|no|false|0)$/i.test(get(r,'active')||'y')};
         var e2=[];if(!/^\d{4}$/.test(p.plant_code))e2.push('Code must be 4 digits');if(!p.plant_name)e2.push('Name is required');if(seen[p.plant_code])e2.push('Duplicate code in file');seen[p.plant_code]=1;
         if(e2.length)bad.push([rn,p.plant_code,e2.join('; ')]);else ok.push(p);
+      }else if(what==='phasing'){
+        var pq=get(r,'fy_quarter').toUpperCase(),pp=get(r,'plant_code').replace(/\.0$/,''),pg=get(r,'product_group'),ps2=get(r,'customer_segment'),mi=+get(r,'month_in_quarter'),pc2=toNum(get(r,'phasing_pct'));
+        var e4=[];if(!/^FY\d\d-Q[1-4]$/.test(pq))e4.push('Bad quarter');else if(S.periods[pq]&&S.periods[pq].plan_locked)e4.push('Quarter is locked');
+        if(!(mi>=1&&mi<=3))e4.push('month_in_quarter must be 1, 2 or 3');if(isNaN(pc2)||pc2<0||pc2>100)e4.push('phasing_pct must be 0 to 100');
+        if(pp&&!S.plants.some(function(x){return x.plant_code===pp}))e4.push('Unknown plant');
+        var pk=slug([pq,pp,pg,ps2].join('_')||'all');var grp=seen['ph'+pk]||(seen['ph'+pk]={pq:pq,pp:pp,pg:pg,ps:ps2,pct:[null,null,null],rows:[],key:pk});
+        if(!e4.length){if(grp.pct[mi-1]!=null)e4.push('Duplicate month in file');else{grp.pct[mi-1]=pc2;grp.rows.push(rn)}}
+        if(e4.length)bad.push([rn,pq+' '+(pp||'all'),e4.join('; ')]);
       }else if(what==='potential'){
         var q=get(r,'fy_quarter').toUpperCase(),pc=get(r,'plant_code').replace(/\.0$/,''),tr=get(r,'territory'),gr=get(r,'product_group'),sg=get(r,'customer_segment'),pv=toNum(get(r,'potential_value_inr')),ps=toNum(get(r,'potential_qty_sheets')),pf=toNum(get(r,'potential_qty_sqft')),ow=get(r,'owner_email').toLowerCase();
         var e3=[];if(!/^FY\d\d-Q[1-4]$/.test(q))e3.push('Bad quarter');else if(S.periods[q]&&S.periods[q].plan_locked)e3.push('Quarter is locked');
@@ -1130,10 +1147,12 @@ async function masterUpload(what,file){
         if(e3.length)bad.push([rn,q+' '+(pc||tr),e3.join('; ')]);else ok.push({fy_quarter:q,plant_code:pc,territory:tr,product_group:gr,customer_segment:sg,potential_value_inr:pv,potential_qty_sheets:ps,potential_qty_sqft:pf,source_type:get(r,'source_type'),source_note:get(r,'source_note'),owner_email:ow,_key:key});
       }
     });
+    if(what==='phasing'){Object.keys(seen).filter(function(k){return k.indexOf('ph')===0}).forEach(function(k){var g=seen[k];if(!g.rows.length)return;var sum=g.pct.reduce(function(x,y){return x+(y||0)},0);if(g.pct.some(function(v){return v==null})||Math.abs(sum-100)>0.01){bad.push([g.rows[0],g.pq+' '+(g.pp||'all'),'The three months must be given and add to 100 (they add to '+sum+')'])}else ok.push({_ph:true,id:g.key,fy_quarter:g.pq,plant_code:g.pp,product_group:g.pg,customer_segment:g.ps,pct:g.pct})})}
     var saved=0;
     for(var i=0;i<ok.length;i++){
       var o=ok[i];
-      if(what==='transfers'){await dset('transfers/'+slug(o.code),o)}
+      if(what==='phasing'){await dset('phasing/'+o.id,{fy_quarter:o.fy_quarter,plant_code:o.plant_code,product_group:o.product_group,customer_segment:o.customer_segment,pct:o.pct,by:S.viewer.email,at:nowISO()});await dset('log/l'+Date.now().toString(36)+i,{at:nowISO(),by:S.viewer.email,event:'phasing changed',quarter:o.fy_quarter})}
+      else if(what==='transfers'){await dset('transfers/'+slug(o.code),o)}
       else if(what==='users'){await dset('users/'+slug(o.email),Object.assign({},S.users.find(function(x){return x.email===o.email})||{},o,{_id:undefined}))}
       else if(what==='plants'){var oldp=S.plants.find(function(x){return x.plant_code===o.plant_code});await dset('plants/'+o.plant_code,Object.assign({},oldp||{},o,{_id:undefined}))}
       else{var ex=S.potential.find(function(x){return x._id===o._key}),rev=(ex?ex.rev||1:0)+1;var k=o._key;delete o._key;
@@ -1388,7 +1407,7 @@ function userName(e){var u=uByEmail(e);return u?u.name:(e||'')}
 
 /* ---- effective user and scope ---- */
 function realUser(){
-  var em=(S.viewer&&S.viewer.email||'').toLowerCase(),u=uByEmail(em);
+  var em=(S.viewer&&S.viewer.email||'').toLowerCase(),u=viewerUser();
   if(u)return u;
   if(S.role==='Super admin')return {email:em,name:(S.viewer&&S.viewer.name)||em||'Super admin',role:'Super admin',department:'HO',plant_codes:'',reports_to_email:'',today_cap:5,active:true,pseudo:true};
   return null;
@@ -1859,9 +1878,10 @@ async function evalR7(){
   var cms=qMonths(cq).filter(function(m){return m<tYm});
   if(cms.length){
     var need=[];cms.forEach(function(m){need.push(m,priorMonth(m))});
-    await loadCust(null,need.concat(qMonths(lq)));
+    /* customer-level checks need the customer detail; they run once it has been read (open Sales or Team) */
+    var allNeed=need.concat(qMonths(lq));
     cms.forEach(function(ym){
-      var pm=priorMonth(ym);if(!monthLoaded(ym,null)||!monthLoaded(pm,null))return;
+      var pm=priorMonth(ym);if(!monthLoaded(ym,null)||!monthLoaded(pm,null))return;if(!custLoaded([ym,pm].concat(qMonths(lq)),SC().plants))return;
       var A=custAgg({plants:SC().plants},[ym]),P=custAgg({plants:SC().plants},[pm]),cm=classMap();
       P.forEach(function(p,code){
         var cls=cm[code]||'C';if(CFG.qoq_classes.split(',').map(function(x){return x.trim()}).indexOf(cls)<0)return;
@@ -1878,7 +1898,7 @@ async function evalR7(){
 async function runEngine(){
   var u=effUser();if(!u||GLOBAL_ROLES.indexOf(u.role)<0||readOnly())return;
   if(!S.loaded.actions||!S.loaded.uploads||!S.loaded.potential||!S.loaded.settings||!DS.ready)return;
-  var sig=[DS.ver,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.orders.length,S.stock.length,S.users.length].join('|');
+  var sig=[DS.ver,DS.custVer,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.orders.length,S.stock.length,S.users.length].join('|');
   if(S.engSig===sig||S.engBusy)return;
   S.engBusy=true;S.engSig=sig;S.engStatus='Checking rules...';
   try{
@@ -1966,7 +1986,7 @@ async function raiseAction(o){
 /* ---- escalation ladder: drafts only, a person sends ---- */
 function senderOf(a){
   if(a.assigner&&a.assigner.indexOf('Desk rule')!==0)return a.assigner;
-  var c=a.plant?coordFor(a.plant):null;return c?c.email:'*super';
+  var c=a.plant?coordFor(a.plant):null;if(c)return c.email;var ow=uByEmail(a.owner),mg=ow&&ow.reports_to_email?uByEmail(ow.reports_to_email):null;return mg?mg.email:'*super';/* Q22 recommendation: plant Coordinator, else the owner's manager, else a Super admin */
 }
 function iAmSender(a,u){var s=senderOf(a);return s===u.email||(s==='*super'&&u.role==='Super admin')}
 function ladderRecipients(a,step){
@@ -1983,8 +2003,8 @@ function ladderRecipients(a,step){
 var TPL={
  Reminder:{subj:'Reminder: {action_id} due {when}, {title}',body:'Hi {recipient},\n\nA reminder that {action_id} "{title}" is due {when}, {due_date}.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\n\nPlease acknowledge or update it here: {link}\n\n{sender}',wa:'Reminder: {action_id} "{title}" is due {when} ({due_date}). Next step: {next_step}. Update here: {link}'},
  L1:{subj:'Overdue 1 day: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}" was due on {due_date} and is now {days_overdue} day(s) overdue.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\n\nPlease respond with an update and a new date, or mark it done with a closure note: {link}\n\n{sender}',wa:'{action_id} "{title}" is {days_overdue} day(s) overdue (was due {due_date}). Next step: {next_step}. Please update or close it here: {link}'},
- L2:{subj:'Overdue {days_overdue} days, for your attention: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}", owned by {owner}, was due on {due_date} and is {days_overdue} days overdue.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\n\nPlease speak with {owner} and help agree a date. Thread and responses: {link}\n\n{sender}',wa:'{action_id} "{title}" ({owner}) is {days_overdue} days overdue, due {due_date}. Next step: {next_step}. Please help move it: {link}'},
- L3:{subj:'Escalation, overdue {days_overdue} days: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}", owned by {owner} (reports to {reports_to}), was due on {due_date} and is {days_overdue} days overdue. It was reminded at 1 day and escalated to {reports_to} at 3 days.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\n\nYour decision is needed on whether to reassign, extend the date or close it. Thread, responses and log: {link}\n\n{sender}',wa:'Escalation: {action_id} "{title}" ({owner}) is {days_overdue} days overdue, due {due_date}. Reminded and escalated to {reports_to}. Please decide: reassign, extend or close. {link}'}
+ L2:{subj:'Overdue {days_overdue} days, for your attention: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}", owned by {owner}, was due on {due_date} and is {days_overdue} days overdue.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\nBlocked: {blocked}\n\nPlease speak with {owner} and help agree a date. Thread and responses: {link}\n\n{sender}',wa:'{action_id} "{title}" ({owner}) is {days_overdue} days overdue, due {due_date}. Next step: {next_step}. Please help move it: {link}'},
+ L3:{subj:'Escalation, overdue {days_overdue} days: {action_id}, {title}',body:'Hi {recipient},\n\n{action_id} "{title}", owned by {owner} (reports to {reports_to}), was due on {due_date} and is {days_overdue} days overdue. It was reminded at 1 day and escalated to {reports_to} at 3 days.\nNext step: {next_step}\nSource: {source_ref}\nValue at risk: {value_at_risk}\nLast update: {last_update}\nBlocked: {blocked}\n\nYour decision is needed on whether to reassign, extend the date or close it. Thread, responses and log: {link}\n\n{sender}',wa:'Escalation: {action_id} "{title}" ({owner}) is {days_overdue} days overdue, due {due_date}. Reminded and escalated to {reports_to}. Please decide: reassign, extend or close. {link}'}
 };
 function fillTpl(t,v){
   /* a line holding a placeholder with no value is dropped whole; text from data is inserted as plain text */
@@ -2000,8 +2020,8 @@ function buildDraft(a,step,today){
   var owner=uByEmail(a.owner),rep=owner&&owner.reports_to_email?uByEmail(owner.reports_to_email):null,sender=effUser();
   var od=diffDays(today,a.due);
   var vars={recipient:(rc.to.name||'').split(' ')[0],owner:owner?owner.name:a.owner,reports_to:rep?rep.name:'',action_id:a.ref,title:a.title,due_date:fmtDate(a.due),days_overdue:od>0?od:'',next_step:a.next_step,
-    value_at_risk:a.value>0?fmtMoney(a.value):'',source_ref:(a.source&&a.source.label)||'',last_update:lastUpdate(a),link:actionLink(a),sender:sender?sender.name:'',when:today<a.due?'tomorrow':'today'};
-  var t=TPL[step],subject=fillTpl(t.subj,vars),body=fillTpl(t.body,vars),wa=fillTpl(t.wa,vars);
+    value_at_risk:a.value>0?fmtMoney(a.value):'',source_ref:(a.source&&a.source.label)||'',last_update:lastUpdate(a),link:actionLink(a),blocked:a.status==='Blocked'?(a.blocked_reason||''):'',sender:sender?sender.name:'',when:today<a.due?'tomorrow':'today'};
+  var t=TPL[step],subject=fillTpl(t.subj,vars),body=fillTpl(t.body,vars),wa=fillTpl(t.wa,Object.assign({},vars,{next_step:String(vars.next_step||'').replace(/[.\s]+$/,'')}));
   var num=String(rc.to.whatsapp_number||'').replace(/\D/g,'');
   return {id:'f_'+a.id+'_'+step+'_'+a.due,action_id:a.id,ref:a.ref,title:a.title,step:step,due:a.due,to_name:rc.to.name,to_email:rc.to.email,to_whatsapp:num,cc_email:rc.cc.map(function(x){return x.email}).join(','),subject:subject,body:body,wa_text:num?wa:'',link:actionLink(a),
     days_overdue:od>0?od:0,created_day:today,created_at:nowISO(),status:'Drafted',sender:senderOf(a),demo:a.demo||undefined};
@@ -2064,7 +2084,8 @@ function actionCard(a,rank,sc,u,today,verifyCard){
 /* ---- Today ---- */
 function pageToday(){
   var u=effUser(),today=TODAY();
-  var cand=todayCandidates(u),ranked=rankSort(cand,today),cap=capFor(u),top=ranked.slice(0,cap),more=ranked.length-top.length;
+  var cand=todayCandidates(u);if(cand.some(function(a){return a.customer})&&!noData()){var lqm=qMonths(prevQ(curQuarterKey()));var sc0=SC();if(!custLoaded(lqm,sc0.plants)&&S.custAsk!=='today'){S.custAsk='today';loadCust(sc0.plants,lqm).then(function(){S.custAsk=null;S.lastHtml='';schedule()})}}
+  var ranked=rankSort(cand,today),cap=capFor(u),top=ranked.slice(0,cap),more=ranked.length-top.length;
   var overdue=cand.filter(function(a){return a.status!=='Done'&&diffDays(a.due,today)<0}).length,dueToday=cand.filter(function(a){return a.status!=='Done'&&a.due===today}).length;
   var fu=S.followups.filter(function(f){return f.status==='Drafted'&&(f.sender===u.email||(f.sender==='*super'&&u.role==='Super admin'))}).length;
   var h='<div class="kpis tiles"><div class="kpi"><small>Today list</small><b>'+top.length+' / '+cap+'</b><small>Cap for '+esc(u.role)+' · editable per role and user</small></div>'
@@ -2260,7 +2281,7 @@ function figs(ent,ctx,opts){
   if(!opts.noTrend){var ser=quarterSeries(f,(f.sp!=null)?f.sp:undefined);var ts=trendStats(ser.map(function(x){return x.isCur?null:x.A}));o.trend=ts;o.series=ser}
   return o;
 }
-function fmtAch(v){if(v==null)return '<span class="note">—</span>';var st=statusOf(v);return '<b class="a-'+st+'">'+v.toFixed(1)+'%</b>'}
+function fmtAch(v,lower){if(v==null)return '<span class="note">—</span>';var st=statusOf(v,lower);return '<b class="a-'+st+'">'+v.toFixed(1)+'%</b>'}
 function qoqCell(q){
   if(!q||q.state==='none')return '<span class="note">—</span>';
   if(q.state==='ok')return '<span class="'+(q.v>=0?'up':'dn')+'">'+fmtPct(q.v,true)+'</span>';
@@ -2394,7 +2415,7 @@ async function loadDocs(ctx,ym,cust,plant,key){
     }
   }
   if(sc.sp&&legacy){/* old chunks: keep only documents of customers who have this person's aggregate rows */
-    var mine={};custAgg({plants:ctx.plants},[ym]).forEach(function(v,k){mine[k]=1});if(Object.keys(mine).length)rows=rows.filter(function(r){return mine[r.cust]||true})}
+    var mine={};custAgg({plants:ctx.plants},[ym]).forEach(function(v,k){mine[k]=1});if(Object.keys(mine).length)rows=rows.filter(function(r){return mine[r.cust]})}
   rows.sort(function(a,b){return b.net-a.net});var cut=rows.length>300;
   S.docs={key:key,rows:rows.slice(0,3000),cut:cut,noIndex:noIndex,legacy:legacy};S.docsLoading=null;S.lastHtml='';schedule();
 }
@@ -2421,9 +2442,9 @@ function pageOverview(){
   /* branch chart + alerts */
   h+='<div class="grid2">'+branchChart(ctx)+alertsCard()+'</div>';
   /* product group table and branch table */
-  var gr=distinct('group').map(function(g){return {label:'<b>'+esc(g)+'</b>',o:figs({group:g},ctx)}});
+  var gr=distinct('group').map(function(g){return {label:'<b>'+esc(g)+'</b> ›',o:figs({group:g},ctx),attrs:' data-act="ov-group" data-v="'+esc(g)+'"'}});
   h+='<section class="card"><div class="hd"><h2>Product group · '+esc(res.label)+' vs '+esc(res.priorLabel||'')+'</h2></div>'+stdTable('Product group',gr.filter(matchSearch),tot)+tableNote(ctx)+'</section>';
-  var br=distinct('plant').filter(function(p){return plantInScope(ctx.sc,p)&&(!ctx.f.plant||p===ctx.f.plant)}).map(function(p){return {label:'<b>'+esc(plantShort(p))+'</b> <span class="note mono">'+p+'</span>',o:figs({plant:p,plants:undefined},ctx)}});
+  var br=distinct('plant').filter(function(p){return plantInScope(ctx.sc,p)&&(!ctx.f.plant||p===ctx.f.plant)}).map(function(p){return {label:'<b>'+esc(plantShort(p))+'</b> <span class="note mono">'+p+'</span> ›',o:figs({plant:p,plants:undefined},ctx),attrs:' data-act="ov-branch" data-v="'+esc(p)+'"'}});
   h+='<section class="card"><div class="hd"><h2>Branch · '+esc(res.label)+'</h2><span class="note">Tap a row in Sales to drill: branch → salesperson → customer → SAP document.</span></div>'+stdTable('Branch',br.filter(matchSearch),tot)+tableNote(ctx,'Drill-down stops at the SAP document (decision D9).')+'</section>';
   h+=ytdStrip(ctx);
   h+=targetRevisionCard(ctx,tot);
@@ -2589,6 +2610,8 @@ function docBlock(ctx,haveCust){
   return '<h3 class="lvl">Level 4 · SAP documents of '+esc(dd.cust)+'</h3>'+sel+docList(ctx,m,dd.cust,dd.plant||null);
 }
 Object.assign(handlers,{
+ 'ov-branch':function(t){S.dd={plant:t.getAttribute('data-v'),sp:'',cust:''};S.docs=null;location.hash='#/sales'},
+ 'ov-group':function(t){S.f.group=t.getAttribute('data-v');S.dd={plant:'',sp:'',cust:''};location.hash='#/sales'},
  'trend-q':function(t){S.drill={q:t.getAttribute('data-q'),m:null};S.lastHtml='';S.docs=null;schedule()},
  'drill-m':function(t){S.drill.m=t.getAttribute('data-m');S.docs=null;S.lastHtml='';schedule()},
  'drill-close':function(){S.drill=null;S.docs=null;S.lastHtml='';schedule()},
@@ -2677,7 +2700,7 @@ function kpiTable(u,ctx){
      var qoq='—';
      if(K.id==='K1'||K.id==='K2'||K.id==='K3')qoq=qoqCell(K.qoq);
      else if(K.last!=null&&K.actual!=null){var d=K.actual-K.last;qoq=K.kind==='pct'?'<span class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'−')+Math.abs(d).toFixed(1)+' pts</span>':(K.last>0?qoqCell(qoqOf(K.actual,K.last,{})):(d===0?'0':(d>0?'+':'−')+Math.abs(d)))}
-     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.ach!=null?fmtAch(K.ach):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
+     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.ach!=null?fmtAch(K.ach,K.lower):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
   return {html:h,on:on,scored:scored,total:rows.length};
 }
 function teamPeople(u){
@@ -2700,7 +2723,7 @@ function pageTeam(){
     var p=people.find(function(x){return x.email===who}),kt2=kpiTable(p,ctx);
     h+='<section class="card"><div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(p.role)+'</h2><span class="note">'+kt2.on+' of '+kt2.scored+' scored KPIs on plan · '+esc(ctx.res.label)+'</span></div>'+kt2.html+'</section>';
     var f=userFilter(p,ctx);
-    if(f&&(f.sp!=null||f.plants||Object.keys(f).length===0)&&!noData())h+=trendCard('12-quarter trend · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm');
+    if(f&&['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive'].indexOf(p.role)>=0&&(p.role!=='HOD'||norm(p.department)==='sales'||norm(p.department)==='ho')&&!noData())h+=trendCard('12-quarter trend · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm');
   }else h+='<div class="note">Tap a person to see the scorecard and the 12-quarter trend.</div>';
   return h;
 }
@@ -2927,13 +2950,17 @@ async function ensureRolls(force){
   var miss=missingRolls();if(!miss.length)return;if(!force&&S.rbSig===miss.length+'|'+Object.keys(S.rollDocs).length)return;
   S.rbBusy=true;S.rbSig=null;var n=0;
   try{
-    for(var i=0;i<miss.length;i++){
-      var m=miss[i];DS.status='Building roll-ups '+(i+1)+' of '+miss.length;schedule();
-      var rows=new Map();
-      for(var k=0;k<(m.info.chunks||0);k++){var snap=await dget('inv/'+m.info.sys+'-'+m.p+'-'+m.ym+'-'+k);if(!snap.exists)continue;var o=JSON.parse(await ungz(snap.data().z));o.a.forEach(function(a){var key=a[3]+'\u0001'+a[2]+'\u0001'+a[4];var r=rows.get(key);if(!r){r=[a[3],a[2],a[4],0,0,0,0,0];rows.set(key,r)}r[3]+=a[5];r[4]+=a[6];r[5]+=a[7];r[6]+=a[8];r[7]+=a[9]})}
-      var rr=Array.from(rows.values()).map(function(r){return [r[0],r[1],r[2],r[3],r[4],r[5],Math.round(r[6]),Math.round(r[7]*100)/100]});
-      await writeRoll(m.p,m.ym,m.info.sys,rr,m.info.at,m.info.demo);n++;
-    }
+    var q=miss.slice(),total=miss.length;
+    var worker=async function(){
+      while(q.length){
+        var m=q.shift();DS.status='Building roll-ups '+(total-q.length)+' of '+total;if(n%5===0)schedule();
+        var rows=new Map();
+        for(var k=0;k<(m.info.chunks||0);k++){var snap=await dget('inv/'+m.info.sys+'-'+m.p+'-'+m.ym+'-'+k);if(!snap.exists)continue;var o=JSON.parse(await ungz(snap.data().z));o.a.forEach(function(a){var key=a[3]+'\u0001'+a[2]+'\u0001'+a[4];var r=rows.get(key);if(!r){r=[a[3],a[2],a[4],0,0,0,0,0];rows.set(key,r)}r[3]+=a[5];r[4]+=a[6];r[5]+=a[7];r[6]+=a[8];r[7]+=a[9]})}
+        var rr=Array.from(rows.values()).map(function(r){return [r[0],r[1],r[2],r[3],r[4],r[5],Math.round(r[6]),Math.round(r[7]*100)/100]});
+        await writeRoll(m.p,m.ym,m.info.sys,rr,m.info.at,m.info.demo);n++;
+      }
+    };
+    await Promise.all([worker(),worker(),worker()]);
   }catch(e){S.err=(S.err||'')+'roll-up: '+dbErrText(e)+' '}
   S.rbBusy=false;DS.status='ready';S.rbSig=missingRolls().length+'|'+Object.keys(S.rollDocs).length;schedule();
 }
@@ -2955,7 +2982,7 @@ async function demoPeople(){
   for(var i=0;i<def.length;i++){var d=def[i];await dset('users/'+slug(d[0]),{email:d[0],name:d[1],role:d[2],department:d[3],plant_codes:d[4],reports_to_email:d[5],whatsapp_number:d[6],today_cap:5,active:true,sales_employee_code:d[2]==='Sales executive'?d[1]:'',demo:true})}
 }
 async function demoPlans(facts,cur){
-  var qs=closedQuarters().concat([cur]),plants=['1001','1011','1012','1013'],groups=['Laminate','Door'],segs=[['Dealer',0.6],['Project',0.4]],n=0,R=(function(){var a=7;return function(){a=(a*9301+49297)%233280;return a/233280}})();
+  var qs=closedQuarters().concat([cur]),plants=['1001','1011','1012','1013'],groups=['Laminate','Door','PVC sheet'],segs=[['Dealer',0.6],['Project',0.4]],n=0,R=(function(){var a=7;return function(){a=(a*9301+49297)%233280;return a/233280}})();
   for(var qi=0;qi<qs.length;qi++){
     var q=qs[qi],ms=qMonths(q),isCur=q===cur;
     for(var pi=0;pi<plants.length;pi++)for(var gi=0;gi<groups.length;gi++){
@@ -3069,6 +3096,7 @@ function bannersHtml(){
   var h='';
   if(S.viewAs){var vu=uByEmail(S.viewAs);h+='<div class="banner warn"><span><b>Viewing as '+esc(vu?vu.name+' · '+vu.role:S.viewAs)+'.</b> Read-only preview with that person\'s filter. Nothing can be saved. Logged.</span><button class="btn sm" data-act="va-exit">Exit view</button></div>'}
   if(lsGet('desk-today'))h+='<div class="banner info"><span>Test clock: today is set to <b>'+esc(fmtDate(TODAY()))+'</b> for this browser only (Admin › Settings).</span><button class="btn sm" data-act="clock-reset">Use the real date</button></div>';
+  if(DS.custJobs>0)h+='<div class="banner info">Reading customer detail '+DS.custDone+' of '+DS.custJobs+'...</div>';
   if(DS.status&&DS.status!=='ready'&&DS.status!=='idle')h+='<div class="banner info">'+esc(DS.status)+'</div>';
   if(S.err)h+='<div class="banner err">Database message: '+esc(S.err)+'</div>';
   return h;
@@ -3087,6 +3115,8 @@ function ctrlBar(pg){
     var plants=DS.plants.length?DS.plants:S.plants.map(function(p){return p.plant_code});plants=plants.filter(function(p){return plantInScope(sc,p)});
     if(plants.length>1||f.plant)h+='<div class="fld"><label for="f-plant">Branch / plant</label><select id="f-plant" data-chg="flt" data-k="plant"><option value="">All</option>'+plants.map(function(p){return '<option value="'+p+'"'+(f.plant===p?' selected':'')+'>'+esc(plantName(p))+'</option>'}).join('')+'</select></div>';
     if(!sc.sp&&(pg==='sales'||pg==='overview'||pg==='team')){var sps=distinct('sp');if(sps.length)h+='<div class="fld"><label for="f-sp">Salesperson</label><select id="f-sp" data-chg="flt" data-k="sp"><option value="">All</option>'+sps.slice(0,500).map(function(p){return '<option value="'+esc(p)+'"'+(f.sp===p?' selected':'')+'>'+esc(p)+'</option>'}).join('')+'</select></div>'}
+    if(pg==='sales'||pg==='overview'||pg==='team')h+='<div class="fld"><label for="f-group">Product group</label><select id="f-group" data-chg="flt" data-k="group"><option value="">All</option>'+GROUPS.map(function(g){return '<option'+(f.group===g?' selected':'')+'>'+g+'</option>'}).join('')+'</select></div>';
+    if(f.plant||f.sp||f.group||f.search)h+='<button class="btn sm" data-act="clear-f">Clear filters</button>';
     h+='<div class="fld"><label for="f-search">Search</label><input id="f-search" class="in" data-in="fsearch" value="'+esc(f.search||'')+'" placeholder="customer, branch, person"></div>';
   }
   if(PERIOD_PAGES.indexOf(pg)>=0)h+='<span class="chip">Compared with: '+esc(res.priorLabel||'previous quarter')+'</span>'+(res.pro?'<span class="chip">To-date plan and previous quarter pro-rated by working days ('+res.N+' elapsed)</span>':'');
@@ -3107,7 +3137,7 @@ function renderAll(){
   if(S.dbState==='none'){root.innerHTML=gate('Database not available','Sign in to claude.ai and open this page again. The Desk stores its data in the shared database.');return}
   if(!S.loaded.users)return;
   S.role=viewerRole();
-  if(S.role===null||S.role==='inactive'){root.innerHTML=gate('Ask your admin for access','You are signed in as '+(S.viewer&&S.viewer.email||'an unknown user')+'. This page is not enabled for that address.');return}
+  if(S.role===null||S.role==='inactive'){root.innerHTML=gate('Ask your admin for access','You are signed in as '+(S.viewer&&S.viewer.email||'a user whose email this page cannot read')+'. This page is not enabled for that address.'+(S.viewer&&S.viewer.id?' Give your admin this viewer ID: '+S.viewer.id:''));return}
   if(S.role==='Super admin'&&!S.seeded&&S.loaded.users&&S.loaded.plants){S.seeded=true;seedDefaults()}
   var u=effUser();
   if(!u){root.innerHTML=gate('Ask your admin for access','Your user record could not be read.');return}
@@ -3144,6 +3174,7 @@ function renderAll(){
 /* ---- handlers ---- */
 function goto(pg,opt){opt=opt||{};if(opt.plant!=null)S.f.plant=opt.plant||'';if(opt.group!=null)S.f.group=opt.group||'';location.hash='#/'+pg}
 Object.assign(handlers,{
+ 'clear-f':function(){S.f.plant='';S.f.sp='';S.f.group='';S.f.search='';S.lastHtml='';schedule()},
  'goto':function(t){S.f.plant=t.getAttribute('data-plant')||S.f.plant;S.f.group=t.getAttribute('data-group')||''},
  'share':function(){var d=window.__clip;return copyText(PAGE_URL,'Link copied')},
  'mode':function(t){S.f.mode=t.getAttribute('data-m');S.lastHtml='';schedule()},
@@ -3221,7 +3252,7 @@ async function boot(){
   if(!window.claude||!window.claude.use){S.dbState='none';renderAll();return}
   try{
     var user=await window.claude.use('user');
-    if(user){try{var me=await user.me();var em=null;try{if(user.email)em=await user.email()}catch(e){}var ow=false;try{ow=await user.isOwner()}catch(e){}S.viewer={email:((em||me.email||'')+'').toLowerCase()||null,name:me.name||'',owner:!!ow}}catch(e){S.viewer={email:null,name:''}}}
+    if(user){try{var me=await user.me();var em=null;try{if(user.email)em=await user.email()}catch(e){}var ow=false;try{ow=await user.isOwner()}catch(e){}var uid=null;try{uid=(me&&me.id)||(user.id?await user.id():null)}catch(e){}S.viewer={email:((em||me.email||'')+'').toLowerCase()||null,name:me.name||'',owner:!!ow,id:uid}}catch(e){S.viewer={email:null,name:''}}}
     else S.viewer={email:null,name:''};
     var dl=await window.claude.use('downloads');window.__downloads=dl||null;
     var db=await window.claude.use('db');

@@ -114,6 +114,8 @@ function docBlock(ctx,haveCust){
   return '<h3 class="lvl">Level 4 · SAP documents of '+esc(dd.cust)+'</h3>'+sel+docList(ctx,m,dd.cust,dd.plant||null);
 }
 Object.assign(handlers,{
+ 'ov-branch':function(t){S.dd={plant:t.getAttribute('data-v'),sp:'',cust:''};S.docs=null;location.hash='#/sales'},
+ 'ov-group':function(t){S.f.group=t.getAttribute('data-v');S.dd={plant:'',sp:'',cust:''};location.hash='#/sales'},
  'trend-q':function(t){S.drill={q:t.getAttribute('data-q'),m:null};S.lastHtml='';S.docs=null;schedule()},
  'drill-m':function(t){S.drill.m=t.getAttribute('data-m');S.docs=null;S.lastHtml='';schedule()},
  'drill-close':function(){S.drill=null;S.docs=null;S.lastHtml='';schedule()},
@@ -202,7 +204,7 @@ function kpiTable(u,ctx){
      var qoq='—';
      if(K.id==='K1'||K.id==='K2'||K.id==='K3')qoq=qoqCell(K.qoq);
      else if(K.last!=null&&K.actual!=null){var d=K.actual-K.last;qoq=K.kind==='pct'?'<span class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'−')+Math.abs(d).toFixed(1)+' pts</span>':(K.last>0?qoqCell(qoqOf(K.actual,K.last,{})):(d===0?'0':(d>0?'+':'−')+Math.abs(d)))}
-     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.ach!=null?fmtAch(K.ach):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
+     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.ach!=null?fmtAch(K.ach,K.lower):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
   return {html:h,on:on,scored:scored,total:rows.length};
 }
 function teamPeople(u){
@@ -225,7 +227,7 @@ function pageTeam(){
     var p=people.find(function(x){return x.email===who}),kt2=kpiTable(p,ctx);
     h+='<section class="card"><div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(p.role)+'</h2><span class="note">'+kt2.on+' of '+kt2.scored+' scored KPIs on plan · '+esc(ctx.res.label)+'</span></div>'+kt2.html+'</section>';
     var f=userFilter(p,ctx);
-    if(f&&(f.sp!=null||f.plants||Object.keys(f).length===0)&&!noData())h+=trendCard('12-quarter trend · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm');
+    if(f&&['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive'].indexOf(p.role)>=0&&(p.role!=='HOD'||norm(p.department)==='sales'||norm(p.department)==='ho')&&!noData())h+=trendCard('12-quarter trend · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm');
   }else h+='<div class="note">Tap a person to see the scorecard and the 12-quarter trend.</div>';
   return h;
 }

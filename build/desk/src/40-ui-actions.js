@@ -27,7 +27,8 @@ function actionCard(a,rank,sc,u,today,verifyCard){
 /* ---- Today ---- */
 function pageToday(){
   var u=effUser(),today=TODAY();
-  var cand=todayCandidates(u),ranked=rankSort(cand,today),cap=capFor(u),top=ranked.slice(0,cap),more=ranked.length-top.length;
+  var cand=todayCandidates(u);if(cand.some(function(a){return a.customer})&&!noData()){var lqm=qMonths(prevQ(curQuarterKey()));var sc0=SC();if(!custLoaded(lqm,sc0.plants)&&S.custAsk!=='today'){S.custAsk='today';loadCust(sc0.plants,lqm).then(function(){S.custAsk=null;S.lastHtml='';schedule()})}}
+  var ranked=rankSort(cand,today),cap=capFor(u),top=ranked.slice(0,cap),more=ranked.length-top.length;
   var overdue=cand.filter(function(a){return a.status!=='Done'&&diffDays(a.due,today)<0}).length,dueToday=cand.filter(function(a){return a.status!=='Done'&&a.due===today}).length;
   var fu=S.followups.filter(function(f){return f.status==='Drafted'&&(f.sender===u.email||(f.sender==='*super'&&u.role==='Super admin'))}).length;
   var h='<div class="kpis tiles"><div class="kpi"><small>Today list</small><b>'+top.length+' / '+cap+'</b><small>Cap for '+esc(u.role)+' · editable per role and user</small></div>'

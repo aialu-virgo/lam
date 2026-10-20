@@ -29,7 +29,7 @@ function figs(ent,ctx,opts){
   if(!opts.noTrend){var ser=quarterSeries(f,(f.sp!=null)?f.sp:undefined);var ts=trendStats(ser.map(function(x){return x.isCur?null:x.A}));o.trend=ts;o.series=ser}
   return o;
 }
-function fmtAch(v){if(v==null)return '<span class="note">—</span>';var st=statusOf(v);return '<b class="a-'+st+'">'+v.toFixed(1)+'%</b>'}
+function fmtAch(v,lower){if(v==null)return '<span class="note">—</span>';var st=statusOf(v,lower);return '<b class="a-'+st+'">'+v.toFixed(1)+'%</b>'}
 function qoqCell(q){
   if(!q||q.state==='none')return '<span class="note">—</span>';
   if(q.state==='ok')return '<span class="'+(q.v>=0?'up':'dn')+'">'+fmtPct(q.v,true)+'</span>';
@@ -163,7 +163,7 @@ async function loadDocs(ctx,ym,cust,plant,key){
     }
   }
   if(sc.sp&&legacy){/* old chunks: keep only documents of customers who have this person's aggregate rows */
-    var mine={};custAgg({plants:ctx.plants},[ym]).forEach(function(v,k){mine[k]=1});if(Object.keys(mine).length)rows=rows.filter(function(r){return mine[r.cust]||true})}
+    var mine={};custAgg({plants:ctx.plants},[ym]).forEach(function(v,k){mine[k]=1});if(Object.keys(mine).length)rows=rows.filter(function(r){return mine[r.cust]})}
   rows.sort(function(a,b){return b.net-a.net});var cut=rows.length>300;
   S.docs={key:key,rows:rows.slice(0,3000),cut:cut,noIndex:noIndex,legacy:legacy};S.docsLoading=null;S.lastHtml='';schedule();
 }
@@ -190,9 +190,9 @@ function pageOverview(){
   /* branch chart + alerts */
   h+='<div class="grid2">'+branchChart(ctx)+alertsCard()+'</div>';
   /* product group table and branch table */
-  var gr=distinct('group').map(function(g){return {label:'<b>'+esc(g)+'</b>',o:figs({group:g},ctx)}});
+  var gr=distinct('group').map(function(g){return {label:'<b>'+esc(g)+'</b> ›',o:figs({group:g},ctx),attrs:' data-act="ov-group" data-v="'+esc(g)+'"'}});
   h+='<section class="card"><div class="hd"><h2>Product group · '+esc(res.label)+' vs '+esc(res.priorLabel||'')+'</h2></div>'+stdTable('Product group',gr.filter(matchSearch),tot)+tableNote(ctx)+'</section>';
-  var br=distinct('plant').filter(function(p){return plantInScope(ctx.sc,p)&&(!ctx.f.plant||p===ctx.f.plant)}).map(function(p){return {label:'<b>'+esc(plantShort(p))+'</b> <span class="note mono">'+p+'</span>',o:figs({plant:p,plants:undefined},ctx)}});
+  var br=distinct('plant').filter(function(p){return plantInScope(ctx.sc,p)&&(!ctx.f.plant||p===ctx.f.plant)}).map(function(p){return {label:'<b>'+esc(plantShort(p))+'</b> <span class="note mono">'+p+'</span> ›',o:figs({plant:p,plants:undefined},ctx),attrs:' data-act="ov-branch" data-v="'+esc(p)+'"'}});
   h+='<section class="card"><div class="hd"><h2>Branch · '+esc(res.label)+'</h2><span class="note">Tap a row in Sales to drill: branch → salesperson → customer → SAP document.</span></div>'+stdTable('Branch',br.filter(matchSearch),tot)+tableNote(ctx,'Drill-down stops at the SAP document (decision D9).')+'</section>';
   h+=ytdStrip(ctx);
   h+=targetRevisionCard(ctx,tot);
