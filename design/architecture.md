@@ -4,6 +4,7 @@ summary: How the page stores, computes and drills down: shared database limits, 
 status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
+  - design/hosting-gcp.md
   - handover/_index.md
   - design/_index.md
   - design/canonical-data-model.md

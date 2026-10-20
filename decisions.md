@@ -4,6 +4,7 @@ summary: Every decision on the Desk: what, who decided or approved, why, date.
 status: active
 updated: 2026-10-20
 related:
+  - design/hosting-gcp.md
   - CLAUDE.md
   - design/comparison-basis.md
 ---

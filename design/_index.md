@@ -10,6 +10,7 @@ related:
   - design/check-rules.md
   - design/comparison-basis.md
   - design/escalation-ladder.md
+  - design/hosting-gcp.md
   - design/kra-kpi.md
   - design/notification-templates.md
   - design/plan-model.md
@@ -27,6 +28,7 @@ related:
 - [Canonical data model](canonical-data-model.md) — draft, approval not submitted
 - [Check rules](check-rules.md) — draft, approval not submitted
 - [Comparison basis](comparison-basis.md) — draft, approval not submitted
+- [Hosting on Virgo Google Cloud](hosting-gcp.md) — draft, approval not submitted
 - [Escalation ladder](escalation-ladder.md) — draft, approval not submitted
 - [KRA / KPI set](kra-kpi.md) — draft, approval not submitted
 - [Notification templates](notification-templates.md) — draft, approval not submitted
