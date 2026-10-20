@@ -1,0 +1,10 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));Object.keys(store).forEach(k=>{if(k.startsWith('collections/'))delete store[k]});
+const browser = await chromium.launch();
+const {page}=await open(browser,{store,viewer:{email:'data@virgoasia.com'}});await page.waitForTimeout(2500);
+await page.evaluate(()=>{location.hash='#/team'});await page.waitForTimeout(2000);
+await page.evaluate(()=>{document.querySelector('[data-act="team-who"][data-e="acc.ab@demo"]').click()});await page.waitForTimeout(1200);
+const t=await page.innerText('#pg');console.log(/Collection export needed/.test(t)&&/data-map\/collection.md/.test(t)?'PASS empty state names the collection export':'FAIL');
+await browser.close();
