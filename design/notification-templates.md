@@ -4,6 +4,7 @@ summary: Email and WhatsApp (wa.me) draft texts for the reminder and the L1, L2 
 status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
+  - handover/_index.md
   - design/escalation-ladder.md
   - design/wireframes.md
   - design/priority-rules.md

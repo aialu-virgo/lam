@@ -4,6 +4,7 @@ summary: How Today ranks actions: five weighted components scored 0-100, editabl
 status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
+  - handover/_index.md
   - design/_index.md
   - design/role-matrix.md
   - design/check-rules.md

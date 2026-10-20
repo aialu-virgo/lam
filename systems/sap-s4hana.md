@@ -4,6 +4,7 @@ summary: Future source for the same canonical model via read-only OData; go-live
 status: draft
 updated: 2026-10-20
 related:
+  - handover/_index.md
   - systems/sap-b1.md
   - .claude/rules/data-handling.md
   - systems/_index.md

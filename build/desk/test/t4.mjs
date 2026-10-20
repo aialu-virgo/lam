@@ -1,0 +1,10 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+const browser = await chromium.launch();
+const { page } = await open(browser,{store});
+page.on('console',m=>{if(m.text().startsWith('ZERO'))console.log(m.text())});
+await page.evaluate(()=>{const d=window.__dbg;let c={};const orig=d.DS;Object.defineProperty(d.DS,'cache',{get(){return c},set(v){c=new Proxy(v,{set(t,k,val){if(val&&val.n===0&&k.indexOf('2026-04')>=0&&k.indexOf('"Compact')<0)console.log('ZERO '+k.slice(0,60)+' ver'+orig.ver+' pgkeys'+Object.keys(orig.pg).length+' '+new Error().stack.split('\n').slice(2,7).join(' <- '));t[k]=val;return true}})}});d.DS.cache={}});
+await page.waitForTimeout(3500);
+await browser.close();

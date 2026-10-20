@@ -4,6 +4,7 @@ summary: The S/4HANA Public Cloud sales register export (60 columns, plant 1013,
 status: draft
 updated: 2026-10-20
 related:
+  - handover/_index.md
   - design/canonical-data-model.md
   - data-map/_index.md
   - data-map/invoice.md
