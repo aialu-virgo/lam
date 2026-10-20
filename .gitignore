@@ -1,0 +1,27 @@
+# Credentials and connections
+.env
+.env.*
+*.pem
+*.key
+*token*
+*credential*
+*secret*
+*.sapconn
+saplogon*.ini
+sap-connection*
+
+# Uploads and exported data — never commit Virgo data
+*.xlsx
+*.xls
+*.csv
+*.tsv
+exports/
+uploads/
+build/demo-data/output/
+
+# Header-only upload templates (column names, no rows) are allowed
+!data-map/templates/*.csv
+
+# OS / editor
+.DS_Store
+*.swp
