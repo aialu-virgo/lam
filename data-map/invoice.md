@@ -48,6 +48,7 @@ Other product lines (ACP, aluminium, MDF, TAS) do **not** appear in this file; t
 - **S/4 equivalent:** `Product Type` ZABLAM or ZCRLAM = laminate; ZCBPVC = PVC sheet (included). `Material Group 3` (LAM, MICA, DOOR, PVC, LINER) agrees.
 
 ## Internal stock transfers (not sales)
+- **Master (D7):** B1 also exports an internal-transfer customer list (headers `CardCode,CardName,Tranfser`). It is loaded in Admin as a master, and any `CardCode` in it is flagged as internal, in addition to the rule below.
 - **Rule (Assumed):** `is_internal_transfer` = `AcctName` is "Sales GST - Stock Outward" (`SaleAcctCode` 41111002), **or** `Zone` is BRANCH or FACTORY (any case).
 - **Evidence:** 19,354 rows flagged; 100% of them have "VIRGO" in `CardName`; 19,331 on the stock-outward account, 17,449 in zone BRANCH/FACTORY, 17,426 on both. Without the flag, branch-to-branch transfers would be counted as sales (13.9% of rows).
 - Not in the S/4 register: it has no account column, so the flag cannot be derived there. All 92 S/4 customers are external by name (Assumed).
