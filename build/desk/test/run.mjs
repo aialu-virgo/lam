@@ -8,7 +8,9 @@ export const here = path.dirname(fileURLToPath(import.meta.url));
 export const dist = path.join(here, '../dist/index.html');
 export async function open(browser, { viewer, store, size = { width: 1440, height: 900 }, scheme = 'light', today } = {}) {
   const ctx = await browser.newContext({ viewport: size, colorScheme: scheme });
-  await ctx.route(/fonts\.googleapis|fonts\.gstatic|cdnjs/, r => r.abort());
+  await ctx.route(/fonts\.googleapis|fonts\.gstatic/, r => r.abort());
+  await ctx.route(/cdnjs.*xlsx/, r => r.fulfill({ path: '/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/xlsx.full.min.js', contentType: 'application/javascript' }));
+  await ctx.route(/cdnjs(?!.*xlsx)/, r => r.abort());
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));

@@ -1,0 +1,11 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+const browser = await chromium.launch();
+const {page,errs}=await open(browser,{store});await page.waitForTimeout(2500);
+await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(500);await page.click('[data-t="items"]');await page.waitForTimeout(300);
+await page.setInputFiles('#up-item',SP+'demo-items.xlsx');await page.waitForTimeout(6000);
+console.log(await page.evaluate(()=>JSON.stringify({st:window.__dbg.S.mst.items&&{stage:window.__dbg.S.mst.items.stage,msg:window.__dbg.S.mst.items.msg},xl:typeof XLSX})));
+try{console.log((await page.evaluate(()=>window.__dbg.itemsHtml())).length)}catch(e){console.log('ERR',e.message)}console.log(errs);
+await browser.close();

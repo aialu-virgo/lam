@@ -161,7 +161,7 @@ async function loadDocs(ctx,ym,cust,plant,key,spF){
         o.h.forEach(function(h){
           if(h[6])return;if(cust&&h[2]!==cust)return;
           if(sc.sp){if(h.length>8){if(!spOk(sc,h[8]))return}else legacy=true}
-          if(spF&&h.length>8&&h[8]!==spF)return;
+          if(spF&&h.length>8&&spCanon(h[8])!==spF)return;
           rows.push({sys:info.sys,type:h[9]||'INV',doc:h[0],date:ym+'-'+pad(h[1]),plant:ps[i],cust:h[2],lines:h[3],sheets:h[4],net:h[5]});
         });
       }

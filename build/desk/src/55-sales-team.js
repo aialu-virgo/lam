@@ -138,7 +138,7 @@ var ROLE_KPIS={
 var DEPT_KPIS={Sales:['K1','K3','K8'],CRR:['K12','K13','K14'],Accounts:['K9','K10','K11'],Plant:['K12','K15','K16'],HO:['K1','K3']};
 var COMMON=['K17','K18','K19'];
 function kpiIdsFor(u){var base=u.role==='HOD'?(DEPT_KPIS[u.department]||DEPT_KPIS.Sales).concat(['K17','K19','K20','K25']):(ROLE_KPIS[u.role]||[]).slice();COMMON.forEach(function(k){if(base.indexOf(k)<0)base.push(k)});return base}
-function spKeyOf(u){var cands=[norm(u.sales_employee_code),norm(u.name)].filter(Boolean);var keys=Object.keys(DS.spIdx);for(var i=0;i<keys.length;i++)if(cands.indexOf(norm(keys[i]))>=0)return keys[i];return null}
+function spKeyOf(u){var cands=[norm(u.sales_employee_code),norm(u.name)].filter(Boolean);var mc=SM.byCode[norm(u.sales_employee_code)];if(mc)cands.push(norm(mc.name));var keys=Object.keys(DS.spIdx);for(var i=0;i<keys.length;i++)if(cands.indexOf(norm(keys[i]))>=0)return keys[i];return null}
 function userFilter(u,ctx){
   if(u.role==='Sales executive'){var k=spKeyOf(u);return k?{sp:k}:null}
   var c=codesOf(u);return c.length?{plants:new Set(c)}:{};
@@ -228,6 +228,7 @@ function pageTeam(){
   var h='<section class="card"><div class="hd"><h2>Team · KRA / KPI plan vs actual</h2><span class="note">'+(u.role==='Sales executive'?'Your own scorecard.':u.role==='Branch / depot manager'?'Your own team.':u.role==='HOD'?'Your department.':'All people.')+'</span></div>'
    +'<div class="tw"><table><thead><tr><th>Person</th><th>Role</th><th>Dept</th><th class="num">KPIs on plan</th><th class="num">On-time closure</th><th class="num">Overdue actions</th><th></th></tr></thead><tbody>'
    +people.map(function(p){var kt=kpiTable(p,ctx),as=actionStats(p,ctx.res.q||curQuarterKey());return '<tr class="clk'+(who===p.email?' sel':'')+'" data-act="team-who" data-e="'+esc(p.email)+'"><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.role)+'</td><td>'+esc(p.department)+'</td><td class="num">'+kt.on+' of '+kt.scored+' scored · '+kt.total+' KPIs</td><td class="num">'+(as.done?fmtPct(as.onTime/as.done*100):'—')+'</td><td class="num">'+as.overdue+'</td><td>›</td></tr>'}).join('')+'</tbody></table></div><p class="note">'+(allPeople>people.length?'Showing the first '+people.length+' of '+allPeople+' people. Use Search to find someone. ':'')+'The scorecard informs. It shows no composite score and no ranking label; disciplinary or incentive action on results is SP Sir\'s decision alone. A KPI whose plan is missing shows "No plan" and is never scored zero.</p></section>';
+  h+=teamSalespeople(ctx,u);
   if(who){
     var p=people.find(function(x){return x.email===who}),kt2=kpiTable(p,ctx);
     h+='<section class="card"><div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(p.role)+'</h2><span class="note">'+kt2.on+' of '+kt2.scored+' scored KPIs on plan · '+esc(ctx.res.label)+'</span></div>'+kt2.html+'</section>';
@@ -249,3 +250,21 @@ function personTrend(p,f,ctx){
   if(f==null)return '<section class="card"><div class="hd"><h2>12-quarter trend · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
   return trendCard('12-quarter trend · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch history (sales order and delivery exports) is not loaded yet, so there is no 12-quarter dispatch series.</p>':'')+drillPanel(ctx);
 }
+
+/* salespeople from the sales-employee master that match the B1 names: scorecards for people who are not Desk users */
+function teamSalespeople(ctx,u){
+  if(u.role==='Sales executive'||!SM.ready||noData())return '';
+  var sc=SC(),list=[];
+  Object.keys(DS.spIdx).filter(Boolean).forEach(function(k){var m=spMeta(k);if(!m)return;if(sc.plants&&m.plant&&!sc.plants.has(m.plant))return;list.push({k:k,m:m})});
+  var q=(S.f.search||'').toLowerCase();list=list.filter(function(x){return !q||(x.k+' '+x.m.zone+' '+x.m.plant).toLowerCase().indexOf(q)>=0});
+  if(!list.length)return '<section class="card"><div class="hd"><h2>Salespeople from the sales-employee master</h2></div><div class="empty sm">No salesperson in your scope matches the master yet. Match rate is in Admin › Sales employees.</div></section>';
+  var rows=list.map(function(x){return {x:x,o:figs({sp:x.k},ctx,{noTrend:true})}}).sort(function(a,b){return (b.o.A)-(a.o.A)}).slice(0,60);
+  var h='<section class="card"><div class="hd"><h2>Salespeople · linked to branch and zone by the master · '+esc(ctx.res.label)+'</h2><span class="note">'+list.length+' matched'+(list.length>60?' (top 60 by actual shown)':'')+'</span></div><div class="tw tall"><table class="std"><thead><tr><th>Person</th><th>Zone</th><th>Branch</th><th>Designation</th><th class="num">Actual</th><th class="num">Ach %</th><th class="num">QoQ %</th></tr></thead><tbody>'
+   +rows.map(function(r){return '<tr class="clk'+(S.team.sp===r.x.k?' sel':'')+'" data-act="team-sp" data-k="'+esc(r.x.k)+'"><td><b>'+esc(r.x.k)+'</b> <span class="note mono">'+esc(r.x.m.code)+'</span></td><td>'+esc(r.x.m.zone||'—')+'</td><td>'+esc(r.x.m.plant?plantShort(r.x.m.plant):(r.x.m.plantRaw||'—'))+'</td><td>'+esc(r.x.m.designation||'—')+'</td><td class="num">'+fmtMoney(r.o.A)+'</td><td class="num">'+fmtAch(r.o.ach)+'</td><td class="num">'+qoqCell(r.o.qoq)+'</td></tr>'}).join('')+'</tbody></table></div><p class="note">Names match the master exactly or after removing the " - &lt;branch&gt;" suffix. Facts only; no ranking label.</p>';
+  if(S.team.sp&&list.some(function(x){return x.k===S.team.sp})){
+    var m=spMeta(S.team.sp),p={name:S.team.sp,email:'',role:'Sales executive',department:'Sales',sales_employee_code:m.code,plant_codes:m.plant||''},kt=kpiTable(p,ctx);
+    h+='<div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(m.zone||'')+' · '+esc(m.plant?plantName(m.plant):(m.plantRaw||''))+'</h2><span class="note">'+kt.on+' of '+kt.scored+' scored KPIs on plan</span></div>'+kt.html+trendCard('12-quarter trend · Net sales · '+p.name,{},ctx,S.team.sp,'tp')+drillPanel(ctx);
+  }
+  return h+'</section>';
+}
+Object.assign(handlers,{'team-sp':function(t){S.team.sp=t.getAttribute('data-k');S.team.who='';S.lastHtml='';schedule()}});

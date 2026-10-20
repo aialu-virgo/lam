@@ -485,6 +485,8 @@ function detect(headers){
   if(set['potential_value_inr']&&set['fy_quarter'])return{type:'master',what:'potential'};
   if(set['cardcode']&&set['tranfser'])return{type:'master',what:'transfers'};
   if(set['phasing_pct'])return{type:'master',what:'phasing'};
+  if(set['item no.']&&set['item category'])return{type:'master',what:'items'};
+  if(set['employee code']&&set['fullname'])return{type:'master',what:'semp'};
   return{type:'unknown'};
 }
 function defaultMap(headers,sys){
@@ -514,7 +516,7 @@ async function onFile(file){
     if(!rows.length)throw new Error('The file is empty.');
     var headers=rows[0].map(function(x){return x==null?'':String(x)});
     var d=detect(headers);
-    if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer'})[d.what]+').';renderUpload();return}
+    if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}
     if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;U.msg='The headers match no known file. Expected an invoice export from SAP B1 (docnum, CardCode, BPLName ...) or the S/4 sales register (Invoice Document Number, Plant ...).';renderUpload();return}
     U.headers=headers;U.rows=rows.slice(1);U.sys=d.sys;U.map=defaultMap(headers,d.sys);
     var sv=S.mappings[d.sys+'_invoice'];
@@ -796,6 +798,8 @@ async function demoClear(){
     for(var q in S.periods){if(S.periods[q].demo)await ddel('periods/'+q)}
     for(var pt of S.plants.filter(function(x){return x.demo})){if(pt.demoDefault)await dset('plants/'+pt.plant_code,{plant_code:pt.plant_code,plant_name:'',plant_type:pt.plant_type||'Depot',zone:'',state:'',b1_bpl_name:'',business:'laminates',active:true,seed:true});else await dset('plants/'+pt.plant_code,Object.assign({},pt,{demo:undefined,plant_name:pt.plant_name,b1_bpl_name:pt.b1_bpl_name}))}
     for(var po of S.potential.filter(function(x){return x.demo}))await ddel('potential/'+po._id);
+    if(S.itemMeta&&S.itemMeta.demo){for(var ic=0;ic<(S.itemMeta.chunks||0);ic++)await ddel('items/c'+ic);await ddel('itemmeta/main')}
+    if(S.salesMaster&&S.salesMaster.demo)await ddel('salesmaster/main');
     await demoClearExtras();
     toast('Demo data cleared');
   }catch(e){toast('Clear failed: '+dbErrText(e))}
@@ -807,7 +811,7 @@ function usersHtml(){
   return '<section class="card"><div class="hd"><h2>Users &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="user-add">Add user</button><label class="btn sm" for="up-users" style="cursor:pointer">Upload users (CSV)</label><input id="up-users" data-file="users" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="users">Download template</button></div></div>'
   +'<div class="tw"><table><thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Dept</th><th>Plants</th><th>Reports to</th><th>WhatsApp</th><th class="num">Cap</th><th>Active</th><th></th></tr></thead><tbody>'
   +rows.map(function(u){return '<tr><td class="break">'+esc(u.email)+'</td><td>'+esc(u.name)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.department)+'</td><td class="mono break">'+esc(u.plant_codes||'All')+'</td><td class="break">'+esc(u.reports_to_email||'-')+'</td><td class="mono">'+esc(u.whatsapp_number||'-')+'</td><td class="num">'+esc(u.today_cap||'')+'</td><td>'+(u.active===false?'<span class="pill mute">Off</span>':'<span class="pill ok">On</span>')+'</td><td><button class="btn sm" data-act="user-edit" data-id="'+esc(u._id)+'">Edit</button></td></tr>'}).join('')+'</tbody></table></div>'
-  +'<p class="note">Roles: '+ROLES.join(' &middot; ')+'. Access is by email. An unknown or inactive viewer sees "Ask your admin for access". For a Sales executive, the sales employee code must match the salesperson name in the SAP export (B1 Salesemployee) until S/4 gives codes. Seed Super admins: '+SEED_SUPER.join(', ')+'.</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
+  +'<p class="note">Roles: '+ROLES.join(' &middot; ')+'. Access is by email. An unknown or inactive viewer sees "Ask your admin for access". For a Sales executive, the sales employee code is the Employee Code from the sales-employee master (Admin › Sales employees) or the salesperson name in the SAP export. Seed Super admins: '+SEED_SUPER.join(', ')+'.</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
 }
 function plantsHtml(){
   var rows=S.plants.slice().sort(function(a,b){return a.plant_code<b.plant_code?-1:1});
@@ -1111,6 +1115,9 @@ async function boot(){
     subscribe('receivables',db.collection('receivables'),function(d){S.recv=d});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});
     subscribe('stock',db.collection('stock'),function(d){S.stock=d});
+    subscribe('itemmeta',db.collection('itemmeta'),function(d){S.itemMeta=d.find(function(x){return x._id==='main'})||null});
+    subscribe('salesmaster',db.collection('salesmaster'),function(d){onSalesMaster(d.find(function(x){return x._id==='main'})||null)});
+    setTimeout(function(){if(!S.smReady){S.smReady=true;ingestRoll()}},5000);
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }

@@ -11,7 +11,7 @@ function mgmtUsers(){return usersOfRole('Management / HO')}
 function coordFor(p){return usersOfRole('Coordinator (sales / CRR)').find(function(u){return holdsPlant(u,p)})||null}
 function accountsFor(p){return usersOfRole('Accounts').find(function(u){var c=codesOf(u);return !c.length||c.indexOf(String(p))>=0})||null}
 function plantUserFor(p){return usersOfRole('Plant').find(function(u){return holdsPlant(u,p)})||null}
-function userBySp(name){var n=norm(name);if(!n)return null;return activeUsers().find(function(u){return u.role==='Sales executive'&&(norm(u.sales_employee_code)===n||norm(u.name)===n)})||null}
+function userBySp(name){var n=norm(name);if(!n)return null;var mm=(function(){var m=spMatch(name);return m&&!m.ambiguous?m:null})();return activeUsers().find(function(u){if(u.role!=='Sales executive')return false;var c=norm(u.sales_employee_code);return c===n||norm(u.name)===n||(mm&&(c===norm(mm.code)||c===norm(mm.name)))})||null}
 function plantName(c){var p=S.plants.find(function(x){return x.plant_code===c});var nm=p&&(p.plant_name||p.b1_bpl_name);return nm?c+' '+nm:c}
 function plantShort(c){var p=S.plants.find(function(x){return x.plant_code===c});var nm=p&&(p.plant_name||p.b1_bpl_name);return nm?nm:c}
 function userName(e){var u=uByEmail(e);return u?u.name:(e||'')}
@@ -37,7 +37,10 @@ function scopeOf(u){
 function SC(){return scopeOf(effUser())}
 function plantInScope(sc,p){return !sc.plants||sc.plants.has(String(p))}
 function scopeSig(sc){return [sc.role,sc.plants?Array.from(sc.plants).sort().join(','):'*',(sc.sp||[]).join('/')].join('#')}
-function spOk(sc,name){return !sc.sp||sc.sp.indexOf(norm(name))>=0}
+function spOk(sc,name){
+  if(!sc.sp)return true;if(sc.sp.indexOf(norm(name))>=0)return true;
+  var m=spMatch(name);return !!(m&&!m.ambiguous&&(sc.sp.indexOf(norm(m.name))>=0||sc.sp.indexOf(norm(m.code))>=0));
+}
 /* what a role may open (role-matrix.md, department table) */
 var DEPT_PAGES={Sales:['overview','sales','orders','team'],CRR:['orders','sales','team'],Accounts:['receivables','team'],Plant:['orders','inventory','team'],HO:['overview','sales','orders','receivables','inventory','team']};
 function pagesFor(u){
@@ -60,7 +63,7 @@ function isCust(u){return u&&u.role==='Coordinator (sales / CRR)'}
 var DS={raw:{},sig:'',ver:0,pg:{},spk:{},spIdx:{},xf:{},busy:false,again:false,status:'idle',cust:{},custVer:0,custJobs:0,custDone:0,cache:{},plants:[],months:[]};
 function T0(){return {n:0,sh:0,sq:0,d:0,l:0}}
 async function ingestRoll(){
-  if(!S.rollLoaded)return;
+  if(!S.rollLoaded||!S.smReady)return;
   if(DS.busy){DS.again=true;return}
   DS.busy=true;
   try{
@@ -88,15 +91,16 @@ async function ingestRoll(){
   DS.busy=false;DS.ready=true;schedule();afterData();
 }
 function rebuildMaps(){
-  DS.pg={};DS.spk={};DS.spIdx={};DS.xf={};var plants={},months={};
+  DS.pg={};DS.spk={};DS.spIdx={};DS.xf={};DS.spRaw={};var plants={},months={};
   Object.keys(DS.raw).forEach(function(id){
     var o=DS.raw[id];plants[o.plant]=1;months[o.ym]=1;
     o.rows.forEach(function(r){
       /* r = [group, salesperson, transfer, docs, lines, sheets, sqft, net] */
       if(r[2]){DS.xf[o.ym]=(DS.xf[o.ym]||0)+r[7];return}
+      var spc=spCanon(r[1]);DS.spRaw[r[1]]=(DS.spRaw[r[1]]||0)+r[4];
       var k1=o.plant+SEP+r[0],m1=DS.pg[k1]||(DS.pg[k1]={}),a=m1[o.ym]||(m1[o.ym]=T0());
       a.n+=r[7];a.sh+=r[5];a.sq+=r[6];a.d+=r[3];a.l+=r[4];
-      var k2=r[1]+SEP+o.plant+SEP+r[0],m2=DS.spk[k2];if(!m2){m2=DS.spk[k2]={};(DS.spIdx[r[1]]=DS.spIdx[r[1]]||[]).push(k2)}
+      var k2=spc+SEP+o.plant+SEP+r[0],m2=DS.spk[k2];if(!m2){m2=DS.spk[k2]={};(DS.spIdx[spc]=DS.spIdx[spc]||[]).push(k2)}
       var b=m2[o.ym]||(m2[o.ym]=T0());b.n+=r[7];b.sh+=r[5];b.sq+=r[6];b.d+=r[3];b.l+=r[4];
     });
   });
@@ -176,9 +180,9 @@ function custAgg(f,w){
       if(!plantInScope(sc,p))return;if(f.plants&&!f.plants.has(p))return;if(f.plant&&p!==f.plant)return;
       var rows=DS.cust[p+SEP+x.ym];if(!rows)return;
       rows.forEach(function(r){
-        if(r[4])return;if(f.group&&r[3]!==f.group)return;if(f.sp!=null&&r[2]!==f.sp)return;
+        if(r[4])return;if(f.group&&r[3]!==f.group)return;if(f.sp!=null&&spCanon(r[2])!==f.sp)return;
         var o=m.get(r[0]);if(!o){o={code:r[0],name:r[1],n:0,sh:0,sq:0,d:0,plants:{},sps:{}};m.set(r[0],o)}
-        o.n+=r[9]*x.frac;o.sh+=r[7]*x.frac;o.sq+=r[8]*x.frac;o.d+=r[5]*x.frac;o.plants[p]=1;if(r[2])o.sps[r[2]]=(o.sps[r[2]]||0)+r[9];
+        o.n+=r[9]*x.frac;o.sh+=r[7]*x.frac;o.sq+=r[8]*x.frac;o.d+=r[5]*x.frac;o.plants[p]=1;if(r[2]){var sc2=spCanon(r[2]);o.sps[sc2]=(o.sps[sc2]||0)+r[9]}
       });
     });
   });
