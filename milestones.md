@@ -8,12 +8,12 @@ related:
 ---
 
 # Milestones
-**Current:** M0 Discovery. **Blocker:** list of B1 exports and users from Vijay ([Open questions](open-questions.md) Q1, Q6).
+**Current:** M0 Discovery. **Blocker:** People List not received; exports for orders, deliveries, receivables, collections, stock not yet listed ([Open questions](open-questions.md) Q1, Q6).
 
 ## Schedule (IST)
 | By | What | Owner | Status |
 |---|---|---|---|
-| Tue 16:15 | Canonical model, B1↔S4 map, one data-map file per export, upload templates sent to Vijay | Data Architect | open |
+| Tue 16:15 | Canonical model, B1↔S4 map, one data-map file per export, upload templates sent to Vijay | Data Architect | slipped → 17:15; 5 SAP exports received 16:30, mapping in progress |
 | Tue 17:15 | desk-v0.1 published: Data Intake, coverage grid, Admin masters | Full-Stack Engineer | open |
 | Tue 18:40 | History, potential, users uploaded; rejected rows fixed; coverage green or gaps named | Vijay + Delivery Lead | open |
 | Tue 20:00 | Wireframes of all pages sent for approval | Product Designer | open |
