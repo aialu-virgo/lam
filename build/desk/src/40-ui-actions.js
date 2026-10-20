@@ -34,6 +34,7 @@ function pageToday(){
   var h='<div class="kpis tiles"><div class="kpi"><small>Today list</small><b>'+top.length+' / '+cap+'</b><small>Cap for '+esc(u.role)+' · editable per role and user</small></div>'
    +'<div class="kpi"><small>More in Action Center</small><b>'+Math.max(0,more)+'</b></div><div class="kpi"><small>Overdue</small><b>'+overdue+'</b></div><div class="kpi"><small>Due today</small><b>'+dueToday+'</b></div>'
    +'<div class="kpi"><small>Follow-ups to send</small><b>'+fu+'</b><small>Separate queue, not counted in the cap</small></div></div>';
+  if(S.role==='Super admin'&&!S.viewAs)h=integrityHtml()+h;
   if(!weightsOk())h+='<div class="banner err">Priority weights do not total 100 (Admin › Settings). Ranking may be wrong.</div>';
   if(!top.length)h+='<div class="empty"><b>Nothing due.</b> You are clear for today.</div>';
   else h+='<div class="stack">'+top.map(function(x,i){return actionCard(x.a,i+1,x.s,u,today,x.a.status==='Done')}).join('')+'</div>';

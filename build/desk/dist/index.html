@@ -381,7 +381,7 @@ async function gz(str){var cs=new CompressionStream('gzip');var w=cs.writable.ge
 async function ungz(s){var ds=new DecompressionStream('gzip');var w=ds.writable.getWriter();w.write(unb64(s));w.close();return new Response(ds.readable).text()}
 
 /* ================= state ================= */
-var S={viewer:null,role:null,db:null,dbState:'init',users:[],plants:[],transfers:[],periods:{},cells:{},mappings:{},uploads:[],potential:[],logs:[],
+var S={planlocks:{},audit:[],viewer:null,role:null,db:null,dbState:'init',users:[],plants:[],transfers:[],periods:{},cells:{},mappings:{},uploads:[],potential:[],logs:[],
   tab:'intake',adminTab:'users',loaded:{},seeded:false,covSel:null,themeSeen:false,docCount:null,potFilter:{q:'',plant:'',group:'',seg:''}};
 var U=null; /* current upload */
 var cancelFlag=false;
@@ -395,6 +395,14 @@ async function dbRetry(fn){
 }
 function dset(path,data){return dbRetry(function(){return S.db.doc(path).set(data)})}
 function ddel(path){return dbRetry(function(){return S.db.doc(path).delete()})}
+/* audit trail of lock and closed-quarter changes: written by Super admin only (database rule: admin write), read back by the integrity check */
+var AUD={};
+function sigOf(st,locked){return (st||'open')+'|'+(locked?1:0)}
+async function auditW(ev,q,extra){
+  var id='a'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  var doc=Object.assign({at:nowISO(),by:(S.viewer&&S.viewer.email)||'unknown',event:ev,q:q||''},extra||{});AUD[id]=doc;await dset('audit/'+id,doc);return id;
+}
+function isPlanLocked(q){return !!((S.periods[q]&&S.periods[q].plan_locked)||(S.planlocks&&S.planlocks[q]))}
 function dget(path){return dbRetry(function(){return S.db.doc(path).get()})}
 function dataOf(snap){return snap.docs.map(function(d){var x=d.data();x._id=d.id;return x})}
 function subscribe(name,q,assign){
@@ -868,9 +876,9 @@ async function runLoad(opts){
   var pms=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1});
   var byYm={};pms.forEach(function(p){(byYm[p.ym]=byYm[p.ym]||[]).push(p)});
   var yms=Object.keys(byYm).sort(),total=pms.length,done=0,bytes=0,docsW=0,failed=null,loadedLines=0,stopped=false;
-  var closedTouched=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
+  var reloadAudit=null,closedTouched=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
   try{
-    if(closedTouched.length){await dset('log/'+uid,{at:nowISO(),by:by,event:'closed quarter reloaded',quarters:closedTouched,reason:U.reason||'',upload:uid,file:U.name})}
+    if(closedTouched.length){await dset('log/'+uid,{at:nowISO(),by:by,event:'closed quarter reloaded',quarters:closedTouched,reason:U.reason||'',upload:uid,file:U.name});reloadAudit=await auditW('closed quarter reloaded',closedTouched.join(','),{quarters:closedTouched,from:nowISO(),reason:U.reason||'',upload:uid,demo:demo||undefined})}
     outer:for(var yi=0;yi<yms.length;yi++){
       var ym=yms[yi],cellId='INV_'+ym;
       var cell=S.cells[cellId]?JSON.parse(JSON.stringify(S.cells[cellId])):{entity:'INV',ym:ym,plants:{}};cell.entity='INV';cell.ym=ym;if(!cell.plants)cell.plants={};
@@ -896,6 +904,7 @@ async function runLoad(opts){
       for(var si=0;si<stale.length;si++)await ddel(stale[si]);
     }
   }catch(e){failed=e}
+  if(reloadAudit){try{await dset('audit/'+reloadAudit,Object.assign({},AUD[reloadAudit],{to:nowISO()}))}catch(e){}}
   /* close completed quarters */
   var closedNow=[];
   if(!failed&&U.mode==='historic'&&U.closeAfter&&!stopped){
@@ -903,7 +912,7 @@ async function runLoad(opts){
     for(var qk in r.quarters){
       var cs=covStatus('INV',qk);
       if(cs.st==='ok'&&qk<curKey&&(!S.periods[qk]||S.periods[qk].status!=='closed')&&qk!==curKey&&isPast(qk)){
-        await dset('periods/'+qk,{fy_quarter:qk,status:'closed',closed_by:by,closed_at:nowISO(),demo:demo||undefined});S.periods[qk]={status:'closed'};closedNow.push(qk);
+        await dset('periods/'+qk,{fy_quarter:qk,status:'closed',closed_by:by,closed_at:nowISO(),demo:demo||undefined});S.periods[qk]={status:'closed'};await auditW('quarter closed',qk,{sig:sigOf('closed',false),demo:demo||undefined,auto:true});closedNow.push(qk);
       }
     }
   }
@@ -1010,7 +1019,7 @@ function potentialHtml(){
   var plantsOpt=Array.from(new Set(all.map(function(x){return x.plant_code||x.territory}).filter(Boolean))).sort();
   var groupOpt=Array.from(new Set(GROUPS.concat(all.map(function(x){return x.product_group})))),segOpt=Array.from(new Set(all.map(function(x){return x.customer_segment}).filter(Boolean)));
   var sel=function(id,cur,opts,label){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="potf" data-k="'+id+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select></div>'};
-  var locked=function(q){return S.periods[q]&&S.periods[q].plan_locked};
+  var locked=function(q){return isPlanLocked(q)};
   return '<section class="card"><div class="hd"><h2>Market potential &middot; revisions</h2><div class="row"><button class="btn pri sm" data-act="pot-add">Add figure</button><label class="btn sm" for="up-pot" style="cursor:pointer">Upload potential (CSV)</label><input id="up-pot" data-file="potential" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="potential">Download template</button><label class="btn sm" for="up-ph" style="cursor:pointer">Upload phasing (CSV)</label><input id="up-ph" data-file="phasing" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="phasing">Phasing template</button></div></div>'
   +'<div class="row">'+sel('pf-q',f.q,quarters.map(function(x){return x}),'Quarter')+sel('pf-plant',f.plant,plantsOpt,'Branch / territory')+sel('pf-group',f.group,groupOpt,'Product group')+sel('pf-seg',f.seg,segOpt,'Segment')+'</div>'
   +(rows.length>300?'<div class="note">Showing the first 300 of '+rows.length+' figures. Filter by quarter, branch or group to narrow.</div>':'')+(rows.length?'<div class="tw tall"><table><thead><tr><th>Quarter</th><th>Branch / territory</th><th>Group</th><th>Segment</th><th class="num">Potential</th><th class="num">Potential sq ft</th><th class="num">Share %</th><th class="num">Target</th><th>Source &middot; owner</th><th>Rev</th><th>Status</th><th></th></tr></thead><tbody>'
@@ -1074,7 +1083,7 @@ async function savePlant(isNew){
 function potDlg(x){
   var n=!x,g=gridQuarters();
   x=x||{fy_quarter:g.cur,plant_code:'',territory:'',product_group:'Laminate',customer_segment:'',potential_value_inr:'',potential_qty_sheets:'',potential_qty_sqft:'',share_pct:'',source_type:'branch estimate',source_note:'',owner_email:S.viewer.email||'',status:'Draft',rev:0,revisions:[]};
-  var lock=S.periods[x.fy_quarter]&&S.periods[x.fy_quarter].plan_locked;
+  var lock=isPlanLocked(x.fy_quarter);
   var tg=x.share_pct!==''&&x.share_pct!=null?fmtMoney((+x.potential_value_inr||0)*(+x.share_pct)/100):'pending';
   var revs=(x.revisions||[]).slice().reverse().map(function(r){return '<div class="note"><b>r'+r.n+' &middot; '+esc(r.status)+'</b> &middot; '+esc(r.change||'')+' &middot; &ldquo;'+esc(r.reason||'')+'&rdquo; &middot; discussed '+esc(r.discussion_date||'-')+' &middot; '+esc(r.participants||'-')+' &middot; by '+esc(r.by)+' '+istStr(r.at)+'</div>'}).join('');
   var ro=lock||x.status==='Locked'?'readonly':'';
@@ -1103,7 +1112,7 @@ async function savePot(isNew,id){
   if(x.share_pct!==''&&!(x.share_pct>=0&&x.share_pct<=100))errs.push('Share % must be 0 to 100');
   if(!reason)errs.push('Reason is required');if(!/^\d{4}-\d\d-\d\d$/.test(disc))errs.push('Discussion date is required (YYYY-MM-DD)');
   if(x.owner_email&&!S.users.some(function(u){return u.email===x.owner_email&&u.active!==false}))errs.push('Owner must be an active user');
-  if(S.periods[q]&&S.periods[q].plan_locked)errs.push('That quarter is locked');
+  if(isPlanLocked(q))errs.push('That quarter is locked');
   var pg0=planGuard(x);if(pg0)errs.push(pg0);
   if(errs.length){dlgErr(errs.join('. '));return}
   var key=isNew?slug([q,x.plant_code||x.territory,x.product_group,x.customer_segment].join('_')):id;
@@ -1137,7 +1146,7 @@ async function masterUpload(what,file){
         if(e2.length)bad.push([rn,p.plant_code,e2.join('; ')]);else ok.push(p);
       }else if(what==='phasing'){
         var pq=get(r,'fy_quarter').toUpperCase(),pp=get(r,'plant_code').replace(/\.0$/,''),pg=get(r,'product_group'),ps2=get(r,'customer_segment'),mi=+get(r,'month_in_quarter'),pc2=toNum(get(r,'phasing_pct'));
-        var e4=[];if(!/^FY\d\d-Q[1-4]$/.test(pq))e4.push('Bad quarter');else if(S.periods[pq]&&S.periods[pq].plan_locked)e4.push('Quarter is locked');
+        var e4=[];if(!/^FY\d\d-Q[1-4]$/.test(pq))e4.push('Bad quarter');else if(isPlanLocked(pq))e4.push('Quarter is locked');
         if(!(mi>=1&&mi<=3))e4.push('month_in_quarter must be 1, 2 or 3');if(isNaN(pc2)||pc2<0||pc2>100)e4.push('phasing_pct must be 0 to 100');
         if(pp&&!S.plants.some(function(x){return x.plant_code===pp}))e4.push('Unknown plant');
         var pk=slug([pq,pp,pg,ps2].join('_')||'all');var grp=seen['ph'+pk]||(seen['ph'+pk]={pq:pq,pp:pp,pg:pg,ps:ps2,pct:[null,null,null],rows:[],key:pk});
@@ -1145,7 +1154,7 @@ async function masterUpload(what,file){
         if(e4.length)bad.push([rn,pq+' '+(pp||'all'),e4.join('; ')]);
       }else if(what==='potential'){
         var q=get(r,'fy_quarter').toUpperCase(),pc=get(r,'plant_code').replace(/\.0$/,''),tr=get(r,'territory'),gr=get(r,'product_group'),sg=get(r,'customer_segment'),pv=toNum(get(r,'potential_value_inr')),ps=toNum(get(r,'potential_qty_sheets')),pf=toNum(get(r,'potential_qty_sqft')),ow=get(r,'owner_email').toLowerCase();
-        var e3=[];if(!/^FY\d\d-Q[1-4]$/.test(q))e3.push('Bad quarter');else if(S.periods[q]&&S.periods[q].plan_locked)e3.push('Quarter is locked');
+        var e3=[];if(!/^FY\d\d-Q[1-4]$/.test(q))e3.push('Bad quarter');else if(isPlanLocked(q))e3.push('Quarter is locked');
         if(!pc&&!tr)e3.push('Plant or territory needed');if(pc&&!S.plants.some(function(x){return x.plant_code===pc}))e3.push('Unknown plant');
         if(!gr)e3.push('Product group needed');if(!sg)e3.push('Segment needed');
         if(isNaN(pv)||pv<0)e3.push('Potential ₹ must be 0 or more');if(isNaN(ps)||ps<0)e3.push('Sheets must be 0 or more');if(isNaN(pf)||pf<0)e3.push('Sq ft must be 0 or more');
@@ -1201,9 +1210,9 @@ var handlers={
  },
  'cov':function(t){var k=t.getAttribute('data-ent')+'|'+t.getAttribute('data-q');S.covSel=S.covSel===k?null:k;renderCov()},
  'cov-upload':function(t){var q=t.getAttribute('data-q');if(U&&(U.stage==='validating'||U.stage==='loading'))return;if(!U||U.stage==='idle'||U.stage==='done')U=newU();U.mode='historic';U.period=q;renderUpload();var el=$('#i-upload');if(el&&el.scrollIntoView)el.scrollIntoView({block:'start'})},
- 'close-q':async function(t){if(!superOnly('close a quarter'))return;var q=t.getAttribute('data-q');await dset('periods/'+q,{fy_quarter:q,status:'closed',closed_by:S.viewer.email,closed_at:nowISO()});S.periods[q]=Object.assign({},S.periods[q],{status:'closed'});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter closed',quarter:q});toast(qLabel(q)+' closed')},
+ 'close-q':async function(t){if(!superOnly('close a quarter'))return;var q=t.getAttribute('data-q');await dset('periods/'+q,{fy_quarter:q,status:'closed',closed_by:S.viewer.email,closed_at:nowISO()});S.periods[q]=Object.assign({},S.periods[q],{status:'closed'});await auditW('quarter closed',q,{sig:sigOf('closed',false)});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter closed',quarter:q});toast(qLabel(q)+' closed')},
  'reopen':async function(t){if(!superOnly('reopen a closed quarter'))return;var q=t.getAttribute('data-q');openDlg('<h3>Reopen '+qLabel(q)+'</h3><p class="note">A closed quarter is locked. Reopening needs Super admin and is logged with your reason.</p><div class="fld"><label for="d-reason">Reason (required)</label><input id="d-reason" class="in"></div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="reopen-go" data-q="'+q+'">Reopen</button><button class="btn" data-act="dlg-close">Cancel</button></div>')},
- 'reopen-go':async function(t){if(!superOnly('reopen a closed quarter')){closeDlg();return}var q=t.getAttribute('data-q'),r=gv('d-reason');if(r.length<3){dlgErr('Give a reason (at least 3 characters)');return}await dset('periods/'+q,Object.assign({},S.periods[q]||{},{fy_quarter:q,status:'open',reopened_by:S.viewer.email,reopened_at:nowISO(),_id:undefined}));await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter reopened',quarter:q,reason:r,role:'Super admin'});closeDlg();toast(qLabel(q)+' reopened')},
+ 'reopen-go':async function(t){if(!superOnly('reopen a closed quarter')){closeDlg();return}var q=t.getAttribute('data-q'),r=gv('d-reason');if(r.length<3){dlgErr('Give a reason (at least 3 characters)');return}await dset('periods/'+q,Object.assign({},S.periods[q]||{},{fy_quarter:q,status:'open',reopened_by:S.viewer.email,reopened_at:nowISO(),_id:undefined}));await auditW('quarter reopened',q,{sig:sigOf('open',S.periods[q]&&S.periods[q].plan_locked),reason:r});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter reopened',quarter:q,reason:r,role:'Super admin'});closeDlg();toast(qLabel(q)+' reopened')},
  'hist-rej':async function(t){
    var id=t.getAttribute('data-id'),snap=await dget('rejects/'+id);
    if(!snap.exists){toast('No stored rejected rows for this upload');return}
@@ -1228,9 +1237,12 @@ var handlers={
  'plan-lock':async function(t){
    if(!guardWrite())return;var q=t.getAttribute('data-q'),u=effUser();
    if(['Super admin','Management / HO'].indexOf(u.role)<0){toast('Only Management / HO or Super admin can lock a quarter');return}
-   if(S.periods[q]&&S.periods[q].plan_locked){toast('Already locked. A locked quarter cannot be unlocked in v1.0');return}
+   if(isPlanLocked(q)){toast('Already locked. A locked quarter cannot be unlocked in v1.0');return}
    for(var po of S.potential.filter(function(x){return x.fy_quarter===q&&x.status==='Approved'})){var d=Object.assign({},po,{status:'Locked',revisions:(po.revisions||[]).concat([{n:po.rev||1,at:nowISO(),by:u.email,status:'Locked',reason:'Quarter locked',change:'Approved to Locked'}]).slice(-40)});delete d._id;await dset('potential/'+po._id,d)}
-   await dset('periods/'+q,Object.assign({fy_quarter:q,status:'open'},S.periods[q]||{},{plan_locked:true,_id:undefined}));await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:u.email,event:'plan locked',quarter:q});toast(qLabel(q)+' locked for plan edits')},
+   var lk=Object.assign({fy_quarter:q,status:'open'},S.periods[q]||{},{plan_locked:true,_id:undefined});
+   if(u.role==='Super admin'){await dset('periods/'+q,lk);await auditW('plan locked',q,{sig:sigOf(lk.status,true)})}
+   else await dset('planlocks/'+q,{fy_quarter:q,by:u.email,at:nowISO()});/* Management locks through an interact-level document; the Super admin periods document stays admin-only */
+   await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:u.email,event:'plan locked',quarter:q});toast(qLabel(q)+' locked for plan edits')},
  'tmpl':function(t){var k=t.getAttribute('data-t');return download(k+'-template.csv',TEMPLATES[k]+'\n')}
 };
 async function saveMappingDraft(){/* mapping is saved on a successful load; nothing to write here */}
@@ -2111,6 +2123,7 @@ function pageToday(){
   var h='<div class="kpis tiles"><div class="kpi"><small>Today list</small><b>'+top.length+' / '+cap+'</b><small>Cap for '+esc(u.role)+' · editable per role and user</small></div>'
    +'<div class="kpi"><small>More in Action Center</small><b>'+Math.max(0,more)+'</b></div><div class="kpi"><small>Overdue</small><b>'+overdue+'</b></div><div class="kpi"><small>Due today</small><b>'+dueToday+'</b></div>'
    +'<div class="kpi"><small>Follow-ups to send</small><b>'+fu+'</b><small>Separate queue, not counted in the cap</small></div></div>';
+  if(S.role==='Super admin'&&!S.viewAs)h=integrityHtml()+h;
   if(!weightsOk())h+='<div class="banner err">Priority weights do not total 100 (Admin › Settings). Ranking may be wrong.</div>';
   if(!top.length)h+='<div class="empty"><b>Nothing due.</b> You are clear for today.</div>';
   else h+='<div class="stack">'+top.map(function(x,i){return actionCard(x.a,i+1,x.s,u,today,x.a.status==='Done')}).join('')+'</div>';
@@ -2979,7 +2992,7 @@ function proposerOf(x){var rv=(x.revisions||[]).filter(function(r){return r.stat
 async function advancePot(id){
   var x=S.potential.find(function(p){return p._id===id});if(!x)return;var u=effUser();
   var g=planGuard(x);if(g){toast(g);return}
-  if(S.periods[x.fy_quarter]&&S.periods[x.fy_quarter].plan_locked){toast('That quarter is locked');return}
+  if(isPlanLocked(x.fy_quarter)){toast('That quarter is locked');return}
   var nx={Draft:'Discussed',Discussed:'Approved'}[x.status];if(!nx){toast(x.status==='Approved'?'Use Lock quarter to freeze approved targets':'Nothing further');return}
   var last=(x.revisions||[]).slice(-1)[0]||{};
   if(nx==='Discussed'){var lastDraft=(x.revisions||[]).filter(function(r){return r.status==='Draft'}).slice(-1)[0]||{};
@@ -3026,7 +3039,7 @@ async function saveSettings(){
 /* ---- tools tab ---- */
 function toolsHtml(){
   var rc=Object.keys(S.rollDocs).length,miss=missingRolls().length;
-  return '<section class="card"><div class="hd"><h2>Tools</h2></div>'
+  return integrityHtml()+'<section class="card"><div class="hd"><h2>Tools</h2></div>'
    +'<div class="kpis"><div class="kpi"><small>Roll-up documents</small><b>'+fmtN(rc)+'</b><small>'+(miss?miss+' plant-months still to build':'all plant-months have one')+'</small></div><div class="kpi"><small>Rules engine</small><b style="font-size:13px;font-family:var(--font)">'+esc(S.engStatus||'not run yet')+'</b></div></div>'
    +'<div class="row"><button class="btn" data-act="rb-run"'+(S.rbBusy?' disabled':'')+'>Rebuild roll-ups now</button><button class="btn" data-act="rules-run">Run the rules now</button></div>'
    +'<p class="note">Roll-ups are the small per plant × month summaries every business page reads. They are written on each upload; this rebuilds any that are missing (for example data loaded by desk-v0.1).</p>'
@@ -3055,11 +3068,52 @@ async function ensureRolls(force){
   }catch(e){S.err=(S.err||'')+'roll-up: '+dbErrText(e)+' '}
   S.rbBusy=false;DS.status='ready';S.rbSig=missingRolls().length+'|'+Object.keys(S.rollDocs).length;schedule();
 }
+/* ---- integrity check: closed-quarter and lock state against the Super-admin audit trail ---- */
+S.integrity=[];S.integSig='';
+function integrityCheck(){
+  var u=realUser();if(!u||u.role!=='Super admin'||!S.loaded.periods||!S.loaded.cells||!S.loaded.audit||!S.loaded.users||!S.loaded.potential)return;
+  var sig=[Object.keys(S.periods).length,Object.keys(S.cells).length,S.audit.length,S.potential.length,Object.keys(S.planlocks).length].join('|')+JSON.stringify(Object.keys(S.periods).map(function(q){return S.periods[q].status+(S.periods[q].plan_locked?1:0)}));
+  var sigAll=sig+S.potVer+S.audit.map(function(a){return a._id+(a.to||'')}).join(',')+S.cellsSigTick;
+  if(S.integSig===sigAll)return;S.integSig=sigAll;
+  var sup={};SEED_SUPER.forEach(function(e){sup[e]=1});S.users.forEach(function(x){if(x.role==='Super admin'&&x.active!==false)sup[x.email]=1});
+  var acked={};S.audit.forEach(function(a){if(a.event==='integrity accepted')(a.keys||[]).forEach(function(k){acked[k]=1})});
+  var out=[],add=function(k,txt){if(!acked[k])out.push({key:k,text:txt})};
+  var byQ={};S.audit.forEach(function(a){if(a.sig&&a.q){(byQ[a.q]=byQ[a.q]||[]).push(a)}});Object.keys(byQ).forEach(function(q){byQ[q].sort(function(a,b){return a.at<b.at?-1:1})});
+  var qs={};Object.keys(S.periods).forEach(function(q){qs[q]=1});Object.keys(byQ).forEach(function(q){qs[q]=1});
+  Object.keys(qs).forEach(function(q){
+    var p=S.periods[q],cur=p?sigOf(p.status,p.plan_locked):'absent',list=byQ[q]||[],last=list[list.length-1];
+    if(!p){if(last&&last.sig!=='open|0')add('period:'+q+':absent',qLabel(q)+' was '+last.sig.replace('|0','').replace('|1',' and plan-locked')+' in the log but its period record is gone.');return}
+    if(cur==='open|0'&&!last)return;
+    if(!last)add('period:'+q+':'+cur,qLabel(q)+' is '+(p.status==='closed'?'closed':'')+(p.plan_locked?' plan-locked':'')+' with no Super-admin log entry.');
+    else if(last.sig!==cur)add('period:'+q+':'+cur,qLabel(q)+' state ('+cur.replace('|0','').replace('|1',' + plan-locked')+') does not match the last logged state ('+last.sig.replace('|0','').replace('|1',' + plan-locked')+' by '+last.by+', '+istStr(last.at)+').');
+    else if(!sup[last.by])add('period:'+q+':by:'+last.by,qLabel(q)+' state was logged by '+last.by+', who is not a Super admin.');
+  });
+  Object.keys(S.periods).forEach(function(q){
+    var p=S.periods[q];if(p.status!=='closed')return;
+    var rel=S.audit.filter(function(a){return a.event==='closed quarter reloaded'&&(a.quarters||[]).indexOf(q)>=0&&sup[a.by]});
+    qMonths(q).forEach(function(ym){var c=S.cells['INV_'+ym];if(!c)return;Object.keys(c.plants||{}).forEach(function(pl){var at=c.plants[pl].at||'';
+      if(p.closed_at&&at<=p.closed_at)return;
+      if(rel.some(function(a){return a.from<=at&&(!a.to||at<=a.to)}))return;
+      add('data:'+ym+'|'+pl+'|'+at,'Closed '+qLabel(q)+': invoice data for plant '+pl+' in '+ymLabel(ym)+' changed '+istStr(at)+' with no reload entry.')})});
+  });
+  S.potential.forEach(function(x){
+    var q=x.fy_quarter;if(!isPlanLocked(q))return;
+    var la=(byQ[q]||[]).filter(function(a){return a.event==='plan locked'}).slice(-1)[0],lockAt=la?la.at:(S.planlocks[q]&&S.planlocks[q].at);if(!lockAt)return;
+    var rv=(x.revisions||[]).slice(-1)[0];if(rv&&rv.at>lockAt)add('plan:'+x._id+'|'+rv.at,'Locked '+qLabel(q)+': plan '+(x.plant_code||'')+' '+(x.product_group||'')+' '+(x.customer_segment||'')+' changed '+istStr(rv.at)+' after the lock.');
+  });
+  S.integrity=out;S.lastHtml='';schedule();
+}
+S.cellsSigTick=0;
+function integrityHtml(){
+  var l=S.integrity||[];if(!l.length)return '';
+  return '<div class="banner err" role="alert" style="flex-direction:column;align-items:flex-start"><b>Integrity alert · '+l.length+' closed-quarter or lock change'+(l.length>1?'s':'')+' without a matching Super-admin log entry</b>'+l.slice(0,8).map(function(x){return '<span>'+esc(x.text)+'</span>'}).join('')+(l.length>8?'<span>and '+(l.length-8)+' more (Admin › Tools)</span>':'')+'<span class="note">Someone wrote to the database directly, or a record was edited outside the page. Check who, then accept the current state to log it.</span><button class="btn sm" data-act="integ-accept">Accept the current state (logged)</button></div>';
+}
 var _afterData=afterData;
-afterData=function(){ensureRolls();runEngine();runLadder()};
+afterData=function(){ensureRolls();runEngine();runLadder();integrityCheck()};
 Object.assign(handlers,{
  'st-save':function(){return saveSettings()},
  'rb-run':function(){return ensureRolls(true)},
+ 'integ-accept':async function(){if(!superOnly('accept the current state'))return;var keys=(S.integrity||[]).map(function(x){return x.key});if(!keys.length)return;await auditW('integrity accepted','',{keys:keys});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'integrity alert accepted',count:keys.length});S.integSig='';toast('Logged')},
  'rules-run':function(){S.engSig=null;S.ladSig=null;return runEngine()},
  'clock-set':function(){var d=gv('tc-d');if(/^\d{4}-\d\d-\d\d$/.test(d)){lsSet('desk-today',d===realToday()?'':d);if(d===realToday()){try{localStorage.removeItem('desk-today')}catch(e){}}S.engSig=null;S.ladSig=null;S.lastHtml='';DS.cache={};schedule();toast('Test clock set')}}
 });
@@ -3091,7 +3145,7 @@ async function demoPlans(facts,cur){
         await dset('potential/'+id,doc);n++;
       }
     }
-    if(!isCur){var pr=S.periods[q];await dset('periods/'+q,Object.assign({fy_quarter:q,status:'open'},pr||{},{plan_locked:true,demo:true,_id:undefined}))}
+    if(!isCur){var pr=S.periods[q];await dset('periods/'+q,Object.assign({fy_quarter:q,status:'open'},pr||{},{plan_locked:true,demo:true,_id:undefined}));await auditW('plan locked',q,{sig:sigOf((pr&&pr.status)||'open',true),demo:true})}
   }
   return n;
 }
@@ -3147,7 +3201,7 @@ async function demoExtras(facts){
   return n;
 }
 async function demoClearExtras(){
-  var cols=[['actions',S.actions],['followups',S.followups],['orders',S.orders],['deliveries',S.deliv],['receivables',S.recv],['collections',S.coll],['stock',S.stock],['roll',Object.keys(S.rollDocs).map(function(k){return S.rollDocs[k]})],['users',S.users]];
+  var cols=[['actions',S.actions],['followups',S.followups],['orders',S.orders],['deliveries',S.deliv],['receivables',S.recv],['collections',S.coll],['stock',S.stock],['roll',Object.keys(S.rollDocs).map(function(k){return S.rollDocs[k]})],['users',S.users],['audit',S.audit]];
   for(var c=0;c<cols.length;c++){var list=cols[c][1].filter(function(x){return x.demo});for(var i=0;i<list.length;i++)await ddel(cols[c][0]+'/'+list[i]._id)}
 }
 
@@ -3473,7 +3527,7 @@ document.addEventListener('change',function(ev){
 });
 
 /* ---- src/80-nav.js ---- */
-/* ================= v1.0 shell, routing, handlers ================= */
+/* ================= v0.9 shell, routing, handlers ================= */
 S.f={mode:'QTD',q:'',m:'',from:'',to:'',plant:'',sp:'',group:'',search:''};
 S.acF={status:'',owner:'',rule:'',q:''};S.logF={kind:'',by:'',q:'',from:''};S.acTab='list';S.threadId=null;
 S.actions=[];S.followups=[];S.phasing=[];S.rollDocs={};S.rollLoaded=false;S.orders=[];S.deliv=[];S.recv=[];S.coll=[];S.stock=[];S.potVer=0;S.viewAs=null;S.demoMode=false;
@@ -3703,11 +3757,13 @@ async function boot(){
     subscribe('users',db.collection('users'),function(d){S.users=d});
     subscribe('plants',db.collection('plants'),function(d){S.plants=d});
     subscribe('periods',db.collection('periods'),function(d){S.periods={};d.forEach(function(x){S.periods[x._id]=x})});
-    subscribe('cells',db.collection('cells'),function(d){S.cells={};d.forEach(function(x){S.cells[x._id]=x})});
+    subscribe('cells',db.collection('cells'),function(d){S.cells={};d.forEach(function(x){S.cells[x._id]=x});S.cellsSigTick=(S.cellsSigTick||0)+1});
     subscribe('mappings',db.collection('mappings'),function(d){S.mappings={};d.forEach(function(x){S.mappings[x._id]=x})});
     subscribe('uploads',db.collection('uploads').orderBy('at','desc').limit(200),function(d){S.uploads=d});
     subscribe('transfers',db.collection('transfers'),function(d){S.transfers=d});
     subscribe('potential',db.collection('potential'),function(d){S.potential=d;S.potVer++;DS.cache={}});
+    subscribe('planlocks',db.collection('planlocks'),function(d){S.planlocks={};d.forEach(function(x){S.planlocks[x._id]=x})});
+    subscribe('audit',db.collection('audit'),function(d){S.audit=d});
     subscribe('actions',db.collection('actions'),function(d){S.actions=d});
     subscribe('followups',db.collection('followups'),function(d){S.followups=d});
     subscribe('settings',db.collection('settings'),function(d){var m=d.find(function(x){return x._id==='main'});S.settings=m||null;applySettings(m);DS.cache={}});

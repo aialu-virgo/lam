@@ -30,7 +30,7 @@ function proposerOf(x){var rv=(x.revisions||[]).filter(function(r){return r.stat
 async function advancePot(id){
   var x=S.potential.find(function(p){return p._id===id});if(!x)return;var u=effUser();
   var g=planGuard(x);if(g){toast(g);return}
-  if(S.periods[x.fy_quarter]&&S.periods[x.fy_quarter].plan_locked){toast('That quarter is locked');return}
+  if(isPlanLocked(x.fy_quarter)){toast('That quarter is locked');return}
   var nx={Draft:'Discussed',Discussed:'Approved'}[x.status];if(!nx){toast(x.status==='Approved'?'Use Lock quarter to freeze approved targets':'Nothing further');return}
   var last=(x.revisions||[]).slice(-1)[0]||{};
   if(nx==='Discussed'){var lastDraft=(x.revisions||[]).filter(function(r){return r.status==='Draft'}).slice(-1)[0]||{};
@@ -77,7 +77,7 @@ async function saveSettings(){
 /* ---- tools tab ---- */
 function toolsHtml(){
   var rc=Object.keys(S.rollDocs).length,miss=missingRolls().length;
-  return '<section class="card"><div class="hd"><h2>Tools</h2></div>'
+  return integrityHtml()+'<section class="card"><div class="hd"><h2>Tools</h2></div>'
    +'<div class="kpis"><div class="kpi"><small>Roll-up documents</small><b>'+fmtN(rc)+'</b><small>'+(miss?miss+' plant-months still to build':'all plant-months have one')+'</small></div><div class="kpi"><small>Rules engine</small><b style="font-size:13px;font-family:var(--font)">'+esc(S.engStatus||'not run yet')+'</b></div></div>'
    +'<div class="row"><button class="btn" data-act="rb-run"'+(S.rbBusy?' disabled':'')+'>Rebuild roll-ups now</button><button class="btn" data-act="rules-run">Run the rules now</button></div>'
    +'<p class="note">Roll-ups are the small per plant × month summaries every business page reads. They are written on each upload; this rebuilds any that are missing (for example data loaded by desk-v0.1).</p>'
@@ -106,11 +106,52 @@ async function ensureRolls(force){
   }catch(e){S.err=(S.err||'')+'roll-up: '+dbErrText(e)+' '}
   S.rbBusy=false;DS.status='ready';S.rbSig=missingRolls().length+'|'+Object.keys(S.rollDocs).length;schedule();
 }
+/* ---- integrity check: closed-quarter and lock state against the Super-admin audit trail ---- */
+S.integrity=[];S.integSig='';
+function integrityCheck(){
+  var u=realUser();if(!u||u.role!=='Super admin'||!S.loaded.periods||!S.loaded.cells||!S.loaded.audit||!S.loaded.users||!S.loaded.potential)return;
+  var sig=[Object.keys(S.periods).length,Object.keys(S.cells).length,S.audit.length,S.potential.length,Object.keys(S.planlocks).length].join('|')+JSON.stringify(Object.keys(S.periods).map(function(q){return S.periods[q].status+(S.periods[q].plan_locked?1:0)}));
+  var sigAll=sig+S.potVer+S.audit.map(function(a){return a._id+(a.to||'')}).join(',')+S.cellsSigTick;
+  if(S.integSig===sigAll)return;S.integSig=sigAll;
+  var sup={};SEED_SUPER.forEach(function(e){sup[e]=1});S.users.forEach(function(x){if(x.role==='Super admin'&&x.active!==false)sup[x.email]=1});
+  var acked={};S.audit.forEach(function(a){if(a.event==='integrity accepted')(a.keys||[]).forEach(function(k){acked[k]=1})});
+  var out=[],add=function(k,txt){if(!acked[k])out.push({key:k,text:txt})};
+  var byQ={};S.audit.forEach(function(a){if(a.sig&&a.q){(byQ[a.q]=byQ[a.q]||[]).push(a)}});Object.keys(byQ).forEach(function(q){byQ[q].sort(function(a,b){return a.at<b.at?-1:1})});
+  var qs={};Object.keys(S.periods).forEach(function(q){qs[q]=1});Object.keys(byQ).forEach(function(q){qs[q]=1});
+  Object.keys(qs).forEach(function(q){
+    var p=S.periods[q],cur=p?sigOf(p.status,p.plan_locked):'absent',list=byQ[q]||[],last=list[list.length-1];
+    if(!p){if(last&&last.sig!=='open|0')add('period:'+q+':absent',qLabel(q)+' was '+last.sig.replace('|0','').replace('|1',' and plan-locked')+' in the log but its period record is gone.');return}
+    if(cur==='open|0'&&!last)return;
+    if(!last)add('period:'+q+':'+cur,qLabel(q)+' is '+(p.status==='closed'?'closed':'')+(p.plan_locked?' plan-locked':'')+' with no Super-admin log entry.');
+    else if(last.sig!==cur)add('period:'+q+':'+cur,qLabel(q)+' state ('+cur.replace('|0','').replace('|1',' + plan-locked')+') does not match the last logged state ('+last.sig.replace('|0','').replace('|1',' + plan-locked')+' by '+last.by+', '+istStr(last.at)+').');
+    else if(!sup[last.by])add('period:'+q+':by:'+last.by,qLabel(q)+' state was logged by '+last.by+', who is not a Super admin.');
+  });
+  Object.keys(S.periods).forEach(function(q){
+    var p=S.periods[q];if(p.status!=='closed')return;
+    var rel=S.audit.filter(function(a){return a.event==='closed quarter reloaded'&&(a.quarters||[]).indexOf(q)>=0&&sup[a.by]});
+    qMonths(q).forEach(function(ym){var c=S.cells['INV_'+ym];if(!c)return;Object.keys(c.plants||{}).forEach(function(pl){var at=c.plants[pl].at||'';
+      if(p.closed_at&&at<=p.closed_at)return;
+      if(rel.some(function(a){return a.from<=at&&(!a.to||at<=a.to)}))return;
+      add('data:'+ym+'|'+pl+'|'+at,'Closed '+qLabel(q)+': invoice data for plant '+pl+' in '+ymLabel(ym)+' changed '+istStr(at)+' with no reload entry.')})});
+  });
+  S.potential.forEach(function(x){
+    var q=x.fy_quarter;if(!isPlanLocked(q))return;
+    var la=(byQ[q]||[]).filter(function(a){return a.event==='plan locked'}).slice(-1)[0],lockAt=la?la.at:(S.planlocks[q]&&S.planlocks[q].at);if(!lockAt)return;
+    var rv=(x.revisions||[]).slice(-1)[0];if(rv&&rv.at>lockAt)add('plan:'+x._id+'|'+rv.at,'Locked '+qLabel(q)+': plan '+(x.plant_code||'')+' '+(x.product_group||'')+' '+(x.customer_segment||'')+' changed '+istStr(rv.at)+' after the lock.');
+  });
+  S.integrity=out;S.lastHtml='';schedule();
+}
+S.cellsSigTick=0;
+function integrityHtml(){
+  var l=S.integrity||[];if(!l.length)return '';
+  return '<div class="banner err" role="alert" style="flex-direction:column;align-items:flex-start"><b>Integrity alert · '+l.length+' closed-quarter or lock change'+(l.length>1?'s':'')+' without a matching Super-admin log entry</b>'+l.slice(0,8).map(function(x){return '<span>'+esc(x.text)+'</span>'}).join('')+(l.length>8?'<span>and '+(l.length-8)+' more (Admin › Tools)</span>':'')+'<span class="note">Someone wrote to the database directly, or a record was edited outside the page. Check who, then accept the current state to log it.</span><button class="btn sm" data-act="integ-accept">Accept the current state (logged)</button></div>';
+}
 var _afterData=afterData;
-afterData=function(){ensureRolls();runEngine();runLadder()};
+afterData=function(){ensureRolls();runEngine();runLadder();integrityCheck()};
 Object.assign(handlers,{
  'st-save':function(){return saveSettings()},
  'rb-run':function(){return ensureRolls(true)},
+ 'integ-accept':async function(){if(!superOnly('accept the current state'))return;var keys=(S.integrity||[]).map(function(x){return x.key});if(!keys.length)return;await auditW('integrity accepted','',{keys:keys});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'integrity alert accepted',count:keys.length});S.integSig='';toast('Logged')},
  'rules-run':function(){S.engSig=null;S.ladSig=null;return runEngine()},
  'clock-set':function(){var d=gv('tc-d');if(/^\d{4}-\d\d-\d\d$/.test(d)){lsSet('desk-today',d===realToday()?'':d);if(d===realToday()){try{localStorage.removeItem('desk-today')}catch(e){}}S.engSig=null;S.ladSig=null;S.lastHtml='';DS.cache={};schedule();toast('Test clock set')}}
 });
@@ -142,7 +183,7 @@ async function demoPlans(facts,cur){
         await dset('potential/'+id,doc);n++;
       }
     }
-    if(!isCur){var pr=S.periods[q];await dset('periods/'+q,Object.assign({fy_quarter:q,status:'open'},pr||{},{plan_locked:true,demo:true,_id:undefined}))}
+    if(!isCur){var pr=S.periods[q];await dset('periods/'+q,Object.assign({fy_quarter:q,status:'open'},pr||{},{plan_locked:true,demo:true,_id:undefined}));await auditW('plan locked',q,{sig:sigOf((pr&&pr.status)||'open',true),demo:true})}
   }
   return n;
 }
@@ -198,6 +239,6 @@ async function demoExtras(facts){
   return n;
 }
 async function demoClearExtras(){
-  var cols=[['actions',S.actions],['followups',S.followups],['orders',S.orders],['deliveries',S.deliv],['receivables',S.recv],['collections',S.coll],['stock',S.stock],['roll',Object.keys(S.rollDocs).map(function(k){return S.rollDocs[k]})],['users',S.users]];
+  var cols=[['actions',S.actions],['followups',S.followups],['orders',S.orders],['deliveries',S.deliv],['receivables',S.recv],['collections',S.coll],['stock',S.stock],['roll',Object.keys(S.rollDocs).map(function(k){return S.rollDocs[k]})],['users',S.users],['audit',S.audit]];
   for(var c=0;c<cols.length;c++){var list=cols[c][1].filter(function(x){return x.demo});for(var i=0;i<list.length;i++)await ddel(cols[c][0]+'/'+list[i]._id)}
 }
