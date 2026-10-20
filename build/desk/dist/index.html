@@ -111,10 +111,11 @@ tr:last-child td{border-bottom:0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:max(18px,env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;z-index:60;max-width:92vw}
 .break{overflow-wrap:anywhere}
 @media (max-width:860px){
+  .side{flex-wrap:wrap!important;overflow:visible!important;height:auto}
   .app{grid-template-columns:minmax(0,1fr)}
   .side{position:static;height:auto;flex-direction:row;align-items:center;overflow-x:auto;padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));gap:12px;border-right:0;border-bottom:1px solid var(--line)}
   .side .navg h4,.side .me,.brand small{display:none}
-  .navg{flex-direction:row;flex:none}
+  .navg{flex-direction:row;flex-wrap:wrap;flex:0 1 auto}
   .nav{white-space:nowrap}
   .brand{flex:none}
   .main{padding:16px max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px))}
@@ -146,7 +147,7 @@ tr:last-child td{border-bottom:0}
     var R = rng(o.seed || 7), shape = o.shape || 'B1', rows = [], headers = shape === 'B1' ? B1_HEADERS.slice() : S4_HEADERS.slice();
     if (shape === 'B1' && o.withLineNum) headers.push('LineNum');
     var nc = o.customers || 60, cats = ['DECORATIVE LAMINATES', 'DECORATIVE LAMINATES', 'DECORATIVE LAMINATES', 'DECORATIVE LAMINATES', 'DECORATIVE LAMINATES DOOR', 'PVC SHEET'];
-    var docSeq = shape === 'B1' ? 270300000 + Math.floor(R() * 1000) : 90000000;
+    var docSeq = 100000 + Math.floor(R() * 1000);
     var idx = {}; headers.forEach(function (h, i) { if (!(h in idx)) idx[h] = i; });
     function put(r, h, v) { r[idx[h]] = v; }
     (o.months || []).forEach(function (ym) {
@@ -156,7 +157,7 @@ tr:last-child td{border-bottom:0}
         for (var d = 0; d < nd; d++) {
           docSeq += 1 + Math.floor(R() * 3);
           var day = 1 + Math.floor(R() * dim), ci = 1 + Math.floor(R() * nc), internal = shape === 'B1' && R() < 0.1;
-          var cust = internal ? 'VRGLCU900001' : 'VRGLCU' + pad(ci, 6);
+          var cust = internal ? 'DEMOCU900001' : 'DEMOCU' + pad(ci, 6);
           var cname = internal ? 'DEMO VIRGO BRANCH TRANSFER' : 'DEMO Customer ' + ci + ' Traders';
           var sp = 'DEMO Sales ' + (1 + (ci % 7)) + ' - ' + p.name;
           var lines = 1 + Math.floor(R() * 4);
@@ -165,21 +166,21 @@ tr:last-child td{border-bottom:0}
             var net = Math.round(qty * price * 100) / 100, r = new Array(headers.length).fill('');
             var dateISO = y + '-' + pad(m, 2) + '-' + pad(day, 2), dateCell = dateISO;
             if (o.dateStyle === 'b1defect') dateCell = day <= 12 ? serial(y, day, m) : pad(day, 2) + '/' + pad(m, 2) + '/' + y;
-            var item = 'FG' + pad(1 + Math.floor(R() * 400), 5), size = R() < 0.85 ? '8X4' : '7X3';
+            var item = 'DEMOFG' + pad(1 + Math.floor(R() * 400), 5), size = R() < 0.85 ? '8X4' : '7X3';
             if (shape === 'B1') {
               put(r, '10', d + 1); put(r, 'BPLId', 1); put(r, 'BPLName', p.name); put(r, 'Salesemployee', sp);
-              put(r, 'Invoice Type', 'Gst Tax Invoice'); put(r, 'DocDate', dateCell); put(r, 'TaxDate', dateCell); put(r, 'docnum', docSeq);
+              put(r, 'Invoice Type', 'Gst Tax Invoice'); put(r, 'DocDate', dateCell); put(r, 'TaxDate', dateCell); put(r, 'docnum', 'DEMO-' + docSeq);
               put(r, 'CardCode', cust); put(r, 'CardName', cname); put(r, 'Zone', internal ? 'BRANCH' : 'ZONE' + (1 + ci % 5));
               put(r, 'ItemCode', item); put(r, 'Dscription', 'DEMO item ' + item); put(r, 'Size', size); put(r, 'Quantity', qty);
               put(r, 'LineTotal', net); put(r, 'Total Value', Math.round(net * 118) / 100); put(r, 'Catagory', cat);
               put(r, 'AcctName', internal ? 'Sales GST - Stock Outward' : 'Sales GST - Local'); put(r, 'Price', price);
               if (o.withLineNum) put(r, 'LineNum', l - 1);
             } else {
-              put(r, 'Invoice Document Number', String(docSeq)); put(r, 'Invoice Document item', l * 10); put(r, 'Invoice Date', dateCell);
-              put(r, 'Plant', p.code); put(r, 'Plant Description', p.name); put(r, 'Sold-to-Party Number', '5000' + pad(ci, 4));
+              put(r, 'Invoice Document Number', 'DEMO-' + docSeq); put(r, 'Invoice Document item', l * 10); put(r, 'Invoice Date', dateCell);
+              put(r, 'Plant', p.code); put(r, 'Plant Description', p.name); put(r, 'Sold-to-Party Number', 'DEMOCU' + pad(ci, 4));
               put(r, 'Sold-to-Party Description', cname); put(r, 'Sales District', 'ZONE0' + (1 + ci % 3));
               put(r, 'Product Type', cat === 'PVC SHEET' ? 'ZCBPVC' : 'ZABLAM'); put(r, 'Material Group 3', cat === 'DECORATIVE LAMINATES DOOR' ? 'DOOR' : cat === 'PVC SHEET' ? 'PVC' : 'LAM');
-              put(r, 'Product Code', '32' + pad(item.slice(2), 6)); put(r, 'Product Description', 'DEMO item ' + item); put(r, 'Material Group 4', size);
+              put(r, 'Product Code', 'DEMOMAT' + item.slice(6)); put(r, 'Product Description', 'DEMO item ' + item); put(r, 'Material Group 4', size);
               put(r, 'Invoice Qty', qty); put(r, 'invqty', qty); put(r, 'Total Amount (Item)', net); put(r, 'Unit Price', net); put(r, 'Billing Type', 'F2');
               put(r, 'Sales Executive', ''); put(r, 'Customer Group', 'C' + (1 + ci % 2));
               var fan = 1 + Math.floor(R() * 3); for (var f = 0; f < fan; f++) { var rc = r.slice(); rc[idx['Price Group(Item)']] = 'G' + f; rows.push(rc); } continue;
@@ -531,7 +532,7 @@ function glyph(st){
 function renderCov(){
   var el=$('#i-cov');if(!el)return;
   var g=gridQuarters();
-  var head='<tr><th>Entity</th>'+g.list.map(function(k){return '<th class="'+(k===g.cur?'cur':'')+'" title="'+qMonths(k)[0]+' to '+qMonths(k)[2]+'">'+qLabel(k).replace(' ','<br>')+(k===g.cur?'<br>now':'')+'</th>'}).join('')+'</tr>';
+  var head='<tr><th>Entity</th>'+g.list.map(function(k){return '<th class="'+(k===g.cur?'cur':'')+'" title="'+qMonths(k)[0]+' to '+qMonths(k)[2]+'">'+qLabel(k).replace(' ','<br>')+(k===g.cur?'<br>open':'')+'</th>'}).join('')+'</tr>';
   var body=ENTITIES.map(function(e){
     if(!e.live)return '<tr><td>'+e.label+'</td>'+g.list.map(function(){return '<td><span class="cell na" title="Not in desk-v0.1">&ndash;</span></td>'}).join('')+'</tr>';
     return '<tr><td><b>'+e.label+'</b></td>'+g.list.map(function(k){var c=covStatus(e.k,k);var sym=glyph(c.st);var sel=S.covSel===e.k+'|'+k;return '<td><button class="cell '+c.st+'" data-act="cov" data-ent="'+e.k+'" data-q="'+k+'" aria-pressed="'+sel+'" aria-label="'+e.label+' '+qLabel(k)+': '+({ok:'loaded',part:'partial',miss:'missing'})[c.st]+(c.closed?', closed':'')+'">'+sym+(c.closed?'<sup style="font-size:8px">L</sup>':'')+'</button></td>'}).join('')+'</tr>';

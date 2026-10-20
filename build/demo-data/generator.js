@@ -16,7 +16,7 @@
     var R = rng(o.seed || 7), shape = o.shape || 'B1', rows = [], headers = shape === 'B1' ? B1_HEADERS.slice() : S4_HEADERS.slice();
     if (shape === 'B1' && o.withLineNum) headers.push('LineNum');
     var nc = o.customers || 60, cats = ['DECORATIVE LAMINATES', 'DECORATIVE LAMINATES', 'DECORATIVE LAMINATES', 'DECORATIVE LAMINATES', 'DECORATIVE LAMINATES DOOR', 'PVC SHEET'];
-    var docSeq = shape === 'B1' ? 270300000 + Math.floor(R() * 1000) : 90000000;
+    var docSeq = 100000 + Math.floor(R() * 1000);
     var idx = {}; headers.forEach(function (h, i) { if (!(h in idx)) idx[h] = i; });
     function put(r, h, v) { r[idx[h]] = v; }
     (o.months || []).forEach(function (ym) {
@@ -26,7 +26,7 @@
         for (var d = 0; d < nd; d++) {
           docSeq += 1 + Math.floor(R() * 3);
           var day = 1 + Math.floor(R() * dim), ci = 1 + Math.floor(R() * nc), internal = shape === 'B1' && R() < 0.1;
-          var cust = internal ? 'VRGLCU900001' : 'VRGLCU' + pad(ci, 6);
+          var cust = internal ? 'DEMOCU900001' : 'DEMOCU' + pad(ci, 6);
           var cname = internal ? 'DEMO VIRGO BRANCH TRANSFER' : 'DEMO Customer ' + ci + ' Traders';
           var sp = 'DEMO Sales ' + (1 + (ci % 7)) + ' - ' + p.name;
           var lines = 1 + Math.floor(R() * 4);
@@ -35,21 +35,21 @@
             var net = Math.round(qty * price * 100) / 100, r = new Array(headers.length).fill('');
             var dateISO = y + '-' + pad(m, 2) + '-' + pad(day, 2), dateCell = dateISO;
             if (o.dateStyle === 'b1defect') dateCell = day <= 12 ? serial(y, day, m) : pad(day, 2) + '/' + pad(m, 2) + '/' + y;
-            var item = 'FG' + pad(1 + Math.floor(R() * 400), 5), size = R() < 0.85 ? '8X4' : '7X3';
+            var item = 'DEMOFG' + pad(1 + Math.floor(R() * 400), 5), size = R() < 0.85 ? '8X4' : '7X3';
             if (shape === 'B1') {
               put(r, '10', d + 1); put(r, 'BPLId', 1); put(r, 'BPLName', p.name); put(r, 'Salesemployee', sp);
-              put(r, 'Invoice Type', 'Gst Tax Invoice'); put(r, 'DocDate', dateCell); put(r, 'TaxDate', dateCell); put(r, 'docnum', docSeq);
+              put(r, 'Invoice Type', 'Gst Tax Invoice'); put(r, 'DocDate', dateCell); put(r, 'TaxDate', dateCell); put(r, 'docnum', 'DEMO-' + docSeq);
               put(r, 'CardCode', cust); put(r, 'CardName', cname); put(r, 'Zone', internal ? 'BRANCH' : 'ZONE' + (1 + ci % 5));
               put(r, 'ItemCode', item); put(r, 'Dscription', 'DEMO item ' + item); put(r, 'Size', size); put(r, 'Quantity', qty);
               put(r, 'LineTotal', net); put(r, 'Total Value', Math.round(net * 118) / 100); put(r, 'Catagory', cat);
               put(r, 'AcctName', internal ? 'Sales GST - Stock Outward' : 'Sales GST - Local'); put(r, 'Price', price);
               if (o.withLineNum) put(r, 'LineNum', l - 1);
             } else {
-              put(r, 'Invoice Document Number', String(docSeq)); put(r, 'Invoice Document item', l * 10); put(r, 'Invoice Date', dateCell);
-              put(r, 'Plant', p.code); put(r, 'Plant Description', p.name); put(r, 'Sold-to-Party Number', '5000' + pad(ci, 4));
+              put(r, 'Invoice Document Number', 'DEMO-' + docSeq); put(r, 'Invoice Document item', l * 10); put(r, 'Invoice Date', dateCell);
+              put(r, 'Plant', p.code); put(r, 'Plant Description', p.name); put(r, 'Sold-to-Party Number', 'DEMOCU' + pad(ci, 4));
               put(r, 'Sold-to-Party Description', cname); put(r, 'Sales District', 'ZONE0' + (1 + ci % 3));
               put(r, 'Product Type', cat === 'PVC SHEET' ? 'ZCBPVC' : 'ZABLAM'); put(r, 'Material Group 3', cat === 'DECORATIVE LAMINATES DOOR' ? 'DOOR' : cat === 'PVC SHEET' ? 'PVC' : 'LAM');
-              put(r, 'Product Code', '32' + pad(item.slice(2), 6)); put(r, 'Product Description', 'DEMO item ' + item); put(r, 'Material Group 4', size);
+              put(r, 'Product Code', 'DEMOMAT' + item.slice(6)); put(r, 'Product Description', 'DEMO item ' + item); put(r, 'Material Group 4', size);
               put(r, 'Invoice Qty', qty); put(r, 'invqty', qty); put(r, 'Total Amount (Item)', net); put(r, 'Unit Price', net); put(r, 'Billing Type', 'F2');
               put(r, 'Sales Executive', ''); put(r, 'Customer Group', 'C' + (1 + ci % 2));
               var fan = 1 + Math.floor(R() * 3); for (var f = 0; f < fan; f++) { var rc = r.slice(); rc[idx['Price Group(Item)']] = 'G' + f; rows.push(rc); } continue;
