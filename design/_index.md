@@ -24,14 +24,14 @@ related:
 
 - [Architecture](architecture.md) — not started
 - [Brief Part B — design inputs](brief-part-b.md) — frozen
-- [Canonical data model](canonical-data-model.md) — not started
-- [Check rules](check-rules.md) — not started
-- [Comparison basis](comparison-basis.md) — not started
-- [Escalation ladder](escalation-ladder.md) — not started
-- [KRA / KPI set](kra-kpi.md) — not started
-- [Notification templates](notification-templates.md) — not started
-- [Plan model](plan-model.md) — not started
-- [Priority rules](priority-rules.md) — not started
-- [Role matrix](role-matrix.md) — not started
-- [Target model](target-model.md) — not started
-- [Wireframes](wireframes.md) — not started
+- [Canonical data model](canonical-data-model.md) — draft, approval not submitted
+- [Check rules](check-rules.md) — draft, approval not submitted
+- [Comparison basis](comparison-basis.md) — draft, approval not submitted
+- [Escalation ladder](escalation-ladder.md) — draft, approval not submitted
+- [KRA / KPI set](kra-kpi.md) — draft, approval not submitted
+- [Notification templates](notification-templates.md) — draft, approval not submitted
+- [Plan model](plan-model.md) — draft, approval not submitted
+- [Priority rules](priority-rules.md) — draft, approval not submitted
+- [Role matrix](role-matrix.md) — draft, approval not submitted
+- [Target model](target-model.md) — draft, approval not submitted
+- [Wireframes](wireframes.md) — ready for approval; every page drawn, approval not submitted

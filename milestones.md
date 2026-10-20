@@ -8,16 +8,16 @@ related:
 ---
 
 # Milestones
-**Current:** M0 Discovery. **Blocker:** list of B1 exports and users from Vijay ([Open questions](open-questions.md) Q1, Q6).
+**Current:** M4 Build v0.9 (design approved, D13). **Blocker:** People List not received; exports for orders, deliveries, receivables, collections, stock not yet listed ([Open questions](open-questions.md) Q1, Q6).
 
 ## Schedule (IST)
 | By | What | Owner | Status |
 |---|---|---|---|
-| Tue 16:15 | Canonical model, B1↔S4 map, one data-map file per export, upload templates sent to Vijay | Data Architect | open |
-| Tue 17:15 | desk-v0.1 published: Data Intake, coverage grid, Admin masters | Full-Stack Engineer | open |
+| Tue 16:15 | Canonical model, B1↔S4 map, one data-map file per export, upload templates sent to Vijay | Data Architect | done 16:46 (slipped 31 min) |
+| Tue 17:15 | desk-v0.1 published: Data Intake, coverage grid, Admin masters | Full-Stack Engineer | published 17:00 (D8); QA passed, fixes republished |
 | Tue 18:40 | History, potential, users uploaded; rejected rows fixed; coverage green or gaps named | Vijay + Delivery Lead | open |
-| Tue 20:00 | Wireframes of all pages sent for approval | Product Designer | open |
-| Tue 21:00 | Written design approval | Principals | open |
+| Tue 20:00 | Wireframes of all pages sent for approval | Product Designer | published 17:25 (D12); awaiting SP Sir |
+| Tue 21:00 | Written design approval | Principals | interim approval by Vijay 18:08 (D13); SP Sir confirms Wed 11:30 |
 | Wed 07:00 | desk-v0.9 on real data | Full-Stack Engineer | open |
 | Wed 10:00 | QA + blind second check passed, fixes done | Engineering QA | open |
 | Wed 11:30 | Acceptance walk-through | SP Sir | open |
@@ -25,18 +25,18 @@ related:
 
 ## Milestones
 **M0 Discovery**
-- [ ] Reference artifact studied (layout notes in [Wireframes](design/wireframes.md))
+- [x] Reference artifact studied (layout notes in [Wireframes](design/wireframes.md))
 - [ ] SAP B1 exports listed, one [data-map](data-map/_index.md) file each
 - [ ] Roles and people list; plant/branch list
-- [ ] Market-potential template
+- [x] Market-potential template
 
 **M1 Foundation**
-- [ ] Canonical model, B1↔S4 map, role matrix, target model, comparison basis, priority + check + escalation rules, KRA/KPI in [design/](design/_index.md)
+- [x] Canonical model, B1↔S4 map, role matrix, target model, comparison basis, priority + check + escalation rules, KRA/KPI in [design/](design/_index.md)
 - [ ] Historic coverage per entity recorded in data-map/
 
-**M2 Design approved** — [ ] wireframes of every page, Today, action thread, intake, admin · [ ] SP Sir's written approval in [Decisions](decisions.md). No build before this (except M3, decision D1).
+**M2 Design approved** — [x] wireframes of every page, Today, action thread, intake, admin · [x] interim written approval (Vijay, D13); SP Sir confirms in [Decisions](decisions.md). No build before this (except M3, decision D1).
 
-**M3 Build v0.1 (intake only)** — [ ] Data Intake with historic mode and coverage grid · [ ] Admin masters: users, plants, market potential with revisions · [ ] real data loaded by Tue 18:40
+**M3 Build v0.1 (intake only)** — [x] Data Intake with historic mode and coverage grid · [x] Admin masters: users, plants, market potential with revisions · [ ] real data loaded by Tue 18:40
 
 **M4 Build v0.9** — [ ] all pages: target vs actual vs potential, 12-quarter trend, Action Center, Today, responses, follow-up drafts, escalation, action log, roles and row-level access, scorecard
 
