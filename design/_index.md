@@ -29,9 +29,9 @@ related:
 - [Comparison basis](comparison-basis.md) — draft, approval not submitted
 - [Escalation ladder](escalation-ladder.md) — draft, approval not submitted
 - [KRA / KPI set](kra-kpi.md) — draft, approval not submitted
-- [Notification templates](notification-templates.md) — not started
+- [Notification templates](notification-templates.md) — draft, approval not submitted
 - [Plan model](plan-model.md) — draft, approval not submitted
 - [Priority rules](priority-rules.md) — draft, approval not submitted
 - [Role matrix](role-matrix.md) — draft, approval not submitted
 - [Target model](target-model.md) — draft, approval not submitted
-- [Wireframes](wireframes.md) — draft; v0.1 intake and admin drawn, approval not submitted
+- [Wireframes](wireframes.md) — ready for approval; every page drawn, approval not submitted

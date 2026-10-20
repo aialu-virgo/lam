@@ -1,11 +1,16 @@
 ---
 title: Wireframes
-summary: Greyscale, mobile-first wireframes with real labels for every page, matched to the reference layout; v0.1 intake and admin drawn.
-status: draft
+summary: Greyscale, mobile-first wireframes with real labels for every page, matched to the reference layout; all pages drawn and ready for SP Sir's approval.
+status: ready for approval
 updated: 2026-10-20
 related:
   - design/_index.md
   - design/brief-part-b.md
+  - design/role-matrix.md
+  - design/notification-templates.md
+  - design/priority-rules.md
+  - design/target-model.md
+  - design/comparison-basis.md
 ---
 
 # Wireframes
@@ -15,17 +20,26 @@ related:
 **Done when:** every sidebar page plus Today, action thread, intake and admin is drawn at phone and desktop width and shared as a link; SP Sir has approved in writing.
 
 ## Mock-ups
-Static greyscale HTML, shared kit [wf.css](wireframes/wf.css). Open in a browser; resize to 360px and 1440px. All values are invented and marked DEMO.
+Static greyscale HTML, shared kit [wf.css](wireframes/wf.css); start at [index.html](wireframes/index.html). Open in a browser and resize to 360 and 1440 px. All values are invented and marked DEMO. Every table, card and chart follows [Brief Part B](brief-part-b.md) §4: Potential · Target · Actual · Var · Ach % · Share % · Last Qtr · QoQ % · Trend with a total row; actual bars, plan line, previous-quarter marker; 12-quarter trend on Overview, Sales and the person scorecard; no last-year comparison anywhere.
 
 | Screen | File | Serves | Status |
 |---|---|---|---|
-| Data Intake: upload, mapping, validation, rejected rows, coverage grid, history, S/4 card | [v0.1-data-intake.html](wireframes/v0.1-data-intake.html) | desk-v0.1 | drawn |
-| Admin: users, plants, market potential with revision trail | [v0.1-admin-masters.html](wireframes/v0.1-admin-masters.html) | desk-v0.1 | drawn |
-| Today | [today.html](wireframes/today.html) | desk-v0.9 | first draft |
-| Action thread | [action-thread.html](wireframes/action-thread.html) | desk-v0.9 | first draft |
-| Overview, Sales, Orders & Dispatch, Receivables, Inventory, Action Center list, Team & Scorecard | not started | desk-v0.9 | open |
+| Index of all mock-ups | [index.html](wireframes/index.html) | all | ready for approval |
+| Overview: KPI cards, 12-quarter trend, branch chart, alerts, product-group and branch tables, YTD strip, target revision and Stretch | [overview.html](wireframes/overview.html) | desk-v0.9 | ready for approval |
+| Sales: A/B/C tiles, leaderboard, drill-down branch → salesperson → customer → SAP document | [sales.html](wireframes/sales.html) | desk-v0.9 | ready for approval |
+| Orders & Dispatch: open orders, O2D days vs plan TAT | [orders-dispatch.html](wireframes/orders-dispatch.html) | desk-v0.9 | ready for approval |
+| Receivables: ageing buckets, collection plan vs actual | [receivables.html](wireframes/receivables.html) | desk-v0.9 | ready for approval |
+| Inventory: stock vs plan, stock days, ageing | [inventory.html](wireframes/inventory.html) | desk-v0.9 | ready for approval |
+| Action Center: actions, raise action, Follow-ups to send, Action log | [action-center.html](wireframes/action-center.html) | desk-v0.9 | ready for approval |
+| Team & Scorecard: KRA/KPI per person, person scorecard with 12-quarter trend | [team-scorecard.html](wireframes/team-scorecard.html) | desk-v0.9 | ready for approval |
+| Today: ranked, capped, why-ranked | [today.html](wireframes/today.html) | desk-v0.9 | ready for approval |
+| Action thread: status ladder, responses, follow-up drafts | [action-thread.html](wireframes/action-thread.html) | desk-v0.9 | ready for approval |
+| Data Intake: upload, mapping, validation, rejected rows, coverage grid, history, S/4 card | [v0.1-data-intake.html](wireframes/v0.1-data-intake.html) | desk-v0.1 (built) | ready for approval |
+| Admin: users, plants, market potential, revision trail, original vs current target, Stretch | [v0.1-admin-masters.html](wireframes/v0.1-admin-masters.html) | desk-v0.1 (built) | ready for approval |
+| Page states: unknown viewer, empty, new entity, partial history, locked quarter, view as role, draft target | [states.html](wireframes/states.html) | desk-v0.9 | ready for approval |
+| Notification texts: reminder, L1, L2, L3 | [Notification templates](notification-templates.md) | desk-v0.9 | ready for approval |
 
-Not yet checked in a browser (none in this environment); layout is by CSS only.
+Not yet checked in a browser (none in this environment); layout is by CSS only. HTML structure was checked for balanced tags. Labels still waiting on the Data Architect's rules are marked "pending rules" on the page.
 
 ## Reference study
 Source: the Virgo ACP Sales Desk artifact. The Artifact tool's summary was truncated; layout tokens below come from the page's own stylesheet in the saved raw read. No data shown there is recorded here.
