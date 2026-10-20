@@ -39,7 +39,7 @@ function plantInScope(sc,p){return !sc.plants||sc.plants.has(String(p))}
 function scopeSig(sc){return [sc.role,sc.plants?Array.from(sc.plants).sort().join(','):'*',(sc.sp||[]).join('/')].join('#')}
 function spOk(sc,name){return !sc.sp||sc.sp.indexOf(norm(name))>=0}
 /* what a role may open (role-matrix.md, department table) */
-var DEPT_PAGES={Sales:['overview','sales','orders','team'],CRR:['orders','sales'],Accounts:['receivables'],Plant:['orders','inventory'],HO:['overview','sales','orders','receivables','inventory','team']};
+var DEPT_PAGES={Sales:['overview','sales','orders','team'],CRR:['orders','sales','team'],Accounts:['receivables','team'],Plant:['orders','inventory','team'],HO:['overview','sales','orders','receivables','inventory','team']};
 function pagesFor(u){
   var base=['today'];if(!u)return [];
   var r=u.role;
@@ -48,9 +48,9 @@ function pagesFor(u){
   if(r==='HOD'){var p=DEPT_PAGES[u.department]||DEPT_PAGES.Sales;return p.filter(function(x){return x!=='sales'||true}).concat(['today','actions','admin'])}
   if(r==='Branch / depot manager')return ['overview','sales','orders','receivables','inventory','today','actions','team','admin'];
   if(r==='Sales executive')return ['sales','today','actions','team'];
-  if(r==='Coordinator (sales / CRR)')return ['orders','sales','today','actions'];
-  if(r==='Accounts')return ['receivables','today','actions'];
-  if(r==='Plant')return ['orders','inventory','today','actions'];
+  if(r==='Coordinator (sales / CRR)')return ['orders','sales','today','actions','team'];
+  if(r==='Accounts')return ['receivables','today','actions','team'];
+  if(r==='Plant')return ['orders','inventory','today','actions','team'];
   return base;
 }
 function canPage(u,pg){return pagesFor(u).indexOf(pg)>=0}
