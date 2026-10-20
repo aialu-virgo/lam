@@ -14,7 +14,7 @@ related:
 | By | What | Owner | Status |
 |---|---|---|---|
 | Tue 16:15 | Canonical model, B1↔S4 map, one data-map file per export, upload templates sent to Vijay | Data Architect | slipped → 17:15; 5 SAP exports received 16:30, mapping in progress |
-| Tue 17:15 | desk-v0.1 published: Data Intake, coverage grid, Admin masters | Full-Stack Engineer | open |
+| Tue 17:15 | desk-v0.1 published: Data Intake, coverage grid, Admin masters | Full-Stack Engineer | published 17:00 (D8); QA blind check running |
 | Tue 18:40 | History, potential, users uploaded; rejected rows fixed; coverage green or gaps named | Vijay + Delivery Lead | open |
 | Tue 20:00 | Wireframes of all pages sent for approval | Product Designer | open |
 | Tue 21:00 | Written design approval | Principals | open |
