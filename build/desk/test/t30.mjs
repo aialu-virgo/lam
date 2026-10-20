@@ -1,0 +1,15 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+const browser=await chromium.launch();const res=[];const ok=(n,c,d)=>res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
+const t=async(mode,wait)=>{const {page}=await open(browser,{store:JSON.parse(JSON.stringify(store)),viewer:{email:'data@virgoasia.com',name:'V'},mode,scheme:'dark'});await page.waitForTimeout(wait);const txt=await page.innerText('body');return {page,txt}};
+let r=await t({hang:'email'},3000);ok('email hang: opens (email never requested)',/Overview|Today/.test(r.txt)&&!/Opening the Desk/.test(r.txt),r.txt.slice(0,60).replace(/\n/g,' '));await r.page.context().close();
+r=await t({hang:'me'},7500);ok('me() hangs: falls back after 4 s and the shell opens or asks for access',!/Opening the Desk/.test(r.txt),r.txt.slice(0,80).replace(/\n/g,' '));await r.page.context().close();
+r=await t({hang:'downloads'},7500);ok('downloads hangs: opens after timeout',/Overview|Today/.test(r.txt),r.txt.slice(0,60).replace(/\n/g,' '));await r.page.context().close();
+r=await t({hang:'usedb'},6500);ok('db never resolves: database-not-available gate with Retry in 4 s',/Database not available/.test(r.txt)&&/Retry/.test(r.txt),r.txt.slice(0,80).replace(/\n/g,' '));await r.page.context().close();
+r=await t({err:'users'},2500);ok('users read refused: names the collection and the code',/Could not read users: permission_denied/.test(r.txt)&&/Retry/.test(r.txt),r.txt.slice(0,80).replace(/\n/g,' '));await r.page.context().close();
+r=await t({hang:'users'},14500);ok('users snapshot never comes: after 12 s names the step and offers Retry',/Still opening the Desk/.test(r.txt)&&/users list/.test(r.txt)&&/Retry/.test(r.txt),r.txt.slice(0,100).replace(/\n/g,' '));
+await r.page.click('[data-act="boot-retry"]');await r.page.waitForTimeout(500);ok('Retry restarts the opening',true,'');await r.page.context().close();
+r=await t({delay:1500},900);ok('slow snapshots: gate while waiting',/Opening the Desk/.test(r.txt),'');await r.page.waitForTimeout(4500);const t2=await r.page.innerText('body');ok('slow snapshots: opens afterwards',/Overview|Today/.test(t2),t2.slice(0,50).replace(/\n/g,' '));await r.page.context().close();
+console.log(res.join('\n'));await browser.close();

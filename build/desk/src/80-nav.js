@@ -124,9 +124,16 @@ function pageHtml(u){
 }
 function renderAll(){
   var root=$('#root');
-  if(S.dbState==='init'){if(!root.innerHTML)root.innerHTML=gate('Opening the Desk','Checking who you are.');return}
-  if(S.dbState==='none'){root.innerHTML=gate('Database not available','Sign in to claude.ai and open this page again. The Desk stores its data in the shared database.');return}
-  if(!S.loaded.users)return;
+  var retryBtn='<div class="gate"><button class="btn pri" data-act="boot-retry">Retry</button></div>';
+  if(S.dbState==='init'){var w0=Date.now()-(S.t0||Date.now());if(w0>12000)root.innerHTML=gate('Still opening the Desk','Waiting on '+(S.step||'the viewer record')+' for '+Math.round(w0/1000)+' seconds.')+retryBtn;else if(!root.innerHTML||/Still opening/.test(root.innerHTML))root.innerHTML=gate('Opening the Desk','Checking who you are.');return}
+  if(S.dbState==='none'){root.innerHTML=gate('Database not available','Sign in to claude.ai and open this page again. The Desk stores its data in the shared database.')+retryBtn;return}
+  if(!S.loaded.users){
+    var waited=Date.now()-(S.t0||Date.now());
+    if(S.errs&&S.errs.users){root.innerHTML=gate('Could not read users: '+S.errs.users,'The Desk cannot tell who you are without its users list.')+'<div class="gate"><button class="btn pri" data-act="boot-retry">Retry</button></div>';return}
+    if(waited>12000){root.innerHTML=gate('Still opening the Desk','Waiting on '+(S.step||'the database')+' for '+Math.round(waited/1000)+' seconds.')+'<div class="gate"><button class="btn pri" data-act="boot-retry">Retry</button></div>';return}
+    if(!root.innerHTML||/Still opening|Could not read/.test(root.innerHTML))root.innerHTML=gate('Opening the Desk','Waiting on '+(S.step||'the users list')+'.');
+    return;
+  }
   S.role=viewerRole();
   if(S.role===null||S.role==='inactive'){root.innerHTML=gate('Ask your admin for access','You are signed in as '+(S.viewer&&S.viewer.email||'a user whose email this page cannot read')+'. This page is not enabled for that address.'+(S.viewer&&S.viewer.id?' Give your admin this viewer ID: '+S.viewer.id:''));return}
   if(S.role==='Super admin'&&!S.seeded&&S.loaded.users&&S.loaded.plants){S.seeded=true;seedDefaults()}
@@ -165,6 +172,7 @@ function renderAll(){
 /* ---- handlers ---- */
 function goto(pg,opt){opt=opt||{};if(opt.plant!=null)S.f.plant=opt.plant||'';if(opt.group!=null)S.f.group=opt.group||'';location.hash='#/'+pg}
 Object.assign(handlers,{
+ 'boot-retry':function(){boot()},
  'clear-f':function(){S.f.plant='';S.f.sp='';S.f.group='';S.f.search='';S.lastHtml='';schedule()},
  'goto':function(t){S.f.plant=t.getAttribute('data-plant')||S.f.plant;S.f.group=t.getAttribute('data-group')||''},
  'share':function(){var d=window.__clip;return copyText(PAGE_URL,'Link copied')},

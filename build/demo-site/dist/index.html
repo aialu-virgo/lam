@@ -450,7 +450,7 @@ function isPlanLocked(q){return !!((S.periods[q]&&S.periods[q].plan_locked)||(S.
 function dget(path){return dbRetry(function(){return S.db.doc(path).get()})}
 function dataOf(snap){return snap.docs.map(function(d){var x=d.data();x._id=d.id;return x})}
 function subscribe(name,q,assign){
-  q.onSnapshot(function(snap){assign(dataOf(snap));S.loaded[name]=true;schedule()},function(e){S.err=(S.err||'')+name+': '+(e&&e.message||e)+' ';schedule()});
+  q.onSnapshot(function(snap){try{assign(dataOf(snap))}catch(e){S.errs[name]='could not decode ('+((e&&e.message)||e)+')';S.err=(S.err||'')+'Could not read '+name+': '+S.errs[name]+' ';schedule();return}S.loaded[name]=true;delete S.errs[name];schedule()},function(e){var c=(e&&e.code)||(e&&e.message)||'error';S.errs[name]=c;S.err=(S.err||'')+'Could not read '+name+': '+c+' ';schedule()});
 }
 function dbErrText(e){
   if(e&&e.code==='quota_exceeded')return 'The shared database is full ('+(e.message||'quota')+'). Nothing more can be stored. Tell the Delivery Lead.';
@@ -3703,9 +3703,16 @@ function pageHtml(u){
 }
 function renderAll(){
   var root=$('#root');
-  if(S.dbState==='init'){if(!root.innerHTML)root.innerHTML=gate('Opening the Desk','Checking who you are.');return}
-  if(S.dbState==='none'){root.innerHTML=gate('Database not available','The demo store could not start in this browser. Reload the page.');return}
-  if(!S.loaded.users)return;
+  var retryBtn='<div class="gate"><button class="btn pri" data-act="boot-retry">Retry</button></div>';
+  if(S.dbState==='init'){var w0=Date.now()-(S.t0||Date.now());if(w0>12000)root.innerHTML=gate('Still opening the Desk','Waiting on '+(S.step||'the viewer record')+' for '+Math.round(w0/1000)+' seconds.')+retryBtn;else if(!root.innerHTML||/Still opening/.test(root.innerHTML))root.innerHTML=gate('Opening the Desk','Checking who you are.');return}
+  if(S.dbState==='none'){root.innerHTML=gate('Database not available','The demo store could not start in this browser. Reload the page.')+retryBtn;return}
+  if(!S.loaded.users){
+    var waited=Date.now()-(S.t0||Date.now());
+    if(S.errs&&S.errs.users){root.innerHTML=gate('Could not read users: '+S.errs.users,'The Desk cannot tell who you are without its users list.')+'<div class="gate"><button class="btn pri" data-act="boot-retry">Retry</button></div>';return}
+    if(waited>12000){root.innerHTML=gate('Still opening the Desk','Waiting on '+(S.step||'the database')+' for '+Math.round(waited/1000)+' seconds.')+'<div class="gate"><button class="btn pri" data-act="boot-retry">Retry</button></div>';return}
+    if(!root.innerHTML||/Still opening|Could not read/.test(root.innerHTML))root.innerHTML=gate('Opening the Desk','Waiting on '+(S.step||'the users list')+'.');
+    return;
+  }
   S.role=viewerRole();
   if(S.role===null||S.role==='inactive'){root.innerHTML=gate('Ask your admin for access','You are signed in as '+(S.viewer&&S.viewer.email||'a user whose email this page cannot read')+'. This page is not enabled for that address.'+(S.viewer&&S.viewer.id?' Give your admin this viewer ID: '+S.viewer.id:''));return}
   if(S.role==='Super admin'&&!S.seeded&&S.loaded.users&&S.loaded.plants){S.seeded=true;seedDefaults()}
@@ -3744,6 +3751,7 @@ function renderAll(){
 /* ---- handlers ---- */
 function goto(pg,opt){opt=opt||{};if(opt.plant!=null)S.f.plant=opt.plant||'';if(opt.group!=null)S.f.group=opt.group||'';location.hash='#/'+pg}
 Object.assign(handlers,{
+ 'boot-retry':function(){boot()},
  'clear-f':function(){S.f.plant='';S.f.sp='';S.f.group='';S.f.search='';S.lastHtml='';schedule()},
  'goto':function(t){S.f.plant=t.getAttribute('data-plant')||S.f.plant;S.f.group=t.getAttribute('data-group')||''},
  'share':function(){var d=window.__clip;return copyText(PAGE_URL,'Link copied')},
@@ -3817,18 +3825,32 @@ window.__dbg={S:S,DS:DS,CFG:CFG,sumF:sumF,quarterSeries:quarterSeries,trendStats
 
 
 /* ================= boot ================= */
+/* every viewer or capability await gets a timeout and a fallback, so the opening gate can never hang */
+function withTimeout(p,ms,fb){return new Promise(function(res){var done=false,t=setTimeout(function(){if(!done){done=true;res(fb)}},ms);Promise.resolve(p).then(function(v){if(!done){done=true;clearTimeout(t);res(v)}},function(){if(!done){done=true;clearTimeout(t);res(fb)}})})}
+var TIMED_OUT={timedOut:true};
 async function boot(){
+  S.t0=Date.now();S.step='checking who you are';S.bootErr=null;S.dbState='init';S.loaded={};S.errs={};
+  clearTimeout(S.gateTimer);S.gateTimer=setTimeout(function(){schedule()},12500);
   var th=lsGet('desk-theme');if(th==='dark'||th==='light')document.documentElement.setAttribute('data-theme',th);
   route();
   if(!window.__demoStore||!window.__demoStore.open){S.dbState='none';renderAll();return}
   try{
-    var user=await window.__demoStore.open('user');
-    if(user){try{var me=await user.me();var em=null;try{if(user.email)em=await user.email()}catch(e){}var ow=false;try{ow=await user.isOwner()}catch(e){}var uid=null;try{uid=(me&&me.id)||(user.id?await user.id():null)}catch(e){}S.viewer={email:((em||me.email||'')+'').toLowerCase()||null,name:me.name||'',owner:!!ow,id:uid}}catch(e){S.viewer={email:null,name:''}}}
-    else S.viewer={email:null,name:''};
-    var dl=await window.__demoStore.open('downloads');window.__downloads=dl||null;
-    var db=await window.__demoStore.open('db');
+    S.step='the viewer record';
+    var user=await withTimeout(window.__demoStore.open('user'),4000,null);
+    if(user){
+      /* no email call: the declared scope is profile only, and on some viewers an email request never settles */
+      var me=await withTimeout(user.me(),4000,TIMED_OUT);
+      if(me===TIMED_OUT||!me)me={};
+      var ow=await withTimeout(user.isOwner?user.isOwner():false,4000,false);
+      var uid=me.id||null;if(!uid&&user.id)uid=await withTimeout(user.id(),4000,null);
+      S.viewer={email:((me.email||'')+'').toLowerCase()||null,name:me.name||'',owner:!!ow,id:uid};
+    }else S.viewer={email:null,name:''};
+    S.step='file saving';
+    var dl=await withTimeout(window.__demoStore.open('downloads'),4000,null);window.__downloads=dl||null;
+    S.step='the database';
+    var db=await withTimeout(window.__demoStore.open('db'),4000,null);
     if(!db){S.dbState='none';renderAll();return}
-    S.db=db;S.dbState='ready';
+    S.db=db;S.dbState='ready';S.step='the users list';
     subscribe('users',db.collection('users'),function(d){S.users=d});
     subscribe('plants',db.collection('plants'),function(d){S.plants=d});
     subscribe('periods',db.collection('periods'),function(d){S.periods={};d.forEach(function(x){S.periods[x._id]=x})});
