@@ -1,7 +1,7 @@
 ---
 title: Priority rules
 summary: How Today ranks actions: five weighted components scored 0-100, editable weights, tie-breaks, the cap, and the "why" text, with a worked example.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - design/_index.md
@@ -13,7 +13,7 @@ related:
 ---
 
 # Priority rules
-**Owner:** Data Architect · **Milestone:** M1 · **Approval:** not submitted
+**Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §6 Today
 
 **Done when:** score formula, editable weights and the 'why' text are defined with a worked example.

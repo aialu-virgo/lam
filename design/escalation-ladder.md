@@ -1,7 +1,7 @@
 ---
 title: Escalation ladder
 summary: Reminder one day before due, then L1, L2, L3 drafts at 1, 3 and 7 days overdue to owner, reports-to and HOD/HO; drafts only, nothing auto-sends; with a dated worked example for QA check 5.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - .claude/rules/boundaries.md
@@ -16,7 +16,7 @@ related:
 ---
 
 # Escalation ladder
-**Owner:** Data Architect · **Milestone:** M1 · **Approval:** not submitted
+**Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §6 Escalation ladder
 
 **Done when:** each step has day, recipient, template and the rule that nothing auto-sends.

@@ -1,7 +1,7 @@
 ---
 title: Target model
 summary: Target = market potential x share %, phased to months, with the revision workflow, approvers, original vs current target, and the Stretch flag, with a hand-calculable example for QA check 12.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - design/_index.md
@@ -17,7 +17,7 @@ related:
 ---
 
 # Target model
-**Owner:** Data Architect · **Milestone:** M1 · **Approval:** not submitted
+**Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §4 Market potential → target
 
 **Done when:** formula, levels, phasing, revision states (Draft → Discussed → Approved → Locked) and Stretch flag are specified with a worked example.

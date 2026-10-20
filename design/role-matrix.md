@@ -1,7 +1,7 @@
 ---
 title: Role matrix
 summary: Eight roles with the row-level scope filter applied before rendering, allowed actions, Today cap and one QA test case each, on a small demo fixture.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - design/_index.md
@@ -20,7 +20,7 @@ related:
 ---
 
 # Role matrix
-**Owner:** Data Architect · **Milestone:** M1 · **Approval:** not submitted
+**Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §3
 
 **Done when:** each role has scope filter, allowed actions, default Today cap and a test case for QA.

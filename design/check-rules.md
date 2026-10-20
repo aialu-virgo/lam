@@ -1,7 +1,7 @@
 ---
 title: Check rules
 summary: Upload validation rules (V1-V12) and the seven rules that raise actions (R1-R7: shortfall, overdue receivable, order beyond TAT, ageing stock, rejected rows, missing plan, QoQ decline), each with trigger, threshold, owner, due date, next-step text and a worked example.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - design/_index.md
@@ -20,7 +20,7 @@ related:
 ---
 
 # Check rules
-**Owner:** Data Architect · **Milestone:** M1 · **Approval:** not submitted
+**Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §6 Created by, §7 Validation, §4 Rules use QoQ
 
 **Done when:** each rule has trigger, threshold, owner, due date and next-step text.

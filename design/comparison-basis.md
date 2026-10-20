@@ -1,7 +1,7 @@
 ---
 title: Comparison basis
 summary: QoQ only: quarter, month, QTD, YTD and custom comparisons, the Q1 to prior-FY Q4 crossover, new-entity and partial-history handling, and what the D9 storage grain forces.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - design/_index.md
@@ -18,7 +18,7 @@ related:
 ---
 
 # Comparison basis
-**Owner:** Data Architect · **Milestone:** M1 · **Approval:** not submitted
+**Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §4 Historic data and the comparison basis, §7 Historic upload mode
 
 **Done when:** every period view's comparison is defined, including Q1 → prior-FY Q4, with no last-FY comparison anywhere.

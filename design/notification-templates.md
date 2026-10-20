@@ -1,7 +1,7 @@
 ---
 title: Notification templates
 summary: Email and WhatsApp (wa.me) draft texts for the reminder and the L1, L2 and L3 follow-ups, with placeholders and an action link; drafts only, a person sends.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - design/escalation-ladder.md
@@ -12,7 +12,7 @@ related:
 ---
 
 # Notification templates
-**Owner:** Product Designer · **Milestone:** M2 · **Approval:** not submitted
+**Owner:** Product Designer · **Milestone:** M2 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §6 · [Escalation ladder](escalation-ladder.md) (days, recipients, draft fields)
 
 **Done when:** each escalation step has an email and a wa.me text with placeholders and an action link.

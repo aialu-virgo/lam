@@ -1,7 +1,7 @@
 ---
 title: Canonical data model
 summary: Entities, keys, fields and the source-reference columns every SAP row lands in; B1 and S/4 map to one model, derived from five real exports.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - data-map/customer.md
@@ -31,7 +31,7 @@ related:
 ---
 
 # Canonical data model
-**Owner:** Data Architect · **Milestone:** M1 · **Approval:** not submitted
+**Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §3, §4, §7
 
 **Done when:** every entity, key, field and the source reference columns are defined; per-export B1↔S4 maps live in [data-map/](../data-map/_index.md). Draft: built from the five real exports of 20 Oct 2026; entities with no export yet carry the brief's fields only (**Assumed**).

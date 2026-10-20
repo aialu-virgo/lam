@@ -1,7 +1,7 @@
 ---
 title: Plan model
 summary: Every plan type beyond the sales target (person split, collections, dispatch TAT, stock days, new customers, personal KPIs): grain, owner, entry route, actual source and approval.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - design/_index.md
@@ -21,7 +21,7 @@ related:
 ---
 
 # Plan model
-**Owner:** Data Architect · **Milestone:** M1 · **Approval:** not submitted
+**Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §4
 
 **Done when:** each plan type has grain, owner, entry route and actual source.

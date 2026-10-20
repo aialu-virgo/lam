@@ -1,7 +1,7 @@
 ---
 title: KRA / KPI set
 summary: KPI catalogue (formula, actual source, plan source) and the KRAs and KPIs per role measured on Team & Scorecard, with status rules and D9 limits.
-status: draft
+status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
   - design/_index.md
@@ -16,7 +16,7 @@ related:
 ---
 
 # KRA / KPI set
-**Owner:** Data Architect · **Milestone:** M1 · **Approval:** not submitted
+**Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §5 Team & Scorecard, §4 (every KPI card)
 
 **Done when:** each role has KPIs with source, plan source and formula.
