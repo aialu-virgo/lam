@@ -84,7 +84,7 @@ function dmLoginHtml(pre,step,msg){
     +'<div class="fld"><label for="dl-p">Password</label><input id="dl-p" type="password" class="in" autocomplete="current-password"></div>'
     +'<div class="dl-err" id="dl-err" role="alert">'+esc(msg||'')+'</div><div class="row"><button class="btn pri" type="submit">Sign in</button></div></form>';
   }
-  return '<div class="dl-wrap"><div class="dl-head"><div class="logo">V</div><div><h1>Virgo Lam Performance Desk</h1><p>Demo. Pick a role, sign in and try the Desk.</p></div></div>'+form
+  return '<div class="dl-wrap"><div class="dl-head">'+brandLogo()+'<div><h1>Lam Performance Desk</h1><p>Demo. Pick a role, sign in and try the Desk.</p></div></div>'+form
    +'<section class="card dl-acc"><h2>Demo accounts</h2><div class="tw"><table><thead><tr><th>Role</th><th>Username</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note" style="margin:0">Every account shares the password <span class="mono">'+DM_PW+'</span> until you change it. Each role sees only its own scope.</p></section>'
    +'<div class="dl-foot"><span>Data Intake works with your own files, but nothing you upload here is saved anywhere.</span></div></div>';
 }

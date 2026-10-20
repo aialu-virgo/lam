@@ -8,7 +8,15 @@ const gen = fs.readFileSync(path.join(here, '../demo-data/generator.js'), 'utf8'
 const srcDir = path.join(here, 'src');
 const mods = fs.readdirSync(srcDir).filter(f => f.endsWith('.js')).sort().map(f => '/* ---- src/' + f + ' ---- */\n' + fs.readFileSync(path.join(srcDir, f), 'utf8')).join('\n');
 const css = fs.readFileSync(path.join(srcDir, 'styles.css'), 'utf8');
+function logoSrc() {
+  for (const ext of ['svg', 'png']) {
+    const f = path.join(here, 'assets', 'virgo-logo.' + ext);
+    if (fs.existsSync(f)) return 'data:' + (ext === 'svg' ? 'image/svg+xml' : 'image/png') + ';base64,' + fs.readFileSync(f).toString('base64');
+  }
+  return '';
+}
+export const LOGO = logoSrc();
 fs.mkdirSync(path.join(here, 'dist'), { recursive: true });
-const out = src.replace('/*@@DEMO_GENERATOR@@*/', () => gen).replace('/*@@V09_MODULES@@*/', () => mods).replace('/*@@V09_CSS@@*/', () => css);
+const out = src.replace('/*@@DEMO_GENERATOR@@*/', () => gen).replace('/*@@V09_MODULES@@*/', () => mods).replace('/*@@V09_CSS@@*/', () => css).replace('/*@@LOGO@@*/', () => LOGO);
 fs.writeFileSync(path.join(here, 'dist/index.html'), out);
 console.log('dist/index.html', out.length, 'bytes');
