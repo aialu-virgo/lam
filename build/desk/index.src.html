@@ -120,6 +120,7 @@ tr:last-child td{border-bottom:0}
   .brand{flex:none}
   .main{padding:16px max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px))}
 }
+/*@@V09_CSS@@*/
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -252,48 +253,7 @@ function closeDlg(){$('#dlg').innerHTML=''}
 function theme(){return document.documentElement.getAttribute('data-theme')}
 function toggleTheme(){var cur=theme();var dark=cur?cur==='dark':window.matchMedia('(prefers-color-scheme:dark)').matches;var nx=dark?'light':'dark';document.documentElement.setAttribute('data-theme',nx);lsSet('desk-theme',nx)}
 
-function shell(inner){
-  var role=S.role,email=S.viewer&&S.viewer.email;
-  var nav=function(id,label,tag){return '<a class="nav" href="#'+id+'" '+(S.tab===id?'aria-current="page"':'')+'><span>'+label+'</span>'+(tag?'<span class="tag">'+tag+'</span>':'')+'</a>'};
-  var off=function(label){return '<button class="nav" disabled><span>'+label+'</span><span class="tag">v0.9</span></button>'};
-  var titles={intake:['Data Intake','SAP B1 now, S/4HANA ready. CSV or XLSX. Every row keeps its SAP reference.'],admin:['Admin','Users, plants and market potential with revisions.']};
-  var t=titles[S.tab]||titles.intake;
-  var demo=S.uploads.some(function(u){return u.demo});
-  return '<div class="app"><aside class="side"><div class="brand"><div class="logo">V</div><div><b>Virgo Lam Performance Desk</b><small>desk-v0.1 intake build</small></div></div>'
-   +'<nav class="navg"><h4>Overview</h4>'+off('Overview')+off('Sales')+off('Orders &amp; Dispatch')+off('Receivables')+off('Inventory')+'</nav>'
-   +'<nav class="navg"><h4>Team</h4>'+off('Today')+off('Action Center')+off('Team &amp; Scorecard')+'</nav>'
-   +'<nav class="navg"><h4>Data</h4>'+nav('intake','Data Intake','LIVE')+nav('admin','Admin','LIVE')+'</nav>'
-   +'<div class="me"><b>'+esc(S.viewer&&S.viewer.name||email||'Viewer')+'</b><span>'+esc(role||'')+'</span><span class="note break">'+esc(email||'')+'</span></div></aside>'
-   +'<main class="main"><div class="top"><div><h1>'+t[0]+'</h1><p>'+t[1]+'</p></div><div class="chips">'+(demo?'<span class="chip demo">DEMO data loaded</span>':'')+'<span class="chip">No LLM, no auto-send, no write-back to SAP</span><button class="btn sm" data-act="theme" aria-label="Switch light or dark theme">Theme</button></div></div>'+inner+'</main></div>';
-}
 function gate(msg,sub){return '<div class="gate"><div class="logo">V</div><h1 style="margin:0 0 8px">'+esc(msg)+'</h1><p class="note">'+esc(sub||'')+'</p></div>'}
-
-function renderAll(){
-  var root=$('#root');
-  if(S.dbState==='init'){if(!root.innerHTML)root.innerHTML=gate('Opening the Desk','Checking who you are.');return}
-  if(S.dbState==='none'){root.innerHTML=gate('Database not available','Sign in to claude.ai and open this page again. The Desk stores its data in the shared database.');return}
-  var need=['users'];
-  if(!S.loaded.users){return}
-  S.role=viewerRole();
-  if(S.role!=='Super admin'){
-    if(S.role===null||S.role==='inactive')root.innerHTML=gate('Ask your admin for access','You are signed in as '+(S.viewer&&S.viewer.email||'an unknown user')+'. This page is not enabled for that address.');
-    else root.innerHTML=gate('desk-v0.1 is for Super admin only','Your role is '+S.role+'. Business views arrive in desk-v0.9.');
-    return;
-  }
-  if(!S.seeded&&S.loaded.users&&S.loaded.plants){S.seeded=true;seedDefaults()}
-  var keepScroll=window.scrollY;
-  var f=document.activeElement;
-  if(!$('#shell')){root.innerHTML='<div id="shell"></div>'}
-  var sh=$('#shell');
-  /* shell is rebuilt only when tab changes or counts change; wizard and forms live in their own containers */
-  var sig=S.tab+'|'+S.role+'|'+S.uploads.some(function(u){return u.demo})+'|'+(S.viewer&&S.viewer.email);
-  if(sh.getAttribute('data-sig')!==sig){
-    sh.setAttribute('data-sig',sig);
-    sh.innerHTML=shell(S.tab==='intake'?'<div id="p-intake"></div>':'<div id="p-admin"></div>');
-    if(S.tab==='intake')buildIntake();else buildAdmin();
-  }
-  if(S.tab==='intake')refreshIntake();else refreshAdmin();
-}
 
 /* ================= seeds ================= */
 function defaultPlants(){var out=[];for(var c=1001;c<=1049;c++){if(c>=1007&&c<=1010)continue;out.push({plant_code:String(c),plant_type:c<=1006?'Factory':c===1011?'HO':'Depot'})}return out}
@@ -686,7 +646,7 @@ async function runValidation(){
     if(!A){A=[cust,cn,sp,grp,xf?1:0,0,0,0,0,0];P.agg.set(ak,A)}
     A[6]++;A[7]+=qty;A[8]+=sq;A[9]+=val;
     var D=P.docs.get(doc);
-    if(!D){D={h:[doc,dt.d,cust,0,0,0,xf?1:0,0],ks:[]};P.docs.set(doc,D)}
+    if(!D){D={h:[doc,dt.d,cust,0,0,0,xf?1:0,0,sp],ks:[]};P.docs.set(doc,D)}
     D.h[3]++;D.h[4]+=qty;D.h[5]+=val;D.h[7]+=sq;
     if(D.ks.indexOf(ak)<0){D.ks.push(ak);A[5]++}
     res.good++;
@@ -697,9 +657,17 @@ async function runValidation(){
 }
 
 /* ---- packing and load ---- */
+function rollRowsOf(aggMap){
+  var rm=new Map();
+  aggMap.forEach(function(a){var k=a[3]+'\u0001'+a[2]+'\u0001'+a[4],o=rm.get(k);if(!o){o=[a[3],a[2],a[4],0,0,0,0,0];rm.set(k,o)}o[3]+=a[5];o[4]+=a[6];o[5]+=a[7];o[6]+=a[8];o[7]+=a[9]});
+  return Array.from(rm.values()).map(function(o){return [o[0],o[1],o[2],o[3],o[4],o[5],Math.round(o[6]),Math.round(o[7]*100)/100]});
+}
+async function writeRoll(plant,ym,sys,rows,src,demo){
+  await dset('roll/'+plant+'-'+ym,{plant:plant,ym:ym,sys:sys,n:rows.length,z:await gz(JSON.stringify(rows)),src:src,at:nowISO(),demo:demo||undefined});
+}
 async function packChunks(sys,P){
   var agg=[];P.agg.forEach(function(a){agg.push([a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7],Math.round(a[8]*10)/10,Math.round(a[9]*100)/100])});
-  var hdr=[];if(U.keepDocs!==false)P.docs.forEach(function(d){var h=d.h;hdr.push([h[0],h[1],h[2],h[3],h[4],Math.round(h[5]*100)/100,h[6],Math.round(h[7]*10)/10])});
+  var hdr=[];if(U.keepDocs!==false)P.docs.forEach(function(d){var h=d.h;hdr.push([h[0],h[1],h[2],h[3],h[4],Math.round(h[5]*100)/100,h[6],Math.round(h[7]*10)/10,h[8]||''])});
   var out=[];
   async function fit(a,h){
     var z=await gz(JSON.stringify({a:a,h:h}));
@@ -709,7 +677,7 @@ async function packChunks(sys,P){
     }else out.push({z:z,na:a.length,nh:h.length});
   }
   await fit(agg,hdr);
-  return out.map(function(c,i){return {id:sys+'-'+P.plant+'-'+P.ym+'-'+i,doc:{z:c.z,na:c.na,nh:c.nh,sys:sys,plant:P.plant,ym:P.ym,i:i,fmt:'gz-json v1: a=[cust,name,salesperson,group,transfer,docs,lines,sheets,sqft,net] h=[doc,day,cust,lines,sheets,net,transfer,sqft]'}}});
+  return out.map(function(c,i){return {id:sys+'-'+P.plant+'-'+P.ym+'-'+i,doc:{z:c.z,na:c.na,nh:c.nh,sys:sys,plant:P.plant,ym:P.ym,i:i,fmt:'gz-json v1: a=[cust,name,salesperson,group,transfer,docs,lines,sheets,sqft,net] h=[doc,day,cust,lines,sheets,net,transfer,sqft,salesperson (added v0.9, D10; older chunks have 8 fields)]'}}});
 }
 async function runLoad(opts){
   var r=U.res,sys=U.sys,demo=!!opts.demo,by=(S.viewer&&S.viewer.email)||'unknown';
@@ -737,7 +705,9 @@ async function runLoad(opts){
         var q=chunks.slice();
         await Promise.all([0,1,2].map(async function(){while(q.length){var c=q.shift();await dset('inv/'+c.id,Object.assign({demo:demo||undefined,upload:uid},c.doc));cb+=c.doc.z.length;docsW++}}));
         if(old){for(var oi=chunks.length;oi<(old.chunks||0);oi++)stale.push('inv/'+(old.sys||sys)+'-'+P.plant+'-'+ym+'-'+oi);if(old.sys&&old.sys!==sys){for(var oj=0;oj<Math.min(old.chunks||0,chunks.length);oj++)stale.push('inv/'+old.sys+'-'+P.plant+'-'+ym+'-'+oj)}}
-        cell.plants[P.plant]={sys:sys,chunks:chunks.length,docs:docsN,lines:lines,net:Math.round(net),sheets:sheets,bytes:cb,upload:uid,at:nowISO(),demo:demo||undefined};
+        var atNow=nowISO();
+        cell.plants[P.plant]={sys:sys,chunks:chunks.length,docs:docsN,lines:lines,net:Math.round(net),sheets:sheets,bytes:cb,upload:uid,at:atNow,demo:demo||undefined};
+        await writeRoll(P.plant,ym,sys,rollRowsOf(P.agg),atNow,demo);
         bytes+=cb;loadedLines+=lines;done++;
       }
       await dset('cells/'+cellId,cell);S.cells[cellId]=cell;
@@ -776,6 +746,7 @@ function paintProgress(){var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.
 
 /* ================= demo ================= */
 async function demoLoad(){
+  if(effRole()!=='Super admin'||readOnly()){toast('Only a Super admin can load demo data');return}
   if(!window.DemoGen){toast('Demo generator not loaded');return}
   if(S.uploads.some(function(u){return u.demo})){toast('Demo data is already loaded');return}
   var codes=['1001','1011','1012','1013'];
@@ -789,19 +760,20 @@ async function demoLoad(){
   var months=[],g=gridQuarters();g.list.slice(0,12).forEach(function(k){qMonths(k).forEach(function(ym){months.push(ym)})});
   /* gaps for the coverage grid: Q3 FY25 missing, Q1 FY26 partial (Apr, May only) */
   months=months.filter(function(ym){var q=qKeyOfYm(ym);if(q==='FY25-Q3')return false;if(q==='FY26-Q1'&&ym==='2025-06')return false;return true});
+  var todayYm=TODAY().slice(0,7);if(months.indexOf(todayYm)<0)months.push(todayYm);
   var saveU=U;
-  var b1=DemoGen.invoices({shape:'B1',plants:plants,months:months,docsPerPlantMonth:14,seed:11,dateStyle:'iso',withLineNum:true});
-  U=newU();U.sys='B1';U.name='DEMO B1 invoices (synthetic)';U.headers=b1.headers;U.rows=b1.rows;U.map=defaultMap(b1.headers,'B1');U.mode='historic';U.period='auto';U.closeAfter=true;
+  var b1=DemoGen.invoices({shape:'B1',plants:plants.slice(0,3),months:months,docsPerPlantMonth:14,seed:11,dateStyle:'iso',withLineNum:true,cutoff:TODAY()});var b1b=DemoGen.invoices({shape:'B1',plants:plants.slice(3),months:months.filter(function(m){return m<todayYm}),docsPerPlantMonth:14,seed:13,docStart:500000,dateStyle:'iso',withLineNum:true});b1.rows=b1.rows.concat(b1b.rows);Object.keys(b1b.facts).forEach(function(k){b1.facts[k]=(b1.facts[k]||0)+b1b.facts[k]});
+  S.demoFacts=b1.facts;U=newU();U.sys='B1';U.name='DEMO B1 invoices (synthetic)';U.headers=b1.headers;U.rows=b1.rows;U.map=defaultMap(b1.headers,'B1');U.mode='historic';U.period='auto';U.closeAfter=true;
   await runValidation();await runLoad({demo:true});
-  var s4=DemoGen.invoices({shape:'S4',plants:[plants[3]],months:['2026-10'],docsPerPlantMonth:10,seed:12,dateStyle:'iso'});
+  var s4=DemoGen.invoices({shape:'S4',plants:[plants[3]],months:[todayYm],docsPerPlantMonth:10,seed:12,dateStyle:'iso',cutoff:TODAY()});Object.keys(s4.facts||{}).forEach(function(k){S.demoFacts[k]=(S.demoFacts[k]||0)+s4.facts[k]});
   U=newU();U.sys='S4';U.name='DEMO S/4 sales register (synthetic)';U.headers=s4.headers;U.rows=s4.rows;U.map=defaultMap(s4.headers,'S4');U.mode='daily';U.period=g.cur;
   await runValidation();await runLoad({demo:true});
-  /* a few DEMO potential rows */
-  var cq=g.cur,items=[['1012','Laminate','Dealer',12e7,9.5e5],['1013','Door','Project',6.5e7,4.8e5]];
-  for(var k=0;k<items.length;k++){var it=items[k];var id=slug([cq,it[0],it[1],it[2]].join('_'));await dset('potential/'+id,{fy_quarter:cq,plant_code:it[0],territory:'',product_group:it[1],customer_segment:it[2],potential_value_inr:it[3],potential_qty_sheets:Math.round(it[4]/8),potential_qty_sqft:it[4],share_pct:8,source_type:'branch estimate',source_note:'DEMO',owner_email:'',status:'Draft',rev:1,demo:true,revisions:[{n:1,at:nowISO(),by:'demo',status:'Draft',reason:'DEMO seed',discussion_date:'',participants:'',old:null,new:{potential_value_inr:it[3],share_pct:8}}]})}
+  toast('Writing demo plans, people, actions and open-item stores...');
+  await demoExtras(S.demoFacts||{});
   U=newU();renderUpload();toast('Demo data loaded');
 }
 async function demoClear(){
+  if(effRole()!=='Super admin'||readOnly()){toast('Only a Super admin can clear demo data');return}
   toast('Clearing demo data...');
   try{
     var cellIds=Object.keys(S.cells);
@@ -814,27 +786,18 @@ async function demoClear(){
     for(var q in S.periods){if(S.periods[q].demo)await ddel('periods/'+q)}
     for(var pt of S.plants.filter(function(x){return x.demo})){if(pt.demoDefault)await dset('plants/'+pt.plant_code,{plant_code:pt.plant_code,plant_name:'',plant_type:pt.plant_type||'Depot',zone:'',state:'',b1_bpl_name:'',business:'laminates',active:true,seed:true});else await dset('plants/'+pt.plant_code,Object.assign({},pt,{demo:undefined,plant_name:pt.plant_name,b1_bpl_name:pt.b1_bpl_name}))}
     for(var po of S.potential.filter(function(x){return x.demo}))await ddel('potential/'+po._id);
+    await demoClearExtras();
     toast('Demo data cleared');
   }catch(e){toast('Clear failed: '+dbErrText(e))}
 }
 
 /* ================= ADMIN ================= */
-function buildAdmin(){
-  $('#p-admin').innerHTML='<div class="tabs seg" role="tablist" style="align-self:flex-start"><button data-act="atab" data-t="users" role="tab">Users</button><button data-act="atab" data-t="plants" role="tab">Plants</button><button data-act="atab" data-t="potential" role="tab">Market potential</button><button data-act="atab" data-t="transfers" role="tab">Internal transfer customers</button></div><div id="a-body"></div>';
-}
-function refreshAdmin(){
-  document.querySelectorAll('[data-act="atab"]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-t')===S.adminTab))});
-  var el=$('#a-body');if(!el)return;
-  var focusId=document.activeElement&&document.activeElement.id;
-  if(S.adminTab==='users')el.innerHTML=usersHtml();else if(S.adminTab==='plants')el.innerHTML=plantsHtml();else if(S.adminTab==='transfers')el.innerHTML=transfersHtml();else el.innerHTML=potentialHtml();
-  if(focusId){var f=document.getElementById(focusId);if(f&&f.focus){f.focus();try{var v=f.value;if(f.setSelectionRange&&f.type!=='number'&&f.type!=='email')f.setSelectionRange(v.length,v.length)}catch(e){}}}
-}
 function usersHtml(){
   var rows=S.users.slice().sort(function(a,b){return a.email<b.email?-1:1});
   return '<section class="card"><div class="hd"><h2>Users &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="user-add">Add user</button><label class="btn sm" for="up-users" style="cursor:pointer">Upload users (CSV)</label><input id="up-users" data-file="users" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="users">Download template</button></div></div>'
   +'<div class="tw"><table><thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Dept</th><th>Plants</th><th>Reports to</th><th>WhatsApp</th><th class="num">Cap</th><th>Active</th><th></th></tr></thead><tbody>'
   +rows.map(function(u){return '<tr><td class="break">'+esc(u.email)+'</td><td>'+esc(u.name)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.department)+'</td><td class="mono break">'+esc(u.plant_codes||'All')+'</td><td class="break">'+esc(u.reports_to_email||'-')+'</td><td class="mono">'+esc(u.whatsapp_number||'-')+'</td><td class="num">'+esc(u.today_cap||'')+'</td><td>'+(u.active===false?'<span class="pill mute">Off</span>':'<span class="pill ok">On</span>')+'</td><td><button class="btn sm" data-act="user-edit" data-id="'+esc(u._id)+'">Edit</button></td></tr>'}).join('')+'</tbody></table></div>'
-  +'<p class="note">Roles: '+ROLES.join(' &middot; ')+'. Access is by email. In desk-v0.1 only Super admin can open the page; an unknown viewer sees "Ask your admin for access". Seed Super admins: '+SEED_SUPER.join(', ')+'.</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
+  +'<p class="note">Roles: '+ROLES.join(' &middot; ')+'. Access is by email. An unknown or inactive viewer sees "Ask your admin for access". For a Sales executive, the sales employee code must match the salesperson name in the SAP export (B1 Salesemployee) until S/4 gives codes. Seed Super admins: '+SEED_SUPER.join(', ')+'.</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
 }
 function plantsHtml(){
   var rows=S.plants.slice().sort(function(a,b){return a.plant_code<b.plant_code?-1:1});
@@ -855,7 +818,7 @@ function transfersHtml(){
 function potStatusPill(s){return '<span class="pill '+({Draft:'mute',Discussed:'info',Approved:'ok',Locked:'part'}[s]||'mute')+'">'+esc(s)+'</span>'}
 function potentialHtml(){
   var f=S.potFilter,g=gridQuarters(),qs=[];var k=g.cur;for(var i=0;i<5;i++){qs.push(k);k=nextQ(k)}
-  var all=S.potential.slice();
+  var all=S.potential.filter(planVisible);
   var quarters=Array.from(new Set(all.map(function(x){return x.fy_quarter}).concat(qs))).sort().reverse();
   var rows=all.filter(function(x){return (!f.q||x.fy_quarter===f.q)&&(!f.plant||(x.plant_code||x.territory)===f.plant)&&(!f.group||x.product_group===f.group)&&(!f.seg||x.customer_segment===f.seg)}).sort(function(a,b){return a.fy_quarter<b.fy_quarter?1:a.fy_quarter>b.fy_quarter?-1:(a.plant_code||'')<(b.plant_code||'')?-1:1});
   var tot={v:0,s:0,t:0};rows.forEach(function(x){tot.v+=+x.potential_value_inr||0;tot.s+=+x.potential_qty_sqft||0;if(x.share_pct!=null&&x.share_pct!=='')tot.t+=(+x.potential_value_inr||0)*(+x.share_pct)/100});
@@ -866,10 +829,10 @@ function potentialHtml(){
   return '<section class="card"><div class="hd"><h2>Market potential &middot; revisions</h2><div class="row"><button class="btn pri sm" data-act="pot-add">Add figure</button><label class="btn sm" for="up-pot" style="cursor:pointer">Upload potential (CSV)</label><input id="up-pot" data-file="potential" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="potential">Download template</button></div></div>'
   +'<div class="row">'+sel('pf-q',f.q,quarters.map(function(x){return x}),'Quarter')+sel('pf-plant',f.plant,plantsOpt,'Branch / territory')+sel('pf-group',f.group,groupOpt,'Product group')+sel('pf-seg',f.seg,segOpt,'Segment')+'</div>'
   +(rows.length?'<div class="tw"><table><thead><tr><th>Quarter</th><th>Branch / territory</th><th>Group</th><th>Segment</th><th class="num">Potential</th><th class="num">Potential sq ft</th><th class="num">Share %</th><th class="num">Target</th><th>Source &middot; owner</th><th>Rev</th><th>Status</th><th></th></tr></thead><tbody>'
-   +rows.map(function(x){var tg=x.share_pct!=null&&x.share_pct!==''?fmtMoney((+x.potential_value_inr||0)*(+x.share_pct)/100):'<span class="pill mute">pending</span>';return '<tr><td>'+qLabel(x.fy_quarter)+(locked(x.fy_quarter)?' <span class="pill part">Locked</span>':'')+'</td><td class="break">'+esc(x.plant_code||x.territory)+'</td><td>'+esc(x.product_group)+'</td><td>'+esc(x.customer_segment)+'</td><td class="num">'+fmtMoney(x.potential_value_inr)+'</td><td class="num">'+fmtN(x.potential_qty_sqft)+'</td><td class="num">'+(x.share_pct==null||x.share_pct===''?'-':x.share_pct)+'</td><td class="num">'+tg+'</td><td class="break">'+esc(x.source_type)+(x.owner_email?' &middot; '+esc(x.owner_email):'')+'</td><td class="mono">r'+(x.rev||1)+'</td><td>'+potStatusPill(x.status)+(x.demo?' <span class="pill part">DEMO</span>':'')+'</td><td><button class="btn sm" data-act="pot-edit" data-id="'+esc(x._id)+'">Open</button></td></tr>'}).join('')
+   +rows.map(function(x){var ap0=approvedOf(x),tg=x.share_pct!=null&&x.share_pct!==''?fmtMoney((+x.potential_value_inr||0)*(+x.share_pct)/100)+(ap0&&x.original&&Math.abs(leafTgt(x.original.potential_value_inr,x.original.share_pct)-leafTgt(ap0.potential_value_inr,ap0.share_pct))>1?'<div class="note">approved '+fmtMoney(leafTgt(ap0.potential_value_inr,ap0.share_pct))+' · orig '+fmtMoney(leafTgt(x.original.potential_value_inr,x.original.share_pct))+'</div>':''):'<span class="pill mute">pending</span>';return '<tr><td>'+qLabel(x.fy_quarter)+(locked(x.fy_quarter)?' <span class="pill part">Locked</span>':'')+'</td><td class="break">'+esc(x.plant_code||x.territory)+'</td><td>'+esc(x.product_group)+'</td><td>'+esc(x.customer_segment)+'</td><td class="num">'+fmtMoney(x.potential_value_inr)+'</td><td class="num">'+fmtN(x.potential_qty_sqft)+'</td><td class="num">'+(x.share_pct==null||x.share_pct===''?'-':x.share_pct)+'</td><td class="num">'+tg+'</td><td class="break">'+esc(x.source_type)+(x.owner_email?' &middot; '+esc(x.owner_email):'')+'</td><td class="mono">r'+(x.rev||1)+'</td><td>'+potStatusPill(x.status)+(x.demo?' <span class="pill part">DEMO</span>':'')+'</td><td><button class="btn sm" data-act="pot-edit" data-id="'+esc(x._id)+'">Open</button></td></tr>'}).join('')
    +'<tr><td colspan="4"><b>Total (target = potential &times; share %)</b></td><td class="num"><b>'+fmtMoney(tot.v)+'</b></td><td class="num"><b>'+fmtN(tot.s)+'</b></td><td></td><td class="num"><b>'+fmtMoney(tot.t)+'</b></td><td colspan="4"></td></tr></tbody></table></div>':'<div class="empty">No potential figures yet. Add one, or upload the template. Share % can stay empty until the discussion is done (target shows "pending").</div>')
-  +'<div class="row"><span class="note">Quarter lock (no more edits):</span>'+qs.map(function(q){return '<button class="btn sm" data-act="plan-lock" data-q="'+q+'">'+qLabel(q)+(locked(q)?' (locked, unlock)':' lock')+'</button>'}).join('')+'</div>'
-  +'<p class="note">Values in ₹ with lakh/crore. Every change is a revision with reason, discussion date and participants. Status runs Draft, Discussed, Approved, Locked. A locked quarter cannot be edited. The target sense-check (QoQ needed vs 12-quarter average, Stretch flag) appears with the business views once history is complete. '+SEGMENT_NOTE+'</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
+  +'<div class="row"><span class="note">Lock quarter (freezes every Approved target; cannot be undone in v1.0):</span>'+qs.map(function(q){return '<button class="btn sm" data-act="plan-lock" data-q="'+q+'"'+(locked(q)||!['Super admin','Management / HO'].includes(effRole())||readOnly()?' disabled':'')+'>'+qLabel(q)+(locked(q)?' (locked)':' lock')+'</button>'}).join('')+'</div>'
+  +'<p class="note">Values in ₹ with lakh/crore. Every change is a revision with reason, discussion date and participants. Status runs Draft, Discussed, Approved, Locked. A locked quarter cannot be edited. Open a row for the sense-check (QoQ needed vs 12-quarter average, Stretch flag). Approval is by SP Sir or a Management / HO user, never the proposer. Achievement counts only against the current approved target. '+SEGMENT_NOTE+'</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
 }
 
 /* ---- dialogs: users / plants / potential ---- */
@@ -937,8 +900,8 @@ function potDlg(x){
    +'<div class="fld"><label for="d-src">Source</label><select id="d-src">'+ty.map(function(t){return '<option'+(t===x.source_type?' selected':'')+'>'+t+'</option>'}).join('')+'</select></div>'+fld('d-owner','Owner (email)',x.owner_email)+fld('d-note','Source note',x.source_note)+'</div>'
    +'<div class="note">Target = potential &times; share % = <b>'+tg+'</b>. Status now: '+potStatusPill(x.status)+'</div>'
    +(lock||x.status==='Locked'?'':'<div class="fgrid">'+fld('d-reason','Reason for this change (required)','')+fld('d-disc','Discussion date (YYYY-MM-DD, required)',new Date(Date.now()+19800000).toISOString().slice(0,10))+fld('d-part','Participants','')+'</div>')
-   +'<div id="d-err"></div><div class="row">'+(lock||x.status==='Locked'?'':'<button class="btn pri" data-act="pot-save" data-new="'+(n?1:0)+'" data-id="'+esc(x._id||'')+'">Save revision as '+(n?'Draft':'new draft')+'</button>')
-   +(!n&&!lock&&x.status!=='Locked'?'<button class="btn" data-act="pot-adv" data-id="'+esc(x._id)+'">Mark '+({Draft:'Discussed',Discussed:'Approved',Approved:'Locked'}[x.status])+'</button>':'')+'<button class="btn" data-act="dlg-close">Close</button></div>'
+   +(n?'':senseHtml(x))+'<div id="d-err"></div><div class="row">'+(lock||x.status==='Locked'?'':'<button class="btn pri" data-act="pot-save" data-new="'+(n?1:0)+'" data-id="'+esc(x._id||'')+'">Save revision as '+(n?'Draft':'new draft')+'</button>')
+   +(!n&&!lock&&x.status!=='Locked'?(x.status==='Approved'?'':'<button class="btn" data-act="pot-adv" data-id="'+esc(x._id)+'">Mark '+({Draft:'Discussed',Discussed:'Approved'}[x.status])+'</button>'):'')+'<button class="btn" data-act="dlg-close">Close</button></div>'
    +(revs?'<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3)">Revision log</h3>'+revs:''));
 }
 async function savePot(isNew,id){
@@ -956,6 +919,7 @@ async function savePot(isNew,id){
   if(!reason)errs.push('Reason is required');if(!/^\d{4}-\d\d-\d\d$/.test(disc))errs.push('Discussion date is required (YYYY-MM-DD)');
   if(x.owner_email&&!S.users.some(function(u){return u.email===x.owner_email&&u.active!==false}))errs.push('Owner must be an active user');
   if(S.periods[q]&&S.periods[q].plan_locked)errs.push('That quarter is locked');
+  var pg0=planGuard(x);if(pg0)errs.push(pg0);
   if(errs.length){dlgErr(errs.join('. '));return}
   var key=isNew?slug([q,x.plant_code||x.territory,x.product_group,x.customer_segment].join('_')):id;
   var ex=isNew?S.potential.find(function(p){return p._id===key}):old;
@@ -964,13 +928,6 @@ async function savePot(isNew,id){
   var doc=Object.assign({},ex||{},x,{status:'Draft',rev:rev,revisions:revisions.slice(-40),_id:undefined});
   try{await dset('potential/'+key,doc);closeDlg();toast('Saved r'+rev+' as Draft')}catch(e){dlgErr(dbErrText(e))}
 }
-async function advancePot(id){
-  var x=S.potential.find(function(p){return p._id===id});if(!x)return;
-  var nx={Draft:'Discussed',Discussed:'Approved',Approved:'Locked'}[x.status];if(!nx)return;
-  var revs=(x.revisions||[]).concat([{n:x.rev||1,at:nowISO(),by:S.viewer.email,status:nx,reason:'Status change',discussion_date:'',participants:'',change:x.status+' to '+nx}]);
-  try{await dset('potential/'+id,Object.assign({},x,{status:nx,revisions:revs.slice(-40),_id:undefined}));closeDlg();toast('Marked '+nx)}catch(e){toast(dbErrText(e))}
-}
-
 /* ---- master CSV uploads ---- */
 async function masterUpload(what,file){
   var show=function(h){S.upMsg=h;var m=$('#up-msg');if(m)m.innerHTML=h};S.upMsg='';
@@ -1073,7 +1030,12 @@ var handlers={
  'pot-edit':function(t){potDlg(S.potential.find(function(u){return u._id===t.getAttribute('data-id')}))},
  'pot-save':function(t){return savePot(t.getAttribute('data-new')==='1',t.getAttribute('data-id'))},
  'pot-adv':function(t){return advancePot(t.getAttribute('data-id'))},
- 'plan-lock':async function(t){var q=t.getAttribute('data-q'),cur=S.periods[q]&&S.periods[q].plan_locked;await dset('periods/'+q,Object.assign({fy_quarter:q,status:'open'},S.periods[q]||{},{plan_locked:!cur,_id:undefined}));await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:cur?'plan unlocked':'plan locked',quarter:q});toast(qLabel(q)+(cur?' unlocked':' locked for plan edits'))},
+ 'plan-lock':async function(t){
+   if(!guardWrite())return;var q=t.getAttribute('data-q'),u=effUser();
+   if(['Super admin','Management / HO'].indexOf(u.role)<0){toast('Only Management / HO or Super admin can lock a quarter');return}
+   if(S.periods[q]&&S.periods[q].plan_locked){toast('Already locked. A locked quarter cannot be unlocked in v1.0');return}
+   for(var po of S.potential.filter(function(x){return x.fy_quarter===q&&x.status==='Approved'})){var d=Object.assign({},po,{status:'Locked',revisions:(po.revisions||[]).concat([{n:po.rev||1,at:nowISO(),by:u.email,status:'Locked',reason:'Quarter locked',change:'Approved to Locked'}]).slice(-40)});delete d._id;await dset('potential/'+po._id,d)}
+   await dset('periods/'+q,Object.assign({fy_quarter:q,status:'open'},S.periods[q]||{},{plan_locked:true,_id:undefined}));await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:u.email,event:'plan locked',quarter:q});toast(qLabel(q)+' locked for plan edits')},
  'tmpl':function(t){var k=t.getAttribute('data-t');return download(k+'-template.csv',TEMPLATES[k]+'\n')}
 };
 async function saveMappingDraft(){/* mapping is saved on a successful load; nothing to write here */}
@@ -1096,8 +1058,7 @@ document.addEventListener('input',function(ev){
   if(c==='reason'){U.reason=t.value;var b=document.querySelector('[data-act="u-load"]');if(b){var r=U.res;var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});b.disabled=!(r.good>0&&(!r.dateInfo.mixed||U.confirmDates)&&(!closedQs.length||U.reason.trim().length>=3))}}
   else if(c==='rejq'){U.rejQ=t.value;var pos=t.selectionStart;renderUpload();var n=$('#rj-q');if(n){n.focus();n.setSelectionRange(pos,pos)}}
 });
-window.addEventListener('hashchange',function(){route()});
-function route(){var h=(location.hash||'').replace('#','');var nt=h==='admin'?'admin':'intake';if(nt!==S.tab){S.tab=nt;var sh=$('#shell');if(sh)sh.removeAttribute('data-sig');schedule()}}
+/*@@V09_MODULES@@*/
 
 /* ================= boot ================= */
 async function boot(){
@@ -1119,7 +1080,17 @@ async function boot(){
     subscribe('mappings',db.collection('mappings'),function(d){S.mappings={};d.forEach(function(x){S.mappings[x._id]=x})});
     subscribe('uploads',db.collection('uploads').orderBy('at','desc').limit(200),function(d){S.uploads=d});
     subscribe('transfers',db.collection('transfers'),function(d){S.transfers=d});
-    subscribe('potential',db.collection('potential'),function(d){S.potential=d});
+    subscribe('potential',db.collection('potential'),function(d){S.potential=d;S.potVer++;DS.cache={}});
+    subscribe('actions',db.collection('actions'),function(d){S.actions=d});
+    subscribe('followups',db.collection('followups'),function(d){S.followups=d});
+    subscribe('settings',db.collection('settings'),function(d){var m=d.find(function(x){return x._id==='main'});S.settings=m||null;applySettings(m);DS.cache={}});
+    subscribe('phasing',db.collection('phasing'),function(d){S.phasing=d;DS.cache={}});
+    subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
+    subscribe('orders',db.collection('orders'),function(d){S.orders=d});
+    subscribe('deliveries',db.collection('deliveries'),function(d){S.deliv=d});
+    subscribe('receivables',db.collection('receivables'),function(d){S.recv=d});
+    subscribe('collections',db.collection('collections'),function(d){S.coll=d});
+    subscribe('stock',db.collection('stock'),function(d){S.stock=d});
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }

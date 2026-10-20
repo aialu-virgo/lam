@@ -1,0 +1,11 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+const browser = await chromium.launch();
+const { page, errs } = await open(browser,{store});
+await page.waitForTimeout(3000);
+const r=await page.evaluate(()=>{const d=window.__dbg;const ser=d.quarterSeries({plants:null},undefined);return ser.map(s=>[s.q,s.A,s.loaded,s.tgt])});
+console.log(JSON.stringify(r));
+console.log(await page.evaluate(()=>Object.keys(window.__dbg.DS.pg).slice(0,3)+' '+window.__dbg.DS.months.join(',')));
+await browser.close();

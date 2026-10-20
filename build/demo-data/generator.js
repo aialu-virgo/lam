@@ -16,11 +16,12 @@
     var R = rng(o.seed || 7), shape = o.shape || 'B1', rows = [], headers = shape === 'B1' ? B1_HEADERS.slice() : S4_HEADERS.slice();
     if (shape === 'B1' && o.withLineNum) headers.push('LineNum');
     var nc = o.customers || 60, cats = ['DECORATIVE LAMINATES', 'DECORATIVE LAMINATES', 'DECORATIVE LAMINATES', 'DECORATIVE LAMINATES', 'DECORATIVE LAMINATES DOOR', 'PVC SHEET'];
-    var docSeq = 100000 + Math.floor(R() * 1000);
+    var docSeq = (o.docStart || 100000) + Math.floor(R() * 1000), facts = {};
     var idx = {}; headers.forEach(function (h, i) { if (!(h in idx)) idx[h] = i; });
     function put(r, h, v) { r[idx[h]] = v; }
     (o.months || []).forEach(function (ym) {
       var y = +ym.slice(0, 4), m = +ym.slice(5, 7), dim = daysIn(y, m);
+      if (o.cutoff && ym === o.cutoff.slice(0, 7)) dim = Math.max(1, +o.cutoff.slice(8, 10));
       (o.plants || []).forEach(function (p) {
         var nd = o.docsPerPlantMonth || 25;
         for (var d = 0; d < nd; d++) {
@@ -28,7 +29,7 @@
           var day = 1 + Math.floor(R() * dim), ci = 1 + Math.floor(R() * nc), internal = shape === 'B1' && R() < 0.1;
           var cust = internal ? 'DEMOCU900001' : 'DEMOCU' + pad(ci, 6);
           var cname = internal ? 'DEMO VIRGO BRANCH TRANSFER' : 'DEMO Customer ' + ci + ' Traders';
-          var sp = 'DEMO Sales ' + (1 + (ci % 7)) + ' - ' + p.name;
+          var sp = 'DEMO Sales ' + (1 + (ci % 7));
           var lines = 1 + Math.floor(R() * 4);
           for (var l = 1; l <= lines; l++) {
             var cat = cats[Math.floor(R() * cats.length)], qty = 5 + Math.floor(R() * 120), price = 700 + Math.floor(R() * 900);
@@ -52,8 +53,10 @@
               put(r, 'Product Code', 'DEMOMAT' + item.slice(6)); put(r, 'Product Description', 'DEMO item ' + item); put(r, 'Material Group 4', size);
               put(r, 'Invoice Qty', qty); put(r, 'invqty', qty); put(r, 'Total Amount (Item)', net); put(r, 'Unit Price', net); put(r, 'Billing Type', 'F2');
               put(r, 'Sales Executive', ''); put(r, 'Customer Group', 'C' + (1 + ci % 2));
+              var fk2 = p.code + '|' + ym + '|' + (cat === 'PVC SHEET' ? 'PVC sheet' : cat === 'DECORATIVE LAMINATES DOOR' ? 'Door' : 'Laminate'); facts[fk2] = (facts[fk2] || 0) + net;
               var fan = 1 + Math.floor(R() * 3); for (var f = 0; f < fan; f++) { var rc = r.slice(); rc[idx['Price Group(Item)']] = 'G' + f; rows.push(rc); } continue;
             }
+            if (!internal) { var fk = p.code + '|' + ym + '|' + (cat === 'PVC SHEET' ? 'PVC sheet' : cat === 'DECORATIVE LAMINATES DOOR' ? 'Door' : 'Laminate'); facts[fk] = (facts[fk] || 0) + net; }
             rows.push(r);
           }
         }
@@ -69,8 +72,30 @@
       a = cp(8); a[idx.docnum] = ''; rows.push(a);
       if (o.withLineNum) { rows.push(cp(9)); }
     }
-    return { headers: headers, rows: rows };
+    return { headers: headers, rows: rows, facts: facts };
   }
-  var api = { invoices: invoices, B1_HEADERS: B1_HEADERS, S4_HEADERS: S4_HEADERS };
+  /* Open-item demo stores for orders, deliveries, receivables, collections and stock. All values invented. */
+  function ops(o) {
+    var R = rng(o.seed || 21), today = o.today, plants = o.plants || [], groups = ['Laminate', 'Door', 'PVC sheet', 'Compact board'];
+    function addDays(s, n) { return new Date(Date.parse(s + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10); }
+    function ymShift(ym, k) { var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + k; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return y + '-' + pad(m + 1, 2); }
+    var out = { orders: [], deliveries: [], receivables: [], collections: [], stock: [] };
+    plants.forEach(function (p, pi) {
+      var ord = [], del = [], rec = [], n;
+      n = 8 + Math.floor(R() * 6);
+      for (var i = 0; i < n; i++) { var age = 1 + Math.floor(R() * 14); ord.push(['DEMO-SO-' + p.code + '-' + (100 + i), addDays(today, -age), 'DEMOCU' + pad(1 + Math.floor(R() * 40), 6), groups[Math.floor(R() * 3)], 'DEMO Customer ' + (1 + Math.floor(R() * 40)) + ' Traders', Math.round((40000 + R() * 900000) / 100) * 100, 20 + Math.floor(R() * 200)]); }
+      n = 60;
+      for (i = 0; i < n; i++) { var oa = 3 + Math.floor(R() * 85), lead = 1 + Math.floor(R() * 6); del.push(['DEMO-SO-' + p.code + '-' + (500 + i), addDays(today, -oa), addDays(today, -oa + lead), groups[Math.floor(R() * 3)]]); }
+      n = 22 + Math.floor(R() * 10);
+      for (i = 0; i < n; i++) { var cu = 1 + Math.floor(R() * 40), od = Math.floor(R() * 120) - 50, tot = Math.round((30000 + R() * 700000) / 100) * 100; rec.push(['DEMO-INV-' + p.code + '-' + (900 + i), 'DEMOCU' + pad(cu, 6), 'DEMO Customer ' + cu + ' Traders', addDays(today, -od), Math.round(tot * (0.5 + R() * 0.5)), tot]); }
+      out.orders.push({ plant: p.code, rows: ord });
+      out.deliveries.push({ plant: p.code, rows: del });
+      out.receivables.push({ plant: p.code, asOn: today, rows: rec });
+      out.stock.push({ plant: p.code, asOn: today, rows: groups.map(function (g, gi) { var on = 600 + Math.floor(R() * 3400), aged = Math.floor(on * (R() * 0.18)); return [g, on, aged, [Math.floor(on * 0.5), Math.floor(on * 0.3), aged]]; }) });
+      (o.months || []).forEach(function (ym) { var total = Math.round((1800000 + R() * 2600000) / 1000) * 1000; out.collections.push({ plant: p.code, ym: ym, total: total, plan: (o.planMonths || []).indexOf(ym) >= 0 ? Math.round(total * (0.88 + R() * 0.28) / 1000) * 1000 : null }); });
+    });
+    return out;
+  }
+  var api = { invoices: invoices, ops: ops, B1_HEADERS: B1_HEADERS, S4_HEADERS: S4_HEADERS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.DemoGen = api;
 })(typeof window !== 'undefined' ? window : globalThis);
