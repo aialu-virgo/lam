@@ -43,10 +43,9 @@ related:
 Other product lines (ACP, aluminium, MDF, TAS) do **not** appear in this file; they appear only in the item master, plant list and employee master.
 
 ## Laminates filter
-- **Rule (Assumed, confirm with Vijay):** `item_category = upper(trim(Catagory))` is `DECORATIVE LAMINATE` or `DECORATIVE LAMINATES` → product group Laminate. `DECORATIVE LAMINATES DOOR` / `DECORATIVE LAMINATE DOOR` → product group Door, included in the Laminates desk as its own group. `PVC SHEET`, compact board, base paper, consumables, scrap, raw material and blank category → excluded from the Desk, kept in the upload record.
+- **Rule (decided by Vijay, 20 Oct 2026 — [Decisions](../decisions.md) D6):** on `item_category = upper(trim(Catagory))`, four product groups are in the Desk: Laminate (`DECORATIVE LAMINATE(S)`), Door (`DECORATIVE LAMINATE(S) DOOR`), PVC sheet (`PVC SHEET`) and Compact board (compact board / compact laminates). Base paper, consumables, scrap, raw material and blank category → excluded from the Desk, kept in the upload record.
 - **Why this column:** `Catagory` (sic) equals the item master `Item Category` for every matched row; the item master is the authority. Spelling and case vary (18 raw values), so normalise before matching. 108 rows have a blank category because the item is not in the FG item master.
-- **Ambiguity:** whether Door, PVC sheet and compact board count as "laminates" is a business call, see Q-D1 below.
-- **S/4 equivalent:** `Product Type` ZABLAM or ZCRLAM = laminate; ZCBPVC = PVC (excluded). `Material Group 3` (LAM, MICA, DOOR, PVC, LINER) agrees.
+- **S/4 equivalent:** `Product Type` ZABLAM or ZCRLAM = laminate; ZCBPVC = PVC sheet (included). `Material Group 3` (LAM, MICA, DOOR, PVC, LINER) agrees.
 
 ## Internal stock transfers (not sales)
 - **Rule (Assumed):** `is_internal_transfer` = `AcctName` is "Sales GST - Stock Outward" (`SaleAcctCode` 41111002), **or** `Zone` is BRANCH or FACTORY (any case).
@@ -175,7 +174,7 @@ Script count by `doc_date` after the date fix. FY Apr–Mar; Q1 = Apr–Jun. Row
 **Result:** 0 of 12 history quarters are complete; 11 are missing. No QoQ figure can be trusted until Jul–Aug 2026 and 10 earlier quarters are exported (Q-D2). Plants with no row in Sep 2026: 1006, 1012, 1027 (and 1 B1 branch with no laminate rows).
 
 ## Open items
-- **Q-D1 (Vijay):** do Door, PVC sheet and compact board belong in the Laminates desk? Recommendation: Door yes (own group); PVC sheet and compact board no.
+- **Q-D1 (Vijay): answered 20 Oct** — Door, PVC sheet and compact board are all in, each its own product group ([Decisions](../decisions.md) D6).
 - **Q-D2 (Vijay):** 11 history quarters and Jul–Aug 2026. Recommendation: one B1 query, doc date 1 Oct 2023 to 31 Aug 2026, in monthly files. Add `LineNum`, `SlpCode`, `WhsCode`, `BaseEntry`.
 - **Q-D3 (Vijay):** export `DocDate` as text `yyyy-mm-dd`; recommended.
 - **Q-D6 (Vijay):** what is the unnamed last column and the 12,301-row blank block? Recommendation: ignore the column.

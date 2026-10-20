@@ -22,7 +22,7 @@ related:
 - **Export filter (from the `Filter` sheet):** `Plant = 1013`; created 20 Oct 2026 10:49 UTC by a Virgo user. So the file holds **one plant only**. All plants need either no plant filter or one export per plant.
 - **Grain:** one row per billing item **repeated** (see fan-out). 911 unique lines in 371 invoices; 92 customers; 564 products.
 - **Documents:** billing type `F2` only (invoices). No credit memos in the file; whether the register shows them at all is open (Q-D4).
-- **Laminates:** `Product Type` ZABLAM (1,605 raw rows) and ZCRLAM (1,045) are laminates; ZCBPVC (14) is PVC, excluded. After de-duplication 904 laminate lines, 7 PVC.
+- **Laminates:** `Product Type` ZABLAM (1,605 raw rows) and ZCRLAM (1,045) are laminates; ZCBPVC (14) is PVC sheet, also included (D6). After de-duplication 904 laminate lines + 7 PVC sheet lines.
 
 ## Fan-out defect (must be handled at intake)
 Each (`Invoice Document Number`, `Invoice Document item`) appears 1–8 times (656 keys repeated; 1,753 surplus rows). Rows differ **only** in `Price Group(Item)` (31 values). Raw sums overstate value and sheets about 2.7×.
