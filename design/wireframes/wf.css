@@ -60,3 +60,6 @@ tr.tot td{background:var(--k1);color:var(--card);font-weight:800;position:sticky
 .kv span:last-child{text-align:right}.kv span:first-child{padding-right:6px}
 @media (max-width:520px){.kpi .kvs{grid-template-columns:1fr}}
 .h .pill{white-space:normal;max-width:100%}
+@media (min-width:1100px){td:not(.n){white-space:normal}th{white-space:normal}td,th{padding:8px 7px}table{font-size:12px}}
+@media (max-width:620px){td:first-child,th:first-child{position:sticky;left:0;z-index:1;background:var(--card)}th:first-child{background:var(--soft)}tr.tot td:first-child{background:var(--k1)}tr.rej td:first-child{background:var(--soft)}}
+@media (min-width:1100px){td,th{padding:8px 5px}}
