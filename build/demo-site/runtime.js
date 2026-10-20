@@ -1,4 +1,4 @@
-/* ===== DEMO RUNTIME (replaces claude.use db/user with an in-browser store; no network, no sign-in) ===== */
+/* ===== DEMO RUNTIME (replaces the platform db and user layer with an in-browser store; no network, no sign-in) ===== */
 var DM_PW='Demo@123';
 var DM_ACCTS=[
  ['Super admin','demo.super@demo','Demo Super Admin','Everything, including Admin, Data Intake and View as role'],
@@ -43,7 +43,7 @@ var DM_DB={collection:function(c){return dmQuery(c)},doc:function(path){return {
   update:async function(d){if(!(path in DM_STORE))throw {code:'invalid_argument',message:'missing document'};DM_STORE[path]=Object.assign({},DM_STORE[path],dmClone(d));dmWrote(path,DM_STORE[path]);dmNotify(dmParent(path))},
   delete:async function(){delete DM_STORE[path];dmWrote(path,null);dmNotify(dmParent(path))}}}};
 function dmInstallClaude(viewer){
-  window.claude={use:async function(n){
+  window.__demoStore={open:async function(n){
     if(n==='db')return DM_DB;
     if(n==='user')return {me:async function(){return {id:'demo_'+viewer.email,name:viewer.name,email:viewer.email}},email:async function(){return viewer.email},isOwner:async function(){return false}};
     return null}};

@@ -36,6 +36,7 @@ rep("The file is read in this browser; nothing is sent anywhere else.", "The fil
 // boot: runtime replaces the platform boot call
 rep('window.__desk={S:S,', 'window.__desk={S:S,');
 rep('boot();\n})();', rt + '\n})();');
+out = out.replace(/window\.claude\.use\(/g, 'window.__demoStore.open(').replace(/window\.claude/g, 'window.__demoStore').replace('!window.__demoStore.use','!window.__demoStore.open');
 fs.mkdirSync(path.join(here, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(here, 'dist/index.html'), out);
 const bad = out.match(/virgoasia|Virgo@2026|spa@|GZei5qVx/g);
