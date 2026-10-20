@@ -154,7 +154,7 @@ async function loadDocs(ctx,ym,cust,plant,key){
     for(var i=0;i<ps.length;i++){var info=c.plants[ps[i]];
       for(var k=0;k<(info.chunks||0);k++){
         var snap=await dget('inv/'+info.sys+'-'+ps[i]+'-'+ym+'-'+k);if(!snap.exists)continue;var o=JSON.parse(await ungz(snap.data().z));
-        if(!o.nh)noIndex=true;
+        if(!snap.data().nh)noIndex=true;
         o.h.forEach(function(h){
           if(h[6])return;if(cust&&h[2]!==cust)return;
           if(sc.sp){if(h.length>8){if(!spOk(sc,h[8]))return}else legacy=true}

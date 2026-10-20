@@ -109,8 +109,11 @@ function custTable(ctx,haveCust,ent,coord){
   return h+'<p class="note">Customers have no market potential or target, so those columns are "—". '+(coord?'Customer and document view only for your role. ':'')+'Showing the top '+shown.length+' of '+rows.length+' by actual. Tap a customer to see its SAP documents.</p>';
 }
 function docBlock(ctx,haveCust){
-  var dd=S.dd,res=ctx.res,ms=res.curMonths.length?res.curMonths:[TODAY().slice(0,7)],m=S.docM&&ms.indexOf(S.docM)>=0?S.docM:ms[ms.length-1];
-  var sel='<div class="row"><div class="fld"><label for="doc-m">Month</label><select id="doc-m" data-chg="docm">'+ms.map(function(x){return '<option value="'+x+'"'+(x===m?' selected':'')+'>'+ymLabel(x)+'</option>'}).join('')+'</select></div></div>';
+  var dd=S.dd,res=ctx.res,set={};res.curMonths.concat(res.priorMonths).forEach(function(m){if(S.cells['INV_'+m])set[m]=1});
+  var ms=Object.keys(set).sort();if(!ms.length)ms=[TODAY().slice(0,7)];
+  var withDocs=ms.filter(function(m){var A=custAgg({plants:ctx.plants,plant:dd.plant||undefined,sp:dd.sp&&dd.sp!=='*'?dd.sp:undefined},[m]).get(dd.cust);return A&&A.n>0});
+  var m=S.docM&&ms.indexOf(S.docM)>=0?S.docM:(withDocs.length?withDocs[withDocs.length-1]:ms[ms.length-1]);
+  var sel='<div class="row"><div class="fld"><label for="doc-m">Month</label><select id="doc-m" data-chg="docm">'+ms.map(function(x){return '<option value="'+x+'"'+(x===m?' selected':'')+'>'+ymLabel(x)+(withDocs.indexOf(x)>=0?' (has sales)':'')+'</option>'}).join('')+'</select></div></div>';
   return '<h3 class="lvl">Level 4 · SAP documents of '+esc(dd.cust)+'</h3>'+sel+docList(ctx,m,dd.cust,dd.plant||null);
 }
 Object.assign(handlers,{

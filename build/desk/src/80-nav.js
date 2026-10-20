@@ -179,6 +179,7 @@ Object.assign(handlers,{
  'dismiss-go':async function(t){var n=gv('rd-text');if(!n){dlgErr('A reason is required');return}await dismissDraft(t.getAttribute('data-id'),n);closeDlg()},
  'log-csv':function(){return logCsv()}
 });
+function superOnly(what){if(readOnly()){toast('Viewing as another user: preview is read-only');return false}var u=effUser();if(!u||u.role!=='Super admin'){toast('Only a Super admin can '+what+'. Ask a Super admin; it needs a reason and is logged.');return false}return true}
 function copyText(text,msg){
   try{if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(text).then(function(){toast(msg||'Copied')},function(){showCopy('Copy',text)})}catch(e){}
   showCopy('Copy',text);return Promise.resolve();

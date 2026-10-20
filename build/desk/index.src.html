@@ -435,8 +435,8 @@ function renderCov(){
     var p=S.covSel.split('|'),c=covStatus(p[0],p[1]);
     det='<div class="banner info" style="display:block"><b>'+qLabel(p[1])+' &middot; Invoice</b> &middot; '+({ok:'Loaded',part:'Partial',miss:'Missing'})[c.st]+(c.closed?' &middot; closed, locked':'')
      +'<div class="note" style="color:inherit">'+c.detail.map(function(d){return d.ym+': '+d.plants+' plant'+(d.plants===1?'':'s')}).join(' &nbsp;|&nbsp; ')+(c.ref?' &nbsp;(a month counts as complete at 90% of the '+c.ref+' plants seen in the busiest month)':'')+'</div>'
-     +'<div class="row" style="margin-top:8px"><button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>'
-     +(c.closed?'<button class="btn sm" data-act="reopen" data-q="'+p[1]+'">Reopen quarter (logged)</button>':(c.st!=='miss'?'<button class="btn sm" data-act="close-q" data-q="'+p[1]+'">Close quarter</button>':''))+'</div></div>';
+     +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>':'')
+     +(effRole()!=='Super admin'||readOnly()?'<span class="note">Closing, reopening and reloading a quarter is for a Super admin.</span>':(c.closed?'<button class="btn sm" data-act="reopen" data-q="'+p[1]+'">Reopen quarter (reason required, logged)</button>':(c.st!=='miss'?'<button class="btn sm" data-act="close-q" data-q="'+p[1]+'">Close quarter</button>':'')))+'</div></div>';
   }
   el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; last 12 FY quarters</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
    +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det
@@ -1010,7 +1010,7 @@ var handlers={
  'demo-clear':function(){return demoClear()},
  'u-reset':function(){U=newU();renderUpload()},
  'u-validate':async function(){await saveMappingDraft();return runValidation()},
- 'u-load':function(){return runLoad({})},
+ 'u-load':function(){if(!superOnly('load SAP data'))return;return runLoad({})},
  'u-cancel':function(){cancelFlag=true},
  'u-rejcsv':function(){var r=U.res;return download('rejected-rows.csv',csvLine(['row','doc_no','line','field','reason','value'])+'\n'+r.rejects.map(csvLine).join('\n'))},
  'u-addplants':async function(){
@@ -1026,9 +1026,9 @@ var handlers={
  },
  'cov':function(t){var k=t.getAttribute('data-ent')+'|'+t.getAttribute('data-q');S.covSel=S.covSel===k?null:k;renderCov()},
  'cov-upload':function(t){var q=t.getAttribute('data-q');if(U&&(U.stage==='validating'||U.stage==='loading'))return;if(!U||U.stage==='idle'||U.stage==='done')U=newU();U.mode='historic';U.period=q;renderUpload();var el=$('#i-upload');if(el&&el.scrollIntoView)el.scrollIntoView({block:'start'})},
- 'close-q':async function(t){var q=t.getAttribute('data-q');await dset('periods/'+q,{fy_quarter:q,status:'closed',closed_by:S.viewer.email,closed_at:nowISO()});S.periods[q]=Object.assign({},S.periods[q],{status:'closed'});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter closed',quarter:q});toast(qLabel(q)+' closed')},
- 'reopen':async function(t){var q=t.getAttribute('data-q');openDlg('<h3>Reopen '+qLabel(q)+'</h3><p class="note">A closed quarter is locked. Reopening needs Super admin and is logged with your reason.</p><div class="fld"><label for="d-reason">Reason (required)</label><input id="d-reason" class="in"></div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="reopen-go" data-q="'+q+'">Reopen</button><button class="btn" data-act="dlg-close">Cancel</button></div>')},
- 'reopen-go':async function(t){var q=t.getAttribute('data-q'),r=gv('d-reason');if(r.length<3){dlgErr('Give a reason');return}await dset('periods/'+q,Object.assign({},S.periods[q]||{},{fy_quarter:q,status:'open',reopened_by:S.viewer.email,reopened_at:nowISO(),_id:undefined}));await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter reopened',quarter:q,reason:r});closeDlg();toast(qLabel(q)+' reopened')},
+ 'close-q':async function(t){if(!superOnly('close a quarter'))return;var q=t.getAttribute('data-q');await dset('periods/'+q,{fy_quarter:q,status:'closed',closed_by:S.viewer.email,closed_at:nowISO()});S.periods[q]=Object.assign({},S.periods[q],{status:'closed'});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter closed',quarter:q});toast(qLabel(q)+' closed')},
+ 'reopen':async function(t){if(!superOnly('reopen a closed quarter'))return;var q=t.getAttribute('data-q');openDlg('<h3>Reopen '+qLabel(q)+'</h3><p class="note">A closed quarter is locked. Reopening needs Super admin and is logged with your reason.</p><div class="fld"><label for="d-reason">Reason (required)</label><input id="d-reason" class="in"></div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="reopen-go" data-q="'+q+'">Reopen</button><button class="btn" data-act="dlg-close">Cancel</button></div>')},
+ 'reopen-go':async function(t){if(!superOnly('reopen a closed quarter')){closeDlg();return}var q=t.getAttribute('data-q'),r=gv('d-reason');if(r.length<3){dlgErr('Give a reason (at least 3 characters)');return}await dset('periods/'+q,Object.assign({},S.periods[q]||{},{fy_quarter:q,status:'open',reopened_by:S.viewer.email,reopened_at:nowISO(),_id:undefined}));await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter reopened',quarter:q,reason:r,role:'Super admin'});closeDlg();toast(qLabel(q)+' reopened')},
  'hist-rej':async function(t){
    var id=t.getAttribute('data-id'),snap=await dget('rejects/'+id);
    if(!snap.exists){toast('No stored rejected rows for this upload');return}
