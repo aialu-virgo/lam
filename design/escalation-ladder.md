@@ -4,6 +4,7 @@ summary: Reminder one day before due, then L1, L2, L3 drafts at 1, 3 and 7 days 
 status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
+  - handover/_index.md
   - .claude/rules/boundaries.md
   - design/notification-templates.md
   - design/_index.md

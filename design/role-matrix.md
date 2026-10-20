@@ -4,6 +4,7 @@ summary: Eight roles with the row-level scope filter applied before rendering, a
 status: approved (interim, Vijay, D13)
 updated: 2026-10-20
 related:
+  - handover/_index.md
   - design/_index.md
   - data-map/sales-employee.md
   - data-map/user-master.md
