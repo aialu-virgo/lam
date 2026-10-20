@@ -5,6 +5,7 @@ status: not started
 updated: 2026-10-20
 related:
   - design/_index.md
+  - design/canonical-data-model.md
 ---
 
 # Architecture

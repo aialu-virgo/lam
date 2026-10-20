@@ -5,6 +5,9 @@ status: not started
 updated: 2026-10-20
 related:
   - design/_index.md
+  - data-map/sales-employee.md
+  - data-map/user-master.md
+  - design/canonical-data-model.md
 ---
 
 # Role matrix

@@ -24,7 +24,7 @@ related:
 
 - [Architecture](architecture.md) — not started
 - [Brief Part B — design inputs](brief-part-b.md) — frozen
-- [Canonical data model](canonical-data-model.md) — not started
+- [Canonical data model](canonical-data-model.md) — draft, approval not submitted
 - [Check rules](check-rules.md) — not started
 - [Comparison basis](comparison-basis.md) — not started
 - [Escalation ladder](escalation-ladder.md) — not started

@@ -6,6 +6,7 @@ updated: 2026-10-20
 related:
   - .claude/rules/talking-to-principals.md
   - CLAUDE.md
+  - data-map/invoice.md
 ---
 
 # Open questions

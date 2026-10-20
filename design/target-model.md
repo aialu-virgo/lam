@@ -5,6 +5,9 @@ status: not started
 updated: 2026-10-20
 related:
   - design/_index.md
+  - data-map/target-phasing.md
+  - data-map/market-potential.md
+  - design/canonical-data-model.md
 ---
 
 # Target model

@@ -1,27 +1,43 @@
 ---
 title: Data map — Collection
-summary: How the collection SAP export reaches the canonical model: columns, B1↔S4 map, validation, coverage.
-status: not started
+summary: Collections (customer receipts): no export yet; exact B1 ORCT/RCT2 query columns.
+status: draft
 updated: 2026-10-20
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
+  - data-map/receivable.md
+  - data-map/invoice.md
+  - data-map/customer.md
 ---
 
 # Collection (SAP export)
-**Owner:** Data Architect · **Due:** Tue 20 Oct 16:15 IST · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Collection
+**Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Collection · **Status:** **no collection export uploaded.**
 
 ## Source and export
-_To fill: system object, saved query name, who exports, frequency._
+- **Not available.** Effect: no collections vs plan, no collection KPI per person.
 
-## Columns
-_To fill: exact export columns, type, mandatory flag, canonical field._
+## Export to request (Q-D18)
+B1 saved query on **ORCT / RCT2**, one row per receipt-to-invoice allocation:
+`ORCT.DocEntry`, `DocNum`, `DocDate`, `Canceled`, `CardCode`, `BPLId`, `DocTotal`, `CashSum`, `CheckSum`, `TrsfrSum`; `RCT2.InvType`, `DocEntry` (the invoice), `SumApplied`. Filter: receipts from 1 Oct 2023. Field names follow the standard B1 schema (**Assumed**).
+S/4: incoming payments (ACDOCA / BSAD, document type DZ): `BELNR`, `BUDAT`, `KUNNR`, `WRBTR`, `AUGBL` (clearing document).
+Recommendation: weekly, same cadence as receivables.
 
 ## B1 ↔ S/4HANA mapping
-_To fill._
+| Canonical | B1 | S/4 |
+|---|---|---|
+| `source_doc_no` | `DocNum` | `BELNR` |
+| `doc_date` | `DocDate` | `BUDAT` |
+| `customer_code` | `CardCode` | `KUNNR` |
+| `amount_inr` | `DocTotal` | `WRBTR` |
+| `applied_invoice_no` | `RCT2.DocEntry` → invoice `DocNum` | `AUGBL` / clearing |
 
 ## Validation
-_To fill: entity-specific checks; shared checks live in [Check rules](../design/check-rules.md)._
+Cancelled receipts dropped; amount > 0; customer exists; allocated amount ≤ receipt total.
 
 ## Coverage (12 quarters)
-_To fill after intake: loaded / partial / missing per quarter._
+| Quarter | Status |
+|---|---|
+| Q3 FY24 to Q2 FY27 (12 quarters) | missing |
+| Q3 FY27 (current) | missing |
+

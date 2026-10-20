@@ -20,22 +20,28 @@ related:
   - data-map/user-master.md
   - data-map/warehouse.md
   - CLAUDE.md
+  - data-map/invoice-s4-register.md
+  - design/canonical-data-model.md
 ---
 
 # data-map/
 
-- [Data map — Collection](collection.md) — not started
-- [Data map — Credit note](credit-note.md) — not started
-- [Data map — Customer](customer.md) — not started
-- [Data map — Delivery](delivery.md) — not started
-- [Data map — Invoice](invoice.md) — not started
-- [Data map — Item](item.md) — not started
-- [Data map — Market potential](market-potential.md) — not started
-- [Data map — Plant / branch master](plant-master.md) — not started
-- [Data map — Receivable](receivable.md) — not started
-- [Data map — Sales employee](sales-employee.md) — not started
-- [Data map — Sales order](sales-order.md) — not started
-- [Data map — Stock](stock.md) — not started
-- [Data map — Target phasing](target-phasing.md) — not started
-- [Data map — User master](user-master.md) — not started
-- [Data map — Plant / warehouse](warehouse.md) — not started
+- [Data map — Collection](collection.md) — draft — no export; B1 query listed
+- [Data map — Credit note](credit-note.md) — draft — no export; B1 query listed
+- [Data map — Customer](customer.md) — draft — no export; B1 query listed
+- [Data map — Delivery](delivery.md) — draft — no export; B1 query listed
+- [Data map — Invoice](invoice.md) — draft — B1 Combine Sale mapped; Sep 2026 only
+- [Data map — Invoice, S/4 sales register](invoice-s4-register.md) — draft — 4–19 Oct 2026, plant 1013 only
+- [Data map — Item](item.md) — draft — item master mapped
+- [Data map — Market potential](market-potential.md) — draft — template ready, no data
+- [Data map — Plant / branch master](plant-master.md) — draft — Plant List mapped
+- [Data map — Receivable](receivable.md) — draft — no export; B1 query listed
+- [Data map — Sales employee](sales-employee.md) — draft — employee master mapped; no SlpCode
+- [Data map — Sales order](sales-order.md) — draft — no export; B1 query listed
+- [Data map — Stock](stock.md) — draft — no export; B1 query listed
+- [Data map — Target phasing](target-phasing.md) — draft — template ready, no data
+- [Data map — User master](user-master.md) — draft — template ready; People List not received
+- [Data map — Plant / warehouse](warehouse.md) — draft — no export; interim plant = warehouse
+
+## Upload templates (header only)
+- [market-potential.csv](templates/market-potential.csv) · [user-master.csv](templates/user-master.csv) · [plant-master.csv](templates/plant-master.csv) · [target-phasing.csv](templates/target-phasing.csv)

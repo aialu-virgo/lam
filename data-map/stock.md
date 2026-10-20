@@ -1,27 +1,44 @@
 ---
 title: Data map — Stock
-summary: How the stock SAP export reaches the canonical model: columns, B1↔S4 map, validation, coverage.
-status: not started
+summary: Stock by plant and item: no export yet; exact B1 OITW and batch query columns for stock days and ageing.
+status: draft
 updated: 2026-10-20
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
+  - data-map/item.md
+  - data-map/warehouse.md
+  - data-map/plant-master.md
 ---
 
 # Stock (SAP export)
-**Owner:** Data Architect · **Due:** Tue 20 Oct 16:15 IST · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Stock
+**Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Stock · **Status:** **no stock export uploaded.**
 
 ## Source and export
-_To fill: system object, saved query name, who exports, frequency._
+- **Not available.** Effect: no Inventory page (stock vs plan, stock days, ageing) and no ageing-stock actions.
+- **Snapshot entity:** "as on" a date; a new snapshot replaces the previous; month-end snapshots are kept for the trend.
 
-## Columns
-_To fill: exact export columns, type, mandatory flag, canonical field._
+## Export to request (Q-D19)
+B1 saved query on **OITW** (stock by warehouse) as on the export date, laminate items only: `ItemCode`, `WhsCode`, `OnHand`, `IsCommited`, `OnOrder`.
+For ageing, batch stock (**OIBT**): `ItemCode`, `WhsCode`, `BatchNum`, `Quantity`, `InDate`. For history, the inventory ledger (**OINM**): `ItemCode`, `Warehouse`, `DocDate`, `InQty`, `OutQty`, `TransType`, `BaseRef`, so month-end stock can be rebuilt for 12 quarters. Field names follow the standard B1 schema (**Assumed**).
+S/4: MARD / MATDOC: `MATNR`, `WERKS`, `LGORT`, `LABST`; API_MATERIAL_STOCK_SRV.
+Recommendation: weekly snapshot from now; ask for the OINM history once.
 
 ## B1 ↔ S/4HANA mapping
-_To fill._
+| Canonical | B1 | S/4 |
+|---|---|---|
+| `item_code` | `ItemCode` | `MATNR` (via item cross-reference) |
+| `warehouse_code`, `plant_code` | `WhsCode`, branch of warehouse | `LGORT`, `WERKS` |
+| `on_hand_sheets` | `OnHand` | `LABST` |
+| `batch_in_date` | `InDate` | batch creation date |
+| `as_on_date` | export date | export date |
 
 ## Validation
-_To fill: entity-specific checks; shared checks live in [Check rules](../design/check-rules.md)._
+`OnHand` ≥ 0 (negative → warn); item and warehouse exist; unit is sheets (item master `Inventory UoM` Pcs); a laminate item stocked in SQM or Mtr is flagged.
 
 ## Coverage (12 quarters)
-_To fill after intake: loaded / partial / missing per quarter._
+| Quarter | Status |
+|---|---|
+| Q3 FY24 to Q2 FY27 (12 quarters) | missing |
+| Q3 FY27 (current) | missing |
+
