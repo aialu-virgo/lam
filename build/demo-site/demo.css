@@ -22,15 +22,15 @@ body.dm-prep #demo-prep{display:grid}
 .dl-form{display:flex;flex-direction:column;gap:12px}
 .dl-form h2,.dl-acc h2{margin:0;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);font-weight:800}
 .dl-form .fld input{width:100%}
-.dl-pw{background:var(--indigo-soft);color:var(--indigo);border-radius:12px;padding:10px 12px;font-size:12.5px;display:flex;flex-direction:column;gap:2px}
+.dl-pw{background:var(--brand-soft);color:var(--brand);border-radius:12px;padding:10px 12px;font-size:12.5px;display:flex;flex-direction:column;gap:2px}
 .dl-pw code{font-family:var(--mono);font-weight:700;font-size:14px}
 .dl-err{color:var(--red);font-size:12.5px;font-weight:600;min-height:1em}
 .dl-acc table td,.dl-acc table th{white-space:normal}
 .dl-acc .mono{font-size:12px;overflow-wrap:anywhere}
 .dl-acc button.use{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700}
-.dl-acc tr.pick td{background:var(--indigo-soft)}
+.dl-acc tr.pick td{background:var(--brand-soft)}
 .dl-foot{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:12.5px;color:var(--ink3)}
-.dl-foot button{border:0;background:none;color:var(--indigo);font-weight:700;text-decoration:underline;padding:0}
+.dl-foot button{border:0;background:none;color:var(--brand);font-weight:700;text-decoration:underline;padding:0}
 .dm-note{border-radius:12px;padding:10px 14px;font-size:13px;background:var(--orange-soft);color:var(--orange)}
 @media (max-width:860px){.dl-wrap{grid-template-columns:minmax(0,1fr)}}
 @media (min-width:861px){.side{top:var(--dbh)!important;height:calc(100vh - var(--dbh))!important}}
