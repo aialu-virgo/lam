@@ -18,7 +18,7 @@ related:
 | Tue 18:40 | History, potential, users uploaded; rejected rows fixed; coverage green or gaps named | Vijay + Delivery Lead | open |
 | Tue 20:00 | Wireframes of all pages sent for approval | Product Designer | published 17:25 (D12); awaiting SP Sir |
 | Tue 21:00 | Written design approval | Principals | interim approval by Vijay 18:08 (D13); SP Sir confirms Wed 11:30 |
-| Wed 07:00 | desk-v0.9 on real data | Full-Stack Engineer | open |
+| Wed 07:00 | desk-v0.9 on real data | Full-Stack Engineer | published Tue ~19:30 on demo data (D14); real data not yet loaded |
 | Wed 10:00 | QA + blind second check passed, fixes done | Engineering QA | open |
 | Wed 11:30 | Acceptance walk-through | SP Sir | open |
 | Wed 12:00 | desk-v1.0 published, tagged, link sent | Delivery Lead | open |
