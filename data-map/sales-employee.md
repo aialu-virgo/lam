@@ -44,6 +44,9 @@ Null % over the 394 zone-sheet rows.
 | 14 | `*StartDate(YYYYMMDD)` | — | 100 | 0 | **Unused.** Treat as active (Assumed). |
 | 15 | `*EndDate(YYYYMMDD)` | — | 100 | 0 | **Unused.** |
 
+## Optional columns (from 20 Oct, desk-v0.9 version 13)
+Three columns may follow the 15 above: `B1 SlpCode`, `B1 Sales Employee Name` (the exact B1 `Salesemployee` text, matched first), and `Reports To (Employee Code)`. A filled `*EndDate(YYYYMMDD)` marks the person inactive, but they still match their past sales. A sheet named "Read me" is ignored. Header-only template: [templates/sales-employee.csv](templates/sales-employee.csv).
+
 ## Designations to roles (Assumed)
 Spellings seen: sales executive (several spellings, e.g. "Sale Executive"), senior sales executive (one misspelt variant), senior sales executive, area sales manager / ASM, branch manager / branch head, business development manager / executive, NBD, branch coordinator. Proposed mapping to [Role matrix](../design/role-matrix.md) roles: sales executive and senior → Sales executive; branch manager / head → Branch / depot manager; branch coordinator → Coordinator; area sales manager, ASM, NBD, business development → **no matching role** (Q-D11).
 

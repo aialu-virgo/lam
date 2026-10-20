@@ -1,6 +1,6 @@
 /* ================= v0.9+ Admin masters: item master and sales-employee master (D18) ================= */
 S.itemMeta=null;S.salesMaster=null;S.mst={items:null,semp:null};
-var SM={list:[],byCode:{},byName:{},byBase:{},cache:{},ready:false};
+var SM={list:[],byCode:{},byName:{},byBase:{},byB1:{},cache:{},ready:false};
 var ZONE_SHEET_RE=/^zone\s*\d/i;
 function nameKey(s){return norm(String(s==null?'':s).replace(/\./g,' ').replace(/[^\w\s\-\/&']/g,' ').replace(/\s+/g,' '))}
 function splitSuffix(s){s=String(s==null?'':s);var i=s.indexOf(' - ');return i>0?[s.slice(0,i),s.slice(i+3)]:[s,'']}
@@ -13,9 +13,10 @@ function roleFromDesignation(d){
   return '';
 }
 function buildSM(list){
-  SM.list=list||[];SM.byCode={};SM.byName={};SM.byBase={};SM.cache={};
+  SM.list=list||[];SM.byCode={};SM.byName={};SM.byBase={};SM.byB1={};SM.cache={};
   SM.list.forEach(function(p){
     SM.byCode[norm(p.code)]=p;
+    if(p.b1name){var k1=nameKey(p.b1name);(SM.byB1[k1]=SM.byB1[k1]||[]).push(p)}
     var k=nameKey(p.name);(SM.byName[k]=SM.byName[k]||[]).push(p);
     var b=nameKey(splitSuffix(p.name)[0]);if(b!==k)(SM.byBase[b]=SM.byBase[b]||[]).push(p);else(SM.byBase[b]=SM.byBase[b]||[]).push(p);
   });
@@ -31,7 +32,8 @@ function spMatch(raw){
     if(suf){var m=arr.filter(function(p){var pn=nameKey(p.plantRaw||'');return pn&&(pn.indexOf(suf)>=0||suf.indexOf(pn)>=0)});if(m.length===1)return m[0]}
     return 'ambiguous';
   };
-  var c=pick(SM.byName[k]);if(c){res=c;how='exact'}
+  var c=pick(SM.byB1[k]);if(c){res=c;how='B1 name column'}
+  else if(c=pick(SM.byName[k])){res=c;how='exact'}
   else{c=pick(SM.byName[base]);if(c){res=c;how='suffix removed'}else{c=pick(SM.byBase[base]);if(c){res=c;how='suffix removed'}}}
   if(res==='ambiguous')res={ambiguous:true};else if(res)res=Object.assign({how:how},res);
   SM.cache[raw]=res;return res;
@@ -50,7 +52,7 @@ function matchStats(){
 function onSalesMaster(doc){
   if(!doc||!doc.z){S.salesMaster=null;buildSM([]);S.smReady=true;DS.sig='';ingestRoll();return Promise.resolve()}
   return ungz(doc.z).then(function(t){
-    var arr=JSON.parse(t).map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8]}});
+    var arr=JSON.parse(t).map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12]}});
     S.salesMaster=Object.assign({},doc,{n:arr.length});buildSM(arr);S.smReady=true;
     /* decode again so a Sales executive's rows that only match through the master are kept */
     if(SC().sp)DS.sig='';
@@ -158,7 +160,7 @@ async function sempPick(file){
   var st={stage:'working',name:file.name,size:file.size,msg:'Reading the workbook...',src:null,sheets:[],res:null};S.mst.semp=st;S.lastHtml='';schedule();
   try{
     var src=await listSheets(file);st.src=src;
-    st.sheets=src.names.map(function(n){return {name:n,ticked:src.csv||ZONE_SHEET_RE.test(n),zone:ZONE_SHEET_RE.test(n)}});
+    st.sheets=src.names.filter(function(n){return !/^\s*read\s*me\s*$/i.test(n)}).map(function(n){return {name:n,ticked:src.csv||ZONE_SHEET_RE.test(n),zone:ZONE_SHEET_RE.test(n)}});
     st.stage='sheets';st.msg='';
   }catch(e){st.stage='idle';st.msg='Could not read the file: '+((e&&e.message)||e)}
   S.lastHtml='';schedule();
@@ -173,7 +175,7 @@ async function sempCheck(){
     for(var si=0;si<ticked.length;si++){
       var rows=await sheetRows(st.src,ticked[si]);if(!rows.length)continue;
       var hd=rows[0].map(function(x){return norm(x)}),ix=function(n){return hd.indexOf(norm(n))};
-      var cCode=ix('Employee Code'),cFull=ix('FullName'),cFn=ix('*FirstName'),cLn=ix('*LastName'),cMob=ix('Mobile No.'),cMail=ix('Email'),cDes=ix('Designation'),cZone=ix('Zone'),cPN=ix('Plant Name'),cCC=ix('*CompanyCode');
+      var cCode=ix('Employee Code'),cFull=ix('FullName'),cFn=ix('*FirstName'),cLn=ix('*LastName'),cMob=ix('Mobile No.'),cMail=ix('Email'),cDes=ix('Designation'),cZone=ix('Zone'),cPN=ix('Plant Name'),cCC=ix('*CompanyCode'),cSlp=ix('B1 SlpCode'),cB1=ix('B1 Sales Employee Name'),cRep=ix('Reports To (Employee Code)'),cEnd=Math.max(ix('EndDate'),ix('*EndDate'),ix('End Date'));
       if(cCode<0||(cFull<0&&cFn<0)){res.rejects.push([0,ticked[si],'','Sheet','Sheet "'+ticked[si]+'" has no Employee Code and FullName columns; skipped','']);res.rejected++;continue}
       for(var i=1;i<rows.length;i++){
         var r=rows[i],code=cellStr(r[cCode]);
@@ -194,11 +196,12 @@ async function sempCheck(){
         var des=cDes>=0?cellStr(r[cDes]):'',role=roleFromDesignation(des);
         if(!role&&des){res.unmappedDes[des]=(res.unmappedDes[des]||0)+1}
         res.byRole[role||'(no matching role)']=(res.byRole[role||'(no matching role)']||0)+1;res.byZone[zone||'(none)']=(res.byZone[zone||'(none)']||0)+1;
-        res.people.push([code,name.slice(0,80),zone,plant,(cPN>=0?cellStr(r[cPN]):'').slice(0,60),des.slice(0,50),role,mail,wa]);res.loaded++;
+        var endD=cEnd>=0?cellStr(r[cEnd]):'';if(endD)res.ended=(res.ended||0)+1;
+        res.people.push([code,name.slice(0,80),zone,plant,(cPN>=0?cellStr(r[cPN]):'').slice(0,60),des.slice(0,50),role,mail,wa,(cSlp>=0?cellStr(r[cSlp]):'').replace(/\.0$/,''),(cB1>=0?cellStr(r[cB1]):'').slice(0,100),(cRep>=0?cellStr(r[cRep]):'').replace(/\.0$/,''),endD.slice(0,20)]);res.loaded++;
       }
     }
     /* match B1 names (all names in the loaded sales data) with the people just read */
-    var save=SM.list;buildSM(res.people.map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8]}}));
+    var save=SM.list;buildSM(res.people.map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12]}}));
     DS.cache={};res.match=matchStats();res.unmatched=unmatchedSp();
     buildSM(save);/* the live master stays until Load */
     st.res=res;st.stage='checked';st.msg='';
@@ -211,7 +214,7 @@ async function sempLoad(){
   st.stage='loading';st.msg='Writing the master...';schedule();await tick();
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=(S.viewer&&S.viewer.email)||'unknown',failed=null;
   try{
-    await dset('salesmaster/main',{z:await gz(JSON.stringify(r.people)),n:r.people.length,at:nowISO(),by:by,file:st.name,sheets:r.sheets,read:r.read,rejected:r.rejected,upload:uid,demo:st.demo||undefined,fmt:'gz-json v1: [code,name,zone,plant,plantRaw,designation,role,email,whatsapp]'});
+    await dset('salesmaster/main',{z:await gz(JSON.stringify(r.people)),n:r.people.length,at:nowISO(),by:by,file:st.name,sheets:r.sheets,read:r.read,rejected:r.rejected,upload:uid,demo:st.demo||undefined,fmt:'gz-json v2: [code,name,zone,plant,plantRaw,designation,role,email,whatsapp,slpCode,b1Name,reportsToCode,endDate]'});
     await dset('uploads/'+uid,{at:nowISO(),by:by,sys:'B1',entity:'SE',file:st.name,size:st.size||0,mode:'master',periodLabel:'Sales employees: '+r.sheets.join(', '),read:r.read,loaded:r.loaded,rejected:r.rejected+r.unmatched.length,warned:r.warned,status:(r.rejected||r.unmatched.length)?'Partial':'Loaded',demo:st.demo||undefined,match:{names:r.match.names,matched:r.match.matched,rate:r.match.rate}});
     var rows=[];r.rejects.forEach(function(x){rows.push(x)});r.unmatched.forEach(function(u,i){rows.push([i+1,u.name,'','Salesperson (B1 name)',u.why,u.lines])});
     if(rows.length){var rr=rows.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:rows.length,demo:st.demo||undefined})}
@@ -220,7 +223,12 @@ async function sempLoad(){
         due:addWD(TODAY(),1),next_step:'Open Admin › Sales employees, download the unmatched list, and add or correct those people in the master (or fix the name in SAP), then upload the master again.',value:0,status:'Open',created:now,updated:now,dependents:0,period:uid,meta:{unmatched:r.unmatched.length},need_help:false,demo:st.demo||undefined,thread:[{at:now,by:'Desk rule R8',kind:'created',text:'Created after the sales-employee master upload '+uid+'.'}]};
       await dset('actions/'+id,a);
     }
-    await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:by,event:'sales-employee master loaded',rows:r.loaded,unmatched:r.unmatched.length});
+    var byCode={};r.people.forEach(function(p){byCode[norm(p[0])]=p});var filled=0;
+    for(var ui=0;ui<S.users.length;ui++){var uu=S.users[ui];if(uu.reports_to_email||uu.pseudo)continue;
+      var pp=r.people.find(function(p){return (p[7]&&p[7]===uu.email)||(uu.sales_employee_code&&norm(uu.sales_employee_code)===norm(p[0]))});
+      var mg=pp&&pp[11]?byCode[norm(pp[11])]:null;
+      if(mg&&mg[7]&&mg[7]!==uu.email){var ud=Object.assign({},uu,{reports_to_email:mg[7],slp_code:pp[9]||uu.slp_code||'',reports_to_code:pp[11]});delete ud._id;await dset('users/'+uu._id,ud);filled++}}
+    await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:by,event:'sales-employee master loaded',users_reports_to_filled:filled,rows:r.loaded,unmatched:r.unmatched.length});
   }catch(e){failed=e}
   st.stage=failed?'checked':'done';st.msg=failed?('Load stopped: '+dbErrText(failed)):('Loaded '+fmtN(r.loaded)+' people. '+(r.match.rate!=null?'Matched '+r.match.matched+' of '+r.match.names+' salesperson names in the sales data ('+r.match.rate.toFixed(1)+'%).':'No sales data to match yet.'));
   S.lastHtml='';schedule();
@@ -238,7 +246,7 @@ function sempHtml(){
   if(st&&st.res&&(st.stage==='checked'||st.stage==='loading'||st.stage==='done')){
     var r=st.res;
     h+='<div class="hd"><h2>Check result · '+esc(st.name)+'</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?'Some rows rejected':'All rows pass')+'</span></div>'
-     +'<div class="kpis"><div class="kpi"><small>People read</small><b>'+fmtN(r.read)+'</b><small>sheets '+esc(r.sheets.join(', '))+'</small></div><div class="kpi"><small>Loading</small><b>'+fmtN(r.loaded)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b><small>'+r.warn.noPlant+' no plant · '+r.warn.unknownPlant+' plant not in master · '+r.warn.noEmail+' no email · '+r.warn.badMobile+' mobile not 10 digits</small></div>'
+     +'<div class="kpis"><div class="kpi"><small>People read</small><b>'+fmtN(r.read)+'</b><small>sheets '+esc(r.sheets.join(', '))+'</small></div><div class="kpi"><small>Loading</small><b>'+fmtN(r.loaded)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b><small>'+(r.ended?r.ended+' with an end date (inactive, still matched) · ':'')+r.warn.noPlant+' no plant · '+r.warn.unknownPlant+' plant not in master · '+r.warn.noEmail+' no email · '+r.warn.badMobile+' mobile not 10 digits</small></div>'
      +'<div class="kpi"><small>Match rate to B1 names</small><b>'+(r.match.rate!=null?r.match.rate.toFixed(1)+'%':'—')+'</b><small>'+(r.match.rate!=null?r.match.matched+' of '+r.match.names+' names · '+(r.match.lineRate||0).toFixed(1)+'% of invoice lines':'no sales data loaded to match against')+'</small></div></div>'
      +'<div class="grid2"><div class="tw"><table><thead><tr><th>Zone</th><th class="num">People</th></tr></thead><tbody>'+Object.keys(r.byZone).sort().map(function(z){return '<tr><td>'+esc(z)+'</td><td class="num">'+fmtN(r.byZone[z])+'</td></tr>'}).join('')+'</tbody></table></div><div class="tw"><table><thead><tr><th>Desk role proposed from designation (Assumed)</th><th class="num">People</th></tr></thead><tbody>'+Object.keys(r.byRole).sort().map(function(z){return '<tr><td>'+esc(z)+'</td><td class="num">'+fmtN(r.byRole[z])+'</td></tr>'}).join('')+'</tbody></table></div></div>';
     if(Object.keys(r.unmappedDes).length)h+='<p class="note">Designations with no matching Desk role (set the role in Users when the person needs access): '+Object.keys(r.unmappedDes).map(function(d){return esc(d)+' ('+r.unmappedDes[d]+')'}).join(', ')+'.</p>';
@@ -255,7 +263,7 @@ Object.assign(handlers,{
  'mst-item-load':function(){return itemLoad()},
  'mst-semp-check':function(){return sempCheck()},
  'mst-semp-load':function(){return sempLoad()},
- 'mst-tmpl':function(t){var k=t.getAttribute('data-t');return download(k==='items'?'item-master-template.csv':'sales-employee-template.csv',(k==='items'?'Item No.,Item Description,Inventory UoM,Active,Thickness,Size,Item Category':'Employee Code,*FirstName,*LastName,FullName,Mobile No.,Email,Designation,Zone,Plant Name,*CompanyCode')+'\n')},
+ 'mst-tmpl':function(t){var k=t.getAttribute('data-t');return download(k==='items'?'item-master-template.csv':'sales-employee-template.csv',(k==='items'?'Item No.,Item Description,Inventory UoM,Active,Thickness,Size,Item Category':'Employee Code,*FirstName,*LastName,FullName,Mobile No.,Email,Designation,Zone,Plant Name,*CompanyCode,B1 SlpCode,B1 Sales Employee Name,Reports To (Employee Code),EndDate')+'\n')},
  'mst-rejcsv':function(t){var st=S.mst[t.getAttribute('data-k')];return download('rejected-rows.csv',csvLine(['row','code','','field','reason','value'])+'\n'+st.res.rejects.map(csvLine).join('\n'))},
  'mst-unmatched-csv':function(){return download('unmatched-salespeople.csv',csvLine(['b1_salesperson_name','invoice_lines','reason'])+'\n'+unmatchedSp().map(function(u){return csvLine([u.name,u.lines,u.why])}).join('\n'))}
 });
