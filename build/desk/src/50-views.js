@@ -2,8 +2,10 @@
 var COLORS=['indigo','violet','orange','green','sky','pink','teal','red'];
 function viewCtx(){
   var sc=SC(),f=S.f,res=resolvePeriod(f,TODAY()),plants=f.plant?new Set([f.plant]):sc.plants;
-  return {sc:sc,f:f,res:res,plants:plants,base:{sp:sc.sp?undefined:(f.sp||undefined),group:f.group||undefined}};
+  return {sc:sc,f:f,res:res,plants:plants,base:{sp:sc.sp?ownKey():(f.sp||undefined),group:f.group||undefined}};
 }
+/* a Sales executive's own salesperson key as stored in the roll-ups ('' when none matches: no rows, no plan) */
+function ownKey(){var k=spKeyOf(effUser());return k==null?'':k}
 function noData(){return !DS.plants.length}
 function emptyData(what){
   return '<div class="empty"><b>'+esc(what||'No sales data in your scope yet.')+'</b><br>'+(effRole()==='Super admin'?'Load history in <a href="#/intake">Data Intake</a>, or load demo data there. ':'Ask your admin to load the SAP invoice history. ')+'The Desk ships empty.</div>';
@@ -16,8 +18,8 @@ function figs(ent,ctx,opts){
   var A=sumF(f,cur),P=pr?sumF(f,pr):null;
   var pl=null;
   if(opts.noPlan){pl={any:false,tgt:0,pot:0,kind:'none',orig:0}}
-  else if(f.sp!=null&&ent.sp!==undefined){pl=personPlan(f.sp,cur);pl.orig=pl.tgt}
-  else if(f.sp!=null){pl=personPlan(f.sp,cur);pl.orig=pl.tgt}
+  else if(f.sp!=null&&ent.sp!==undefined){pl=personPlan(f.sp,cur,f.plant,f.group);pl.orig=pl.tgt}
+  else if(f.sp!=null){pl=personPlan(f.sp,cur,f.plant,f.group);pl.orig=pl.tgt}
   else pl=planW(f,cur);
   var pset=f.plant?new Set([f.plant]):f.plants;
   var incomplete=!monthsLoaded(res.curMonths,pset)||(res.prior?!monthsLoaded(res.priorMonths,pset):false);
@@ -72,7 +74,7 @@ function kpiCard(o){
    +(o.pending?'<div class="empty sm">'+esc(o.pendingMsg||'')+'</div>':'<div class="bar"><i style="width:'+pct+'%;background:var(--'+(st==='green'?'green':st==='orange'?'orange':st==='red'?'red':'indigo')+')"></i></div>'+(o.mini?miniBars(o.mini,o.color||'indigo'):''))+'</article>';
 }
 function runRate(ctx,o,fl){
-  var r=ctx.res;if(r.mode!=='QTD'||!r.qOpen||o.tgt==null)return null;
+  var r=ctx.res;if(ctx.sc.sp||r.mode!=='QTD'||!r.qOpen||o.tgt==null)return null;
   var ms=qMonths(r.q),tot=ms.reduce(function(a,m){return a+WD(m)},0),el=r.N,rem=Math.max(0,tot-el);
   var pl=planW(Object.assign({plants:ctx.plants},ctx.base,fl||{}),ms.map(function(m){return {ym:m,frac:1}}));
   var needTotal=pl.tgt;var need=rem>0?Math.max(0,(needTotal-o.A)/rem):0,now=el>0?o.A/el:0;return {need:need,now:now};
@@ -80,7 +82,7 @@ function runRate(ctx,o,fl){
 function salesKpis(ctx,o,series){
   var st=statusOf(o.ach),rr=runRate(ctx,o),mini=series?series.map(function(s){return s.A}):null;
   var shareChg='';
-  if(o.share!=null&&ctx.res.prior&&ctx.res.mode!=='YTD'){
+  if(!ctx.sc.sp&&o.share!=null&&ctx.res.prior&&ctx.res.mode!=='YTD'){
     var pf=Object.assign({plants:ctx.plants},ctx.base),pp=planW(pf,ctx.res.prior);
     if(pp.any&&pp.pot>0&&o.P!=null){var ps=o.P/pp.pot*100;shareChg=' ('+((o.share-ps)>=0?'+':'−')+Math.abs(o.share-ps).toFixed(1)+' pts vs last quarter)'}
     else shareChg=' (change greyed: no potential last quarter)';
@@ -205,6 +207,7 @@ function pageOverview(){
 }
 function matchSearch(r){var q=(S.f.search||'').toLowerCase();return !q||(r.label||'').replace(/<[^>]+>/g,' ').toLowerCase().indexOf(q)>=0}
 function planSq(ctx){
+  if(ctx.sc.sp)return {pot:0,tgt:0};/* plant-level quantity plans are not an executive's target */
   var f=Object.assign({plants:ctx.plants},ctx.base),w=ctx.res.cur,out={pot:0,tgt:0};
   wins(w).forEach(function(x){var q=qKeyOfYm(x.ym),P=planQ(f,q),qm=qMonths(q),idx=qm.indexOf(x.ym),wdq=qm.reduce(function(a,m){return a+WD(m)},0);if(!P.nLeaf)return;out.pot+=P.potSqft*(WD(x.ym)*x.frac)/wdq;out.tgt+=(P.tgt>0?P.tgtSq*(P.months[idx]/P.tgt):0)*x.frac});
   return out;
@@ -235,6 +238,7 @@ function ytdStrip(ctx){
   return '<section class="card"><div class="hd"><h2>YTD · '+qLabel(qs[qs.length-1]).split(' ')[1]+' so far · quarter by quarter</h2><span class="note">Not compared with any other year.</span></div><div class="tw"><table><thead><tr><th>Quarter</th><th class="num">Target</th><th class="num">Actual</th><th class="num">Ach %</th><th>Compared with</th><th class="num">QoQ step</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div></section>';
 }
 function targetRevisionCard(ctx,tot){
+  if(ctx.sc.sp)return '';/* the revision trail covers plant targets, not an executive's own */
   var q=ctx.res.q||curQuarterKey(),f=Object.assign({plants:ctx.plants},ctx.base),P=planQ(f,q);
   if(!P.nLeaf)return '<section class="card"><div class="hd"><h2>Target revision · '+qLabel(q)+'</h2></div><div class="empty sm">No potential or target entered for '+qLabel(q)+(effRole()==='Super admin'||canEditPlan(effUser())?'. Add it in <a href="#/admin">Admin › Market potential</a>.':'.')+'</div></section>';
   var ser=quarterSeries(f,undefined),closed=ser.filter(function(s){return !s.isCur}),ts=trendStats(closed.map(function(s){return s.A}));

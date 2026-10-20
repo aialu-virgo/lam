@@ -167,7 +167,30 @@ async function demoActions(){
   list.push(mk('DEMO_S1','DEMO call customer','se.s1@demo','bm.a@demo',addDays(t,1),300000,{plant:'1012'}));
   for(i=0;i<list.length;i++)await dset('actions/'+list[i].id,list[i]);
 }
+/* synthetic masters: written only when no real master is loaded; flagged demo so Clear demo removes only these */
+async function demoMasters(){
+  var by=(S.viewer&&S.viewer.email)||'demo',now=nowISO(),pl=function(c){return 'DEMO plant '+c};
+  if(!S.salesMaster){
+    var P=[['DEMO-M-A','DEMO Manager A','Zone 1','1012','Branch Manager','Branch / depot manager','','DEMO-H-1'],['DEMO-M-B','DEMO Manager B','Zone 2','1013','Branch Manager','Branch / depot manager','','DEMO-H-1'],['DEMO-H-1','DEMO Head Sales','Zone 1','1011','Zonal Head','','','']];
+    var sp=[['DEMO Sales 1','Zone 1','1012','DEMO-M-A'],['DEMO Sales 2','Zone 1','1012','DEMO-M-A'],['DEMO Sales 3','Zone 2','1013','DEMO-M-B'],['DEMO Sales 4','Zone 2','1013','DEMO-M-B'],['DEMO Sales 5','Zone 3','1011','DEMO-H-1'],['DEMO Sales 6','Zone 3','1001','DEMO-H-1']];
+    var people=P.map(function(x){return [x[0],x[1],x[2],x[3],pl(x[3]),x[4],x[5],'','','','',x[7],'','']});
+    sp.forEach(function(x,i){people.push(['DEMO-E-'+pad(i+1,3),x[0],x[1],x[2],pl(x[2]),'Sales Executive','Sales executive','','','','',x[3],'',''])});
+    /* DEMO Sales 7 is left out on purpose: the match rate shows one unmatched name and the R8 hint */
+    var uid='udemo'+Date.now().toString(36);
+    await dset('salesmaster/main',{z:await gz(JSON.stringify(people)),n:people.length,at:now,by:by,file:'DEMO sales employees (synthetic)',sheets:['DEMO'],read:people.length,rejected:0,upload:uid,demo:true,fmt:'gz-json v3: [code,name,zone,plant,plantRaw,designation,role,email,whatsapp,slpCode,b1Name,reportsToCode,endDate,altCode]'});
+    await dset('uploads/'+uid,{at:now,by:by,sys:'B1',entity:'SE',file:'DEMO sales employees (synthetic)',size:0,mode:'master',periodLabel:'Sales employees: DEMO',read:people.length,loaded:people.length,rejected:1,warned:0,status:'Partial',demo:true});
+  }
+  if(!S.itemMeta){
+    var items=[],sizes=[['8X4',32],['7X3',21],['6X4',24]],g=0;
+    for(var i=1;i<=24;i++){var z=sizes[i%3];items.push(['DEMOFG'+pad(i,5),i%6===0?1:0,z[1],i%2?1:0.8,'Pcs',true,z[0]])}
+    var uid2='udemoi'+Date.now().toString(36);
+    await dset('items/c0',{z:await gz(JSON.stringify(items)),n:items.length,i:0,at:now,by:by,fmt:'gz-json v1: [code,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sqft per sheet,thickness mm,uom,active,size]',demo:true});
+    await dset('itemmeta/main',{at:now,by:by,file:'DEMO items (synthetic)',sheet:'DEMO',read:items.length,loaded:items.length,out_of_scope:0,rejected:0,warned:0,by_group:{Laminate:20,Door:4},chunks:1,upload:uid2,demo:true});
+    await dset('uploads/'+uid2,{at:now,by:by,sys:'B1',entity:'IT',file:'DEMO items (synthetic)',size:0,mode:'master',periodLabel:'Item master snapshot',read:items.length,loaded:items.length,rejected:0,warned:0,status:'Loaded',demo:true});
+  }
+}
 async function demoExtras(facts){
+  await demoMasters();
   await demoPeople();
   var n=await demoPlans(facts,gridQuarters().cur);
   await demoOps();

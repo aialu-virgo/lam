@@ -80,8 +80,10 @@ async function ingestRoll(){
         var d=S.rollDocs[ids[i]],cur=DS.raw[ids[i]];
         if(cur&&cur.at===d.at)continue;
         var rows=JSON.parse(await ungz(d.z));
-        if(sc.sp)rows=rows.filter(function(r){return spOk(sc,r[1])});
-        DS.raw[ids[i]]={at:d.at,plant:d.plant,ym:d.ym,rows:rows};changed=true;
+        var tot=null;
+        if(sc.sp){/* an executive's own share of a plant needs the plant total; only the number is kept, never other people's rows */
+          tot={};rows.forEach(function(r){if(!r[2])tot[r[0]]=(tot[r[0]]||0)+r[7]});rows=rows.filter(function(r){return spOk(sc,r[1])})}
+        DS.raw[ids[i]]={at:d.at,plant:d.plant,ym:d.ym,rows:rows,tot:tot};changed=true;
         if(Date.now()-T>120){T=Date.now();DS.status='Reading history '+(i+1)+' of '+ids.length;schedule();await tick()}
       }
       if(changed||DS.ver===0){rebuildMaps();DS.ver++;DS.cache={}}
@@ -91,9 +93,10 @@ async function ingestRoll(){
   DS.busy=false;DS.ready=true;schedule();afterData();
 }
 function rebuildMaps(){
-  DS.pg={};DS.spk={};DS.spIdx={};DS.xf={};DS.spRaw={};var plants={},months={};
+  DS.pg={};DS.spk={};DS.spIdx={};DS.xf={};DS.spRaw={};DS.ptot={};var plants={},months={};
   Object.keys(DS.raw).forEach(function(id){
     var o=DS.raw[id];plants[o.plant]=1;months[o.ym]=1;
+    if(o.tot)Object.keys(o.tot).forEach(function(g){var kk=o.plant+SEP+g,m=DS.ptot[kk]||(DS.ptot[kk]={});m[o.ym]=(m[o.ym]||0)+o.tot[g]});
     o.rows.forEach(function(r){
       /* r = [group, salesperson, transfer, docs, lines, sheets, sqft, net] */
       if(r[2]){DS.xf[o.ym]=(DS.xf[o.ym]||0)+r[7];return}
@@ -259,13 +262,19 @@ function planW(f,w){
   var ks=Object.keys(kinds);out.kind=!ks.length?'none':ks.length===1?ks[0]:'mixed';
   return out;
 }
+/* net sales of a plant x group across everyone; for an executive's scoped data this comes from the kept totals */
+function plantGroupNet(plant,grp,ms){
+  if(SC().sp){var m=(DS.ptot||{})[plant+SEP+grp]||{},t=0;ms.forEach(function(ym){t+=m[ym]||0});return t}
+  return sumF({plant:plant,group:grp},ms).n;
+}
 /* default person split P2: last quarter's share of the leaf */
-function personPlan(sp,w){
+function personPlan(sp,w,onlyPlant,onlyGroup){
   w=wins(w);var out={tgt:0,pot:0,any:false,kind:'none'};
   (DS.spIdx[sp]||[]).forEach(function(k){
     var parts=k.split(SEP),plant=parts[1],grp=parts[2];
+    if(onlyPlant&&plant!==onlyPlant)return;if(onlyGroup&&grp!==onlyGroup)return;
     w.forEach(function(x){
-      var q=qKeyOfYm(x.ym),pq=prevQ(q),lp=sumF({plant:plant,group:grp},qMonths(pq)).n,mine=sumF({plant:plant,group:grp,sp:sp},qMonths(pq)).n;
+      var q=qKeyOfYm(x.ym),pq=prevQ(q),lp=plantGroupNet(plant,grp,qMonths(pq)),mine=sumF({plant:plant,group:grp,sp:sp},qMonths(pq)).n;
       var share=lp>0?mine/lp:0;if(share<=0)return;
       var P=planW({plant:plant,group:grp},[x]);if(!P.any)return;
       out.any=true;out.tgt+=P.tgt*share;out.pot+=P.pot*share;out.kind=P.kind;
@@ -282,9 +291,9 @@ function quarterSeries(f,personSp){
     var ff=Object.assign({},f);if(personSp!=null)ff.sp=personSp;
     var N=isCur?wdBetween(ms[0]+'-01',TODAY()):Infinity;var w=isCur?walk(ms,N):wins(ms);
     var A=loaded?sumF(ff,w).n:null;
-    var P=personSp!=null?personPlan(personSp,qMonths(q)):planW(f,qMonths(q));
+    var P=personSp!=null?personPlan(personSp,qMonths(q),f.plant,f.group):planW(f,qMonths(q));
     var tgt=(personSp!=null?P.any:P.any)?(personSp!=null?P.tgt:P.tgt):null;
-    var tgtTo=isCur?(personSp!=null?personPlan(personSp,w).tgt:planW(f,w).tgt):tgt;
+    var tgtTo=isCur?(personSp!=null?personPlan(personSp,w,f.plant,f.group).tgt:planW(f,w).tgt):tgt;
     out.push({q:q,label:qLabel(q),A:A,loaded:loaded,tgt:tgt,tgtTo:tgtTo,kind:P.kind,isCur:isCur,ach:(A!=null&&tgtTo>0)?A/tgtTo*100:null,N:N});
   });
   return out;

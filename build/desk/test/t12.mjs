@@ -9,7 +9,7 @@ const res=[];const ok=(n,c,d)=>{res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
  await page.evaluate(()=>{document.querySelector('.bar-q[data-q="FY27-Q2"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))});await page.waitForTimeout(500);
  let t=await page.innerText('#pg');ok('click bar -> quarter drill with 3 months',/Drill-down · Q2 FY27/i.test(t)&&/Jul 2026/.test(t)&&/Sep 2026/.test(t),'');
  await page.evaluate(()=>{document.querySelector('[data-act="drill-m"][data-m="2026-08"]').click()});await page.waitForTimeout(1200);
- t=await page.innerText('#pg');ok('month -> SAP document list with system, type, doc no',/SAP documents · Aug 2026/i.test(t)&&/B1 · INV/.test(t)&&/DEMO-\d+/.test(t),'');
+ t=await page.innerText('#pg');ok('month -> SAP document list with system, type, doc no',/SAP documents · Aug 2026/i.test(t)&&/B1\s+INV/.test(t)&&/DEMO-\d+/.test(t),'');
  const nd=await page.evaluate(()=>document.querySelectorAll('#pg table tr').length);
  await page.screenshot({path:SP+'s-drill.png'});
  /* sales chain */
