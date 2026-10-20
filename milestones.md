@@ -15,7 +15,7 @@ related:
 |---|---|---|---|
 | Tue 16:15 | Canonical model, B1↔S4 map, one data-map file per export, upload templates sent to Vijay | Data Architect | done 16:46 (slipped 31 min) |
 | Tue 17:15 | desk-v0.1 published: Data Intake, coverage grid, Admin masters | Full-Stack Engineer | published 17:00 (D8); QA passed, fixes republished |
-| Tue 18:40 | History, potential, users uploaded; rejected rows fixed; coverage green or gaps named | Vijay + Delivery Lead | open |
+| Tue 18:40 | History, potential, users uploaded; rejected rows fixed; coverage green or gaps named | Vijay + Delivery Lead | partial 19:55 (D17): Sep 2026 B1 + Oct 2026 S/4 (1013) loaded; gap = Oct 2023–Aug 2026, users, potential |
 | Tue 20:00 | Wireframes of all pages sent for approval | Product Designer | published 17:25 (D12); awaiting SP Sir |
 | Tue 21:00 | Written design approval | Principals | interim approval by Vijay 18:08 (D13); SP Sir confirms Wed 11:30 |
 | Wed 07:00 | desk-v0.9 on real data | Full-Stack Engineer | published Tue ~19:30 on demo data (D14); real data not yet loaded |
