@@ -144,6 +144,7 @@ var TEMPLATES={
  users:'email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code',
  plants:'plant_code,plant_name,plant_type,zone,state,b1_bpl_name,active',
  potential:'fy_quarter,plant_code,territory,product_group,customer_segment,potential_value_inr,potential_qty_sheets,potential_qty_sqft,source_type,source_note,owner_email',
+ transfers:'CardCode,CardName,Tranfser',
  phasing:'fy_quarter,plant_code,product_group,customer_segment,month_in_quarter,phasing_pct'};
 var INSTR_RE=/(ignore (all |any |the )?(previous|prior|above)|disregard .{0,20}instruction|system prompt|you (must|should) (now )?(send|email|delete|reply)|forward (this|the|all)|override (the )?(rule|check))/i;
 var CHUNK_LIM=190000; /* base64 chars per document; the store cap is 256 KiB */
@@ -207,7 +208,7 @@ async function gz(str){var cs=new CompressionStream('gzip');var w=cs.writable.ge
 async function ungz(s){var ds=new DecompressionStream('gzip');var w=ds.writable.getWriter();w.write(unb64(s));w.close();return new Response(ds.readable).text()}
 
 /* ================= state ================= */
-var S={viewer:null,role:null,db:null,dbState:'init',users:[],plants:[],periods:{},cells:{},mappings:{},uploads:[],potential:[],logs:[],
+var S={viewer:null,role:null,db:null,dbState:'init',users:[],plants:[],transfers:[],periods:{},cells:{},mappings:{},uploads:[],potential:[],logs:[],
   tab:'intake',adminTab:'users',loaded:{},seeded:false,covSel:null,themeSeen:false,docCount:null,potFilter:{q:'',plant:'',group:'',seg:''}};
 var U=null; /* current upload */
 var cancelFlag=false;
@@ -416,7 +417,7 @@ function resultHtml(){
   var grows=GROUPS.map(function(g){var x=r.groups[g]||{rows:0,value:0};return '<tr><td>'+g+'</td><td class="num">'+fmtN(x.rows)+'</td><td class="num">'+fmtMoney(x.value)+'</td></tr>'}).join('');
   var h='<div class="hd"><h2>Validation result</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?'Some rows rejected':'All rows pass')+'</span></div>';
   h+='<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Good rows loading</small><b>'+fmtN(r.good)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b></div>'
-   +'<div class="kpi"><small>Out of scope (kept in record)</small><b>'+fmtN(r.other.rows)+'</b></div><div class="kpi"><small>Internal transfers (flagged)</small><b>'+fmtN(r.xfer.rows)+'</b></div></div>';
+   +'<div class="kpi"><small>Out of scope (kept in record)</small><b>'+fmtN(r.other.rows)+'</b></div><div class="kpi"><small>Internal transfers (flagged)</small><b>'+fmtN(r.xfer.rows)+'</b><small>'+fmtN(r.xferMaster)+' via the Admin list</small></div></div>';
   if(r.dateInfo.mixed)h+='<div class="banner warn"><span>This file mixes real date cells and dd/mm/yyyy text. Day and month were swapped back on '+fmtN(r.dateInfo.swapped)+' date cells ('+fmtN(r.dateInfo.unfixable)+' could not be fixed). Resulting range <b>'+esc(r.minDate||'-')+' to '+esc(r.maxDate||'-')+'</b>.</span><label class="chip"><input type="checkbox" id="u-confd" data-chg="confd" '+(U.confirmDates?'checked':'')+' '+(locked?'disabled':'')+'> I confirm this range</label></div>';
   else h+='<div class="note">Dates run '+esc(r.minDate||'-')+' to '+esc(r.maxDate||'-')+'.</div>';
   if(r.fanout)h+='<div class="note">S/4 fan-out: '+fmtN(r.fanout)+' surplus repeated rows removed (same document and item). Not an error.</div>';
@@ -512,6 +513,7 @@ function detect(headers){
   if(set['email']&&set['role']&&set['today_cap'])return{type:'master',what:'users'};
   if(set['plant_code']&&set['plant_name']&&set['plant_type'])return{type:'master',what:'plants'};
   if(set['potential_value_inr']&&set['fy_quarter'])return{type:'master',what:'potential'};
+  if(set['cardcode']&&set['tranfser'])return{type:'master',what:'transfers'};
   if(set['phasing_pct'])return{type:'master',what:'phasing'};
   return{type:'unknown'};
 }
@@ -542,7 +544,7 @@ async function onFile(file){
     if(!rows.length)throw new Error('The file is empty.');
     var headers=rows[0].map(function(x){return x==null?'':String(x)});
     var d=detect(headers);
-    if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'target phasing is not in desk-v0.1'})[d.what]+').';renderUpload();return}
+    if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'target phasing is not in desk-v0.1',transfers:'Internal transfer'})[d.what]+').';renderUpload();return}
     if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;U.msg='The headers match no known file. Expected an invoice export from SAP B1 (docnum, CardCode, BPLName ...) or the S/4 sales register (Invoice Document Number, Plant ...).';renderUpload();return}
     U.headers=headers;U.rows=rows.slice(1);U.sys=d.sys;U.map=defaultMap(headers,d.sys);
     var sv=S.mappings[d.sys+'_invoice'];
@@ -611,7 +613,7 @@ async function runValidation(){
   var nSerial=0,nText=0;
   for(var i=0;i<n;i++){var v=rows[i][cDate];if(typeof v==='number')nSerial++;else if(typeof v==='string'&&/^\s*\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4}/.test(v))nText++}
   var swap=nSerial>0&&nText>0;res.dateInfo.mixed=swap;
-  var seen=new Set(),lineCtr=new Map();
+  var seen=new Set(),lineCtr=new Map();var tset=new Set();S.transfers.forEach(function(t){if(t.flag!==false)tset.add(String(t.code).toUpperCase())});res.xferMaster=0;
   var periodSel=U.period,allowed=null;
   if(U.mode==='daily'&&periodSel==='auto')periodSel=g.cur;
   if(periodSel!=='auto')allowed={lo:qStartYm(periodSel),hi:qEndYm(periodSel),label:qLabel(periodSel)};
@@ -670,7 +672,7 @@ async function runValidation(){
     var val=Math.round(net*100)/100;
     if(!grp){res.other.rows++;res.other.value+=val;res.good++;continue}
     var xf=false;
-    if(sys==='B1'){var ac=cAcct>=0?norm(r[cAcct]):'',zn=cZone>=0?String(r[cZone]||'').trim().toUpperCase():'';xf=ac==='sales gst - stock outward'||zn==='BRANCH'||zn==='FACTORY'}
+    if(sys==='B1'){var ac=cAcct>=0?norm(r[cAcct]):'',zn=cZone>=0?String(r[cZone]||'').trim().toUpperCase():'';var byRule=ac==='sales gst - stock outward'||zn==='BRANCH'||zn==='FACTORY',byMaster=tset.has(String(r[cCust]).trim().toUpperCase());xf=byRule||byMaster;if(byMaster)res.xferMaster++}
     var size=cSize>=0?r[cSize]:'',sq=sqftOf(size,qty);if(sq==null){sq=0;res.missingSize++;res.warned++}
     if(xf){res.xfer.rows++;res.xfer.value+=val}
     var G=res.groups[grp]||(res.groups[grp]={rows:0,value:0,sheets:0});
@@ -817,13 +819,13 @@ async function demoClear(){
 
 /* ================= ADMIN ================= */
 function buildAdmin(){
-  $('#p-admin').innerHTML='<div class="tabs seg" role="tablist" style="align-self:flex-start"><button data-act="atab" data-t="users" role="tab">Users</button><button data-act="atab" data-t="plants" role="tab">Plants</button><button data-act="atab" data-t="potential" role="tab">Market potential</button></div><div id="a-body"></div>';
+  $('#p-admin').innerHTML='<div class="tabs seg" role="tablist" style="align-self:flex-start"><button data-act="atab" data-t="users" role="tab">Users</button><button data-act="atab" data-t="plants" role="tab">Plants</button><button data-act="atab" data-t="potential" role="tab">Market potential</button><button data-act="atab" data-t="transfers" role="tab">Internal transfer customers</button></div><div id="a-body"></div>';
 }
 function refreshAdmin(){
   document.querySelectorAll('[data-act="atab"]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-t')===S.adminTab))});
   var el=$('#a-body');if(!el)return;
   var focusId=document.activeElement&&document.activeElement.id;
-  if(S.adminTab==='users')el.innerHTML=usersHtml();else if(S.adminTab==='plants')el.innerHTML=plantsHtml();else el.innerHTML=potentialHtml();
+  if(S.adminTab==='users')el.innerHTML=usersHtml();else if(S.adminTab==='plants')el.innerHTML=plantsHtml();else if(S.adminTab==='transfers')el.innerHTML=transfersHtml();else el.innerHTML=potentialHtml();
   if(focusId){var f=document.getElementById(focusId);if(f&&f.focus){f.focus();try{var v=f.value;if(f.setSelectionRange&&f.type!=='number'&&f.type!=='email')f.setSelectionRange(v.length,v.length)}catch(e){}}}
 }
 function usersHtml(){
@@ -841,6 +843,13 @@ function plantsHtml(){
   +'<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Zone</th><th>State</th><th>B1 branch name</th><th>Business</th><th>Active</th><th></th></tr></thead><tbody>'
   +rows.map(function(p){return '<tr><td class="mono">'+esc(p.plant_code)+'</td><td>'+esc(p.plant_name||'-')+(p.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(p.plant_type)+'</td><td>'+esc(p.zone||'-')+'</td><td>'+esc(p.state||'-')+'</td><td class="break">'+esc(p.b1_bpl_name||'-')+'</td><td>'+esc(p.business||'laminates')+'</td><td>'+(p.active===false?'<span class="pill mute">Off</span>':'<span class="pill ok">On</span>')+'</td><td><button class="btn sm" data-act="plant-edit" data-id="'+esc(p._id)+'">Edit</button></td></tr>'}).join('')+'</tbody></table></div>'
   +'<p class="note">Default master: factories 1001-1006, head office 1011, depots 1012-1049 (context/branches-plants.md). All editable. ACP codes 1050-1065 are not part of this Desk.</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
+}
+function transfersHtml(){
+  var rows=S.transfers.slice().sort(function(a,b){return a.code<b.code?-1:1});
+  return '<section class="card"><div class="hd"><h2>Internal transfer customers &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="tr-add">Add account</button><label class="btn sm" for="up-tr" style="cursor:pointer">Upload list (CSV)</label><input id="up-tr" data-file="transfers" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="transfers">Download template</button></div></div>'
+  +'<p class="note" style="margin:0">Virgo\'s own branch and group accounts. A B1 invoice line is an internal transfer, not a sale, when its CardCode is in this list <b>or</b> the sale account is "Sales GST - Stock Outward" <b>or</b> the zone is BRANCH or FACTORY. Columns: CardCode, CardName, Tranfser (as in the B1 export). A blank or any value except N, No, 0, False counts as internal (Assumed).</p>'
+  +(rows.length?'<div class="tw" style="max-height:420px;overflow:auto"><table><thead><tr><th>CardCode</th><th>CardName</th><th>Internal</th><th></th></tr></thead><tbody>'+rows.map(function(t){return '<tr><td class="mono">'+esc(t.code)+'</td><td class="break">'+esc(t.name)+'</td><td>'+(t.flag===false?'<span class="pill mute">No</span>':'<span class="pill ok">Yes</span>')+'</td><td><button class="btn sm" data-act="tr-del" data-id="'+esc(t._id)+'">Remove</button></td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty">No accounts yet. Upload the list from the B1 export. Until then only the account and zone rules flag internal transfers.</div>')
+  +'<div id="up-msg">'+(S.upMsg||'')+'</div></section>';
 }
 function potStatusPill(s){return '<span class="pill '+({Draft:'mute',Discussed:'info',Approved:'ok',Locked:'part'}[s]||'mute')+'">'+esc(s)+'</span>'}
 function potentialHtml(){
@@ -967,12 +976,15 @@ async function masterUpload(what,file){
   try{
     var rows=parseCSV(await file.text());if(rows.length<2){show('<div class="banner err">The file has no data rows.</div>');return}
     var hd=rows[0].map(function(x){return norm(x)}),idx=function(k){return hd.indexOf(k)},get=function(r,k){var i=idx(k);return i<0?'':String(r[i]==null?'':r[i]).trim()};
-    var need=TEMPLATES[what].split(',');var missingCols=need.filter(function(c){return c!=='sales_employee_code'&&c!=='territory'&&c!=='source_note'&&idx(c)<0&&!(what==='plants'&&(c==='zone'||c==='state'||c==='b1_bpl_name'))});
+    var need=TEMPLATES[what].toLowerCase().split(',');var missingCols=need.filter(function(c){return c!=='sales_employee_code'&&c!=='territory'&&c!=='source_note'&&idx(c)<0&&!(what==='plants'&&(c==='zone'||c==='state'||c==='b1_bpl_name'))});
     if(missingCols.length){show('<div class="banner err">Missing columns: '+esc(missingCols.join(', '))+'. Download the template.</div>');return}
     var bad=[],ok=[],seen={};
     rows.slice(1).forEach(function(r,i){
       var rn=i+2;
-      if(what==='users'){
+      if(what==='transfers'){
+        var tc=get(r,'cardcode').toUpperCase(),tf=get(r,'tranfser');
+        if(!tc)bad.push([rn,'','CardCode is empty']);else if(seen[tc])bad.push([rn,tc,'Duplicate CardCode in file']);else{seen[tc]=1;ok.push({code:tc,name:get(r,'cardname'),flag:!/^(n|no|0|false)$/i.test(tf),raw_flag:tf.slice(0,20)})}
+      }else if(what==='users'){
         var u={email:get(r,'email').toLowerCase(),name:get(r,'name'),role:get(r,'role'),department:get(r,'department'),plant_codes:get(r,'plant_codes'),reports_to_email:get(r,'reports_to_email').toLowerCase(),whatsapp_number:get(r,'whatsapp_number').replace(/[\s+\-]/g,''),today_cap:Number(get(r,'today_cap')||5),active:!/^(n|no|false|0)$/i.test(get(r,'active')),sales_employee_code:get(r,'sales_employee_code')};
         var e=validateUser(u,false);if(seen[u.email])e.push('Duplicate email in file');seen[u.email]=1;
         if(e.length)bad.push([rn,u.email,e.join('; ')]);else ok.push(u);
@@ -994,7 +1006,8 @@ async function masterUpload(what,file){
     var saved=0;
     for(var i=0;i<ok.length;i++){
       var o=ok[i];
-      if(what==='users'){await dset('users/'+slug(o.email),Object.assign({},S.users.find(function(x){return x.email===o.email})||{},o,{_id:undefined}))}
+      if(what==='transfers'){await dset('transfers/'+slug(o.code),o)}
+      else if(what==='users'){await dset('users/'+slug(o.email),Object.assign({},S.users.find(function(x){return x.email===o.email})||{},o,{_id:undefined}))}
       else if(what==='plants'){var oldp=S.plants.find(function(x){return x.plant_code===o.plant_code});await dset('plants/'+o.plant_code,Object.assign({},oldp||{},o,{_id:undefined}))}
       else{var ex=S.potential.find(function(x){return x._id===o._key}),rev=(ex?ex.rev||1:0)+1;var k=o._key;delete o._key;
         var rv={n:rev,at:nowISO(),by:S.viewer.email,status:'Draft',reason:'Uploaded file '+file.name,discussion_date:'',participants:'',change:ex?'₹ '+fmtMoney(ex.potential_value_inr)+' to '+fmtMoney(o.potential_value_inr):'new figure'};
@@ -1048,6 +1061,9 @@ var handlers={
  'user-add':function(){userDlg(null)},
  'user-edit':function(t){userDlg(S.users.find(function(u){return u._id===t.getAttribute('data-id')}))},
  'user-save':function(t){return saveUser(t.getAttribute('data-new')==='1')},
+ 'tr-add':function(){openDlg('<h3>Add internal transfer account</h3><div class="fgrid">'+fld('d-tc','CardCode','')+fld('d-tn','CardName','')+'</div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="tr-save">Save</button><button class="btn" data-act="dlg-close">Cancel</button></div>')},
+ 'tr-save':async function(){var c=gv('d-tc').toUpperCase();if(!c){dlgErr('CardCode is required');return}await dset('transfers/'+slug(c),{code:c,name:gv('d-tn'),flag:true});closeDlg();toast('Account added')},
+ 'tr-del':async function(t){await ddel('transfers/'+t.getAttribute('data-id'));toast('Removed')},
  'plant-add':function(){plantDlg(null)},
  'plant-edit':function(t){plantDlg(S.plants.find(function(u){return u._id===t.getAttribute('data-id')}))},
  'plant-save':function(t){return savePlant(t.getAttribute('data-new')==='1')},
@@ -1101,6 +1117,7 @@ async function boot(){
     subscribe('cells',db.collection('cells'),function(d){S.cells={};d.forEach(function(x){S.cells[x._id]=x})});
     subscribe('mappings',db.collection('mappings'),function(d){S.mappings={};d.forEach(function(x){S.mappings[x._id]=x})});
     subscribe('uploads',db.collection('uploads').orderBy('at','desc').limit(200),function(d){S.uploads=d});
+    subscribe('transfers',db.collection('transfers'),function(d){S.transfers=d});
     subscribe('potential',db.collection('potential'),function(d){S.potential=d});
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
