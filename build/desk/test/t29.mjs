@@ -24,4 +24,11 @@ const acc=await page.evaluate(()=>Object.values(window.__mockStore()).filter(v=>
  await p2.evaluate(async()=>{const db=await window.claude.use('db');const p=await db.doc('periods/FY27-Q2').get();const d=p.data();d.plan_locked=false;await db.doc('periods/FY27-Q2').set(d)});await p2.waitForTimeout(1500);
  ok('management user does not see the alert',!/Integrity alert/.test(await p2.innerText('#pg')),'')}
 /* legit close/reopen through the page leaves no alert */
+/* legit reopen by a Super admin through the page: logged, no alert */
+{const {page:p3}=await open(browser,{store:JSON.parse(JSON.stringify(store)),viewer:{email:'data@virgoasia.com',name:'V'}});await p3.waitForTimeout(4000);await p3.evaluate(()=>{location.hash='#/today'});await p3.waitForTimeout(800);
+ const q=await p3.evaluate(()=>Object.keys(window.__dbg.S.periods).find(k=>window.__dbg.S.periods[k].status==='closed'));
+ await p3.evaluate(q=>{const b=document.createElement('button');b.setAttribute('data-act','reopen');b.setAttribute('data-q',q);document.body.appendChild(b);b.click()},q);await p3.waitForTimeout(500);
+ await p3.fill('#d-reason','DEMO correction');await p3.evaluate(q=>{const b=document.createElement('button');b.setAttribute('data-act','reopen-go');b.setAttribute('data-q',q);document.body.appendChild(b);b.click()},q);await p3.waitForTimeout(2500);
+ const st=await p3.evaluate(q=>window.__dbg.S.periods[q].status,q);
+ ok('legit reopen applied and writes an audit entry, no alert',st==='open'&&!/Integrity alert/.test(await p3.innerText('#pg'))&&await p3.evaluate(()=>Object.values(window.__mockStore()).some(v=>v.event==='quarter reopened'&&v.sig)),st)}
 console.log(res.join('\n'));console.log(errs.filter(e=>!/ERR_FAILED/.test(e)));await browser.close();

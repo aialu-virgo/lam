@@ -74,5 +74,10 @@ Viewer email decides the role. v0.1 opens only for Super admin (seed: Vijay and 
 - **No comparison with last year.** The only period shift is three months (`priorQuarterMonth`); `month_compare` offers previous month, never last year.
 - **Customer-level R7 and class A/B/C** need the customer detail, read when Sales or Team is opened (and the last closed quarter when Today holds customer actions).
 
+## Database write rules and integrity check (desk-v1.0)
+- **Rules.** The `db` capability takes per-path minimum sharing levels (`view` < `interact` < `admin` (Editor or granted Owner) < `owner`). The page declares `write: admin` on `periods`, `audit`, `settings`, `users`, `plants`, `cells`, `inv`, `roll`, `mappings`, `transfers`, `uploads`, `rejects`, `items`, `itemmeta`, `salesmaster`, `phasing` and the open-item stores. Both Super admins must therefore be shared as Editor. Levels are sharing levels, not Desk roles: `potential`, `actions`, `followups`, `log` and `planlocks` stay at `interact`, because Branch managers and Management write them.
+- **Management plan lock** writes `planlocks/{quarter}` (interact); a Super admin lock writes `periods`. A quarter is locked if either exists.
+- **Integrity check.** Every close, reopen, lock and closed-quarter reload writes an `audit` entry (admin-only). On load the Super admin page compares each period, closed-quarter plant-month load stamp and locked-quarter plan with the audit trail; a mismatch shows an integrity alert on Today and Admin › Tools. "Accept the current state" logs the acceptance.
+
 ## Not built yet
 S/4HANA OData connector (card shown, disabled). Intake for orders, deliveries, receivables, collections, stock and credit notes (pages show the empty state naming the export). New-customer KPI (K7) needs a customer first-seen index. Plans P2 (person split, default shown), P3 to P7 entry screens (defaults used). Segment is not an SAP field, so actuals compare with targets at plant × product group.

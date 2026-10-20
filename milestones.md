@@ -8,7 +8,7 @@ related:
 ---
 
 # Milestones
-**Current:** M4 Build v0.9 (design approved, D13). **Blocker:** People List not received; exports for orders, deliveries, receivables, collections, stock not yet listed ([Open questions](open-questions.md) Q1, Q6).
+**Current:** M6 acceptance (desk-v1.0 published, D22). **Blocker:** People List not received; exports for orders, deliveries, receivables, collections, stock not yet listed ([Open questions](open-questions.md) Q1, Q6).
 
 ## Schedule (IST)
 | By | What | Owner | Status |
@@ -21,7 +21,7 @@ related:
 | Wed 07:00 | desk-v0.9 on real data | Full-Stack Engineer | published Tue ~19:30 on demo data (D14); real data not yet loaded |
 | Wed 10:00 | QA + blind second check passed, fixes done | Engineering QA | passed Tue ~20:00 on v0.9 version 11 (demo data, stubbed runtime); open: live sign-in, real-data volume, visual match to reference |
 | Wed 11:30 | Acceptance walk-through | SP Sir | open |
-| Wed 12:00 | desk-v1.0 published, tagged, link sent | Delivery Lead | open |
+| Wed 12:00 | desk-v1.0 published, tagged, link sent | Delivery Lead | done Tue night (D22) |
 
 ## Milestones
 **M0 Discovery**
@@ -40,8 +40,8 @@ related:
 
 **M4 Build v0.9** — [x] all pages: target vs actual vs potential, 12-quarter trend, Action Center, Today, responses, follow-up drafts, escalation, action log, roles and row-level access, scorecard
 
-**M5 v1.0** — [ ] QA and acceptance fixes · [ ] published and tagged by Wed 12:00
+**M5 v1.0** — [x] QA fixes (acceptance fixes after 11:30 if any) · [x] published and tagged (D22)
 
 **M6 QA pass + acceptance** — [ ] all 12 checks pass ([Brief Part B — design inputs](design/brief-part-b.md) §8) · [ ] SP Sir accepts · [ ] first real B1 upload by Virgo users
 
-**M7 Handover** — [ ] role guides + admin guide + walkthrough in [handover/](handover/_index.md) · [ ] S/4HANA switch notes
+**M7 Handover** — [x] role guides + admin guide (drafts) · [ ] walkthrough in [handover/](handover/_index.md) · [x] S/4HANA switch notes
