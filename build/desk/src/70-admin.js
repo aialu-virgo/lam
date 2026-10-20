@@ -80,7 +80,7 @@ function toolsHtml(){
   return integrityHtml()+'<section class="card"><div class="hd"><h2>Tools</h2></div>'
    +'<div class="kpis"><div class="kpi"><small>Roll-up documents</small><b>'+fmtN(rc)+'</b><small>'+(miss?miss+' plant-months still to build':'all plant-months have one')+'</small></div><div class="kpi"><small>Rules engine</small><b style="font-size:13px;font-family:var(--font)">'+esc(S.engStatus||'not run yet')+'</b></div></div>'
    +'<div class="row"><button class="btn" data-act="rb-run"'+(S.rbBusy?' disabled':'')+'>Rebuild roll-ups now</button><button class="btn" data-act="rules-run">Run the rules now</button></div>'
-   +'<p class="note">Roll-ups are the small per plant × month summaries every business page reads. They are written on each upload; this rebuilds any that are missing (for example data loaded by desk-v0.1).</p>'
+   +'<p class="note">Roll-ups are the small per plant × month summaries every business page reads. They are written on each upload; this rebuilds any that are missing (for example data loaded earlier).</p>'
    +'<h3 style="margin:8px 0 0;font-size:13px">Test clock (this browser only)</h3><div class="row"><div class="fld"><label for="tc-d">Pretend today is</label><input id="tc-d" type="date" class="in" value="'+TODAY()+'"></div><button class="btn" data-act="clock-set">Set</button><button class="btn" data-act="clock-reset">Use the real date</button></div><p class="note">For the escalation walk-through: set a date, open Action Center, and the next ladder step is drafted. The real date is '+fmtDate(realToday())+'. The clock never changes stored data other than the drafts it causes.</p></section>';
 }
 function missingRolls(){

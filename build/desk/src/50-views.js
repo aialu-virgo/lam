@@ -189,7 +189,7 @@ function pageOverview(){
     rows:[['Potential',sqPlan.pot>0?fmtSqft(sqPlan.pot):'—'],['Target',sqPlan.tgt>0?fmtSqft(sqPlan.tgt):'No plan'],['Var',sqPlan.tgt>0?(sqA-sqPlan.tgt>=0?'+':'−')+fmtSqft(Math.abs(sqA-sqPlan.tgt)):'—'],['Ach %',fmtAch(sqAch)],['Share of potential',sqPlan.pot>0?(sqA/sqPlan.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psq!=null?qoqCell(qoqOf(sqA,tot.Psq,{incomplete:tot.incomplete})):'—'],['12-qtr trend',trendWord(tot)]]}));
   var col=collectionFigs(ctx);
   cardsQ.push(col.card);
-  cardsQ.push(kpiCard({color:'orange',chip:'+',title:'K7 · New customers',value:'—',sub:'Needs the customer first-seen index (four earlier quarters).',pending:true,pendingTxt:'Pending',pendingMsg:'Not built in v0.9: the roll-up holds no customer history. Shown as pending, not zero.',
+  cardsQ.push(kpiCard({color:'orange',chip:'+',title:'K7 · New customers',value:'—',sub:'Needs the customer first-seen index (four earlier quarters).',pending:true,pendingTxt:'Pending',pendingMsg:'Needs four earlier quarters of history to find first-time customers; shown as pending, not zero.',
     rows:[['Addressable','pending rules'],['Target','No plan (P6)'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %','—'],['12-qtr trend','—']]}));
   var h='<div class="kpirow">'+cardsQ.join('')+'</div>';
   h+=trendCard('12-quarter trend · Net sales',{},ctx,undefined,'ov');
