@@ -10,4 +10,4 @@ related:
 # Additional work log
 | Date notified | What | Why it serves the goal | Effort spent | Status |
 |---|---|---|---|---|
-| — | none yet | | | |
+| 2026-10-21 | Host the Desk outside claude.ai on a Virgo-owned server with its own login (email + password, initial Virgo@2026, forced change at first login), server-side role filtering and database. | Most Desk users have no claude.ai account, so the claude.ai link cannot reach them (Vijay, 21 Oct). | Analysis only; estimate 2–3 days once server access is given. | Approved by Vijay 21 Oct (D24): Virgo Google Cloud; design in progress. |

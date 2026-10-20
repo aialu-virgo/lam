@@ -53,6 +53,9 @@ function navTags(u,open){
   return t;
 }
 function navTagSig(u){var t=navTags(u,0);return Object.keys(t).map(function(k){return k+t[k]}).join('')}
+/* Logo slot: build/desk/assets/virgo-logo.(svg|png) is inlined at build time; until it exists a neutral text mark stands in (no invented logo). */
+var LOGO_SRC='/*@@LOGO@@*/';
+function brandLogo(){return '<span class="brandmark">'+(LOGO_SRC?'<img class="brandlogo" src="'+LOGO_SRC+'" alt="Virgo">':'<span class="brandtext">Virgo</span>')+'</span>'}
 function navHtml(u){
   var pages=pagesFor(u),open=0;try{open=todayCandidates(u).length}catch(e){}
   var groups={};PAGES.forEach(function(p){(groups[p[2]]=groups[p[2]]||[]).push(p)});
@@ -65,7 +68,7 @@ function navHtml(u){
   }).join('');
 }
 function shellHtml(u){
-  return '<div class="app"><aside class="side"><div class="brand"><div class="logo">V</div><div><b>Virgo Lam Performance Desk</b><small>desk-v1.0</small></div></div>'+navHtml(u)
+  return '<div class="app"><aside class="side"><div class="brand">'+brandLogo()+'<div><b>Lam Performance Desk</b><small>desk-v1.0</small></div></div>'+navHtml(u)
    +'<div class="me"><b>'+esc(S.viewer&&S.viewer.name||u.name||'Viewer')+'</b><span>'+esc(S.role||'')+'</span><span class="note break">'+esc(S.viewer&&S.viewer.email||'')+'</span>'
    +(S.role==='Super admin'?'<label class="note" for="va-sel">View as role</label><select id="va-sel" class="in" data-chg="viewas"><option value="">Myself (Super admin)</option>'+S.users.filter(function(x){return x.active!==false&&x.email!==(S.viewer&&S.viewer.email)}).sort(function(a,b){return a.role<b.role?-1:a.role>b.role?1:a.name<b.name?-1:1}).map(function(x){return '<option value="'+esc(x.email)+'"'+(S.viewAs===x.email?' selected':'')+'>'+esc(x.role+' · '+x.name)+'</option>'}).join('')+'</select>':'')
    +'</div></aside><main class="main"><div class="top" id="top"></div><div id="banners"></div><div id="pg"></div></main></div>';
@@ -121,9 +124,16 @@ function pageHtml(u){
 }
 function renderAll(){
   var root=$('#root');
-  if(S.dbState==='init'){if(!root.innerHTML)root.innerHTML=gate('Opening the Desk','Checking who you are.');return}
-  if(S.dbState==='none'){root.innerHTML=gate('Database not available','Sign in to claude.ai and open this page again. The Desk stores its data in the shared database.');return}
-  if(!S.loaded.users)return;
+  var retryBtn='<div class="gate"><button class="btn pri" data-act="boot-retry">Retry</button></div>';
+  if(S.dbState==='init'){var w0=Date.now()-(S.t0||Date.now());if(w0>12000)root.innerHTML=gate('Still opening the Desk','Waiting on '+(S.step||'the viewer record')+' for '+Math.round(w0/1000)+' seconds.')+retryBtn;else if(!root.innerHTML||/Still opening/.test(root.innerHTML))root.innerHTML=gate('Opening the Desk','Checking who you are.');return}
+  if(S.dbState==='none'){root.innerHTML=gate('Database not available','Sign in to claude.ai and open this page again. The Desk stores its data in the shared database.')+retryBtn;return}
+  if(!S.loaded.users){
+    var waited=Date.now()-(S.t0||Date.now());
+    if(S.errs&&S.errs.users){root.innerHTML=gate('Could not read users: '+S.errs.users,'The Desk cannot tell who you are without its users list.')+'<div class="gate"><button class="btn pri" data-act="boot-retry">Retry</button></div>';return}
+    if(waited>12000){root.innerHTML=gate('Still opening the Desk','Waiting on '+(S.step||'the database')+' for '+Math.round(waited/1000)+' seconds.')+'<div class="gate"><button class="btn pri" data-act="boot-retry">Retry</button></div>';return}
+    if(!root.innerHTML||/Still opening|Could not read/.test(root.innerHTML))root.innerHTML=gate('Opening the Desk','Waiting on '+(S.step||'the users list')+'.');
+    return;
+  }
   S.role=viewerRole();
   if(S.role===null||S.role==='inactive'){root.innerHTML=gate('Ask your admin for access','You are signed in as '+(S.viewer&&S.viewer.email||'a user whose email this page cannot read')+'. This page is not enabled for that address.'+(S.viewer&&S.viewer.id?' Give your admin this viewer ID: '+S.viewer.id:''));return}
   if(S.role==='Super admin'&&!S.seeded&&S.loaded.users&&S.loaded.plants){S.seeded=true;seedDefaults()}
@@ -162,6 +172,7 @@ function renderAll(){
 /* ---- handlers ---- */
 function goto(pg,opt){opt=opt||{};if(opt.plant!=null)S.f.plant=opt.plant||'';if(opt.group!=null)S.f.group=opt.group||'';location.hash='#/'+pg}
 Object.assign(handlers,{
+ 'boot-retry':function(){boot()},
  'clear-f':function(){S.f.plant='';S.f.sp='';S.f.group='';S.f.search='';S.lastHtml='';schedule()},
  'goto':function(t){S.f.plant=t.getAttribute('data-plant')||S.f.plant;S.f.group=t.getAttribute('data-group')||''},
  'share':function(){var d=window.__clip;return copyText(PAGE_URL,'Link copied')},

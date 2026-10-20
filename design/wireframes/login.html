@@ -1,0 +1,74 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wireframe Login</title><link rel="stylesheet" href="wf.css">
+<style>
+.auth{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:18px;padding:20px 16px 48px}
+.auth .top{width:100%;max-width:1100px}
+.lg{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px;width:100%;max-width:1100px;align-items:start}
+.lg .card{max-width:440px;width:100%;margin:0 auto}
+.lg .brand{justify-content:center;flex-direction:column;text-align:center;gap:6px}
+.lg h2{margin:0;font-size:18px;text-align:center}
+.lg .field .inp{min-height:44px;font-size:15px}
+.lg .btn{min-height:44px;justify-content:center;font-size:14px;width:100%}
+.lg .dots{letter-spacing:.25em;color:var(--ink3)}
+.rules{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink2)}
+.rules li:before{content:"\25CB  ";color:var(--ink3)}.rules li.ok:before{content:"\25CF  ";color:var(--k1)}
+.st{font:700 10.5px var(--mono);letter-spacing:.06em;color:var(--ink3);text-transform:uppercase;text-align:center}
+.lk{border:2px solid var(--k1);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+</style></head><body><div class="auth">
+<div class="top"><div><h1>Login</h1><p>Virgo Lam Performance Desk on Virgo Google Cloud · four screens, each shown once; the live page shows one at a time</p></div><div class="tools"><span class="demo">DEMO</span><span class="btn ghost">Theme &#9680;</span></div></div>
+<div class="wfnote" style="max-width:1100px;width:100%">WIREFRAME · Login · greyscale · DEMO values only · Passwords are always dots; no password value is shown, logged or stored in the page. Design: <a href="../hosting-gcp.md">Hosting on Virgo Google Cloud</a>.</div>
+<div class="lg">
+
+<section class="card" aria-label="Sign in"><div class="st">1 &middot; Sign in</div>
+<div class="brand"><i></i><div>Virgo Lam<small>Performance Desk</small></div></div>
+<h2>Sign in</h2>
+<label class="field">Email<span class="inp">name@virgoasia.com</span></label>
+<label class="field">Password<span class="inp"><span class="dots">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span><span style="margin-left:auto" class="pill">Show</span></span></label>
+<span class="btn pri">Sign in</span>
+<div class="note">Wrong email or password. (The same message is shown whether the email exists or not.)</div>
+<div class="kv"><span>Forgot your password?</span><span>See screen 3</span></div>
+<div class="note">Not your own device? Close the browser tab after you sign out. You are signed out after 4 hours of no activity.</div>
+</section>
+
+<section class="card" aria-label="Set a new password"><div class="st">2 &middot; First sign-in or after an admin reset</div>
+<div class="brand"><i></i><div>Virgo Lam<small>Performance Desk</small></div></div>
+<h2>Set your own password</h2>
+<div class="note">You signed in with the starting password your admin gave you. Choose your own to continue. Nothing else opens until you do.</div>
+<label class="field">Starting password<span class="inp"><span class="dots">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span></span></label>
+<label class="field">New password<span class="inp"><span class="dots">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span><span style="margin-left:auto" class="pill">Show</span></span></label>
+<ul class="rules"><li class="ok">At least 12 characters</li><li class="ok">Not your email or name</li><li class="ok">Not a common password</li><li>Different from your last 3 passwords</li></ul>
+<label class="field">Confirm new password<span class="inp"><span class="dots">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span></span></label>
+<span class="btn pri">Save and continue</span>
+<span class="btn ghost">Sign out</span>
+<div class="note">The two new passwords do not match. (Error shown here, under the field.)</div>
+</section>
+
+<section class="card" aria-label="Forgot password"><div class="st">3 &middot; Forgot password: reset by admin</div>
+<div class="brand"><i></i><div>Virgo Lam<small>Performance Desk</small></div></div>
+<h2>Forgot your password?</h2>
+<div class="note">The Desk does not send email. Your Desk admin resets it for you, and you set a new one at your next sign-in.</div>
+<div class="kv"><span>Desk admin</span><span>Vijay &middot; data@virgoasia.com</span></div>
+<div class="kv"><span>Also</span><span>HO coordination</span></div>
+<label class="field">Your email (to copy into your message)<span class="inp">name@virgoasia.com</span></label>
+<span class="btn pri">Copy message to admin</span>
+<span class="btn ghost">Back to sign in</span>
+<div class="wfnote">Admin side (Admin &rsaquo; Users, Super admin only):<br>Row actions per user: <b>Reset password</b> &middot; <b>Unlock</b> &middot; <b>Make inactive</b>. Reset sets the starting password (read from Secret Manager, never shown) and marks the user "must change at next sign-in". Every use is logged with who and when. The admin cannot see or choose anyone's password.</div>
+<div class="tw"><table><thead><tr><th>User</th><th>Role</th><th>Sign-in status</th><th>Actions</th></tr></thead><tbody>
+<tr><td>Demo User 1</td><td>Branch manager</td><td><span class="pill pend">Must change password</span></td><td><span class="btn ghost">Reset password</span></td></tr>
+<tr><td>Demo User 2</td><td>Sales executive</td><td><span class="pill bad">Locked</span></td><td><span class="btn ghost">Unlock</span></td></tr>
+<tr><td>Demo User 3</td><td>Plant</td><td><span class="pill ok">Active</span></td><td><span class="btn ghost">Make inactive</span></td></tr>
+<tr><td>Demo User 4</td><td>Accounts</td><td><span class="pill warn">Starting password expired</span></td><td><span class="btn ghost">Reset password</span></td></tr>
+</tbody></table></div>
+</section>
+
+<section class="card" aria-label="Account locked"><div class="st">4 &middot; Locked account (and inactive)</div>
+<div class="brand"><i></i><div>Virgo Lam<small>Performance Desk</small></div></div>
+<h2>This account is locked</h2>
+<div class="lk"><b>Too many wrong passwords.</b><span>You can try again in 30 minutes, or ask your Desk admin to unlock it now.</span></div>
+<div class="kv"><span>Try again at</span><span>10:45 (IST)</span></div>
+<span class="btn pri">Copy message to admin</span>
+<span class="btn ghost">Back to sign in</span>
+<div class="empty"><b>Ask your admin for access</b><br>Shown when an account is inactive or the email is not in the user list. Same words as today (see <a href="states.html">Page states</a>); nothing is loaded.</div>
+<div class="note">Lock rule: 5 wrong passwords in a row lock the account for 30 minutes. Both the locked and the unknown-email cases are answered with the same sign-in message on screen 1 so nobody can test which emails exist; the lock screen appears only after the lock is real.</div>
+</section>
+
+</div></div></body></html>

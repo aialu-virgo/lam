@@ -43,3 +43,5 @@ If a question is unanswered by the time work needs it, the recommendation is use
 | Q21 | SP Sir | Personal KPI plan defaults (e.g. 90% on-time closure, ≤15% overdue) per [KRA / KPI set](design/kra-kpi.md)? | Accept as proposed; editable in Admin. | |
 | Q22 | SP Sir | Who sends follow-ups for actions raised by rules: the plant's Coordinator? | Yes, the plant Coordinator; owner's manager if none. | |
 | Q23 | SP Sir | Should escalation keep running for a Blocked action (e.g. customer dispute)? | Yes: a block needs the manager's help; L2/L3 drafts note "Blocked: <reason>". | |
+| Q24 | SP Sir | Approve hosting the Desk on a Virgo-owned server with its own login, so users without claude.ai accounts can use it? | Yes, on a server or cloud account Virgo already owns; keep the claude.ai link for account holders until it is live. | |
+| Q25 | Vijay | What server or cloud account does Virgo IT run (Windows server, AWS, Azure, web host)? | Use an existing Virgo-owned one; no new purchase. | **Answered (Vijay, 21 Oct):** Virgo's Google Cloud → D24. |

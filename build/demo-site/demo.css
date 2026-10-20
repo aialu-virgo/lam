@@ -1,0 +1,36 @@
+/* Demo shell: banner, login, change-password. Uses the Desk tokens. */
+:root{--dbh:0px}
+#demobar{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:var(--orange-soft);color:var(--orange);border-bottom:1px solid color-mix(in srgb,var(--orange) 30%,transparent);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:space-between;padding:7px max(16px,env(safe-area-inset-right,0px)) 7px max(16px,env(safe-area-inset-left,0px));font-size:12.5px}
+#demobar b{font-weight:800;letter-spacing:.02em}
+#demobar .dm-l{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center;min-width:0}
+#demobar .dm-r{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0}
+#demobar .dm-who{font-weight:700;overflow-wrap:anywhere}
+#demobar .dbtn{border:1px solid color-mix(in srgb,var(--orange) 45%,transparent);background:var(--card);color:var(--ink);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700}
+#demobar .dbtn.lnk{border:0;background:none;color:var(--orange);text-decoration:underline;padding:3px 4px}
+#demobar .dbtn.red{background:var(--red-soft);color:var(--red);border-color:transparent}
+#demo-login,#demo-prep{display:none}
+body.dm-login #root,body.dm-login #dlg{display:none}
+body.dm-login #demo-login{display:block}
+body.dm-prep #demo-prep{display:grid}
+#demo-prep{position:fixed;inset:0;z-index:70;background:var(--bg);place-items:center;padding:24px}
+#demo-prep .box{max-width:420px;text-align:center;display:flex;flex-direction:column;gap:12px}
+#demo-prep .brandmark{margin:0 auto}
+.dl-wrap{max-width:960px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:20px;align-items:start}
+.dl-head{grid-column:1/-1;display:flex;gap:12px;align-items:center}
+.dl-head h1{margin:0;font-size:22px;font-weight:800;text-wrap:balance}
+.dl-head p{margin:2px 0 0;color:var(--ink3);font-size:12.5px}
+.dl-form{display:flex;flex-direction:column;gap:12px}
+.dl-form h2,.dl-acc h2{margin:0;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);font-weight:800}
+.dl-form .fld input{width:100%}
+.dl-pw{background:var(--brand-soft);color:var(--brand-ink);border-radius:12px;padding:10px 12px;font-size:12.5px;display:flex;flex-direction:column;gap:2px}
+.dl-pw code{font-family:var(--mono);font-weight:700;font-size:14px}
+.dl-err{color:var(--red);font-size:12.5px;font-weight:600;min-height:1em}
+.dl-acc table td,.dl-acc table th{white-space:normal}
+.dl-acc .mono{font-size:12px;overflow-wrap:anywhere}
+.dl-acc button.use{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700}
+.dl-acc tr.pick td{background:var(--brand-soft)}
+.dl-foot{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:12.5px;color:var(--ink3)}
+.dl-foot button{border:0;background:none;color:var(--brand-ink);font-weight:700;text-decoration:underline;padding:0}
+.dm-note{border-radius:12px;padding:10px 14px;font-size:13px;background:var(--orange-soft);color:var(--orange)}
+@media (max-width:860px){.dl-wrap{grid-template-columns:minmax(0,1fr)}}
+@media (min-width:861px){.side{top:var(--dbh)!important;height:calc(100vh - var(--dbh))!important}}
