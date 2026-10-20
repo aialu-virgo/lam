@@ -92,7 +92,8 @@
       out.deliveries.push({ plant: p.code, rows: del });
       out.receivables.push({ plant: p.code, asOn: today, rows: rec });
       out.stock.push({ plant: p.code, asOn: today, rows: groups.map(function (g, gi) { var on = 600 + Math.floor(R() * 3400), aged = Math.floor(on * (R() * 0.18)); return [g, on, aged, [Math.floor(on * 0.5), Math.floor(on * 0.3), aged]]; }) });
-      (o.months || []).forEach(function (ym) { var total = Math.round((1800000 + R() * 2600000) / 1000) * 1000; out.collections.push({ plant: p.code, ym: ym, total: total, plan: (o.planMonths || []).indexOf(ym) >= 0 ? Math.round(total * (0.88 + R() * 0.28) / 1000) * 1000 : null }); });
+      (o.months || []).forEach(function (ym) { var total = Math.round((1800000 + R() * 2600000) / 1000) * 1000; var rcs = [], left = total, nr = 5; for (var ri = 0; ri < nr; ri++) { var amt = ri === nr - 1 ? left : Math.round(total / nr * (0.6 + R() * 0.8) / 100) * 100; amt = Math.min(amt, left); left -= amt; rcs.push(['DEMO-RC-' + p.code + '-' + ym.replace('-', '') + '-' + (ri + 1), 1 + Math.floor(R() * 27), 'DEMOCU' + pad(1 + Math.floor(R() * 40), 6), amt]); }
+      out.collections.push({ plant: p.code, ym: ym, total: total, rows: rcs, plan: (o.planMonths || []).indexOf(ym) >= 0 ? Math.round(total * (0.88 + R() * 0.28) / 1000) * 1000 : null }); });
     });
     return out;
   }

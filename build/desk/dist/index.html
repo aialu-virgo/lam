@@ -293,7 +293,8 @@ a.btn{text-decoration:none;display:inline-block}
       out.deliveries.push({ plant: p.code, rows: del });
       out.receivables.push({ plant: p.code, asOn: today, rows: rec });
       out.stock.push({ plant: p.code, asOn: today, rows: groups.map(function (g, gi) { var on = 600 + Math.floor(R() * 3400), aged = Math.floor(on * (R() * 0.18)); return [g, on, aged, [Math.floor(on * 0.5), Math.floor(on * 0.3), aged]]; }) });
-      (o.months || []).forEach(function (ym) { var total = Math.round((1800000 + R() * 2600000) / 1000) * 1000; out.collections.push({ plant: p.code, ym: ym, total: total, plan: (o.planMonths || []).indexOf(ym) >= 0 ? Math.round(total * (0.88 + R() * 0.28) / 1000) * 1000 : null }); });
+      (o.months || []).forEach(function (ym) { var total = Math.round((1800000 + R() * 2600000) / 1000) * 1000; var rcs = [], left = total, nr = 5; for (var ri = 0; ri < nr; ri++) { var amt = ri === nr - 1 ? left : Math.round(total / nr * (0.6 + R() * 0.8) / 100) * 100; amt = Math.min(amt, left); left -= amt; rcs.push(['DEMO-RC-' + p.code + '-' + ym.replace('-', '') + '-' + (ri + 1), 1 + Math.floor(R() * 27), 'DEMOCU' + pad(1 + Math.floor(R() * 40), 6), amt]); }
+      out.collections.push({ plant: p.code, ym: ym, total: total, rows: rcs, plan: (o.planMonths || []).indexOf(ym) >= 0 ? Math.round(total * (0.88 + R() * 0.28) / 1000) * 1000 : null }); });
     });
     return out;
   }
@@ -2344,9 +2345,10 @@ function salesKpis(ctx,o,series){
 function trendWord(o){return o.trend?(o.trend.short?'history too short':arrow(o.trend.dir)):'—'}
 
 /* ---- trend card: 12 closed quarters + current, target markers, QoQ line, MA4, trend line, Stretch ---- */
-function trendCard(title,ent,ctx,personSp,id){
+function trendCard(title,ent,ctx,personSp,id,opts){
+  opts=opts||{};
   var f=Object.assign({plants:ctx.plants},ctx.base,ent||{});var sp=personSp!=null?personSp:(f.sp!=null?f.sp:undefined);
-  var ser=quarterSeries(f,sp),closed=ser.filter(function(s){return !s.isCur}),ts=trendStats(closed.map(function(s){return s.A})),cur=ser[ser.length-1];
+  var ser=opts.series||quarterSeries(f,sp),closed=ser.filter(function(s){return !s.isCur}),ts=trendStats(closed.map(function(s){return s.A})),cur=ser[ser.length-1];
   var all=ser.map(function(s){return s.A});
   if(!all.some(function(v){return v!=null&&v>0}))return '<section class="card"><div class="hd"><h2>'+esc(title)+'</h2></div><div class="empty">No quarters loaded in your scope yet. The trend needs history from Data Intake.</div></section>';
   var W=760,H=250,L=44,R=10,T=14,B=62,n=ser.length,bw=(W-L-R)/n,mx=Math.max.apply(null,all.map(function(v){return v||0}).concat(ser.map(function(s){return s.tgt||0})).concat([1]))*1.12;
@@ -2356,7 +2358,7 @@ function trendCard(title,ent,ctx,personSp,id){
   ser.forEach(function(s,i){
     var bx=x(i)+bw*.18,w=bw*.64;
     if(s.A==null){svg+='<rect x="'+bx+'" y="'+(T+4)+'" width="'+w+'" height="'+(H-T-B-4)+'" rx="4" fill="none" stroke="var(--ink3)" stroke-dasharray="4 3" opacity=".6"><title>'+s.label+': not loaded (gap, not zero)</title></rect>'}
-    else svg+='<rect class="bar-q" data-act="trend-q" data-q="'+s.q+'" data-sp="'+esc(sp!=null?sp:'')+'" x="'+bx+'" y="'+y(s.A)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(s.A))+'" rx="4" fill="'+(s.isCur?'url(#hat'+id+')':'var(--indigo)')+'" stroke="var(--indigo)" tabindex="0"><title>'+s.label+' actual '+fmtMoney(s.A)+(s.tgt!=null?' · target '+fmtMoney(s.tgt):' · no plan')+'</title></rect>';
+    else svg+='<rect class="bar-q" data-act="trend-q" data-q="'+s.q+'" data-sp="'+esc(sp!=null?sp:'')+'" data-kind="'+(opts.kind||'sales')+'" data-pl="'+esc(f.plants?Array.from(f.plants).join(','):'')+'" x="'+bx+'" y="'+y(s.A)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(s.A))+'" rx="4" fill="'+(s.isCur?'url(#hat'+id+')':'var(--indigo)')+'" stroke="var(--indigo)" tabindex="0"><title>'+s.label+' actual '+fmtMoney(s.A)+(s.tgt!=null?' · target '+fmtMoney(s.tgt):' · no plan')+'</title></rect>';
     if(s.tgt!=null)svg+='<line x1="'+(bx-3)+'" x2="'+(bx+w+3)+'" y1="'+y(s.tgt)+'" y2="'+y(s.tgt)+'" stroke="var(--orange)" stroke-width="2.5"><title>'+s.label+' target '+fmtMoney(s.tgt)+'</title></line>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="ax">'+esc(s.label.replace(' FY',' '))+(s.isCur?'*':'')+'</text>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+26)+'" text-anchor="middle" class="ax a-'+statusOf(s.ach)+'">'+(s.ach!=null?s.ach.toFixed(0)+'%':'—')+'</text>';
@@ -2381,18 +2383,19 @@ function trendCard(title,ent,ctx,personSp,id){
 }
 function drillPanel(ctx){
   var d=S.drill;if(!d)return '';
-  var q=d.q,ms=qMonths(q),f=Object.assign({plants:ctx.plants},ctx.base);if(d.sp)f.sp=d.sp;
+  if(d.kind==='coll')return drillColl(ctx);
+  var q=d.q,ms=qMonths(q),f=Object.assign({plants:ctx.plants},ctx.base);if(d.sp)f.sp=d.sp;if(d.pl&&!d.sp)f.plants=new Set(d.pl.split(','));
   var rows=ms.map(function(m){var A=sumF(f,[m]),pm=priorMonth(m),P=sumF(f,[pm]),inc=!monthLoaded(m,ctx.plants)||!monthLoaded(pm,ctx.plants);var qo=qoqOf(A.n,P.n,{incomplete:inc});
     return '<tr class="clk" data-act="drill-m" data-m="'+m+'"><td>'+ymLabel(m)+' ›</td><td class="num">'+fmtMoney(A.n)+'</td><td class="num">'+fmtMoney(P.n)+' <span class="note">'+ymLabel(pm)+'</span></td><td class="num">'+qoqCell(qo)+'</td><td class="num">'+fmtN(A.d)+'</td></tr>'}).join('');
   var h='<section class="card" id="drillp"><div class="hd"><h2>Drill-down · '+qLabel(q)+(d.sp?' · '+esc(d.sp):'')+'</h2><button class="btn sm" data-act="drill-close">Close</button></div>'
    +'<div class="crumbs"><button class="chip" data-act="drill-close">Trend</button> › <button class="chip'+(d.m?'':' on')+'" data-act="drill-qonly">'+qLabel(q)+'</button>'+(d.m?' › <button class="chip" data-act="drill-m" data-m="'+d.m+'">'+ymLabel(d.m)+'</button> › <span class="chip on">SAP documents</span>':'')+'</div>'
    +'<div class="tw"><table><thead><tr><th>Month</th><th class="num">Actual</th><th class="num">Same position, previous quarter</th><th class="num">QoQ %</th><th class="num">Documents</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
-  if(d.m)h+=docList(ctx,d.m,null,null,d.sp||null);
+  if(d.m)h+=docList((d.pl&&!d.sp)?Object.assign({},ctx,{plants:f.plants}):ctx,d.m,null,null,d.sp||null);
   return h+'</section>';
 }
 /* documents: the last drill level. Index rows: [doc, day, customer, lines, sheets, net, transfer, sqft, salesperson] */
 function docList(ctx,ym,cust,plant,spF){
-  var key=ym+'|'+(cust||'')+'|'+(plant||'')+'|'+(spF||'');var st=S.docs&&S.docs.key===key?S.docs:null;
+  var key=ym+'|'+(cust||'')+'|'+(plant||'')+'|'+(spF||'')+'|'+(ctx.plants?Array.from(ctx.plants).join(','):'');var st=S.docs&&S.docs.key===key?S.docs:null;
   if(!st){if(!S.docsLoading||S.docsLoading!==key){S.docsLoading=key;loadDocs(ctx,ym,cust,plant,key,spF)}return '<div class="note">Loading documents from the stored index...</div>'}
   var sc=ctx.sc,rows=st.rows;
   var h='<div class="hd"><h3 style="margin:0;font-size:13px">SAP documents · '+ymLabel(ym)+(cust?' · '+esc(cust):'')+'</h3><span class="note">'+fmtN(rows.length)+' documents'+(st.cut?' (first 300 by value shown)':'')+'</span></div>';
@@ -2621,7 +2624,7 @@ function docBlock(ctx,haveCust){
 Object.assign(handlers,{
  'ov-branch':function(t){S.dd={plant:t.getAttribute('data-v'),sp:'',cust:''};S.docs=null;S.lastHtml='';location.hash='#/sales';schedule()},
  'ov-group':function(t){S.f.group=t.getAttribute('data-v');S.dd={plant:'',sp:'',cust:''};S.lastHtml='';location.hash='#/sales';schedule()},
- 'trend-q':function(t){S.drill={q:t.getAttribute('data-q'),m:null,sp:t.getAttribute('data-sp')||''};S.lastHtml='';S.docs=null;schedule();scrollDrill()},
+ 'trend-q':function(t){S.drill={q:t.getAttribute('data-q'),m:null,sp:t.getAttribute('data-sp')||'',kind:t.getAttribute('data-kind')||'sales',pl:t.getAttribute('data-pl')||''};S.lastHtml='';S.docs=null;schedule();scrollDrill()},
  'drill-qonly':function(){S.drill.m=null;S.docs=null;S.lastHtml='';schedule()},
  'drill-m':function(t){S.drill.m=t.getAttribute('data-m');S.docs=null;S.lastHtml='';schedule();scrollDrill()},
  'drill-close':function(){S.drill=null;S.docs=null;S.lastHtml='';schedule()},
@@ -2733,11 +2736,23 @@ function pageTeam(){
     var p=people.find(function(x){return x.email===who}),kt2=kpiTable(p,ctx);
     h+='<section class="card"><div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(p.role)+'</h2><span class="note">'+kt2.on+' of '+kt2.scored+' scored KPIs on plan · '+esc(ctx.res.label)+'</span></div>'+kt2.html+'</section>';
     var f=userFilter(p,ctx);
-    if(f&&['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive'].indexOf(p.role)>=0&&(p.role!=='HOD'||norm(p.department)==='sales'||norm(p.department)==='ho')&&!noData())h+=trendCard('12-quarter trend · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+drillPanel(ctx);
+    h+=personTrend(p,f,ctx);
   }else h+='<div class="note">Tap a person to see the scorecard and the 12-quarter trend.</div>';
   return h;
 }
 Object.assign(handlers,{'team-who':function(t){S.team.who=t.getAttribute('data-e');S.lastHtml='';schedule()}});
+
+/* the 12-quarter trend card of a person's scorecard: primary KPI per kra-kpi.md */
+function personTrend(p,f,ctx){
+  if(p.role==='Accounts'){
+    var pl=f&&f.plants?f.plants:SC().plants;
+    if(!collAvailable(pl))return '<section class="card"><div class="hd"><h2>12-quarter trend · Collections · '+esc(p.name)+'</h2></div>'+needPanel(['coll'],'No collection history is loaded, so the Accounts scorecard has no trend yet.')+'</section>';
+    return trendCard('12-quarter trend · Collections · '+p.name,{plants:pl},ctx,undefined,'tm',{series:collSeries(pl),kind:'coll'})+drillPanel(ctx);
+  }
+  if(noData())return '<section class="card"><div class="hd"><h2>12-quarter trend · Net sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
+  if(f==null)return '<section class="card"><div class="hd"><h2>12-quarter trend · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
+  return trendCard('12-quarter trend · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch history (sales order and delivery exports) is not loaded yet, so there is no 12-quarter dispatch series.</p>':'')+drillPanel(ctx);
+}
 
 /* ---- src/60-ops.js ---- */
 /* ================= v0.9 Orders & Dispatch, Receivables, Inventory (open-item stores) ================= */
@@ -2863,6 +2878,32 @@ function pageInventory(){
    +rows.sort(function(a,b){return (b.days||0)-(a.days||0)}).map(function(r){var ach=r.days!=null?CFG.stock_days_target/Math.max(r.days,.1)*100:null;var stt=r.days!=null?statusOf(r.days/CFG.stock_days_target*100,true):'none';return '<tr><td>'+esc(plantShort(r.plant))+'</td><td>'+esc(r.group)+'</td><td class="num">'+fmtN(r.on)+'</td><td class="num">'+CFG.stock_days_target+'</td><td class="num">'+(r.days!=null?r.days.toFixed(1):'—')+'</td><td class="num">'+(r.days!=null?(r.days-CFG.stock_days_target>=0?'+':'−')+Math.abs(r.days-CFG.stock_days_target).toFixed(1):'—')+'</td><td class="num">'+fmtAch(ach)+'</td><td class="num">'+fmtN(r.aged)+'</td><td class="num">'+(r.on>0?(r.aged/r.on*100).toFixed(1)+'%':'—')+'</td><td>'+statusPill(stt)+'</td></tr>'}).join('')+'</tbody></table></div>';
   h+='<p class="note">Stock days are per plant × product group. Item-level stock days cannot be derived (the invoice store has no item; decision D9). Stock snapshots keep no history yet, so Last Qtr and QoQ show "—". Rule R4 raises an action at '+fmtN(CFG.stock_age_min_sheets)+' aged sheets or '+CFG.stock_over_pct+'% of plan days.</p></section>';
   return h;
+}
+
+/* ---- collections: 12-quarter series for a scorecard (Accounts' primary KPI) ---- */
+function collSeries(plants){
+  var cur=curQuarterKey(),qs=closedQuarters().concat([cur]);
+  return qs.map(function(q){
+    var ms=qMonths(q),isCur=q===cur,N=isCur?wdBetween(ms[0]+'-01',TODAY()):Infinity,w=isCur?walk(ms,N):wins(ms);
+    var c=collMonths(plants,w),full=collMonths(plants,wins(ms)),A=c.have?c.rec:null,tgtTo=c.planHave?c.plan:null;
+    return {q:q,label:qLabel(q),A:A,loaded:c.have,tgt:full.planHave?full.plan:null,tgtTo:tgtTo,kind:'approved',isCur:isCur,ach:(A!=null&&tgtTo>0)?A/tgtTo*100:null,N:N};
+  });
+}
+function collAvailable(plants){var sc=SC();return S.coll.some(function(d){return plantInScope(sc,d.plant)&&(!plants||plants.has(d.plant))})}
+function collRows(plants,ym){
+  var sc=SC(),out=[];
+  S.coll.forEach(function(d){if(d.ym!==ym||!plantInScope(sc,d.plant)||(plants&&!plants.has(d.plant)))return;(d.rows||[]).forEach(function(r){out.push({doc:r[0],date:ym+'-'+pad(r[1]),cust:r[2],amount:r[3],plant:d.plant})})});
+  return out.sort(function(a,b){return b.amount-a.amount});
+}
+function drillColl(ctx){
+  var d=S.drill,q=d.q,ms=qMonths(q),plants=d.pl?new Set(d.pl.split(',')):ctx.plants;
+  var rows=ms.map(function(m){var A=collMonths(plants,[{ym:m,frac:1}]),pm=priorMonth(m),P=collMonths(plants,[{ym:pm,frac:1}]);var qo=qoqOf(A.rec,P.rec,{incomplete:!A.have||!P.have});
+    return '<tr class="clk" data-act="drill-m" data-m="'+m+'"><td>'+ymLabel(m)+' ›</td><td class="num">'+(A.have?fmtMoney(A.rec):'—')+'</td><td class="num">'+(A.planHave?fmtMoney(A.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(P.have?fmtMoney(P.rec):'—')+' <span class="note">'+ymLabel(pm)+'</span></td><td class="num">'+qoqCell(qo)+'</td></tr>'}).join('');
+  var h='<section class="card" id="drillp"><div class="hd"><h2>Drill-down · Collections · '+qLabel(q)+'</h2><button class="btn sm" data-act="drill-close">Close</button></div>'
+   +'<div class="crumbs"><button class="chip" data-act="drill-close">Trend</button> › <button class="chip'+(d.m?'':' on')+'" data-act="drill-qonly">'+qLabel(q)+'</button>'+(d.m?' › <button class="chip" data-act="drill-m" data-m="'+d.m+'">'+ymLabel(d.m)+'</button> › <span class="chip on">Receipt documents</span>':'')+'</div>'
+   +'<div class="tw"><table><thead><tr><th>Month</th><th class="num">Receipts</th><th class="num">Plan</th><th class="num">Same position, previous quarter</th><th class="num">QoQ %</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  if(d.m){var dl=collRows(plants,d.m);h+='<div class="hd"><h3 style="margin:0;font-size:13px">SAP receipts · '+ymLabel(d.m)+'</h3><span class="note">'+dl.length+' documents</span></div>'+(dl.length?'<div class="tw tall"><table><thead><tr><th>System</th><th>Doc type</th><th>Doc no</th><th>Date</th><th>Plant</th><th>Customer</th><th class="num">Amount</th></tr></thead><tbody>'+dl.slice(0,300).map(function(x){return '<tr><td class="mono">B1</td><td class="mono" title="Incoming payment">RC</td><td class="mono">'+esc(x.doc)+'</td><td>'+esc(x.date)+'</td><td>'+esc(plantShort(x.plant))+'</td><td class="break">'+esc(x.cust)+'</td><td class="num">'+fmtMoney(x.amount)+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty sm">No receipt documents loaded for this month.</div>')}
+  return h+'</section>';
 }
 
 /* ---- src/70-admin.js ---- */

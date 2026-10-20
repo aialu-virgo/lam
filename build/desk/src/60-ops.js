@@ -122,3 +122,29 @@ function pageInventory(){
   h+='<p class="note">Stock days are per plant × product group. Item-level stock days cannot be derived (the invoice store has no item; decision D9). Stock snapshots keep no history yet, so Last Qtr and QoQ show "—". Rule R4 raises an action at '+fmtN(CFG.stock_age_min_sheets)+' aged sheets or '+CFG.stock_over_pct+'% of plan days.</p></section>';
   return h;
 }
+
+/* ---- collections: 12-quarter series for a scorecard (Accounts' primary KPI) ---- */
+function collSeries(plants){
+  var cur=curQuarterKey(),qs=closedQuarters().concat([cur]);
+  return qs.map(function(q){
+    var ms=qMonths(q),isCur=q===cur,N=isCur?wdBetween(ms[0]+'-01',TODAY()):Infinity,w=isCur?walk(ms,N):wins(ms);
+    var c=collMonths(plants,w),full=collMonths(plants,wins(ms)),A=c.have?c.rec:null,tgtTo=c.planHave?c.plan:null;
+    return {q:q,label:qLabel(q),A:A,loaded:c.have,tgt:full.planHave?full.plan:null,tgtTo:tgtTo,kind:'approved',isCur:isCur,ach:(A!=null&&tgtTo>0)?A/tgtTo*100:null,N:N};
+  });
+}
+function collAvailable(plants){var sc=SC();return S.coll.some(function(d){return plantInScope(sc,d.plant)&&(!plants||plants.has(d.plant))})}
+function collRows(plants,ym){
+  var sc=SC(),out=[];
+  S.coll.forEach(function(d){if(d.ym!==ym||!plantInScope(sc,d.plant)||(plants&&!plants.has(d.plant)))return;(d.rows||[]).forEach(function(r){out.push({doc:r[0],date:ym+'-'+pad(r[1]),cust:r[2],amount:r[3],plant:d.plant})})});
+  return out.sort(function(a,b){return b.amount-a.amount});
+}
+function drillColl(ctx){
+  var d=S.drill,q=d.q,ms=qMonths(q),plants=d.pl?new Set(d.pl.split(',')):ctx.plants;
+  var rows=ms.map(function(m){var A=collMonths(plants,[{ym:m,frac:1}]),pm=priorMonth(m),P=collMonths(plants,[{ym:pm,frac:1}]);var qo=qoqOf(A.rec,P.rec,{incomplete:!A.have||!P.have});
+    return '<tr class="clk" data-act="drill-m" data-m="'+m+'"><td>'+ymLabel(m)+' ›</td><td class="num">'+(A.have?fmtMoney(A.rec):'—')+'</td><td class="num">'+(A.planHave?fmtMoney(A.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(P.have?fmtMoney(P.rec):'—')+' <span class="note">'+ymLabel(pm)+'</span></td><td class="num">'+qoqCell(qo)+'</td></tr>'}).join('');
+  var h='<section class="card" id="drillp"><div class="hd"><h2>Drill-down · Collections · '+qLabel(q)+'</h2><button class="btn sm" data-act="drill-close">Close</button></div>'
+   +'<div class="crumbs"><button class="chip" data-act="drill-close">Trend</button> › <button class="chip'+(d.m?'':' on')+'" data-act="drill-qonly">'+qLabel(q)+'</button>'+(d.m?' › <button class="chip" data-act="drill-m" data-m="'+d.m+'">'+ymLabel(d.m)+'</button> › <span class="chip on">Receipt documents</span>':'')+'</div>'
+   +'<div class="tw"><table><thead><tr><th>Month</th><th class="num">Receipts</th><th class="num">Plan</th><th class="num">Same position, previous quarter</th><th class="num">QoQ %</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  if(d.m){var dl=collRows(plants,d.m);h+='<div class="hd"><h3 style="margin:0;font-size:13px">SAP receipts · '+ymLabel(d.m)+'</h3><span class="note">'+dl.length+' documents</span></div>'+(dl.length?'<div class="tw tall"><table><thead><tr><th>System</th><th>Doc type</th><th>Doc no</th><th>Date</th><th>Plant</th><th>Customer</th><th class="num">Amount</th></tr></thead><tbody>'+dl.slice(0,300).map(function(x){return '<tr><td class="mono">B1</td><td class="mono" title="Incoming payment">RC</td><td class="mono">'+esc(x.doc)+'</td><td>'+esc(x.date)+'</td><td>'+esc(plantShort(x.plant))+'</td><td class="break">'+esc(x.cust)+'</td><td class="num">'+fmtMoney(x.amount)+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty sm">No receipt documents loaded for this month.</div>')}
+  return h+'</section>';
+}

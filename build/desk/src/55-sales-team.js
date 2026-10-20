@@ -120,7 +120,7 @@ function docBlock(ctx,haveCust){
 Object.assign(handlers,{
  'ov-branch':function(t){S.dd={plant:t.getAttribute('data-v'),sp:'',cust:''};S.docs=null;S.lastHtml='';location.hash='#/sales';schedule()},
  'ov-group':function(t){S.f.group=t.getAttribute('data-v');S.dd={plant:'',sp:'',cust:''};S.lastHtml='';location.hash='#/sales';schedule()},
- 'trend-q':function(t){S.drill={q:t.getAttribute('data-q'),m:null,sp:t.getAttribute('data-sp')||''};S.lastHtml='';S.docs=null;schedule();scrollDrill()},
+ 'trend-q':function(t){S.drill={q:t.getAttribute('data-q'),m:null,sp:t.getAttribute('data-sp')||'',kind:t.getAttribute('data-kind')||'sales',pl:t.getAttribute('data-pl')||''};S.lastHtml='';S.docs=null;schedule();scrollDrill()},
  'drill-qonly':function(){S.drill.m=null;S.docs=null;S.lastHtml='';schedule()},
  'drill-m':function(t){S.drill.m=t.getAttribute('data-m');S.docs=null;S.lastHtml='';schedule();scrollDrill()},
  'drill-close':function(){S.drill=null;S.docs=null;S.lastHtml='';schedule()},
@@ -232,8 +232,20 @@ function pageTeam(){
     var p=people.find(function(x){return x.email===who}),kt2=kpiTable(p,ctx);
     h+='<section class="card"><div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(p.role)+'</h2><span class="note">'+kt2.on+' of '+kt2.scored+' scored KPIs on plan · '+esc(ctx.res.label)+'</span></div>'+kt2.html+'</section>';
     var f=userFilter(p,ctx);
-    if(f&&['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive'].indexOf(p.role)>=0&&(p.role!=='HOD'||norm(p.department)==='sales'||norm(p.department)==='ho')&&!noData())h+=trendCard('12-quarter trend · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+drillPanel(ctx);
+    h+=personTrend(p,f,ctx);
   }else h+='<div class="note">Tap a person to see the scorecard and the 12-quarter trend.</div>';
   return h;
 }
 Object.assign(handlers,{'team-who':function(t){S.team.who=t.getAttribute('data-e');S.lastHtml='';schedule()}});
+
+/* the 12-quarter trend card of a person's scorecard: primary KPI per kra-kpi.md */
+function personTrend(p,f,ctx){
+  if(p.role==='Accounts'){
+    var pl=f&&f.plants?f.plants:SC().plants;
+    if(!collAvailable(pl))return '<section class="card"><div class="hd"><h2>12-quarter trend · Collections · '+esc(p.name)+'</h2></div>'+needPanel(['coll'],'No collection history is loaded, so the Accounts scorecard has no trend yet.')+'</section>';
+    return trendCard('12-quarter trend · Collections · '+p.name,{plants:pl},ctx,undefined,'tm',{series:collSeries(pl),kind:'coll'})+drillPanel(ctx);
+  }
+  if(noData())return '<section class="card"><div class="hd"><h2>12-quarter trend · Net sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
+  if(f==null)return '<section class="card"><div class="hd"><h2>12-quarter trend · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
+  return trendCard('12-quarter trend · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch history (sales order and delivery exports) is not loaded yet, so there is no 12-quarter dispatch series.</p>':'')+drillPanel(ctx);
+}
