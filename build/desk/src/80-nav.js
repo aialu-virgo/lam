@@ -23,6 +23,7 @@ function route(){
   var valid=PAGES.map(function(p){return p[0]});
   if(pg==='action'&&parts[1]){S.tab='actions';S.threadId=decodeURIComponent(parts.slice(1).join('/'))}
   else{S.threadId=null;if(valid.indexOf(pg)>=0)S.tab=pg;else{var u=effUser();S.tab=u&&u.role==='Super admin'?'overview':'today'}}
+  S.drill=null;S.docs=null;
   var sh=$('#shell');if(sh)sh.removeAttribute('data-sig');schedule();
 }
 window.addEventListener('hashchange',function(){route()});

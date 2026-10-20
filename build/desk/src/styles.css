@@ -66,3 +66,4 @@ a.btn{text-decoration:none;display:inline-block}
 .seg button{white-space:nowrap}
 @media (max-width:860px){.ctrl{align-items:stretch}.main .top h1{font-size:19px}}
 @media (max-width:520px){.kval{font-size:24px}.ctrl .fld{flex:1 1 140px}.top .chips{width:100%}}
+.hb.clk{cursor:pointer;border-radius:8px;padding:2px 4px}.hb.clk:hover{background:var(--indigo-soft)}.crumbs .chip{font-family:inherit}

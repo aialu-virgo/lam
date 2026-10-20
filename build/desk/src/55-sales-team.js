@@ -1,5 +1,6 @@
 /* ================= v0.9 Sales, Team & Scorecard ================= */
-S.dd={plant:'',sp:'',cust:''};S.cls='';S.drill=null;S.team={who:''};S.docM='';
+S.dd={plant:'',sp:'',cust:''};S.cls='';S.drill=null;function scrollDrill(){setTimeout(function(){var e=document.getElementById('drillp');if(e&&e.scrollIntoView)e.scrollIntoView({block:'start',behavior:'smooth'})},250)}
+S.team={who:''};S.docM='';
 function needCust(ctx,ms){
   var key=ms.join(',')+'|'+DS.sig;
   if(!custLoaded(ms,ctx.plants)){if(S.custAsk!==key){S.custAsk=key;loadCust(ctx.plants,ms).then(function(){S.custAsk=null;S.lastHtml='';schedule()})}return false}
@@ -61,7 +62,7 @@ function groupBars(ctx){
   var gs=distinct('group');if(!gs.length)return '';
   var rows=gs.map(function(g){return {g:g,o:figs({group:g},ctx,{noTrend:true})}});var mx=Math.max.apply(null,rows.map(function(r){return Math.max(r.o.A,r.o.tgt||0,r.o.P||0)}).concat([1]));
   var pc=function(v){return Math.max(0,Math.min(100,v/mx*100))};
-  return '<section class="card"><div class="hd"><h2>Sales by product group · '+esc(ctx.res.label)+'</h2></div><div class="hbars">'+rows.map(function(r){return '<div class="hb"><div class="hl">'+esc(r.g)+'</div><div class="ht"><i class="a" style="width:'+pc(r.o.A)+'%"></i>'+(r.o.tgt!=null?'<i class="pm" style="left:'+pc(r.o.tgt)+'%"></i>':'')+(r.o.P!=null?'<i class="pv" style="left:'+pc(r.o.P)+'%"></i>':'')+'</div><div class="hv">'+fmtMoney(r.o.A)+'</div></div>'}).join('')+'</div></section>';
+  return '<section class="card"><div class="hd"><h2>Sales by product group · '+esc(ctx.res.label)+'</h2></div><div class="hbars">'+rows.map(function(r){return '<div class="hb clk" data-act="ov-group" data-v="'+esc(r.g)+'" role="button" tabindex="0" title="Filter the page to '+esc(r.g)+'"><div class="hl">'+esc(r.g)+' ›</div><div class="ht"><i class="a" style="width:'+pc(r.o.A)+'%"></i>'+(r.o.tgt!=null?'<i class="pm" style="left:'+pc(r.o.tgt)+'%"></i>':'')+(r.o.P!=null?'<i class="pv" style="left:'+pc(r.o.P)+'%"></i>':'')+'</div><div class="hv">'+fmtMoney(r.o.A)+'</div></div>'}).join('')+'</div></section>';
 }
 function drillDown(ctx,haveCust,coord){
   var dd=S.dd,sc=ctx.sc,res=ctx.res,h='<section class="card"><div class="hd"><h2>Drill-down · branch → salesperson → customer → SAP document</h2></div>';
@@ -117,10 +118,11 @@ function docBlock(ctx,haveCust){
   return '<h3 class="lvl">Level 4 · SAP documents of '+esc(dd.cust)+'</h3>'+sel+docList(ctx,m,dd.cust,dd.plant||null);
 }
 Object.assign(handlers,{
- 'ov-branch':function(t){S.dd={plant:t.getAttribute('data-v'),sp:'',cust:''};S.docs=null;location.hash='#/sales'},
- 'ov-group':function(t){S.f.group=t.getAttribute('data-v');S.dd={plant:'',sp:'',cust:''};location.hash='#/sales'},
- 'trend-q':function(t){S.drill={q:t.getAttribute('data-q'),m:null};S.lastHtml='';S.docs=null;schedule()},
- 'drill-m':function(t){S.drill.m=t.getAttribute('data-m');S.docs=null;S.lastHtml='';schedule()},
+ 'ov-branch':function(t){S.dd={plant:t.getAttribute('data-v'),sp:'',cust:''};S.docs=null;S.lastHtml='';location.hash='#/sales';schedule()},
+ 'ov-group':function(t){S.f.group=t.getAttribute('data-v');S.dd={plant:'',sp:'',cust:''};S.lastHtml='';location.hash='#/sales';schedule()},
+ 'trend-q':function(t){S.drill={q:t.getAttribute('data-q'),m:null,sp:t.getAttribute('data-sp')||''};S.lastHtml='';S.docs=null;schedule();scrollDrill()},
+ 'drill-qonly':function(){S.drill.m=null;S.docs=null;S.lastHtml='';schedule()},
+ 'drill-m':function(t){S.drill.m=t.getAttribute('data-m');S.docs=null;S.lastHtml='';schedule();scrollDrill()},
  'drill-close':function(){S.drill=null;S.docs=null;S.lastHtml='';schedule()},
  'cls':function(t){S.cls=t.getAttribute('data-k');S.lastHtml='';schedule()},
  'dd':function(t){var k=t.getAttribute('data-k'),v=t.getAttribute('data-v');if(k==='plant'){S.dd={plant:v,sp:'',cust:''}}else if(k==='sp'){S.dd.sp=v;S.dd.cust=''}else S.dd.cust=v;S.docs=null;S.lastHtml='';schedule()},
@@ -230,7 +232,7 @@ function pageTeam(){
     var p=people.find(function(x){return x.email===who}),kt2=kpiTable(p,ctx);
     h+='<section class="card"><div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(p.role)+'</h2><span class="note">'+kt2.on+' of '+kt2.scored+' scored KPIs on plan · '+esc(ctx.res.label)+'</span></div>'+kt2.html+'</section>';
     var f=userFilter(p,ctx);
-    if(f&&['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive'].indexOf(p.role)>=0&&(p.role!=='HOD'||norm(p.department)==='sales'||norm(p.department)==='ho')&&!noData())h+=trendCard('12-quarter trend · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm');
+    if(f&&['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive'].indexOf(p.role)>=0&&(p.role!=='HOD'||norm(p.department)==='sales'||norm(p.department)==='ho')&&!noData())h+=trendCard('12-quarter trend · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+drillPanel(ctx);
   }else h+='<div class="note">Tap a person to see the scorecard and the 12-quarter trend.</div>';
   return h;
 }

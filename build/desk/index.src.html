@@ -655,7 +655,7 @@ async function runValidation(){
     if(!A){A=[cust,cn,sp,grp,xf?1:0,0,0,0,0,0];P.agg.set(ak,A)}
     A[6]++;A[7]+=qty;A[8]+=sq;A[9]+=val;
     var D=P.docs.get(doc);
-    if(!D){D={h:[doc,dt.d,cust,0,0,0,xf?1:0,0,sp],ks:[]};P.docs.set(doc,D)}
+    if(!D){D={h:[doc,dt.d,cust,0,0,0,xf?1:0,0,sp,'INV'],ks:[]};P.docs.set(doc,D)}
     D.h[3]++;D.h[4]+=qty;D.h[5]+=val;D.h[7]+=sq;
     if(D.ks.indexOf(ak)<0){D.ks.push(ak);A[5]++}
     res.good++;
@@ -676,7 +676,7 @@ async function writeRoll(plant,ym,sys,rows,src,demo){
 }
 async function packChunks(sys,P){
   var agg=[];P.agg.forEach(function(a){agg.push([a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7],Math.round(a[8]*10)/10,Math.round(a[9]*100)/100])});
-  var hdr=[];if(U.keepDocs!==false)P.docs.forEach(function(d){var h=d.h;hdr.push([h[0],h[1],h[2],h[3],h[4],Math.round(h[5]*100)/100,h[6],Math.round(h[7]*10)/10,h[8]||''])});
+  var hdr=[];if(U.keepDocs!==false)P.docs.forEach(function(d){var h=d.h;hdr.push([h[0],h[1],h[2],h[3],h[4],Math.round(h[5]*100)/100,h[6],Math.round(h[7]*10)/10,h[8]||'',h[9]||'INV'])});
   var out=[];
   async function fit(a,h){
     var z=await gz(JSON.stringify({a:a,h:h}));
@@ -686,7 +686,7 @@ async function packChunks(sys,P){
     }else out.push({z:z,na:a.length,nh:h.length});
   }
   await fit(agg,hdr);
-  return out.map(function(c,i){return {id:sys+'-'+P.plant+'-'+P.ym+'-'+i,doc:{z:c.z,na:c.na,nh:c.nh,sys:sys,plant:P.plant,ym:P.ym,i:i,fmt:'gz-json v1: a=[cust,name,salesperson,group,transfer,docs,lines,sheets,sqft,net] h=[doc,day,cust,lines,sheets,net,transfer,sqft,salesperson (added v0.9, D10; older chunks have 8 fields)]'}}});
+  return out.map(function(c,i){return {id:sys+'-'+P.plant+'-'+P.ym+'-'+i,doc:{z:c.z,na:c.na,nh:c.nh,sys:sys,plant:P.plant,ym:P.ym,i:i,fmt:'gz-json v1: a=[cust,name,salesperson,group,transfer,docs,lines,sheets,sqft,net] h=[doc,day,cust,lines,sheets,net,transfer,sqft,salesperson (v0.9, D10), doc type INV (v0.9); older chunks have 8 fields]'}}});
 }
 async function runLoad(opts){
   var r=U.res,sys=U.sys,demo=!!opts.demo,by=(S.viewer&&S.viewer.email)||'unknown';
