@@ -25,13 +25,13 @@ related:
 - [Architecture](architecture.md) — not started
 - [Brief Part B — design inputs](brief-part-b.md) — frozen
 - [Canonical data model](canonical-data-model.md) — draft, approval not submitted
-- [Check rules](check-rules.md) — not started
-- [Comparison basis](comparison-basis.md) — not started
-- [Escalation ladder](escalation-ladder.md) — not started
-- [KRA / KPI set](kra-kpi.md) — not started
+- [Check rules](check-rules.md) — draft, approval not submitted
+- [Comparison basis](comparison-basis.md) — draft, approval not submitted
+- [Escalation ladder](escalation-ladder.md) — draft, approval not submitted
+- [KRA / KPI set](kra-kpi.md) — draft, approval not submitted
 - [Notification templates](notification-templates.md) — not started
-- [Plan model](plan-model.md) — not started
-- [Priority rules](priority-rules.md) — not started
-- [Role matrix](role-matrix.md) — not started
-- [Target model](target-model.md) — not started
+- [Plan model](plan-model.md) — draft, approval not submitted
+- [Priority rules](priority-rules.md) — draft, approval not submitted
+- [Role matrix](role-matrix.md) — draft, approval not submitted
+- [Target model](target-model.md) — draft, approval not submitted
 - [Wireframes](wireframes.md) — draft; v0.1 intake and admin drawn, approval not submitted

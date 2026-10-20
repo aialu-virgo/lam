@@ -12,6 +12,7 @@ related:
   - data-map/customer.md
   - data-map/sales-employee.md
   - data-map/credit-note.md
+  - design/check-rules.md
 ---
 
 # Invoice — S/4 sales register (SAP export)

@@ -9,6 +9,7 @@ related:
   - data-map/item.md
   - data-map/warehouse.md
   - data-map/plant-master.md
+  - design/plan-model.md
 ---
 
 # Stock (SAP export)

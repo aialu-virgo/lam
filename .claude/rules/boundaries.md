@@ -6,6 +6,7 @@ updated: 2026-10-20
 related:
   - design/escalation-ladder.md
   - .claude/_index.md
+  - design/kra-kpi.md
 ---
 
 # Boundaries

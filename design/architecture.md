@@ -9,6 +9,10 @@ related:
   - build/desk/_index.md
   - build/demo-data/_index.md
   - data-map/invoice.md
+  - design/role-matrix.md
+  - design/plan-model.md
+  - design/comparison-basis.md
+  - design/check-rules.md
 ---
 
 # Architecture

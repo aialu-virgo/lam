@@ -9,6 +9,7 @@ related:
   - data-map/receivable.md
   - data-map/invoice.md
   - data-map/customer.md
+  - design/plan-model.md
 ---
 
 # Collection (SAP export)

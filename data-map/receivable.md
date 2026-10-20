@@ -10,6 +10,7 @@ related:
   - data-map/collection.md
   - data-map/credit-note.md
   - data-map/customer.md
+  - design/plan-model.md
 ---
 
 # Receivable (SAP export)

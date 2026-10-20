@@ -9,6 +9,7 @@ related:
   - data-map/sales-order.md
   - data-map/invoice.md
   - data-map/warehouse.md
+  - design/plan-model.md
 ---
 
 # Delivery (SAP export)

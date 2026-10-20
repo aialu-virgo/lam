@@ -10,6 +10,7 @@ related:
   - data-map/delivery.md
   - data-map/customer.md
   - data-map/item.md
+  - design/plan-model.md
 ---
 
 # Sales order (SAP export)

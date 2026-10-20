@@ -10,6 +10,7 @@ related:
   - data-map/plant-master.md
   - data-map/templates/user-master.csv
   - design/role-matrix.md
+  - design/escalation-ladder.md
 ---
 
 # User master (master file, Admin)

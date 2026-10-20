@@ -27,6 +27,7 @@ related:
   - design/target-model.md
   - design/plan-model.md
   - design/architecture.md
+  - design/check-rules.md
 ---
 
 # Canonical data model
