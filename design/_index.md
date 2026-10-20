@@ -34,4 +34,4 @@ related:
 - [Priority rules](priority-rules.md) — not started
 - [Role matrix](role-matrix.md) — not started
 - [Target model](target-model.md) — not started
-- [Wireframes](wireframes.md) — not started
+- [Wireframes](wireframes.md) — draft; v0.1 intake and admin drawn, approval not submitted
