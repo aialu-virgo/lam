@@ -42,3 +42,4 @@ If a question is unanswered by the time work needs it, the recommendation is use
 | Q20 | SP Sir | When the 12-quarter average QoQ is 0 or negative, any growth target is Stretch. Add a floor? | Keep as is for v1.0; consider a 2% floor after the first quarter of use. | |
 | Q21 | SP Sir | Personal KPI plan defaults (e.g. 90% on-time closure, ≤15% overdue) per [KRA / KPI set](design/kra-kpi.md)? | Accept as proposed; editable in Admin. | |
 | Q22 | SP Sir | Who sends follow-ups for actions raised by rules: the plant's Coordinator? | Yes, the plant Coordinator; owner's manager if none. | |
+| Q23 | SP Sir | Should escalation keep running for a Blocked action (e.g. customer dispute)? | Yes: a block needs the manager's help; L2/L3 drafts note "Blocked: <reason>". | |
