@@ -134,5 +134,8 @@ function statusOf(ach,lowerBetter){
 }
 function statusPill(st,txt){var m={green:['ok','On plan'],orange:['part','Watch'],red:['miss','Behind'],none:['mute','No plan'],pending:['mute','Pending']}[st]||['mute',st];return '<span class="pill '+m[0]+'">'+esc(txt||m[1])+'</span>'}
 function fmtSqft(v){return fmtN(Math.round(v||0))+' sq ft'}
+/* sheets are the primary quantity unit; sq ft is the secondary line */
+function fmtSheets(v){return fmtN(Math.round(v||0))+' sheets'}
+function shOfLeaf(o){var s=+o.potential_qty_sheets||0;return s>0?s:(+o.potential_qty_sqft||0)/32}/* a leaf with no sheet count is converted from sq ft at 32 sq ft per 8x4 sheet (Assumed) */
 function hashRef(s){var h=5381;for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;return 'ACT-'+h.toString(36).toUpperCase().padStart(6,'0').slice(0,6)}
 function rowKey(a){return a.join('|')}

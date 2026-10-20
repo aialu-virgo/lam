@@ -236,18 +236,18 @@ function leafMatch(x,f){
 function planQ(f,q){
   var key='pq'+JSON.stringify([f.plants?Array.from(f.plants):null,f.plant||'',f.group||'',q])+S.potVer;
   if(DS.cache[key])return DS.cache[key];
-  var R={pot:0,potSqft:0,tgtSq:0,tgtSqD:0,tgt:0,orig:0,draft:0,nAppr:0,nDraft:0,nLeaf:0,months:[0,0,0],draftMonths:[0,0,0],revs:[],kind:'none'};
+  var R={pot:0,potSqft:0,potSh:0,tgtSh:0,tgtShD:0,tgtSq:0,tgtSqD:0,tgt:0,orig:0,draft:0,nAppr:0,nDraft:0,nLeaf:0,months:[0,0,0],draftMonths:[0,0,0],revs:[],kind:'none'};
   (S.potential||[]).forEach(function(x){
     if(x.fy_quarter!==q||!leafMatch(x,f))return;
     R.nLeaf++;var ap=approvedOf(x),pct=phasingFor(x);
-    var src=ap||x;R.pot+=+src.potential_value_inr||0;R.potSqft+=+src.potential_qty_sqft||0;
-    if(ap){var t=leafTgt(ap.potential_value_inr,ap.share_pct);R.tgt+=t;R.nAppr++;R.tgtSq+=(+ap.potential_qty_sqft||0)*(+ap.share_pct||0)/100;monthsOfTarget(t,pct).forEach(function(v,i){R.months[i]+=v});
+    var src=ap||x;R.pot+=+src.potential_value_inr||0;R.potSqft+=+src.potential_qty_sqft||0;R.potSh+=shOfLeaf(src);
+    if(ap){var t=leafTgt(ap.potential_value_inr,ap.share_pct);R.tgt+=t;R.nAppr++;R.tgtSq+=(+ap.potential_qty_sqft||0)*(+ap.share_pct||0)/100;R.tgtSh+=shOfLeaf(ap)*(+ap.share_pct||0)/100;monthsOfTarget(t,pct).forEach(function(v,i){R.months[i]+=v});
       var og=x.original||ap;R.orig+=leafTgt(og.potential_value_inr,og.share_pct)}
-    if(!ap&&x.share_pct!==''&&x.share_pct!=null){var d=leafTgt(x.potential_value_inr,x.share_pct);R.draft+=d;R.nDraft++;R.tgtSqD+=(+x.potential_qty_sqft||0)*(+x.share_pct||0)/100;monthsOfTarget(d,pct).forEach(function(v,i){R.draftMonths[i]+=v})}
+    if(!ap&&x.share_pct!==''&&x.share_pct!=null){var d=leafTgt(x.potential_value_inr,x.share_pct);R.draft+=d;R.nDraft++;R.tgtSqD+=(+x.potential_qty_sqft||0)*(+x.share_pct||0)/100;R.tgtShD+=shOfLeaf(x)*(+x.share_pct||0)/100;monthsOfTarget(d,pct).forEach(function(v,i){R.draftMonths[i]+=v})}
     R.revs.push(x);
   });
   if(R.nAppr>0){R.kind=R.nDraft>0?'mixed':'approved'}
-  else if(R.nDraft>0){R.kind='draft';R.tgt=R.draft;R.orig=R.draft;R.months=R.draftMonths.slice();R.tgtSq=R.tgtSqD}
+  else if(R.nDraft>0){R.kind='draft';R.tgt=R.draft;R.orig=R.draft;R.months=R.draftMonths.slice();R.tgtSq=R.tgtSqD;R.tgtSh=R.tgtShD}
   DS.cache[key]=R;return R;
 }
 /* plan figures over a window of months: target to date (phased), potential pro-rated by working days */
