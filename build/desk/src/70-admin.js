@@ -197,7 +197,6 @@ async function demoOps(){
   var o=DemoGen.ops({today:today,plants:plants,months:months,planMonths:plan,seed:31});
   var i;
   for(i=0;i<o.receivables.length;i++)await dset('receivables/'+o.receivables[i].plant,Object.assign({demo:true},o.receivables[i]));
-  for(i=0;i<o.stock.length;i++)await dset('stock/'+o.stock[i].plant,Object.assign({demo:true},o.stock[i]));
   for(i=0;i<o.collections.length;i++){var c=o.collections[i];await dset('collections/'+c.plant+'-'+c.ym,Object.assign({demo:true},c))}
 }
 async function demoActions(){
@@ -208,6 +207,19 @@ async function demoActions(){
   list.push(mk('DEMO_VER','DEMO closure waiting for verification','bm.a@demo','hod.sales@demo',addDays(t,1),0,{status:'Done',closure:'Dispatched and confirmed with the customer.',done_at:nowISO()}));
   list.push(mk('DEMO_S1','DEMO call customer','se.s1@demo','bm.a@demo',addDays(t,1),300000,{plant:'1012'}));
   for(i=0;i<list.length;i++)await dset('actions/'+list[i].id,list[i]);
+}
+/* synthetic stock snapshots (batch layout, two warehouses per plant): month-end and today */
+async function demoStock(){
+  if(!window.DemoGen||!DemoGen.stockFile)return;
+  var idx=await loadItemIdx(),items=Array.from(idx.keys()).filter(function(c){return /^DEMOFG/.test(c)});if(!items.length)return;
+  var today=TODAY(),me=addDays(today.slice(0,7)+'-01',-1),plants=['1001','1011','1012','1013'].map(function(c){return {code:c}}),saveU=U;
+  var asOfs=[me,today];
+  for(var i=0;i<asOfs.length;i++){
+    var f=DemoGen.stockFile({kind:'batch',asOf:asOfs[i],plants:plants,items:items,seed:41+i});
+    U=newU();U.kind='stock';U.entity='ST';U.sk='batch';U.sys='B1';U.name='DEMO Stock '+asOfs[i]+' (synthetic).csv';U.headers=f.headers;U.rows=f.rows;U.map=stockDefaultMap('batch',f.headers);U.asOf=asOfs[i];U.demoFlag=true;
+    U.res=await stockParse();U.stage='validated';await stockLoad();
+  }
+  U=saveU;
 }
 /* synthetic masters: written only when no real master is loaded; flagged demo so Clear demo removes only these */
 async function demoMasters(){
@@ -233,6 +245,7 @@ async function demoMasters(){
 }
 async function demoExtras(facts){
   await demoMasters();
+  await demoStock();
   await demoPeople();
   var n=await demoPlans(facts,gridQuarters().cur);
   await demoOps();

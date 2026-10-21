@@ -1,7 +1,7 @@
 /* ================= Auto-fix pass (Vijay, 21 Oct 2026): upload files as SAP gives them, show what was fixed =================
  * Alias tables live in settings/alias_<kind> (database rule: admin write). Seeds are in code. Nothing is changed silently:
  * every fix is counted and shown in the "Fixes applied" panel of the upload; what only the source can fix is named. */
-S.alias={category:{},zone:{},designation:{},salesperson:{},plantprefix:{}};
+S.alias={category:{},zone:{},designation:{},salesperson:{},warehouse:{},plantprefix:{}};
 var ZONE_CANON=['ZONE1','ZONE2','ZONE3','ZONE4','ZONE5','BRANCH','FACTORY','ACP'];
 var CAT_CANON=['Laminate','Door','PVC sheet','Compact board','Out of scope'];
 function seedZone(){var o={};for(var i=1;i<=5;i++){o['zone'+i]='ZONE'+i;o['zone '+i]='ZONE'+i;o['zone 0'+i]='ZONE'+i}o.branch='BRANCH';o.factory='FACTORY';o.acp='ACP';return o}
@@ -12,6 +12,7 @@ var ALIAS_KINDS={
  designation:{label:'Designation spelling → designation',hint:'Applies when a sales-employee file is checked. The Desk role is proposed from the chosen designation.',canon:null,
   seed:{'sales executive':'Sales Executive','sale executive':'Sales Executive','sales exec':'Sales Executive','sales executives':'Sales Executive','sr sales executive':'Sr. Sales Executive','senior sales executive':'Sr. Sales Executive','branch manager':'Branch Manager','branch head':'Branch Manager','depot manager':'Depot Manager'}},
  salesperson:{label:'B1 salesperson name → employee code',hint:'One click in a list of unmatched names saves a row here. Applies at once, no reload.',canon:null,seed:{}},
+ warehouse:{label:'Warehouse code → plant code',hint:'B1 WhsCode (or S/4 storage location) to the plant that owns it. Several warehouses may map to one plant; their stock is added together. Applies when a stock file is checked.',canon:null,seed:{}},
  plantprefix:{label:'Employee ID prefix → plant code',hint:'The part of the employee ID before the number (E-XXX in E-XXX-0123). The Desk also learns prefixes from people whose plant is already known.',canon:null,seed:{}}
 };
 function akey(s){return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
@@ -28,7 +29,7 @@ function aliasRows(kind){
   return rows.sort(function(a,b){return a.k<b.k?-1:1});
 }
 function ingestAliases(docs){
-  var next={category:{},zone:{},designation:{},salesperson:{},plantprefix:{}};
+  var next={category:{},zone:{},designation:{},salesperson:{},warehouse:{},plantprefix:{}};
   (docs||[]).forEach(function(x){var m=/^alias_(\w+)$/.exec(x._id||'');if(m&&next[m[1]]&&x.map&&typeof x.map==='object')next[m[1]]=x.map});
   var changed=JSON.stringify(next)!==JSON.stringify(S.alias);S.alias=next;
   if(changed)onAliasChange();
@@ -282,7 +283,7 @@ function aliasesHtml(){
   var h='<section class="card"><div class="hd"><h2>Aliases and normalisations</h2></div><p class="note" style="margin:0">Every spelling table the auto-fix pass uses. Seeded with the current rules; Super admin edits. Each change is saved to the database and applies at the next check (names and prefixes apply at once). Nothing here changes stored data silently: uploads list what was fixed.</p></section>';
   Object.keys(ALIAS_KINDS).forEach(function(kind){
     var K=ALIAS_KINDS[kind],rows=aliasRows(kind);
-    var inCanon=K.canon?'<select id="al-c-'+kind+'" class="in">'+K.canon.map(function(c){return '<option>'+esc(c)+'</option>'}).join('')+'</select>':'<input id="al-c-'+kind+'" class="in" placeholder="'+(kind==='plantprefix'?'plant code, e.g. 1012':kind==='salesperson'?'employee code':'designation')+'">';
+    var inCanon=K.canon?'<select id="al-c-'+kind+'" class="in">'+K.canon.map(function(c){return '<option>'+esc(c)+'</option>'}).join('')+'</select>':'<input id="al-c-'+kind+'" class="in" placeholder="'+(kind==='plantprefix'||kind==='warehouse'?'plant code, e.g. 1012':kind==='salesperson'?'employee code':'designation')+'">';
     h+='<section class="card"><div class="hd"><h2>'+esc(K.label)+' &middot; '+rows.length+'</h2></div><p class="note" style="margin:0">'+esc(K.hint)+'</p>'
      +'<div class="row"><div class="fld"><label for="al-r-'+kind+'">'+(kind==='plantprefix'?'ID prefix':'Spelling in the file')+'</label><input id="al-r-'+kind+'" class="in"></div><div class="fld"><label for="al-c-'+kind+'">Becomes</label>'+inCanon+'</div><div class="fld"><label>&nbsp;</label><button class="btn pri sm" data-act="al-add" data-kind="'+kind+'">Add or change</button></div></div>'
      +(rows.length?'<div class="tw" style="max-height:260px;overflow:auto"><table><thead><tr><th>Spelling</th><th>Becomes</th><th>From</th><th></th></tr></thead><tbody>'+rows.map(function(x){return '<tr><td class="break">'+esc(x.k)+'</td><td class="break">'+esc(x.v==='-'?'(switched off)':x.v)+'</td><td><span class="pill '+(x.src==='seed'?'mute':'part')+'">'+x.src+'</span></td><td><button class="btn sm" data-act="al-del" data-kind="'+kind+'" data-k="'+esc(x.k)+'">'+(x.src==='seed'?'Switch off':'Remove')+'</button></td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty sm">No rows yet.</div>');
@@ -396,6 +397,9 @@ function undoPlan(uid){
   return {u:u,mine:mine,months:Object.keys(mine).sort(),n:n,later:Math.max(0,(u.plantMonths||0)-n),actId:aId,act:S.actions.find(function(a){return a.id===aId}),fus:S.followups.filter(function(f){return f.action_id===aId})};
 }
 function undoDialog(uid){
+  var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);
+    openDlg('<h3>Undo stock upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>'+(sp?'Removes the stock snapshot as on '+esc(sp.as_of)+' ('+sp.plants+' plants)':'This upload no longer holds a snapshot (a later upload for the same date replaced it)')+'</b> with its item rows. The upload stays in history marked Undone, and the undo is logged.</div><p><b>Upload again afterwards:</b> '+(sp?'the stock file as on '+esc(sp.as_of):'nothing')+'.</p><p class="note">Undo cannot bring back an earlier snapshot for the same date that this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   var pl=undoPlan(uid);if(!pl)return;
   var u=pl.u,sa=effRole()==='Super admin'&&!readOnly();
   openDlg('<h3>Undo upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(u.file||'')+' &middot; '+esc(istStr(u.at))+' &middot; '+esc(u.by||'')+'</p>'
@@ -406,6 +410,8 @@ function undoDialog(uid){
 }
 async function undoUpload(uid){
   if(!superOnly('undo an upload'))return;
+  var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3><p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   var pl=undoPlan(uid);if(!pl)return;
   var jobs=[],months=pl.months.slice(),sets=[];
   pl.months.forEach(function(ym){
