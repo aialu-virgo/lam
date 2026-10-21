@@ -91,6 +91,31 @@
     });
     return out;
   }
-  var api = { invoices: invoices, ops: ops, B1_HEADERS: B1_HEADERS, S4_HEADERS: S4_HEADERS };
+  /* Synthetic stock snapshot files (all values invented). kind: batch (B1 OIBT), oitw (B1 OITW), s4 (MB52 style).
+     o: {kind, asOf 'YYYY-MM-DD', plants [{code,name}], items ['DEMOFG00001'...], seed, warehouses (per plant, default 2)} */
+  function stockFile(o) {
+    var R = rng(o.seed || 41), kind = o.kind || 'batch', rows = [], headers;
+    function addDays(s, n) { return new Date(Date.parse(s + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10); }
+    headers = kind === 'oitw' ? ['ItemCode', 'ItemName', 'WhsCode', 'OnHand', 'IsCommited', 'OnOrder', 'AvgPrice']
+      : kind === 's4' ? ['Material', 'Material Description', 'Plant', 'Storage Location', 'Unrestricted', 'Quality Inspection', 'Blocked', 'Value Unrestricted', 'Batch Creation Date']
+      : ['ItemCode', 'ItemName', 'WhsCode', 'BatchNum', 'Quantity', 'InDate', 'AvgPrice'];
+    (o.plants || []).forEach(function (p) {
+      var nw = o.warehouses || 2;
+      (o.items || []).forEach(function (it, ii) {
+        for (var w = 0; w < nw; w++) {
+          if (R() < 0.25) continue;
+          var wh = kind === 's4' ? p.code : p.code + '-' + (w === 0 ? 'FG' : 'W' + w), nb = kind === 'batch' ? 1 + Math.floor(R() * 3) : 1;
+          for (var b = 0; b < nb; b++) {
+            var qty = 20 + Math.floor(R() * 580), price = 700 + Math.floor(R() * 900), age = Math.floor(R() * 300), ind = addDays(o.asOf, -age);
+            if (kind === 'oitw') rows.push([it, 'DEMO item ' + (ii + 1), wh, qty, 0, 0, price]);
+            else if (kind === 's4') rows.push([it, 'DEMO item ' + (ii + 1), wh, 'FG' + (w + 1), qty, 0, R() < 0.1 ? 5 : 0, qty * price, ind]);
+            else rows.push([it, 'DEMO item ' + (ii + 1), wh, 'DEMO-B' + p.code + '-' + ii + '-' + w + '-' + b, qty, ind, price]);
+          }
+        }
+      });
+    });
+    return { headers: headers, rows: rows };
+  }
+  var api = { invoices: invoices, ops: ops, stockFile: stockFile, B1_HEADERS: B1_HEADERS, S4_HEADERS: S4_HEADERS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.DemoGen = api;
 })(typeof window !== 'undefined' ? window : globalThis);

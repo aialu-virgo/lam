@@ -3074,6 +3074,19 @@ var STK_KINDS={
   {k:'value',label:'Stock value (₹)',canon:'value_inr',c:['StockValue','Stock Value','Value']},
   {k:'price',label:'Average price (₹)',canon:'avg_price',c:['AvgPrice','Avg Price']},
   {k:'name',label:'Item name',canon:'item_name',c:['ItemName','Item Name','Description']}]},
+ s4tot:{label:'S/4 Stock Overview Totals (by material, plant, batch)',sys:'S4',fields:[
+  {k:'item',label:'Old material number (B1 item code)',canon:'item_code',c:['Old Material Number','Old Material No.','Old material number']},
+  {k:'material',label:'Material (S/4 number)',canon:'material',req:1,c:['Material','Material Number']},
+  {k:'wh',label:'Plant',canon:'plant_code',req:1,c:['Plant']},
+  {k:'sloc',label:'Storage location',canon:'storage_location',c:['Storage Location']},
+  {k:'batch',label:'Batch',canon:'batch_no',c:['Batch']},
+  {k:'qty',label:'Stock quantity on period end (sheets)',canon:'qty_sheets',req:1,c:['Stock Quantity on Period End']},
+  {k:'value',label:'Stock value on period end (₹)',canon:'value_inr',c:['Stock Value on Period End']},
+  {k:'qs',label:'Stock quantity on period start',canon:'qty_start',c:['Stock Quantity on Period Start']},
+  {k:'gr',label:'Total goods receipt quantity',canon:'qty_gr',c:['Total Goods Receipt Quantity']},
+  {k:'gi',label:'Total goods issue quantity',canon:'qty_gi',c:['Total Goods Issue Quantity']},
+  {k:'mg',label:'Material group',canon:'material_group',c:['Material Group']},
+  {k:'name',label:'Material description',canon:'item_name',c:['Material Description']}]},
  s4:{label:'S/4 stock (MB52 / API_MATERIAL_STOCK_SRV)',sys:'S4',fields:[
   {k:'item',label:'Material',canon:'item_code',req:1,c:['Material','Material Number','Product','MATNR']},
   {k:'wh',label:'Plant',canon:'plant_code',req:1,c:['Plant','WERKS']},
@@ -3092,6 +3105,7 @@ function stockDetect(headers){
     if(has(['batchnum','batch no.','batch number','distnumber'])&&has(['indate','in date','admissiondate','admission date','batch in date']))return {kind:'batch',sys:'B1'};
     if(has(['onhand','on hand','in stock']))return {kind:'oitw',sys:'B1'};
   }
+  if(set['stock quantity on period end']&&set['plant']&&(set['material']||set['material number']))return {kind:'s4tot',sys:'S4'};
   if(has(['material','material number','matnr'])&&has(['plant','werks'])&&headers.some(function(h){return /unrestricted|labst/.test(norm(h))}))return {kind:'s4',sys:'S4'};
   return null;
 }
@@ -3135,24 +3149,27 @@ function whResolver(){
 /* ---- file -> snapshot (pure) ---- */
 async function stockParse(){
   var kind=U.sk,F=STK_KINDS[kind],map=U.map,rows=U.rows,asOf=U.asOf,idx=await loadItemIdx(),wr=whResolver();
-  var res={kind:kind,sys:F.sys,asOf:asOf,read:rows.length,good:0,rejected:0,rejects:[],zero:0,other:{rows:0,sheets:0,items:{}},unknownWh:{},plants:{},hasAge:false,warn:{futureBatch:0,noPrice:0},fx:{whMapped:0},itemMaster:idx.size>0};
-  var col=function(k){return map[k]==null?-1:map[k]};var cI=col('item'),cW=col('wh'),cQ=col('qty'),cV=col('value'),cP=col('price'),cD=col('indate'),cB=col('batch'),cQi=col('qi'),cBl=col('blocked'),cS=col('sloc');
+  var res={kind:kind,sys:F.sys,asOf:asOf,read:rows.length,good:0,rejected:0,rejects:[],zero:0,other:{rows:0,sheets:0,items:{}},unknownWh:{},plants:{},hasAge:false,warn:{futureBatch:0,noPrice:0,mismatch:0,noSize:0},fx:{whMapped:0,viaGroup:0},itemMaster:idx.size>0};
+  var col=function(k){return map[k]==null?-1:map[k]};var cMat=col('material'),cMG=col('mg'),cQs=col('qs'),cGr=col('gr'),cGi=col('gi'),cI=col('item'),cW=col('wh'),cQ=col('qty'),cV=col('value'),cP=col('price'),cD=col('indate'),cB=col('batch'),cQi=col('qi'),cBl=col('blocked'),cS=col('sloc');
   var rej=function(i,item,field,reason,val){res.rejected++;res.reasons=res.reasons||{};res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,item,'',field,reason,val==null?'':val])};
   var T0=Date.now(),thr=CFG.stock_age_days,hasIn=cD>=0;
   for(var i=0;i<rows.length;i++){
     if(Date.now()-T0>40){T0=Date.now();U.progress=Math.round(i/rows.length*100);U.progressMsg='Checking row '+fmtN(i)+' of '+fmtN(rows.length);var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%';await tick()}
-    var r=rows[i],item=String(r[cI]==null?'':r[cI]).trim().replace(/\.0$/,'');
+    var r=rows[i],item=String(r[cI]==null?'':r[cI]).trim().replace(/\.0$/,''),matRef='';
+    if(kind==='s4tot'){matRef=String(r[cMat]==null?'':r[cMat]).trim().replace(/\.0$/,'');if(!item)item=matRef}
     if(!item){rej(i,'','Item code','Item code is empty','');continue}
     var q=toNum(r[cQ]);
     if(kind==='s4'){var qi=cQi>=0?toNum(r[cQi]):0,bl=cBl>=0?toNum(r[cBl]):0;q=(isNaN(q)?0:q)+(isNaN(qi)?0:qi)+(isNaN(bl)?0:bl);if(r[cQ]===''&&(cQi<0||r[cQi]==='')&&(cBl<0||r[cBl]===''))q=NaN}
     if(isNaN(q)){rej(i,item,'Quantity','Quantity is not a number',r[cQ]);continue}
     if(q<0){rej(i,item,'Quantity','Negative stock',q);continue}
+    if(kind==='s4tot'&&q>0&&cQs>=0&&cGr>=0&&cGi>=0){var a0=toNum(r[cQs])||0,a1=toNum(r[cGr])||0,a2=toNum(r[cGi])||0;if(Math.abs(a0+a1-a2-q)>0.5)res.warn.mismatch++}
     var plant=null,whRaw=String(r[cW]==null?'':r[cW]).trim();
     var rs=wr(whRaw);if(!rs){res.unknownWh[whRaw||'(blank)']=(res.unknownWh[whRaw||'(blank)']||0)+1;rej(i,item,kind==='s4'?'Plant':'Warehouse','Unknown warehouse or plant',whRaw);continue}
     if(rs.p.active===false){rej(i,item,'Plant','Plant is switched off in Admin',rs.p.plant_code);continue}
     plant=rs.p.plant_code;if(rs.how==='alias')res.fx.whMapped++;
     if(q===0){res.zero++;continue}
     var it=idx.get(item.toUpperCase());
+    if(!it&&kind==='s4tot'){var mgr=cMG>=0?String(r[cMG]==null?'':r[cMG]).trim().toUpperCase():'';if(/^Z[A-Z0-9]{2,5}(LAM|PVC)$/.test(mgr)){it=[/PVC$/.test(mgr)?'PVC sheet':'Laminate',0,true];res.fx.viaGroup++;res.warn.noSize++}}
     if(!it){res.other.rows++;res.other.sheets+=q;var oi=res.other.items;if(Object.keys(oi).length<2000||oi[item])oi[item]=(oi[item]||0)+q;continue}
     var g=it[0],sq=Math.round(q*it[1]*100)/100,val=cV>=0?toNum(r[cV]):NaN;
     if(isNaN(val)&&cP>=0){var pr=toNum(r[cP]);if(!isNaN(pr))val=Math.round(pr*q*100)/100}
@@ -3163,7 +3180,7 @@ async function stockParse(){
     var G=P.groups[g]||(P.groups[g]={sheets:0,sqft:0,value:0,hasValue:false,items:new Set(),age:[0,0,0,0],over:0,ageKnown:0});
     G.sheets+=q;G.sqft+=sq;G.items.add(item);if(val!=null){G.value+=val;G.hasValue=true}
     if(age!=null){res.hasAge=true;G.ageKnown+=q;G.age[age<=30?0:age<=60?1:age<=90?2:3]+=q;if(age>thr)G.over+=q}
-    P.rows.push([item,whRaw.slice(0,20),ITEM_GROUPS.indexOf(g),q,sq,val==null?'':val,inD||'',cB>=0?String(r[cB]==null?'':r[cB]).slice(0,30):'']);
+    P.rows.push([item,(kind==='s4tot'&&cS>=0?String(r[cS]==null?'':r[cS]):whRaw).slice(0,20),ITEM_GROUPS.indexOf(g),q,sq,val==null?'':val,inD||'',cB>=0?String(r[cB]==null?'':r[cB]).slice(0,30):'',matRef]);
     res.good++;
   }
   return res;
@@ -3277,8 +3294,10 @@ function stockResultHtml(locked){
   var uw=Object.keys(r.unknownWh);
   if(uw.length)it.push({st:'sugg',t:'Warehouses not matched to a plant (rows skipped)',n:uw.reduce(function(a,k){return a+r.unknownWh[k]},0),d:'<div class="tw" style="max-height:200px;overflow:auto"><table><thead><tr><th>Warehouse in the file</th><th class="num">Rows</th><th>Plant</th><th></th></tr></thead><tbody>'+uw.slice(0,15).map(function(w,i){return '<tr><td class="break">'+esc(w)+'</td><td class="num">'+fmtN(r.unknownWh[w])+'</td><td><select id="stkw-'+i+'" class="in">'+S.plants.slice().sort(function(a,b){return a.plant_code<b.plant_code?-1:1}).map(function(p){return '<option value="'+esc(p.plant_code)+'">'+esc(p.plant_code+' '+(p.plant_name||''))+'</option>'}).join('')+'</select></td><td><button class="btn sm" data-act="stk-whmap" data-i="'+i+'" data-raw="'+esc(w)+'">Save mapping</button></td></tr>'}).join('')+'</tbody></table></div>'});
   if(r.other.rows){var oi=Object.keys(r.other.items).sort(function(a,b){return r.other.items[b]-r.other.items[a]}).slice(0,8);it.push({st:r.itemMaster?'info':'need',t:'Items not in the item master (counted, not stored)',n:Object.keys(r.other.items).length,d:esc(fmtN(Math.round(r.other.sheets))+' sheets. Largest: '+oi.map(function(k){return k+' '+fmtN(Math.round(r.other.items[k]))}).join(', ')+'. The item master holds laminate-scope items only; if these are laminates, add them to it and upload again.')})}
+  if(r.warn.mismatch)it.push({st:'info',t:'Rows where start + receipts − issues does not equal the closing quantity',n:r.warn.mismatch,d:'Warned, not rejected: the closing quantity (Stock Quantity on Period End) is used.'});
+  if(r.fx.viaGroup)it.push({st:'need',t:'Items with no size: not in the item master, group taken from the material group',n:r.fx.viaGroup,d:'Sheets and stock days are right; sq ft needs the item in the item master (Admin › Item master).'});
   if(r.reasons&&r.reasons['Negative stock'])it.push({st:'need',t:'Negative stock quantities skipped',n:r.reasons['Negative stock'],d:'Correct the negative on-hand in SAP (goods movement posted before receipt).'});
-  if(r.kind==='oitw'&&!r.hasAge)it.push({st:'need',t:'No ageing',n:null,d:'This file has no batch dates, so stock age and aged stock % need the batch export (OIBT with InDate). Stock days work.'});
+  if((r.kind==='oitw'||r.kind==='s4tot')&&!r.hasAge)it.push({st:'need',t:'No ageing',n:null,d:'This file has no batch dates, so stock age and aged stock % need the batch export (OIBT with InDate). Stock days work.'});
   if(r.hasAge)it.push({st:'info',t:'Ageing from batch dates',n:null,d:esc('Age buckets 0-30 / 31-60 / 61-90 / 90+ days and sheets older than '+CFG.stock_age_days+' days.'+(r.warn.futureBatch?' '+r.warn.futureBatch+' batches dated after the as-of date counted as new.':''))});
   var nv=0;Object.keys(r.plants).forEach(function(p){Object.keys(r.plants[p].groups).forEach(function(g){if(!r.plants[p].groups[g].hasValue)nv++})});
   if(nv&&r.good)it.push({st:'info',t:'No stock value for '+nv+' plant x group lines',n:null,d:'Add StockValue or AvgPrice to the export if you want stock value shown.'});
