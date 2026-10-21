@@ -355,7 +355,7 @@ function periodOptions(){
   return o;
 }
 function updateUploadPeriods(){var el=$('#u-period');if(el&&U&&U.stage!=='validating'&&U.stage!=='loading'){var v=el.value;el.innerHTML=periodOptions();el.value=U.period}}
-function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:'auto',entity:'INV',file:null,name:'',size:0,headers:[],rows:[],sys:null,map:{},savedMap:false,res:null,msg:'',closeAfter:true,reason:'',confirmDates:false,anyway:false,confirmReplace:false,swapSerial:false,progress:0,progressMsg:''}}
+function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:'auto',entity:'INV',file:null,name:'',size:0,headers:[],rows:[],sys:null,map:{},savedMap:false,res:null,msg:'',closeAfter:true,reason:'',confirmDates:false,anyway:false,confirmReplace:false,swapSerial:false,expMonth:'auto',progress:0,progressMsg:''}}
 function renderUpload(){var _e=$('#i-upload');withScroll(_e,renderUpload0)}
 function renderUpload0(){
   if(!U)U=newU();
@@ -659,8 +659,16 @@ async function runValidation(){
   /* pass 1: date kinds */
   var nSerial=0,nText=0;
   for(var i=0;i<n;i++){var v=rows[i][cDate];if(typeof v==='number'||(typeof v==='string'&&/^\s*\d{5}(\.\d+)?\s*$/.test(v)))nSerial++;else if(typeof v==='string'&&/^\s*\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4}/.test(v))nText++}
-  var swap=!!U.swapSerial&&nSerial>0;res.dateInfo.mixed=swap;/* D32: serial (numeric) dates are never swapped on their own; only a Super admin's explicit choice after the sanity check below */
-  res.monthHist={};res.altHist={};res.future=0;res.altFuture=0;res.altRows=0;var todayIso=TODAY();
+  var swap=false;res.dateInfo.mixed=false;var todayIso=TODAY();
+  /* D34: expected month = file name, else the month holding most of the unambiguous dates, else the uploader's pick. Dates outside it are tried the other way round (day/month swapped); what still misses is skipped. */
+  res.monthHist={};res.future=0;
+  var exp='',expSrc='none',nameExp=expectedMonthFromName(U.name),hU={},nU=0,topM=null;
+  for(var pi0=0;pi0<n;pi0++){var d0=parseDateCell(rows[pi0][cDate]);if(!d0||!validYMD(d0))continue;if(d0.kind==='iso'||d0.d>12){var k0=d0.y+'-'+pad(d0.m);hU[k0]=(hU[k0]||0)+1;nU++}}
+  Object.keys(hU).forEach(function(k){if(!topM||hU[k]>hU[topM])topM=k});var topShare=nU?hU[topM]/nU:0;
+  if(U.expMonth&&U.expMonth!=='auto'){if(U.expMonth==='any'){exp='';expSrc='any'}else{exp=U.expMonth;expSrc='picked'}}
+  else if(nameExp){if(topM&&topShare>=0.8&&topM!==nameExp){exp=topM;expSrc='data';res.nameConflict={name:nameExp,share:topShare}}else{exp=nameExp;expSrc='name'}}
+  else if(topM&&topShare>=0.8){exp=topM;expSrc='majority'}
+  res.exp=exp;res.expSrc=expSrc;res.af.dateFixed=0;res.expHistU=hU;
   var seen=new Set(),lineCtr=new Map();var tset=new Set();S.transfers.forEach(function(t){if(t.flag!==false)tset.add(String(t.code).toUpperCase())});res.xferMaster=0;
   var periodSel=U.period,allowed=null;
   if(U.mode==='daily'&&periodSel==='auto')periodSel=g.cur;
@@ -698,13 +706,14 @@ async function runValidation(){
     var dt=parseDateCell(r[cDate]);
     if(!dt){rej(i,doc,line,'Document date','Date not readable',r[cDate]);continue}
     res.af.dateKinds[dt.kind]=(res.af.dateKinds[dt.kind]||0)+1;
+    if(exp&&(dt.y+'-'+pad(dt.m))!==exp&&(dt.kind==='serial'||dt.kind==='text')&&dt.d<=12&&dt.m!==dt.d){var swd={y:dt.y,m:dt.d,d:dt.m,kind:dt.kind};if(validYMD(swd)&&(swd.y+'-'+pad(swd.m))===exp){dt=swd;res.af.dateFixed++}}
     if(swap&&dt.kind==='serial'){var m0=dt.m;dt.m=dt.d;dt.d=m0;res.dateInfo.swapped++;if(!validYMD(dt)){res.dateInfo.unfixable++;rej(i,doc,line,'Document date','Date cannot be repaired (day over 12)',r[cDate]);continue}}
     if(!validYMD(dt)){rej(i,doc,line,'Document date','Date not valid',r[cDate]);continue}
     var ym=dt.y+'-'+pad(dt.m);
     var iso=ym+'-'+pad(dt.d);
-    res.monthHist[ym]=(res.monthHist[ym]||0)+1;if(iso>todayIso)res.future++;
-    var altYm=ym;if(!swap&&dt.kind==='serial'&&dt.d<=12&&dt.m!==dt.d){altYm=dt.y+'-'+pad(dt.d);res.altRows++;if(altYm+'-'+pad(dt.m)>todayIso)res.altFuture++}else if(iso>todayIso)res.altFuture++;
-    res.altHist[altYm]=(res.altHist[altYm]||0)+1;
+    if(exp&&ym!==exp){rej(i,doc,line,'Document date','Date outside '+ymLabel(exp),iso);continue}
+    if(iso>todayIso){rej(i,doc,line,'Document date','Date in the future',iso);continue}
+    res.monthHist[ym]=(res.monthHist[ym]||0)+1;
     if(!res.minDate||iso<res.minDate)res.minDate=iso;if(!res.maxDate||iso>res.maxDate)res.maxDate=iso;
     if(ym<histLoYm()){res.preHist.rows++;continue}/* D28: before history start; counted, not a reject, no action */
     if(allowed){if(ym<allowed.lo||ym>allowed.hi){rej(i,doc,line,'Document date','Date outside period '+allowed.label+' (use Historic mode)',iso);continue}}
@@ -1182,6 +1191,7 @@ document.addEventListener('change',function(ev){
   else if(c==='u-ent'){U.entity=t.value}
   else if(c==='map'){U.map[t.getAttribute('data-k')]=+t.value;U.savedMap=false;renderUpload()}
   else if(c==='confd'){U.confirmDates=t.checked;renderUpload()}
+  else if(c==='expm'){U.expMonth=t.value;U.stage='validating';U.progressMsg='Checking the dates for '+(t.value==='any'?'any month':t.value)+'...';renderUpload();runValidation().then(afterValidate)}
   else if(c==='anyway'){U.anyway=t.checked;renderUpload()}
   else if(c==='confrep'){U.confirmReplace=t.checked;renderUpload()}
   else if(c==='closeafter'){U.closeAfter=t.checked}

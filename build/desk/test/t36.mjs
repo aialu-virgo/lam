@@ -40,10 +40,10 @@ await page.click('[data-act="u-load"]');await page.waitForFunction(()=>window.__
 await page.waitForTimeout(5000);
 const a2=await page.evaluate(()=>Object.values(window.__mockStore()).filter(v=>v&&v.rule==='R5').length);
 ok('R5 is raised when the skipped share is above the setting (12% > 2%)',a2===1,String(a2));
-/* 3. file named for another month: not loaded automatically, one-line explanation */
-await up(AF+'Combine Sale 2026-07 wrong.csv');await page.waitForTimeout(3500);
-const t3=await page.innerText('#i-upload');const stg=await page.evaluate(()=>window.__desk.U.stage);
-ok('a file named for July holding August stops with the safety line and does not auto-load',stg==='validated'&&/Safety check stopped this file/.test(t3)&&/not about rejected rows/.test(t3),stg);
+/* 3. file named for July holding August: no stop; the data decide (August), the conflict is shown */
+await up(AF+'Combine Sale 2026-07 wrong.csv');await page.waitForTimeout(4000);
+const t3=await page.innerText('#i-upload');const ex3=await page.evaluate(()=>window.__desk.U.res&&[window.__desk.U.res.exp,window.__desk.U.res.expSrc]);
+ok('a file named for July holding August is not blocked; August is used and the conflict is stated',ex3&&ex3[0]==='2026-08'&&ex3[1]==='data'&&/file name says Jul 2026/.test(t3),JSON.stringify(ex3));
 /* 4. undo of an auto-loaded upload works */
 await page.click('[data-act="u-reset"]').catch(()=>{});
 await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(600);

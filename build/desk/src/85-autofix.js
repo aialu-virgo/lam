@@ -158,6 +158,7 @@ function invoiceFixes(r){
   it.push({st:'info',t:'File layout',n:null,d:esc((U.sys==='B1'?'SAP B1 Combine Sale':'SAP S/4HANA Sales Register')+(U.sheetPicked?', sheet "'+U.sheetPicked+'"':'')+'. '+U.rows.length.toLocaleString('en-IN')+' data rows.')});
   var kinds=[['serial','date cells'],['text','text dd/mm/yyyy'],['iso','text YYYY-MM-DD']].filter(function(k){return fmtK[k[0]]}).map(function(k){return fmtK[k[0]].toLocaleString('en-IN')+' '+k[1]}).join(', ');
   it.push({st:r.dateInfo.mixed?'fixed':'info',t:r.dateInfo.mixed?'Dates: day and month swapped back':'Dates read',n:r.dateInfo.mixed?r.dateInfo.swapped:null,d:esc((kinds||'none')+'. Range '+(r.minDate||'-')+' to '+(r.maxDate||'-')+'.')+(r.dateInfo.mixed?' Confirm the range below before loading.':'')+(r.dateInfo.unfixable?' <b>'+r.dateInfo.unfixable+' could not be repaired and are rejected.</b>':'')});
+  if(r.exp)it.push({st:r.af.dateFixed?'fixed':'info',t:r.af.dateFixed?'Dates corrected to '+ymLabel(r.exp):'Expected month',n:r.af.dateFixed||null,d:esc(ymLabel(r.exp)+' ('+expSourceText(r)+'). '+(r.af.dateFixed?'These dates fell outside it as read; reading day and month the other way round put them inside, so they were stored as that date.':'No date needed correcting.'))});
   if(r.preHist&&r.preHist.rows)it.push({st:'info',t:'Before history start ('+qLabel(histStart())+')',n:r.preHist.rows,d:'Not loaded and not rejected; no action needed (D28).'});
   if(r.noLineCol)it.push({st:'fixed',t:'No LineNum column: line numbers created',n:af.lineSynth||0,d:'Numbered 1, 2, 3 ... in file row order within each document, so the same file always gives the same numbers.'});
   if(af.dupNoLine)it.push({st:'fixed',t:'Repeated lines removed (same document, item, quantity and value)',n:af.dupNoLine,d:'Only because the file has no LineNum. If a document genuinely has two identical lines, add LineNum to the saved query.'});
@@ -339,14 +340,7 @@ function expectedMonthFromName(name){
 function histMonths(hist,total){return Object.keys(hist).filter(function(k){return total&&hist[k]/total>=0.005}).sort()}
 function sanityOf(res,name){
   var hist=res.monthHist||{},total=0;Object.keys(hist).forEach(function(k){total+=hist[k]});
-  var months=histMonths(hist,total),reasons=[],hard=false,exp=expectedMonthFromName(name);
-  if(months.length>2)reasons.push('The dates fall in '+months.length+' calendar months ('+months.map(ymLabel).join(', ')+'). One file normally holds one month.');
-  if(res.future>0)reasons.push(fmtN(res.future)+' rows are dated in the future (after today).');
-  if(exp&&total){var sh=(hist[exp]||0)/total;if(sh<0.5){hard=true;reasons.push('The file name says '+ymLabel(exp)+' but only '+(sh*100).toFixed(1)+'% of the rows fall in that month.')}}
-  var swapOffer=null;
-  if(reasons.length&&res.altRows>0&&total){var am=histMonths(res.altHist||{},total);
-    if(am.length<=2&&!res.altFuture&&(!exp||((res.altHist[exp]||0)/total>=0.5)))swapOffer={rows:res.altRows,months:am}}
-  return {hist:hist,total:total,months:months,future:res.future||0,exp:exp,reasons:reasons,hard:hard,suspect:reasons.length>0,swapOffer:swapOffer};
+  return {hist:hist,total:total,months:histMonths(hist,total),future:0,exp:res.exp||'',reasons:[],hard:false,suspect:false,swapOffer:null};
 }
 function replaceRisk(r){
   var out={},list=[];
@@ -361,21 +355,29 @@ function replaceRisk(r){
 function canLoad(r,locked){
   if(!r||!(r.good>0)||locked)return false;
   var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(r.dateInfo.mixed&&!U.confirmDates)return false;
   if(closedQs.length&&U.reason.trim().length<3)return false;
-  if(r.sanity&&r.sanity.suspect&&!U.anyway)return false;
   if(replaceRisk(r).length&&!U.confirmReplace)return false;
   return true;
 }
+function expSourceText(r){
+  var s=r.expSrc;
+  if(s==='name')return 'from the file name';
+  if(s==='majority')return 'the month holding most of the dates';
+  if(s==='data')return 'the file name says '+ymLabel(r.nameConflict.name)+' but '+(r.nameConflict.share*100).toFixed(0)+'% of the dates are in '+ymLabel(r.exp)+', so '+ymLabel(r.exp)+' is used';
+  if(s==='picked')return 'chosen by you';
+  if(s==='any')return 'any month: rows are split by their own dates';
+  return 'no single month holds most of the dates, so rows are split by their own dates';
+}
+function expPickerHtml(r,locked){
+  var opts=[['auto','Automatic']].concat([['any','Any month (split by date)']]),lo=histLoYm(),cur=TODAY().slice(0,7),ms=ymRange(lo,cur).reverse();
+  var sel=U.expMonth||'auto';
+  opts=opts.concat(ms.map(function(m){return [m,ymLabel(m)]}));
+  var out=Object.keys(r.reasons||{}).filter(function(k){return /^Date outside/.test(k)}).reduce(function(a,k){return a+r.reasons[k]},0);
+  return '<div class="row" style="align-items:flex-end"><div class="fld"><label for="u-exp">Expected month</label><select id="u-exp" data-chg="expm" '+(locked?'disabled':'')+'>'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(sel===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'
+   +'<div class="note" style="flex:1">'+(r.exp?'<b>'+esc(ymLabel(r.exp))+'</b> &middot; ':'')+esc(expSourceText(r))+'.'+(r.af.dateFixed?' <b>'+fmtN(r.af.dateFixed)+' date'+(r.af.dateFixed===1?'':'s')+' corrected to '+esc(ymLabel(r.exp))+'</b> (day and month were the wrong way round).':'')+(out?' '+fmtN(out)+' row'+(out===1?'':'s')+' outside '+esc(ymLabel(r.exp))+' skipped.':'')+'</div></div>';
+}
 function sanityHtml(r,locked){
-  var z=r.sanity,h='',sa=effRole()==='Super admin'&&!readOnly();
-  if(z&&z.suspect){
-    var mx=0;Object.keys(z.hist).forEach(function(k){mx=Math.max(mx,z.hist[k])});
-    h+='<div class="banner err" style="display:block"><b>'+(z.hard?'Safety check stopped this file: it does not look like the month it is named for.':'Safety check stopped this file: check the dates before loading.')+'</b> <span class="note" style="color:inherit">(This is not about rejected rows; those are skipped and the rest loads.)</span><ul style="margin:6px 0 6px 18px;padding:0">'+z.reasons.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'
-     +'<div class="tw hscroll" style="max-height:220px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Rows</th><th>Share</th></tr></thead><tbody>'+Object.keys(z.hist).sort().map(function(k){return '<tr><td>'+esc(ymLabel(k))+(k===z.exp?' <span class="pill ok">named month</span>':'')+(k>TODAY().slice(0,7)?' <span class="pill miss">future</span>':'')+'</td><td class="num">'+fmtN(z.hist[k])+'</td><td><i style="display:inline-block;height:8px;border-radius:4px;background:var(--brand);width:'+Math.max(2,Math.round(z.hist[k]/mx*160))+'px"></i> '+(z.hist[k]/z.total*100).toFixed(1)+'%</td></tr>'}).join('')+'</tbody></table></div>'
-     +(z.swapOffer&&sa?'<div class="note" style="margin-top:6px">Date cells are never swapped on their own. If this file really has day and month the wrong way round on '+fmtN(z.swapOffer.rows)+' date cells, reading them swapped gives '+z.swapOffer.months.map(ymLabel).join(', ')+'. <button class="btn sm" data-act="u-swap-serial" '+(locked?'disabled':'')+'>Read those date cells swapped</button></div>':'')
-     +'<label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="anyway" '+(U.anyway?'checked':'')+' '+(sa&&!locked?'':'disabled')+'> Load anyway (Super admin only)</label></div>';
-  }
+  var h=expPickerHtml(r,locked),sa=effRole()==='Super admin'&&!readOnly();
   var rk=replaceRisk(r);
   if(rk.length){
     h+='<div class="banner warn" style="display:block"><b>Safety check stopped this file: it would replace '+rk.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more lines than the new data.</b> (Not a rejected-rows issue.) Replaced data cannot be restored by the Desk; you would have to upload it again.'
