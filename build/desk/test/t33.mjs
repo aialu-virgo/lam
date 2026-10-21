@@ -72,7 +72,9 @@ ok('#5 one click adds the customer to the transfer list; its rows are now exclud
 const sp=await page.evaluate(()=>{const n=Object.keys(window.__desk.U.res.af.spNames);return n.map(x=>[x,(window.__dbg.spMatch(x)||{}).how||null,(window.__dbg.spMatch(x)||{}).name||null])});
 console.log(JSON.stringify(sp));
 const how=Object.fromEntries(sp.map(x=>[x[0],x[1]]));
-ok('#9 case and spacing, compact spelling, initials, close spelling match',!!how['demo  sales 1']&&!!how['DEMO Sales2']&&how['D. Sales 3']==='initials'&&/spelling/.test(how['DEMO Saels 4']||''),JSON.stringify(how));
+ok('#9 case, spacing and punctuation match; initials and close spellings stay unmatched (suggestions only)',!!how['demo  sales 1']&&!!how['DEMO Sales2']&&how['D. Sales 3']==null&&how['DEMO Saels 4']==null,JSON.stringify(how));
+const sg=await page.evaluate(()=>[window.__dbg.spMatch&&0,[...document.querySelectorAll('[data-act="af-sp"]')].map(b=>b.getAttribute('data-raw')+'>'+b.innerText)]);
+ok('#9 initials and close spellings are offered as suggestions with the reason',sg[1].some(x=>/D\. Sales 3>.*initials/.test(x))&&sg[1].some(x=>/DEMO Saels 4>.*(close spelling|similar|shared)/.test(x)),JSON.stringify(sg[1]));
 ok('#9 name with extra text stays unmatched and shows suggestions',how['DEMO Sales 6 East']==null&&!!(await page.$('[data-act="af-sp"]')),'');
 const before=await page.evaluate(()=>window.__dbg.matchStats().names+'');
 await page.click('[data-act="af-sp"]');await page.waitForTimeout(1500);

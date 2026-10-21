@@ -48,7 +48,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 {const {page}=await open(browser,{store:JSON.parse(JSON.stringify(store)),viewer:{email:'data@virgoasia.com',name:'Vijay'}});await page.waitForTimeout(2500);
  await page.selectOption('#va-sel','bm.a@demo');await page.waitForTimeout(2500);
  const t=await page.innerText('body');ok('view-as banner labelled and read-only',/Viewing as Demo Branch Manager A/.test(t)&&/Read-only preview/.test(t),'');
- const tot=await page.evaluate(()=>Math.round(window.__dbg.sumF({plants:null},window.__dbg.qMonths('FY27-Q2')).n));ok('view-as bm.a shows plant 1012 only total',tot===7614017,String(tot));
+ const tot=await page.evaluate(()=>Math.round(window.__dbg.sumF({plants:null},window.__dbg.qMonths('FY27-Q2')).n));ok('view-as bm.a shows plant 1012 only total',tot===7030286/* D28: fixture holds Q1 FY26 onward; 7,030,286 = plant 1012 net sales Jul-Sep 2026 summed straight from the stored chunks */,String(tot));
  await page.evaluate(()=>{location.hash='#/action/DEMO_A5'});await page.waitForTimeout(500);
  const before=await page.evaluate(()=>window.__dbg.S.actions.find(a=>a.id==='DEMO_A5').status);
  await page.click('[data-act="r-ack"]').catch(()=>{});await page.waitForTimeout(500);

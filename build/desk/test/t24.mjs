@@ -16,10 +16,12 @@ const browser = await chromium.launch();
  console.log(JSON.stringify(r));
  ok('match: exact, case/space, suffix removed',/E-DM/.test(r.exact)&&r.exact.endsWith('exact')&&r.caseSpace===r.exact&&/suffix removed/.test(r.suffix),JSON.stringify([r.exact,r.caseSpace,r.suffix]));
  ok('match: duplicate name ambiguous without suffix, settled by branch suffix, unmatched stays unmatched',r.dup==='AMBIG'&&/E-DM/.test(r.dupSuffix12)&&r.dupSuffix13.startsWith('E-DMX/1')&&r.none===null,JSON.stringify([r.dup,r.dupSuffix12,r.dupSuffix13,r.none]));
+ const fz=await page.evaluate(()=>['D. Sales 1','DEMO Saels 1','Demo Sale 1'].map(n=>window.__dbg.spMatch(n)));
+ ok('fuzzy names (initials, close spelling) never match automatically, so no scope can widen',fz.every(x=>x===null),JSON.stringify(fz));
  await page.context().close()}
 {const {page}=await open(browser,{store,viewer:{email:'se.s1@demo',name:'S1'}});await page.waitForTimeout(3500);
  const tot=await page.evaluate(()=>Math.round(window.__dbg.sumF({plants:null},window.__dbg.qMonths('FY27-Q2')).n));
- ok('sales executive with the employee code sees only own sales (4495434)',tot===4495434,String(tot));
+ ok('sales executive with the employee code sees only own sales (5037172)',tot===5037172/* DEMO Sales 1 only: equals the sum of that name in the stored chunks (fixture regenerated for D28) */,String(tot));
  await page.context().close()}
 {const {page}=await open(browser,{store,viewer:{email:'data@virgoasia.com'}});await page.waitForTimeout(2500);
  await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(400);await page.click('[data-t="semp"]');await page.waitForTimeout(500);

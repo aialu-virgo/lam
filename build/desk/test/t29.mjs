@@ -9,8 +9,8 @@ const aud=Object.keys(store).filter(k=>k.startsWith('audit/')).length;
 ok('demo load wrote audit entries',aud>=2,aud);
 let t=await page.innerText('#pg');ok('clean demo store: no integrity alert',!/Integrity alert/.test(t),'');
 /* forged writes straight into the database */
-await page.evaluate(async()=>{const db=await window.claude.use('db');const p=await db.doc('periods/FY27-Q2').get();const d=p.data();d.plan_locked=false;await db.doc('periods/FY27-Q2').set(d);
-  const c=await db.doc('cells/INV_2026-04').get();const cd=c.data();const pl=Object.keys(cd.plants)[0];cd.plants[pl].at=new Date().toISOString();await db.doc('cells/INV_2026-04').set(cd);});
+await page.evaluate(async()=>{const db=await window.claude.use('db');const p=await db.doc('periods/FY27-Q2').get();const d=JSON.parse(JSON.stringify(p.data()));d.plan_locked=false;await db.doc('periods/FY27-Q2').set(d);
+  const c=await db.doc('cells/INV_2026-04').get();const cd=JSON.parse(JSON.stringify(c.data()));const pl=Object.keys(cd.plants)[0];cd.plants[pl].at=new Date().toISOString();await db.doc('cells/INV_2026-04').set(cd);});
 await page.waitForTimeout(2500);
 t=await page.innerText('#pg');
 ok('forged unlock raises an integrity alert on Super admin Today',/Integrity alert/.test(t)&&/Q2 FY27/.test(t),t.match(/Integrity alert[^\n]*/));
@@ -21,7 +21,7 @@ t=await page.innerText('#pg');ok('accepting logs it and clears the alert',!/Inte
 const acc=await page.evaluate(()=>Object.values(window.__mockStore()).filter(v=>v.event==='integrity accepted').length);ok('acceptance written to audit',acc===1,acc);
 /* a non-Super viewer never sees it */
 {const {page:p2}=await open(browser,{store:JSON.parse(JSON.stringify(store)),viewer:{email:'mgmt@demo',name:'M'}});await p2.waitForTimeout(3500);await p2.evaluate(()=>{location.hash='#/today'});await p2.waitForTimeout(800);
- await p2.evaluate(async()=>{const db=await window.claude.use('db');const p=await db.doc('periods/FY27-Q2').get();const d=p.data();d.plan_locked=false;await db.doc('periods/FY27-Q2').set(d)});await p2.waitForTimeout(1500);
+ await p2.evaluate(async()=>{const db=await window.claude.use('db');const p=await db.doc('periods/FY27-Q2').get();const d=JSON.parse(JSON.stringify(p.data()));d.plan_locked=false;await db.doc('periods/FY27-Q2').set(d)});await p2.waitForTimeout(1500);
  ok('management user does not see the alert',!/Integrity alert/.test(await p2.innerText('#pg')),'')}
 /* legit close/reopen through the page leaves no alert */
 /* legit reopen by a Super admin through the page: logged, no alert */

@@ -103,28 +103,22 @@ function initialsMatch(ta,tb){
   return init;
 }
 function fuzzyMatch(raw){
-  /* returns {p:person,how} for a unique fuzzy hit, {ambiguous:true} for several, null for none */
+  /* Only a deterministic tidy-up is applied automatically: the same name written with different case, spacing or punctuation
+     (compact keys equal), and only when it picks one person. Initials and close spellings are SUGGESTIONS (spSuggest): they
+     never change whose sales a figure or a Sales executive's scope shows until a Super admin saves them as an alias. */
   var cp=compactKey(raw);if(!cp)return null;
-  var hit=SM.list.filter(function(p){return compactKey(p.name)===cp||(p.b1name&&compactKey(p.b1name)===cp)});
-  var uniq=function(a){var o={},r=[];a.forEach(function(p){if(!o[p.code]){o[p.code]=1;r.push(p)}});return r};
-  hit=uniq(hit);if(hit.length===1)return {p:hit[0],how:'spacing or punctuation'};if(hit.length>1)return {ambiguous:true};
-  var ta=tokensOf(raw);
-  hit=uniq(SM.list.filter(function(p){return initialsMatch(ta,tokensOf(p.name))}));
-  if(hit.length===1)return {p:hit[0],how:'initials'};if(hit.length>1)return {ambiguous:true};
-  if(cp.length>=8){
-    var dg=cp.replace(/\D/g,'');
-    hit=uniq(SM.list.filter(function(p){var pc=compactKey(p.name);return pc.replace(/\D/g,'')===dg&&editDist(cp,pc,2)<=2}));
-    if(hit.length===1)return {p:hit[0],how:'spelling (1-2 letters)'};if(hit.length>1)return {ambiguous:true};
-  }
-  return null;
+  var hit=SM.list.filter(function(p){return compactKey(p.name)===cp||(p.b1name&&compactKey(p.b1name)===cp)}),o={},u=[];
+  hit.forEach(function(p){if(!o[p.code]){o[p.code]=1;u.push(p)}});
+  if(u.length===1)return {p:u[0],how:'spacing or punctuation'};
+  return u.length>1?{ambiguous:true}:null;
 }
 function spSuggest(raw,n){
   var cp=compactKey(raw),ta=tokensOf(raw),out=[];
   SM.list.forEach(function(p){
     var pc=compactKey(p.name),d=editDist(cp,pc,6),tb=tokensOf(p.name),ov=0;
     ta.forEach(function(t){if(tb.indexOf(t)>=0)ov++});
-    var score=d<=6?(10-d):0;score+=ov*3;if(initialsMatch(ta,tb))score+=6;
-    if(score>=5)out.push({code:p.code,name:p.name,plant:p.plant||'',score:score});
+    var ini=initialsMatch(ta,tb),score=d<=6?(10-d):0;score+=ov*3;if(ini)score+=6;
+    if(score>=5)out.push({code:p.code,name:p.name,plant:p.plant||'',score:score,why:ini?'initials':d<=2&&cp.length>=8?'close spelling':ov?'shared words':'similar'});
   });
   return out.sort(function(a,b){return b.score-a.score}).slice(0,n||3);
 }
@@ -150,12 +144,12 @@ function mapTable(kind,obj,head){
 function sugRows(names,lines){
   return names.map(function(nm,i){
     var s=spSuggest(nm,3);
-    return '<tr><td class="break">'+esc(nm)+'</td><td class="num">'+fmtN(lines[nm]||0)+'</td><td>'+(s.length?s.map(function(x){return '<button class="btn sm" data-act="af-sp" data-raw="'+esc(nm)+'" data-code="'+esc(x.code)+'" title="Save as an alias">'+esc(x.name)+(x.plant?' · '+esc(x.plant):'')+'</button>'}).join(' '):'<span class="note">no close match; add the person or the B1 name in the master</span>')+'</td></tr>';
+    return '<tr><td class="break">'+esc(nm)+'</td><td class="num">'+fmtN(lines[nm]||0)+'</td><td>'+(s.length?s.map(function(x){return '<button class="btn sm" data-act="af-sp" data-raw="'+esc(nm)+'" data-code="'+esc(x.code)+'" title="Looks like a match by '+esc(x.why)+'. Saves an alias; only a Super admin can confirm it.">'+esc(x.name)+(x.plant?' · '+esc(x.plant):'')+' <span class="note">('+esc(x.why)+')</span></button>'}).join(' '):'<span class="note">no close match; add the person or the B1 name in the master</span>')+'</td></tr>';
   }).join('');
 }
 function sugTable(names,lines){
   if(!names.length)return '';
-  return '<div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th>Name in the sales data</th><th class="num">Lines</th><th>Click the right person to save an alias</th></tr></thead><tbody>'+sugRows(names.slice(0,25),lines)+'</tbody></table></div>'+(names.length>25?'<div class="note">'+(names.length-25)+' more names not shown.</div>':'');
+  return '<div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th>Name in the sales data</th><th class="num">Lines</th><th>Suggestions only. Click the right person to confirm it as an alias</th></tr></thead><tbody>'+sugRows(names.slice(0,25),lines)+'</tbody></table></div>'+(names.length>25?'<div class="note">'+(names.length-25)+' more names not shown.</div>':'');
 }
 
 /* ---- invoice upload: panel ---- */
@@ -193,9 +187,9 @@ function invoiceFixes(r){
   /* salespeople */
   if(af.spNames){
     var names=Object.keys(af.spNames).filter(Boolean),un=[],mt=0,viaFuzzy=0;
-    names.forEach(function(n){var m=spMatch(n);if(m&&!m.ambiguous){mt++;if(m.how&&/spacing|initials|spelling|alias/.test(m.how))viaFuzzy++}else un.push(n)});
+    names.forEach(function(n){var m=spMatch(n);if(m&&!m.ambiguous){mt++;if(m.how&&/spacing|alias/.test(m.how))viaFuzzy++}else un.push(n)});
     if(SM.ready){
-      it.push({st:viaFuzzy?'fixed':'info',t:'Salesperson names matched to the sales-employee master',n:mt,d:esc(mt+' of '+names.length+' names ('+(names.length?(mt/names.length*100).toFixed(1):'0')+'%).'+(viaFuzzy?' '+viaFuzzy+' matched through case, spacing, punctuation, initials, a close spelling or a saved alias.':''))});
+      it.push({st:viaFuzzy?'fixed':'info',t:'Salesperson names matched to the sales-employee master',n:mt,d:esc(mt+' of '+names.length+' names ('+(names.length?(mt/names.length*100).toFixed(1):'0')+'%).'+(viaFuzzy?' '+viaFuzzy+' matched through case, spacing, punctuation or a saved alias. Initials and close spellings are only suggested below until you confirm them.':''))});
       if(un.length){un.sort(function(a,b){return af.spNames[b]-af.spNames[a]});it.push({st:'sugg',t:'Salesperson names with no match',n:un.length,d:sugTable(un,af.spNames)})}
     }else if(names.length)it.push({st:'need',t:'No sales-employee master loaded',n:names.length,d:'Load the master in Admin › Sales employees so names can be matched.'});
   }

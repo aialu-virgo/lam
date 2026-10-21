@@ -9,8 +9,8 @@ const res=[];const ok=(n,c,d)=>{res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
  const n0=Object.keys(st).length;
  const {page,errs}=await open(browser,{store:st});await page.waitForTimeout(14000);
  const r=await page.evaluate(()=>({rolls:Object.keys(window.__mockStore()).filter(k=>k.startsWith('roll/')).length,tot:Math.round(window.__dbg.sumF({plants:null},window.__dbg.qMonths('FY27-Q2')).n),status:window.__dbg.DS.status}));
- ok('v0.1 data: roll-ups rebuilt from stored chunks',r.rolls===129+3&&r.tot===28224877,JSON.stringify(r));
- const inv=await page.evaluate(()=>Object.keys(window.__mockStore()).filter(k=>k.startsWith('inv/')).length);ok('existing inv chunks untouched',inv===132,String(inv));
+ ok('v0.1 data: roll-ups rebuilt from stored chunks',r.rolls===78&&r.tot===26689923/* D28 fixture: 78 plant-months; total = sum of the stored chunks, Jul-Sep 2026 */,JSON.stringify(r));
+ const inv=await page.evaluate(()=>Object.keys(window.__mockStore()).filter(k=>k.startsWith('inv/')).length);ok('existing inv chunks untouched',inv===78,String(inv));
  await page.context().close();}
 /* empty database: ships empty */
 {const {page,errs}=await open(browser,{store:{}});await page.waitForTimeout(2000);
