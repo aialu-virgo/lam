@@ -323,7 +323,7 @@ function buildIntake(){
    '<div id="i-banner"></div>'
   +(effRole()==='Super admin'&&!readOnly()?'<section class="card" id="i-upload"></section>':'')
   +'<section class="card" id="i-cov"></section>'
-  +'<div class="grid2"><section class="card" id="i-hist"></section><section class="card" id="i-feed"></section></div>';
+  +'<section class="card" id="i-hist"></section><section class="card" id="i-feed"></section>';
   renderUpload();
 }
 function refreshIntake(){renderBanner();renderCov();renderHist();renderFeed();if(U&&(U.stage==='idle'||U.stage==='done'))updateUploadPeriods()}
@@ -356,7 +356,8 @@ function periodOptions(){
 }
 function updateUploadPeriods(){var el=$('#u-period');if(el&&U&&U.stage!=='validating'&&U.stage!=='loading'){var v=el.value;el.innerHTML=periodOptions();el.value=U.period}}
 function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:'auto',entity:'INV',file:null,name:'',size:0,headers:[],rows:[],sys:null,map:{},savedMap:false,res:null,msg:'',closeAfter:true,reason:'',confirmDates:false,progress:0,progressMsg:''}}
-function renderUpload(){
+function renderUpload(){var _e=$('#i-upload');withScroll(_e,renderUpload0)}
+function renderUpload0(){
   if(!U)U=newU();
   var el=$('#i-upload');if(!el)return;
   var st=U.stage;
@@ -450,7 +451,8 @@ function glyph(st){
   if(st==='part')return svg+'<circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 1.5a5.5 5.5 0 0 1 0 11z" fill="currentColor"/></svg>';
   return svg+'<circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
 }
-function renderCov(){
+function renderCov(){var _e=$('#i-cov');withScroll(_e,renderCov0)}
+function renderCov0(){
   var el=$('#i-cov');if(!el)return;
   var g=gridQuarters();
   var head='<tr><th>Entity</th>'+g.list.map(function(k){return '<th class="'+(k===g.cur?'cur':'')+'" title="'+qMonths(k)[0]+' to '+qMonths(k)[2]+'">'+qLabel(k).replace(' ','<br>')+(k===g.cur?'<br>open':'')+'</th>'}).join('')+'</tr>';
@@ -470,13 +472,49 @@ function renderCov(){
    +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det
    +'<p class="note">FY runs April to March; Q1 = Apr to Jun. A partial quarter greys its QoQ figures with "incomplete history" in the business views. Tap a cell for detail. Closed quarters are locked; reloading needs Super admin and is logged. Q3 FY27 is the current quarter, shown for reference. Other entities arrive later.</p>';
 }
+/* keep every inner scroll position across a re-render of a container (a snapshot or timer tick must not throw the reader back to the top) */
+function withScroll(container,fn){
+  var pos=[];if(container){Array.prototype.forEach.call(container.querySelectorAll('.tw,.hscroll'),function(e){pos.push([e.scrollTop,e.scrollLeft])})}
+  fn();
+  if(container){Array.prototype.forEach.call(container.querySelectorAll('.tw,.hscroll'),function(e,i){if(pos[i]){e.scrollTop=pos[i][0];e.scrollLeft=pos[i][1]}})}
+}
+S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:''};
+var ENT_NAME={INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
+function histRows(){
+  var f=S.hist,q=(f.q||'').toLowerCase();
+  return S.uploads.slice().sort(function(a,b){return a.at<b.at?1:-1}).filter(function(u){
+    return (!f.src||u.sys===f.src)&&(!f.ent||(u.entity||'INV')===f.ent)&&(!f.status||u.status===f.status)&&(!q||((u.file||'')+' '+(u.by||'')+' '+(u.periodLabel||'')+' '+(u.status||'')+' '+(u.demo?'demo':'')).toLowerCase().indexOf(q)>=0);
+  });
+}
+function histSig(){return JSON.stringify([S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file]}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
+function histBodyHtml(){
+  var all=histRows(),rows=all.slice(0,S.hist.shown);
+  if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
+  if(!all.length)return '<div class="empty sm">No upload matches these filters.</div>';
+  var open=S.hist.open;
+  return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Rej.</th><th>Status</th><th></th></tr></thead><tbody>'
+   +rows.map(function(u){
+     var fn=u.file||'',isOpen=!!open[u._id];
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+fmtN(u.rejected)+'</td><td><span class="pill '+(u.status==='Loaded'?'ok':u.status==='Failed'?'miss':'part')+'">'+esc(u.status)+'</span></td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Rejected rows</button>':'')+'</td></tr>';
+     if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
+     return tr}).join('')
+   +'</tbody></table></div>'
+   +'<div class="row" style="justify-content:space-between;align-items:center"><span class="note">Showing '+rows.length+' of '+all.length+(all.length!==S.uploads.length?' (filtered from '+S.uploads.length+')':'')+'. Click a row for the full file name and details.</span>'+(all.length>rows.length?'<button class="btn sm" data-act="hist-more">Show 15 more</button>':'')+'</div>';
+}
 function renderHist(){
   var el=$('#i-hist');if(!el)return;
-  var rows=S.uploads.slice().sort(function(a,b){return a.at<b.at?1:-1}).slice(0,60);
-  el.innerHTML='<div class="hd"><h2>Upload history</h2><span class="note">'+fmtN(S.uploads.length)+' upload'+(S.uploads.length===1?'':'s')+'</span></div>'
-   +(rows.length?'<div class="tw" style="max-height:360px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>By</th><th>Src</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Rej.</th><th>Status</th><th></th></tr></thead><tbody>'
-   +rows.map(function(u){return '<tr><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+fmtN(u.rejected)+'</td><td><span class="pill '+(u.status==='Loaded'?'ok':u.status==='Failed'?'miss':'part')+'">'+esc(u.status)+'</span></td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Rejected rows</button>':'')+'</td></tr>'}).join('')
-   +'</tbody></table></div>':'<div class="empty">No uploads yet.</div>');
+  var sig=histSig();
+  if(!$('#hist-body')){
+    var f=S.hist,srcs=Array.from(new Set(S.uploads.map(function(u){return u.sys}).filter(Boolean))).sort(),ents=Array.from(new Set(S.uploads.map(function(u){return u.entity||'INV'}))).sort(),sts=Array.from(new Set(S.uploads.map(function(u){return u.status}).filter(Boolean))).sort();
+    var sel=function(id,label,cur,opts,nm){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="hist-f" data-k="'+nm+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(cur===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'};
+    el.innerHTML='<div class="hd"><h2>Upload history</h2><span class="note" id="hist-count"></span></div>'
+     +'<div class="row" id="hist-ctl" style="align-items:flex-end">'+sel('hf-src','Source',f.src,srcs.map(function(x){return [x,x==='B1'?'SAP B1':x==='S4'?'SAP S/4':x]}),'src')+sel('hf-ent','Entity',f.ent,ents.map(function(x){return [x,ENT_NAME[x]||x]}),'ent')+sel('hf-st','Status',f.status,sts.map(function(x){return [x,x]}),'status')
+     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div></div><div id="hist-body"></div>';
+    S.hist.sig='';
+  }
+  if(S.hist.sig===sig)return;S.hist.sig=sig;
+  var c=$('#hist-count');if(c)c.textContent=fmtN(S.uploads.length)+' upload'+(S.uploads.length===1?'':'s');
+  var body=$('#hist-body');withScroll(body,function(){body.innerHTML=histBodyHtml()});
 }
 function renderFeed(){
   var el=$('#i-feed');if(!el)return;
@@ -1093,6 +1131,9 @@ var handlers={
  'close-q':async function(t){if(!superOnly('close a quarter'))return;var q=t.getAttribute('data-q');await dset('periods/'+q,{fy_quarter:q,status:'closed',closed_by:S.viewer.email,closed_at:nowISO()});S.periods[q]=Object.assign({},S.periods[q],{status:'closed'});await auditW('quarter closed',q,{sig:sigOf('closed',false)});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter closed',quarter:q});toast(qLabel(q)+' closed')},
  'reopen':async function(t){if(!superOnly('reopen a closed quarter'))return;var q=t.getAttribute('data-q');openDlg('<h3>Reopen '+qLabel(q)+'</h3><p class="note">A closed quarter is locked. Reopening needs Super admin and is logged with your reason.</p><div class="fld"><label for="d-reason">Reason (required)</label><input id="d-reason" class="in"></div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="reopen-go" data-q="'+q+'">Reopen</button><button class="btn" data-act="dlg-close">Cancel</button></div>')},
  'reopen-go':async function(t){if(!superOnly('reopen a closed quarter')){closeDlg();return}var q=t.getAttribute('data-q'),r=gv('d-reason');if(r.length<3){dlgErr('Give a reason (at least 3 characters)');return}await dset('periods/'+q,Object.assign({},S.periods[q]||{},{fy_quarter:q,status:'open',reopened_by:S.viewer.email,reopened_at:nowISO(),_id:undefined}));await auditW('quarter reopened',q,{sig:sigOf('open',S.periods[q]&&S.periods[q].plan_locked),reason:r});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'quarter reopened',quarter:q,reason:r,role:'Super admin'});closeDlg();toast(qLabel(q)+' reopened')},
+ 'hist-open':function(t){if(t.closest&&t.closest('button'))return;var id=t.getAttribute('data-id');if(S.hist.open[id])delete S.hist.open[id];else S.hist.open[id]=1;renderHist()},
+ 'hist-more':function(){S.hist.shown+=15;renderHist()},
+ 'hist-csv':function(){var rows=histRows();return download('upload-history.csv',csvLine(['when_ist','file','by','source','entity','period','rows_read','rows_loaded','rows_rejected','status','demo'])+'\n'+rows.map(function(u){return csvLine([istStr(u.at),u.file||'',u.by||'',u.sys||'',u.entity||'INV',u.periodLabel||'',u.read,u.loaded,u.rejected,u.status,u.demo?'DEMO':''])}).join('\n'))},
  'hist-rej':async function(t){
    var id=t.getAttribute('data-id'),snap=await dget('rejects/'+id);
    if(!snap.exists){toast('No stored rejected rows for this upload');return}
@@ -1138,10 +1179,12 @@ document.addEventListener('change',function(ev){
   else if(c==='closeafter'){U.closeAfter=t.checked}
   else if(c==='keepdocs'){U.keepDocs=t.checked}
   else if(c==='rejf'){U.rejFilter=t.value;renderUpload()}
+  else if(c==='hist-f'){S.hist[t.getAttribute('data-k')]=t.value;S.hist.shown=15;renderHist()}
   else if(c==='potf'){var k=t.getAttribute('data-k');S.potFilter[{'pf-q':'q','pf-plant':'plant','pf-group':'group','pf-seg':'seg'}[k]]=t.value;refreshAdmin()}
 });
 document.addEventListener('input',function(ev){
   var t=ev.target,c=t.getAttribute&&t.getAttribute('data-chg');
+  if(c==='hist-f'&&t.tagName==='INPUT'){S.hist[t.getAttribute('data-k')]=t.value;S.hist.shown=15;renderHist();return}
   if(c==='reason'){U.reason=t.value;var b=document.querySelector('[data-act="u-load"]');if(b){var r=U.res;var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});b.disabled=!(r.good>0&&(!r.dateInfo.mixed||U.confirmDates)&&(!closedQs.length||U.reason.trim().length>=3))}}
   else if(c==='rejq'){U.rejQ=t.value;var pos=t.selectionStart;renderUpload();var n=$('#rj-q');if(n){n.focus();n.setSelectionRange(pos,pos)}}
 });

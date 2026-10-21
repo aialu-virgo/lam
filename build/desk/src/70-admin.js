@@ -9,7 +9,8 @@ function buildAdmin(){
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
   $('#p-admin').innerHTML=(tabs.length>1?'<div class="tabs seg" role="tablist" style="align-self:flex-start">'+tabs.map(function(t){return '<button data-act="atab" data-t="'+t[0]+'" role="tab">'+t[1]+'</button>'}).join('')+'</div>':'')+'<div id="a-body"></div>';
 }
-function refreshAdmin(){
+function refreshAdmin(){var _e=$('#a-body');withScroll(_e,refreshAdmin0)}
+function refreshAdmin0(){
   document.querySelectorAll('[data-act="atab"]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-t')===S.adminTab))});
   var el=$('#a-body');if(!el)return;
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
