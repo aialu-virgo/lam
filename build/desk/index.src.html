@@ -355,7 +355,7 @@ function periodOptions(){
   return o;
 }
 function updateUploadPeriods(){var el=$('#u-period');if(el&&U&&U.stage!=='validating'&&U.stage!=='loading'){var v=el.value;el.innerHTML=periodOptions();el.value=U.period}}
-function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:'auto',entity:'INV',file:null,name:'',size:0,headers:[],rows:[],sys:null,map:{},savedMap:false,res:null,msg:'',closeAfter:true,reason:'',confirmDates:false,progress:0,progressMsg:''}}
+function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:'auto',entity:'INV',file:null,name:'',size:0,headers:[],rows:[],sys:null,map:{},savedMap:false,res:null,msg:'',closeAfter:true,reason:'',confirmDates:false,anyway:false,confirmReplace:false,swapSerial:false,progress:0,progressMsg:''}}
 function renderUpload(){var _e=$('#i-upload');withScroll(_e,renderUpload0)}
 function renderUpload0(){
   if(!U)U=newU();
@@ -417,7 +417,8 @@ function resultHtml(){
   h+='<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Good rows loading</small><b>'+fmtN(r.good)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b></div>'+(r.preHist&&r.preHist.rows?'<div class="kpi"><small>Before history start (FY25-26 and earlier)</small><b>'+fmtN(r.preHist.rows)+'</b><small>not loaded, no action needed</small></div>':'')
    +'<div class="kpi"><small>Out of scope (kept in record)</small><b>'+fmtN(r.other.rows)+'</b></div><div class="kpi"><small>Internal transfers (flagged)</small><b>'+fmtN(r.xfer.rows)+'</b><small>'+fmtN(r.xferMaster)+' via the Admin list</small></div></div>';
   h+=invoiceFixes(r);
-  if(r.dateInfo.mixed)h+='<div class="banner warn"><span>This file mixes real date cells and dd/mm/yyyy text. Day and month were swapped back on '+fmtN(r.dateInfo.swapped)+' date cells ('+fmtN(r.dateInfo.unfixable)+' could not be fixed). Resulting range <b>'+esc(r.minDate||'-')+' to '+esc(r.maxDate||'-')+'</b>.</span><label class="chip"><input type="checkbox" id="u-confd" data-chg="confd" '+(U.confirmDates?'checked':'')+' '+(locked?'disabled':'')+'> I confirm this range</label></div>';
+  h+=sanityHtml(r,locked);
+  if(r.dateInfo.mixed)h+='<div class="banner warn"><span>You chose to read date cells with day and month swapped. Day and month were swapped on '+fmtN(r.dateInfo.swapped)+' date cells ('+fmtN(r.dateInfo.unfixable)+' could not be fixed). Resulting range <b>'+esc(r.minDate||'-')+' to '+esc(r.maxDate||'-')+'</b>.</span><label class="chip"><input type="checkbox" id="u-confd" data-chg="confd" '+(U.confirmDates?'checked':'')+' '+(locked?'disabled':'')+'> I confirm this range</label><button class="btn sm" data-act="u-unswap" '+(locked?'disabled':'')+'>Read dates as given</button></div>';
   else h+='<div class="note">Dates run '+esc(r.minDate||'-')+' to '+esc(r.maxDate||'-')+'.</div>';
   if(r.fanout)h+='<div class="note">S/4 fan-out: '+fmtN(r.fanout)+' surplus repeated rows removed (same document and item). Not an error.</div>';
   if(r.injection)h+='<div class="banner warn">'+fmtN(r.injection)+' text cell(s) read like instructions (for example, "ignore previous instructions"). Treated as data, nothing followed. Review the source file.</div>';
@@ -431,7 +432,7 @@ function resultHtml(){
   if(closedQs.length)h+='<div class="banner err" style="display:block"><b>Closed quarter in this file: '+closedQs.map(qLabel).join(', ')+'.</b> Reloading a closed quarter needs Super admin and is logged. <div class="fld" style="margin-top:8px"><label for="u-reason">Reason for reload (required)</label><input id="u-reason" class="in" data-chg="reason" value="'+esc(U.reason)+'" '+(locked?'disabled':'')+'></div></div>';
   h+='<label class="chip" style="align-self:flex-start"><input type="checkbox" id="u-docs" data-chg="keepdocs" '+(U.keepDocs===false?'':'checked')+' '+(locked?'disabled':'')+'> Keep the document index (needed to drill down to a source document; uses most of the storage)</label>';
   if(U.mode==='historic')h+='<label class="chip" style="align-self:flex-start"><input type="checkbox" id="u-close" data-chg="closeafter" '+(U.closeAfter?'checked':'')+' '+(locked?'disabled':'')+'> Close quarters that become complete and have ended</label>';
-  var can=r.good>0&&!locked&&(!r.dateInfo.mixed||U.confirmDates)&&(!closedQs.length||U.reason.trim().length>=3);
+  var can=canLoad(r,locked);
   h+='<div class="row"><button class="btn pri" data-act="u-load" '+(can?'':'disabled')+'>Load '+fmtN(r.good)+' good rows</button>'+(r.rejected?'<button class="btn" data-act="u-rejcsv">Download rejected rows (CSV)</button>':'')+(locked?'':'<button class="btn" data-act="u-reset">Cancel upload</button>')+'</div>';
   if(r.rejected)h+=rejectsHtml();
   return h;
@@ -495,7 +496,7 @@ function histBodyHtml(){
   return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Rej.</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(u){
      var fn=u.file||'',isOpen=!!open[u._id];
-     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+fmtN(u.rejected)+'</td><td><span class="pill '+(u.status==='Loaded'?'ok':u.status==='Failed'?'miss':'part')+'">'+esc(u.status)+'</span></td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Rejected rows</button>':'')+'</td></tr>';
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+fmtN(u.rejected)+'</td><td><span class="pill '+(u.status==='Loaded'?'ok':u.status==='Failed'?'miss':'part')+'">'+esc(u.status)+'</span></td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Rejected rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&(u.entity||'INV')==='INV'&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
      if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
      return tr}).join('')
    +'</tbody></table></div>'
@@ -657,8 +658,9 @@ async function runValidation(){
   var cDoc=cols('doc'),cLine=cols('line'),cDate=cols('date'),cPlant=cols('plant'),cCust=cols('cust'),cName=cols('cname'),cItem=cols('item'),cQty=cols('qty'),cNet=cols('net'),cType=cols('itype'),cCat=cols('cat'),cTT=cols('tt'),cSize=cols('size'),cSp=cols('sp'),cAcct=cols('acct'),cZone=cols('zone');
   /* pass 1: date kinds */
   var nSerial=0,nText=0;
-  for(var i=0;i<n;i++){var v=rows[i][cDate];if(typeof v==='number')nSerial++;else if(typeof v==='string'&&/^\s*\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4}/.test(v))nText++}
-  var swap=nSerial>0&&nText>0;res.dateInfo.mixed=swap;
+  for(var i=0;i<n;i++){var v=rows[i][cDate];if(typeof v==='number'||(typeof v==='string'&&/^\s*\d{5}(\.\d+)?\s*$/.test(v)))nSerial++;else if(typeof v==='string'&&/^\s*\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4}/.test(v))nText++}
+  var swap=!!U.swapSerial&&nSerial>0;res.dateInfo.mixed=swap;/* D32: serial (numeric) dates are never swapped on their own; only a Super admin's explicit choice after the sanity check below */
+  res.monthHist={};res.altHist={};res.future=0;res.altFuture=0;res.altRows=0;var todayIso=TODAY();
   var seen=new Set(),lineCtr=new Map();var tset=new Set();S.transfers.forEach(function(t){if(t.flag!==false)tset.add(String(t.code).toUpperCase())});res.xferMaster=0;
   var periodSel=U.period,allowed=null;
   if(U.mode==='daily'&&periodSel==='auto')periodSel=g.cur;
@@ -700,6 +702,9 @@ async function runValidation(){
     if(!validYMD(dt)){rej(i,doc,line,'Document date','Date not valid',r[cDate]);continue}
     var ym=dt.y+'-'+pad(dt.m);
     var iso=ym+'-'+pad(dt.d);
+    res.monthHist[ym]=(res.monthHist[ym]||0)+1;if(iso>todayIso)res.future++;
+    var altYm=ym;if(!swap&&dt.kind==='serial'&&dt.d<=12&&dt.m!==dt.d){altYm=dt.y+'-'+pad(dt.d);res.altRows++;if(altYm+'-'+pad(dt.m)>todayIso)res.altFuture++}else if(iso>todayIso)res.altFuture++;
+    res.altHist[altYm]=(res.altHist[altYm]||0)+1;
     if(!res.minDate||iso<res.minDate)res.minDate=iso;if(!res.maxDate||iso>res.maxDate)res.maxDate=iso;
     if(ym<histLoYm()){res.preHist.rows++;continue}/* D28: before history start; counted, not a reject, no action */
     if(allowed){if(ym<allowed.lo||ym>allowed.hi){rej(i,doc,line,'Document date','Date outside period '+allowed.label+' (use Historic mode)',iso);continue}}
@@ -754,7 +759,8 @@ async function runValidation(){
   }
   res.warned+=res.injection;
   res.af.catSpellings=Object.keys(catSp).length;res.af.zoneSpellings=Object.keys(zoneSp).length;
-  U.res=res;U.stage='validated';U.confirmDates=false;U.reason='';U.progress=100;
+  res.sanity=sanityOf(res,U.name);
+  U.res=res;U.stage='validated';U.confirmDates=false;U.reason='';U.anyway=false;U.confirmReplace=false;U.progress=100;
   renderUpload();
 }
 
@@ -1112,7 +1118,7 @@ var handlers={
  'demo-clear':function(){return demoClear()},
  'u-reset':function(){U=newU();renderUpload()},
  'u-validate':async function(){await saveMappingDraft();return runValidation()},
- 'u-load':function(){if(!superOnly('load SAP data'))return;return runLoad({})},
+ 'u-load':function(){if(!superOnly('load SAP data'))return;if(!canLoad(U.res,false)){toast('Not loaded: tick the confirmations the page asks for first');return}return runLoad({})},
  'u-cancel':function(){cancelFlag=true},
  'u-rejcsv':function(){var r=U.res;return download('rejected-rows.csv',csvLine(['row','doc_no','line','field','reason','value'])+'\n'+r.rejects.map(csvLine).join('\n'))},
  'u-addplants':async function(){
@@ -1176,6 +1182,8 @@ document.addEventListener('change',function(ev){
   else if(c==='u-ent'){U.entity=t.value}
   else if(c==='map'){U.map[t.getAttribute('data-k')]=+t.value;U.savedMap=false;renderUpload()}
   else if(c==='confd'){U.confirmDates=t.checked;renderUpload()}
+  else if(c==='anyway'){U.anyway=t.checked;renderUpload()}
+  else if(c==='confrep'){U.confirmReplace=t.checked;renderUpload()}
   else if(c==='closeafter'){U.closeAfter=t.checked}
   else if(c==='keepdocs'){U.keepDocs=t.checked}
   else if(c==='rejf'){U.rejFilter=t.value;renderUpload()}
@@ -1185,7 +1193,7 @@ document.addEventListener('change',function(ev){
 document.addEventListener('input',function(ev){
   var t=ev.target,c=t.getAttribute&&t.getAttribute('data-chg');
   if(c==='hist-f'&&t.tagName==='INPUT'){S.hist[t.getAttribute('data-k')]=t.value;S.hist.shown=15;renderHist();return}
-  if(c==='reason'){U.reason=t.value;var b=document.querySelector('[data-act="u-load"]');if(b){var r=U.res;var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});b.disabled=!(r.good>0&&(!r.dateInfo.mixed||U.confirmDates)&&(!closedQs.length||U.reason.trim().length>=3))}}
+  if(c==='reason'){U.reason=t.value;var b=document.querySelector('[data-act="u-load"]');if(b)b.disabled=!canLoad(U.res,false)}
   else if(c==='rejq'){U.rejQ=t.value;var pos=t.selectionStart;renderUpload();var n=$('#rj-q');if(n){n.focus();n.setSelectionRange(pos,pos)}}
 });
 /*@@V09_MODULES@@*/

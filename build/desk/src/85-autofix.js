@@ -326,3 +326,110 @@ function itemFixes(r){
   if(r.rejected)it.push({st:'need',t:'Rows rejected',n:r.rejected,d:'Blank or duplicate item codes. Listed below.'});
   return fixesPanel(it,'Fixes applied');
 }
+
+/* ================= D32 (21 Oct 2026): date sanity check, replace guard, Undo upload ================= */
+var MONTH_ABBR=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+function expectedMonthFromName(name){
+  var n=String(name||''),m=/(20\d{2})[-_.](0[1-9]|1[0-2])(?:[-_.](?:0[1-9]|[12]\d|3[01]))?(?!\d)/.exec(n);
+  if(m)return m[1]+'-'+m[2];
+  m=/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s_.\-]*(20\d{2})/i.exec(n);
+  if(m)return m[2]+'-'+pad(MONTH_ABBR.indexOf(m[1].toLowerCase())+1,2);
+  return '';
+}
+function histMonths(hist,total){return Object.keys(hist).filter(function(k){return total&&hist[k]/total>=0.005}).sort()}
+function sanityOf(res,name){
+  var hist=res.monthHist||{},total=0;Object.keys(hist).forEach(function(k){total+=hist[k]});
+  var months=histMonths(hist,total),reasons=[],hard=false,exp=expectedMonthFromName(name);
+  if(months.length>2)reasons.push('The dates fall in '+months.length+' calendar months ('+months.map(ymLabel).join(', ')+'). One file normally holds one month.');
+  if(res.future>0)reasons.push(fmtN(res.future)+' rows are dated in the future (after today).');
+  if(exp&&total){var sh=(hist[exp]||0)/total;if(sh<0.5){hard=true;reasons.push('The file name says '+ymLabel(exp)+' but only '+(sh*100).toFixed(1)+'% of the rows fall in that month.')}}
+  var swapOffer=null;
+  if(reasons.length&&res.altRows>0&&total){var am=histMonths(res.altHist||{},total);
+    if(am.length<=2&&!res.altFuture&&(!exp||((res.altHist[exp]||0)/total>=0.5)))swapOffer={rows:res.altRows,months:am}}
+  return {hist:hist,total:total,months:months,future:res.future||0,exp:exp,reasons:reasons,hard:hard,suspect:reasons.length>0,swapOffer:swapOffer};
+}
+function replaceRisk(r){
+  var out={},list=[];
+  if(!r||!r.pm)return list;
+  r.pm.forEach(function(P){
+    var c=S.cells['INV_'+P.ym],old=c&&c.plants&&c.plants[P.plant];if(!old||old.demo)return;
+    var nl=0;P.agg.forEach(function(a){nl+=a[6]});
+    if((old.lines||0)>nl){var o=out[P.ym]||(out[P.ym]={ym:P.ym,plants:0,oldLines:0,newLines:0,sys:{}});o.plants++;o.oldLines+=old.lines||0;o.newLines+=nl;if(old.sys)o.sys[old.sys]=1}
+  });
+  Object.keys(out).sort().forEach(function(k){list.push(out[k])});return list;
+}
+function canLoad(r,locked){
+  if(!r||!(r.good>0)||locked)return false;
+  var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
+  if(r.dateInfo.mixed&&!U.confirmDates)return false;
+  if(closedQs.length&&U.reason.trim().length<3)return false;
+  if(r.sanity&&r.sanity.suspect&&!U.anyway)return false;
+  if(replaceRisk(r).length&&!U.confirmReplace)return false;
+  return true;
+}
+function sanityHtml(r,locked){
+  var z=r.sanity,h='',sa=effRole()==='Super admin'&&!readOnly();
+  if(z&&z.suspect){
+    var mx=0;Object.keys(z.hist).forEach(function(k){mx=Math.max(mx,z.hist[k])});
+    h+='<div class="banner err" style="display:block"><b>'+(z.hard?'Blocked: this file does not look like the month it is named for.':'Check the dates before loading.')+'</b><ul style="margin:6px 0 6px 18px;padding:0">'+z.reasons.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'
+     +'<div class="tw hscroll" style="max-height:220px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Rows</th><th>Share</th></tr></thead><tbody>'+Object.keys(z.hist).sort().map(function(k){return '<tr><td>'+esc(ymLabel(k))+(k===z.exp?' <span class="pill ok">named month</span>':'')+(k>TODAY().slice(0,7)?' <span class="pill miss">future</span>':'')+'</td><td class="num">'+fmtN(z.hist[k])+'</td><td><i style="display:inline-block;height:8px;border-radius:4px;background:var(--brand);width:'+Math.max(2,Math.round(z.hist[k]/mx*160))+'px"></i> '+(z.hist[k]/z.total*100).toFixed(1)+'%</td></tr>'}).join('')+'</tbody></table></div>'
+     +(z.swapOffer&&sa?'<div class="note" style="margin-top:6px">Date cells are never swapped on their own. If this file really has day and month the wrong way round on '+fmtN(z.swapOffer.rows)+' date cells, reading them swapped gives '+z.swapOffer.months.map(ymLabel).join(', ')+'. <button class="btn sm" data-act="u-swap-serial" '+(locked?'disabled':'')+'>Read those date cells swapped</button></div>':'')
+     +'<label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="anyway" '+(U.anyway?'checked':'')+' '+(sa&&!locked?'':'disabled')+'> Load anyway (Super admin only)</label></div>';
+  }
+  var rk=replaceRisk(r);
+  if(rk.length){
+    h+='<div class="banner warn" style="display:block"><b>This upload would replace '+rk.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more lines than the new data.</b> Replaced data cannot be restored by the Desk; you would have to upload it again.'
+     +'<div class="tw hscroll" style="max-height:200px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Plant-months</th><th class="num">Lines held now</th><th class="num">Lines in this file</th></tr></thead><tbody>'+rk.map(function(x){return '<tr><td>'+esc(ymLabel(x.ym))+'</td><td class="num">'+x.plants+'</td><td class="num">'+fmtN(x.oldLines)+'</td><td class="num">'+fmtN(x.newLines)+'</td></tr>'}).join('')+'</tbody></table></div>'
+     +'<label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="confrep" '+(U.confirmReplace?'checked':'')+' '+(sa&&!locked?'':'disabled')+'> I confirm: replace these months ('+rk.map(function(x){return ymLabel(x.ym)}).join(', ')+')</label></div>';
+  }
+  return h;
+}
+
+/* ---- Undo upload ---- */
+function undoPlan(uid){
+  var u=S.uploads.find(function(x){return x._id===uid});if(!u)return null;
+  var mine={},n=0;
+  Object.keys(S.cells).forEach(function(k){var c=S.cells[k];if(c.entity!=='INV')return;Object.keys(c.plants||{}).forEach(function(p){var x=c.plants[p];if(x.upload===uid){(mine[c.ym]=mine[c.ym]||[]).push(p);n++}})});
+  var aId=actionIdOf('R5',[uid,'upload']);
+  return {u:u,mine:mine,months:Object.keys(mine).sort(),n:n,later:Math.max(0,(u.plantMonths||0)-n),actId:aId,act:S.actions.find(function(a){return a.id===aId}),fus:S.followups.filter(function(f){return f.action_id===aId})};
+}
+function undoDialog(uid){
+  var pl=undoPlan(uid);if(!pl)return;
+  var u=pl.u,sa=effRole()==='Super admin'&&!readOnly();
+  openDlg('<h3>Undo upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(u.file||'')+' &middot; '+esc(istStr(u.at))+' &middot; '+esc(u.by||'')+'</p>'
+   +'<div class="banner warn" style="display:block"><b>Removes '+pl.n+' plant-month'+(pl.n===1?'':'s')+' in '+pl.months.length+' month'+(pl.months.length===1?'':'s')+'</b> that still point to this upload: their stored invoice chunks, cells entries and roll-up documents. Also its rejected-rows record'+(pl.act?', its action':'')+(pl.fus.length?' and '+pl.fus.length+' follow-up draft'+(pl.fus.length===1?'':'s'):'')+'. The upload stays in history marked Undone, and the undo is logged.</div>'
+   +'<p><b>Months to upload again afterwards:</b> '+(pl.months.length?esc(pl.months.map(ymLabel).join(', ')):'none')+'.</p>'
+   +'<p class="note">Undo cannot bring back what this upload replaced. Any month it overwrote lost its earlier figures, so upload those months again. Months it created are simply removed. '+(pl.later?pl.later+' plant-month'+(pl.later===1?'':'s')+' written by this upload were already replaced by a later upload; those are left alone. ':'')+(u.closedQuarters&&u.closedQuarters.length?'Quarters it closed ('+esc(u.closedQuarters.map(qLabel).join(', '))+') stay closed; reopen them in the coverage grid if needed. ':'')+'</p>'
+   +'<div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'" '+(sa&&pl.n+(pl.act?1:0)+pl.fus.length>=0?'':'disabled')+'>Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');
+}
+async function undoUpload(uid){
+  if(!superOnly('undo an upload'))return;
+  var pl=undoPlan(uid);if(!pl)return;
+  var jobs=[],months=pl.months.slice(),sets=[];
+  pl.months.forEach(function(ym){
+    var c=JSON.parse(JSON.stringify(S.cells['INV_'+ym]));
+    pl.mine[ym].forEach(function(p){var x=c.plants[p];for(var i=0;i<(x.chunks||0);i++)jobs.push('inv/'+x.sys+'-'+p+'-'+ym+'-'+i);if(S.rollDocs[p+'-'+ym])jobs.push('roll/'+p+'-'+ym);delete c.plants[p]});
+    sets.push([ym,c]);
+  });
+  var toast0=function(m){toast(m)};toast0('Undoing '+uid+': removing '+pl.n+' plant-months...');
+  try{
+    /* cells first, so the roll-up rebuilder never sees a month with chunks and no roll */
+    for(var i=0;i<sets.length;i++){var ym=sets[i][0],c=sets[i][1];if(Object.keys(c.plants).length)await dset('cells/INV_'+ym,c);else await ddel('cells/INV_'+ym)}
+    var q=jobs.slice();await Promise.all([0,1,2,3,4].map(async function(){while(q.length){var path=q.shift();await ddel(path)}}));
+    await ddel('rejects/'+uid);
+    if(pl.act)await ddel('actions/'+pl.act._id);
+    for(var f=0;f<pl.fus.length;f++)await ddel('followups/'+pl.fus[f]._id);
+    var up=Object.assign({},S.uploads.find(function(x){return x._id===uid}));delete up._id;
+    await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:months,undone_plant_months:pl.n}));
+    await auditW('upload undone','',{upload:uid,file:(up.file||'').slice(0,120),months:months,plant_months:pl.n});
+    await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,months:months,plant_months:pl.n});
+    closeDlg();
+    openDlg('<h3>Upload '+esc(uid)+' undone</h3><p>Removed '+pl.n+' plant-month'+(pl.n===1?'':'s')+'. <b>Upload these months again:</b> '+(months.length?esc(months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>');
+  }catch(e){var el=$('#d-err');if(el)el.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'. Nothing else was changed; run it again.</div>'}
+}
+Object.assign(handlers,{
+ 'hist-undo':function(t){undoDialog(t.getAttribute('data-id'))},
+ 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'))},
+ 'u-swap-serial':async function(){if(!U||!U.res)return;U.swapSerial=true;U.stage='validating';U.progressMsg='Reading date cells swapped...';renderUpload();await runValidation()},
+ 'u-unswap':async function(){if(!U||!U.res)return;U.swapSerial=false;U.stage='validating';renderUpload();await runValidation()}
+});

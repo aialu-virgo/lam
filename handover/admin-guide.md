@@ -55,3 +55,6 @@ Data Intake > **Load demo data** fills the Desk with synthetic records labelled 
 
 ## Upload fixes panel and aliases (21 Oct 2026)
 Every upload shows a "Fixes applied" panel: what the Desk fixed, the counts, what still needs the source, and the choices left to you (a suggested transfer customer, an unknown category or zone, an unmatched salesperson). Nothing is added unless you click. Admin › Aliases holds the editable tables: item category to product group, zone spelling, designation spelling, B1 salesperson name to employee code, and employee ID prefix to plant. List of problems and what the Desk does about each: [Data upload problems and fixes](upload-issues.md).
+
+## Undo upload and the date check (D32, 21 Oct 2026)
+Data Intake › Upload history › Undo removes everything one upload still holds: stored chunks, cells entries, roll-ups, its rejected-rows record, its action and follow-up drafts, and logs it. It lists the months to upload again, because undo cannot restore what the upload overwrote. Before loading, a file that spans more than two months, has future dates, or does not match the month in its name is stopped with a month histogram; only a Super admin can tick Load anyway. A re-upload that would replace months holding more lines than the new file lists those months and needs a confirm.
