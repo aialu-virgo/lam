@@ -10,7 +10,7 @@ const mk=(file,month,badEvery,seed)=>{const g=G.invoices({shape:'B1',plants,mont
 const f1=mk('Combine Sale 2026-08 skip-few.csv','2026-08',60,21);   /* ~1.7% skipped */
 const f2=mk('Combine Sale 2026-08 skip-many.csv','2026-08',8,22);   /* ~12% skipped */
 const f3=mk('Combine Sale 2026-07 wrong.csv','2026-08',0,23);        /* named July, holds August */
-const st0=JSON.parse(JSON.stringify(store));Object.keys(st0).forEach(k=>{if(/^(cells|inv|roll|uploads|actions|followups|periods\/FY2[67]-Q[12]|audit)/.test(k))delete st0[k]});
+const st0=JSON.parse(JSON.stringify(store));Object.keys(st0).forEach(k=>{if(/^(cells|inv|roll|uploads|rejects|actions|followups|periods\/FY2[67]-Q[12]|audit)/.test(k))delete st0[k]});
 const {page,errs}=await open(browser,{store:st0,autoload:true});await page.waitForTimeout(3500);
 await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(700);
 const up=async f=>{await page.click('[data-act="u-reset"]').catch(()=>{});const inp=await page.$('input[type=file]');await inp.setInputFiles(f);await page.waitForTimeout(2200);await page.click('[data-act="u-validate"]')};
