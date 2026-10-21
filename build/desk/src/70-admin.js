@@ -210,7 +210,7 @@ async function demoActions(){
 }
 /* synthetic masters: written only when no real master is loaded; flagged demo so Clear demo removes only these */
 async function demoMasters(){
-  var by=(S.viewer&&S.viewer.email)||'demo',now=nowISO(),pl=function(c){return 'DEMO plant '+c};
+  var by=whoAmI(),now=nowISO(),pl=function(c){return 'DEMO plant '+c};
   if(!S.salesMaster){
     var P=[['DEMO-M-A','DEMO Manager A','Zone 1','1012','Branch Manager','Branch / depot manager','','DEMO-H-1'],['DEMO-M-B','DEMO Manager B','Zone 2','1013','Branch Manager','Branch / depot manager','','DEMO-H-1'],['DEMO-H-1','DEMO Head Sales','Zone 1','1011','Zonal Head','','','']];
     var sp=[['DEMO Sales 1','Zone 1','1012','DEMO-M-A'],['DEMO Sales 2','Zone 1','1012','DEMO-M-A'],['DEMO Sales 3','Zone 2','1013','DEMO-M-B'],['DEMO Sales 4','Zone 2','1013','DEMO-M-B'],['DEMO Sales 5','Zone 3','1011','DEMO-H-1'],['DEMO Sales 6','Zone 3','1001','DEMO-H-1']];
@@ -240,5 +240,6 @@ async function demoExtras(facts){
 }
 async function demoClearExtras(){
   var cols=[['actions',S.actions],['followups',S.followups],['orders',S.orders],['deliveries',S.deliv],['receivables',S.recv],['collections',S.coll],['stock',S.stock],['roll',Object.keys(S.rollDocs).map(function(k){return S.rollDocs[k]})],['users',S.users],['audit',S.audit]];
-  for(var c=0;c<cols.length;c++){var list=cols[c][1].filter(function(x){return x.demo});for(var i=0;i<list.length;i++)await ddel(cols[c][0]+'/'+list[i]._id)}
+  for(var c=0;c<cols.length;c++){var list=cols[c][1].filter(function(x){return x.demo});
+    if(cols[c][0]==='roll')list=list.filter(function(x){var ce=S.cells['INV_'+x.ym],cp=ce&&ce.plants&&ce.plants[x.plant];return !(cp&&!cp.demo)});/* never delete a roll doc that sits on a real plant-month */for(var i=0;i<list.length;i++)await ddel(cols[c][0]+'/'+list[i]._id)}
 }

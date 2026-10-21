@@ -120,7 +120,7 @@ async function itemLoad(){
   if(!superOnly('load the item master'))return;
   var st=S.mst.items,r=st.res;if(!r||st.stage!=='checked')return;
   st.stage='loading';st.msg='Writing items...';schedule();await tick();
-  var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=(S.viewer&&S.viewer.email)||'unknown',failed=null,chunks=0;
+  var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,chunks=0;
   try{
     var per=3000,n=Math.ceil(r.items.length/per);
     for(var i=0;i<n;i++){var part=r.items.slice(i*per,(i+1)*per);st.msg='Writing chunk '+(i+1)+' of '+n;schedule();
@@ -250,7 +250,7 @@ async function sempLoad(){
   if(!superOnly('load the sales-employee master'))return;
   var st=S.mst.semp,r=st.res;if(!r||st.stage!=='checked')return;
   st.stage='loading';st.msg='Writing the master...';schedule();await tick();
-  var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=(S.viewer&&S.viewer.email)||'unknown',failed=null;
+  var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null;
   try{
     await dset('salesmaster/main',{z:await gz(JSON.stringify(r.people)),n:r.people.length,at:nowISO(),by:by,file:st.name,sheets:r.sheets,read:r.read,rejected:r.rejected,upload:uid,demo:st.demo||undefined,fmt:'gz-json v3: [code,name,zone,plant,plantRaw,designation,role,email,whatsapp,slpCode,b1Name,reportsToCode,endDate,altCode]'});
     await dset('uploads/'+uid,{at:nowISO(),by:by,sys:'B1',entity:'SE',file:st.name,size:st.size||0,mode:'master',periodLabel:'Sales employees: '+r.sheets.join(', '),read:r.read,loaded:r.loaded,rejected:r.rejected+r.unmatched.length,warned:r.warned,status:(r.rejected||r.unmatched.length)?'Partial':'Loaded',demo:st.demo||undefined,match:{names:r.match.names,matched:r.match.matched,rate:r.match.rate}});
