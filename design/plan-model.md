@@ -66,4 +66,4 @@ Quarter plans lock with the quarter ([Target model](target-model.md)). Past-quar
 P1, P2, P6 read the aggregates (plant × month × customer × salesperson × product group) and work. P3 to P5 use their own stores, not the invoice aggregates. **Cannot be done at D9 grain:** item- or line-level plans, per-item stock days, per-SKU TAT. S/4 rows have no salesperson, so P2 actuals for S/4-loaded periods use the customer master's salesperson (**Assumed (new)**).
 
 
-> **D35 (Vijay, 21 Oct 2026):** P5 stock days now use the last 90 days to the stock snapshot's as-on date (not the last three completed months). Stock comes from snapshots: [Stock](../data-map/stock.md).
+> **D34 (Vijay, 21 Oct 2026):** P5 stock days now use the last 90 days to the stock snapshot's as-on date (not the last three completed months). Stock comes from snapshots: [Stock](../data-map/stock.md).

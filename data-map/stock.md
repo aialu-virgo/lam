@@ -13,7 +13,7 @@ related:
 ---
 
 # Stock (SAP export)
-**Owner:** Data Architect · **Built:** Full-Stack Engineer · **Decision:** D35 (Vijay, 21 Oct 2026, "build stock data intake").
+**Owner:** Data Architect · **Built:** Full-Stack Engineer · **Decision:** D34 (Vijay, 21 Oct 2026, "build stock data intake").
 
 ## Source and export
 Stock is a **snapshot "as on" a date**, never a period sum. The as-on date comes from the file name (for example `Stock 2026-10-20` or `Stock_Overview_Totals-2026-10-20-1.xlsx`); if the name has none, the uploader picks it (required). A new upload for the same date replaces that snapshot.

@@ -92,4 +92,4 @@ Team & Scorecard shows, per person and per role: the role's KPIs, plan vs actual
 - **O-K1 (SP Sir):** default plan values for P7 (90% on-time closure, 15% overdue, 10% aged stock, 90% on-time dispatch). Recommendation: accept as proposed, review after the first quarter of use.
 
 
-> **D35:** K15 stock days = on hand sheets ÷ average daily sheets sold in the last 90 days to the as-on date; K16 aged stock % is shown only when the stock file has batch dates ([Stock](../data-map/stock.md)).
+> **D34:** K15 stock days = on hand sheets ÷ average daily sheets sold in the last 90 days to the as-on date; K16 aged stock % is shown only when the stock file has batch dates ([Stock](../data-map/stock.md)).
