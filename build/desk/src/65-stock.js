@@ -1,4 +1,4 @@
-/* ================= Stock intake and Inventory (D35, Vijay: "build stock data intake", 21 Oct 2026) =================
+/* ================= Stock intake and Inventory (D34, Vijay: "build stock data intake", 21 Oct 2026) =================
  * Stock is a SNAPSHOT as on a date, never a period sum. Per snapshot the `stock` collection holds:
  *   stock/snap_YYYYMMDD            index + aggregates per plant x product group (small)
  *   stock/it_YYYYMMDD_<plant>_<n>  per-item rows of one plant, gzipped, chunked like inv
