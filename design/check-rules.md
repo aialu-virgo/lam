@@ -146,3 +146,7 @@ Run **on page load and on each upload**, on open periods only. They never use la
 
 ## Weekly review
 Rejected rows and unanswered follow-ups are reviewed weekly ([Rules — learning](../.claude/rules/learning.md)); a repeated cause becomes a new V rule.
+
+
+## V13. Date sanity (D32, 21 Oct 2026)
+Before any write: a file whose dates fall in more than 2 calendar months (months holding at least 0.5% of rows), contain a date after today, or are named for one month (YYYY-MM in the file name) while under half of the rows fall in it, is stopped and shown with a month histogram. Super admin may Load anyway. Excel serial dates are never day/month-swapped automatically; reading them swapped is an explicit Super admin choice offered only when it makes the file consistent. A re-upload that would replace plant-months holding more lines than the new data needs a confirm listing those months. Undo upload removes what one upload still holds (it cannot restore what it overwrote).
