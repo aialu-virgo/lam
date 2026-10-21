@@ -4,6 +4,7 @@ summary: Super admin routine: monthly uploads, coverage grid, rejected rows, clo
 status: draft (to check against desk-v1.0 in the page)
 updated: 2026-10-20
 related:
+  - handover/upload-issues.md
   - handover/_index.md
   - handover/super-admin.md
   - handover/s4hana-switch.md
