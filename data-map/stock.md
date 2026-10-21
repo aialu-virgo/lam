@@ -1,8 +1,8 @@
 ---
 title: Data map — Stock
-summary: Stock by plant and item: no export yet; exact B1 OITW and batch query columns for stock days and ageing.
+summary: Stock by plant and item: S/4 Stock Overview Totals export received 21 Oct 2026 (layout below); B1 OITW/batch query still listed for history.
 status: draft
-updated: 2026-10-20
+updated: 2026-10-21
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -13,10 +13,12 @@ related:
 ---
 
 # Stock (SAP export)
-**Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Stock · **Status:** **no stock export uploaded.**
+**Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Stock · **Status:** first S/4 export received 21 Oct 2026; intake being built ([Decisions](../decisions.md) D34).
 
 ## Source and export
-- **Not available.** Effect: no Inventory page (stock vs plan, stock days, ageing) and no ageing-stock actions.
+- **S/4 "Stock Overview Totals"** (`Stock_Overview_Totals-YYYY-MM-DD-N.xlsx`): one sheet `Data`, header on row 1, one row per material × plant × batch, storage location W003, unit PC (sheets), INR. As-on date comes from the file name.
+- Columns: Company Code, Plant, Material Type, Material Group, Old Material Number, Material, Material Description, Batch, Storage Location, Stock Quantity/Value on Period Start, Total Goods Receipt Quantity/Value, Total Goods Issue Quantity/Value, Stock Quantity/Value on Period End, Debit/Credit Revaluation, Base Unit of Measure, Currency, Price Control.
+- Map: `on_hand_sheets` = Stock Quantity on Period End (summed over batches); value = Stock Value on Period End; `item_code` = Old Material Number (B1 code), S/4 `MATNR` = Material. Zero-end rows skipped; start + receipts − issues ≠ end is a warning, never a reject.
 - **Snapshot entity:** "as on" a date; a new snapshot replaces the previous; month-end snapshots are kept for the trend.
 
 ## Export to request (Q-D19)
