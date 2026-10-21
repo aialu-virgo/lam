@@ -133,9 +133,9 @@ document.addEventListener('change',function(ev){var t=ev.target;if(t.getAttribut
 /* ================= Team & Scorecard ================= */
 var ROLE_KPIS={
  'Super admin':['K24','K21','K17'],'Management / HO':['K1','K2','K3','K5','K6','K9','K10','K20','K23'],
- 'HOD':null,'Branch / depot manager':['K1','K2','K3','K4','K7','K8','K9','K10','K14','K15','K23','K25'],'Sales executive':['K1','K2','K3','K4','K7','K8'],
- 'Coordinator (sales / CRR)':['K12','K13','K14','K22'],'Accounts':['K9','K10','K11'],'Plant':['K12','K13','K14','K15','K16']};
-var DEPT_KPIS={Sales:['K1','K3','K8'],CRR:['K12','K13','K14'],Accounts:['K9','K10','K11'],Plant:['K12','K15','K16'],HO:['K1','K3']};
+ 'HOD':null,'Branch / depot manager':['K1','K2','K3','K4','K7','K8','K9','K10','K15','K23','K25'],'Sales executive':['K1','K2','K3','K4','K7','K8'],
+ 'Coordinator (sales / CRR)':['K1','K3','K22'],'Accounts':['K9','K10','K11'],'Plant':['K1','K15','K16']};
+var DEPT_KPIS={Sales:['K1','K3','K8'],CRR:['K1','K3','K22'],Accounts:['K9','K10','K11'],Plant:['K1','K15','K16'],HO:['K1','K3']};
 var COMMON=['K17','K18','K19'];
 function kpiIdsFor(u){var base=u.role==='HOD'?(DEPT_KPIS[u.department]||DEPT_KPIS.Sales).concat(['K17','K19','K20','K25']):(ROLE_KPIS[u.role]||[]).slice();COMMON.forEach(function(k){if(base.indexOf(k)<0)base.push(k)});return base}
 function spKeyOf(u){var cands=[norm(u.sales_employee_code),norm(u.name)].filter(Boolean);var mc=SM.byCode[norm(u.sales_employee_code)];if(mc)cands.push(norm(mc.name));var keys=Object.keys(DS.spIdx);for(var i=0;i<keys.length;i++)if(cands.indexOf(norm(keys[i]))>=0)return keys[i];return null}
@@ -172,7 +172,6 @@ function kpiCompute(id,u,ctx){
    case 'K9':{var co=collectionFigs(ctx,f&&f.plants);Object.assign(K,{name:'Collection achievement %',kind:'pct',actual:co.ach,plan:co.plan>0?100:null,detail:co.detail,none:co.plan<=0,pending:!co.have});break}
    case 'K10':{var rv=recvStats(f&&f.plants);Object.assign(K,{name:'Overdue share %',kind:'pct',actual:rv.have?rv.overShare:null,plan:15,lower:true,detail:rv.have?'':'Needs the receivable export',pending:!rv.have});break}
    case 'K11':{var rv2=recvStats(f&&f.plants);Object.assign(K,{name:'Ageing profile (0–30 / 31–60 / 61–90 / 90+)',kind:'text',text:rv2.have?rv2.buckets.map(function(b){return fmtMoney(b)}).join(' / '):'—',none:true,pending:!rv2.have});break}
-   case 'K12':case 'K13':case 'K14':{var od=orderStats(f&&f.plants);var map={K12:['On-time dispatch %','pct',od.have?od.onTime:null,90,false],K13:['Order-to-dispatch days','days',od.have?od.o2d:null,CFG.tat_days,true],K14:['Open orders beyond TAT','n',od.have?od.late:null,0,true]};var m=map[id];Object.assign(K,{name:m[0],kind:m[1],actual:m[2],plan:m[3],lower:m[4],pending:!od.have,detail:od.have?'':'Needs the sales order and delivery exports'});break}
    case 'K15':case 'K16':{var st=stockStats(f&&f.plants);var m2=id==='K15'?['Stock days','days',st.have?st.days:null,CFG.stock_days_target,true]:['Aged stock %','pct',st.have?st.agedPct:null,10,true];Object.assign(K,{name:m2[0],kind:m2[1],actual:m2[2],plan:m2[3],lower:m2[4],pending:!st.have,detail:st.have?'':'Needs the stock export'});break}
    case 'K17':Object.assign(K,{name:'On-time closure %',kind:'pct',actual:pct(cur.onTime,cur.done),plan:90,last:pct(prv.onTime,prv.done),detail:cur.onTime+' of '+cur.done+' on time'});break;
    case 'K18':Object.assign(K,{name:'Response within 1 day %',kind:'pct',actual:pct(cur.quick,cur.assigned),plan:90,last:pct(prv.quick,prv.assigned),detail:cur.quick+' of '+cur.assigned+' assigned'});break;
@@ -248,7 +247,7 @@ function personTrend(p,f,ctx){
   }
   if(noData())return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
   if(f==null)return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
-  return trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch history (sales order and delivery exports) is not loaded yet, so there is no 12-quarter dispatch series.</p>':'')+drillPanel(ctx);
+  return trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch KPIs were dropped (D31).</p>':'')+drillPanel(ctx);
 }
 
 /* salespeople from the sales-employee master that match the B1 names: scorecards for people who are not Desk users */

@@ -12,11 +12,11 @@ related:
 ---
 
 # Plant guide
-You see orders, dispatch and stock for your own plant only. All figures in the examples are DEMO.
+You see stock for your own plant only (Orders & Dispatch was removed, D31). All figures in the examples are DEMO.
 
 ## What you see
-- Orders & Dispatch, Inventory and Action Center, for your plant. Another plant's orders never appear.
-- You respond on plant actions (order beyond TAT, ageing stock) and propose P4 and P5.
+- Inventory and Action Center, for your plant.
+- You respond on plant actions (ageing stock) and propose P5.
 Every table follows one layout: Potential, Target, Actual, Var, Ach %, Share %, Last Qtr, QoQ %, Trend, with a total row. Growth is quarter on quarter only; there is no last-year comparison. A quarter with partial history shows QoQ greyed with "incomplete history". Achievement is not shown for a target that is not approved.
 
 ## Your Today list
@@ -39,4 +39,4 @@ Tap a figure, chart bar or scorecard number and keep going: branch, salesperson,
 ## Follow-up drafts
 The Desk writes the follow-up text (Reminder one day before due, L1 one day overdue, L2 at 3 days, L3 at 7 days); **nothing sends by itself**. No. You do not send drafts. Texts about your action reach you from your sender. A sender uses Copy, Open mail or Open WhatsApp (a link, no WhatsApp service), then marks Sent or Dismissed with a reason. Texts are in [Notification templates](../design/notification-templates.md).
 
-Orders and stock need their exports; until then the page shows an empty state naming them. Check in the page.
+Stock needs its export; until then the page shows an empty state naming them. Check in the page.

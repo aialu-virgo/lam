@@ -2,7 +2,7 @@
 title: KRA / KPI set
 summary: KPI catalogue (formula, actual source, plan source) and the KRAs and KPIs per role measured on Team & Scorecard, with status rules and D9 limits.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-20
+updated: 2026-10-21
 related:
   - design/_index.md
   - design/role-matrix.md
@@ -16,6 +16,8 @@ related:
 ---
 
 # KRA / KPI set
+
+> **D31 (Vijay, 21 Oct 2026):** K12, K13 and K14 (dispatch KPIs) are dropped with the Orders & Dispatch page. Coordinator and Plant scorecards keep plant net sales as the primary KPI; Plant keeps stock days and aged stock.
 **Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §5 Team & Scorecard, §4 (every KPI card)
 
@@ -41,9 +43,9 @@ Scopes follow the viewer ([Role matrix](role-matrix.md)). "Aggregates" = the D9 
 | K9 | Collection achievement % | Receipts in the period ÷ collection plan × 100 | Collection export | P3 |
 | K10 | Overdue share % | Open receivables more than 60 days past due ÷ total open × 100 | Receivable export | P7 (default 15%, **Assumed (new)**) |
 | K11 | Ageing profile | Open receivables in 0–30 / 31–60 / 61–90 / 90+ days past due, ₹ and % | Receivable export | none (display) |
-| K12 | On-time dispatch % | Order documents dispatched within plant × group TAT ÷ order documents dispatched | Sales order and delivery exports | P4 TAT, P7 (default 90%, **Assumed (new)**) |
-| K13 | Order-to-dispatch days | Average working days from order date to dispatch date | Sales order and delivery exports | P4 TAT |
-| K14 | Open orders beyond TAT | Count and ₹ of open order documents past TAT | Sales order export | P4 (target 0) |
+| K12 | ~~On-time dispatch %~~ (dropped, D31) | Order documents dispatched within plant × group TAT ÷ order documents dispatched | Sales order and delivery exports | P4 TAT, P7 (default 90%, **Assumed (new)**) |
+| K13 | ~~Order-to-dispatch days~~ (dropped, D31) | Average working days from order date to dispatch date | Sales order and delivery exports | P4 TAT |
+| K14 | ~~Open orders beyond TAT~~ (dropped, D31) | Count and ₹ of open order documents past TAT | Sales order export | P4 (target 0) |
 | K15 | Stock days | On hand sheets ÷ (sheets sold in the last three completed months ÷ days in them), plant × product group | Stock export, aggregates | P5 |
 | K16 | Aged stock % | Sheets older than 180 days ÷ on hand sheets | Stock export (age buckets) | P7 (default 10%, **Assumed (new)**) |
 | K17 | On-time closure % | Actions reaching Done on or before due date ÷ actions reaching Done in the period | Desk action log | P7 (default 90%, **Assumed (new)**) |
@@ -65,12 +67,12 @@ Every role with actions also carries **K17, K18, K19** on its own scorecard.
 |---|---|---|
 | **Super admin** | Data completeness and system health | K24, K21 (all uploaders), upload recency (days since last upload per entity), K17 |
 | **Management / HO** | Business results and plan discipline | K1, K2, K3, K5, K6, K9, K10, K20 (all L3 reached), K23 |
-| **HOD** | Department delivery | Department set: Sales: K1, K3, K8. CRR: K12, K13, K14. Accounts: K9, K10, K11. Plant: K12, K15, K16. Plus K17, K19, K20, K25 |
-| **Branch / depot manager** | Branch results, receivables, execution | K1, K2, K3, K4, K7, K8, K9 (view), K10, K14, K15, K23, K25 |
+| **HOD** | Department delivery | Department set: Sales: K1, K3, K8. CRR: K1, K3, K22. Accounts: K9, K10, K11. Plant: K1, K15, K16. Plus K17, K19, K20, K25 |
+| **Branch / depot manager** | Branch results, receivables, execution | K1, K2, K3, K4, K7, K8, K9 (view), K10, K15, K23, K25 |
 | **Sales executive** | Own targets and customers | K1, K2, K3, K4, K7, K8 (own customers) |
-| **Coordinator (sales / CRR)** | Order flow and follow-through | K12, K13, K14, K22 |
+| **Coordinator (sales / CRR)** | Order flow and follow-through | K1, K3, K22 (primary KPI: net sales in own plants) |
 | **Accounts** | Collections | K9, K10, K11 |
-| **Plant** | Dispatch and stock | K12, K13, K14, K15, K16 |
+| **Plant** | Dispatch and stock | K1, K15, K16 (primary KPI: plant net sales) |
 
 Team & Scorecard shows, per person and per role: the role's KPIs, plan vs actual, K17 on-time closure, K21 data errors (for uploaders), and the trend card (12 quarters, QoQ line, 4-quarter average, direction). A Branch manager sees own team; HOD sees department; Management sees all.
 

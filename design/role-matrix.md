@@ -2,7 +2,7 @@
 title: Role matrix
 summary: Eight roles with the row-level scope filter applied before rendering, allowed actions, Today cap and one QA test case each, on a small demo fixture.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-20
+updated: 2026-10-21
 related:
   - handover/_index.md
   - design/_index.md
@@ -21,6 +21,8 @@ related:
 ---
 
 # Role matrix
+
+> **D31 (Vijay, 21 Oct 2026):** the Orders & Dispatch page is removed from every role. Coordinator keeps own-plant scope on the Sales page (customers and documents); Plant keeps Inventory. No role is left without a page. Rows below that still name orders or dispatch are superseded.
 **Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §3
 
@@ -38,10 +40,10 @@ related:
 **Assumed (new), editable in Admin.** A department decides which pages and actions a HOD sees.
 | Department | Pages | Action sources |
 |---|---|---|
-| Sales | Overview, Sales, Orders & Dispatch, Team & Scorecard | Plan shortfall, QoQ decline, missing plan |
-| CRR | Orders & Dispatch, Sales (customer and document view) | Order beyond TAT |
+| Sales | Overview, Sales, Team & Scorecard | Plan shortfall, QoQ decline, missing plan |
+| CRR | Sales (customer and document view) | — |
 | Accounts | Receivables | Overdue receivable |
-| Plant | Orders & Dispatch, Inventory | Order beyond TAT, ageing stock |
+| Plant | Inventory | Ageing stock |
 | HO | All | All |
 
 ## Matrix
@@ -52,11 +54,11 @@ Plants: "own" means `plant_code ∈ user.plant_codes`. "Sees" lists data scope; 
 | **Super admin** | All rows, all plants, all users | All, including Data Intake and Admin | Users, roles, rules and settings, masters, plan and data upload; re-load a closed quarter (logged); lock quarter; view-as; every action of every role |
 | **Management / HO** | All plants and departments (`plant_codes` blank) | All except Admin settings and Data Intake (view only on Intake) | Propose and **approve** plans; assign and reassign any action; **verify** closures; see escalations; approve revisions (never own) |
 | **HOD** | All plants; department filter per the Department table; actions where `department` = own | Pages of own department; Action Center for own department | Assign and close department actions; propose department plans (P4, P5, P7); approve P2 and P4 and P5 |
-| **Branch / depot manager** | `plant_code ∈ plant_codes`; customers and persons of those plants; actions owned by or assigned within own plants | Overview, Sales, Orders & Dispatch, Receivables, Inventory (own plants), Action Center, Team & Scorecard (own team) | Propose branch plans (P1, P2, P3 view, P6, P7); assign within branch; respond; request reassign; verify closure of actions assigned by self |
+| **Branch / depot manager** | `plant_code ∈ plant_codes`; customers and persons of those plants; actions owned by or assigned within own plants | Overview, Sales, Dispatch, Receivables, Inventory (own plants), Action Center, Team & Scorecard (own team) | Propose branch plans (P1, P2, P3 view, P6, P7); assign within branch; respond; request reassign; verify closure of actions assigned by self |
 | **Sales executive** | Aggregate rows where `salesperson = sales_employee_code`, plus customers whose master salesperson is the user. Where the row has no salesperson (S/4 periods) the customer master's salesperson is used | Today, Sales (own customers), own scorecard, own actions | Respond to own actions and follow-ups: Acknowledge, Update, Mark done, Need help, Request reassign. Cannot assign or approve |
 | **Coordinator (sales / CRR)** | Plants in `plant_codes`; orders, dispatch, customers. Sales page shows customers and documents only (no target, potential or scorecard columns) | Orders & Dispatch, Sales (customer and document view), Action Center | Raise and track actions within scope; send follow-up drafts (copy, open mail, open WhatsApp, mark Sent) for own scope ([Escalation ladder](escalation-ladder.md)) |
 | **Accounts** | Plants in `plant_codes` (blank = all); receivables and collections | Receivables, Action Center | Respond on collection actions; propose P3 for own plants |
-| **Plant** | `plant_code ∈ plant_codes` (own plant) | Orders & Dispatch, Inventory, Action Center | Respond on plant actions; propose P4 and P5 |
+| **Plant** | `plant_code ∈ plant_codes` (own plant) | Inventory, Action Center | Respond on plant actions; propose P4 and P5 |
 
 ## Capability grid
 Y = yes, own scope. P = propose only. A = approves. V = view only. — = no.

@@ -25,7 +25,7 @@ Only a Super admin sees Data Intake and Admin. SAP is the only source of transac
 4. Read the result: rows read, loading, rejected. Choose **Load good rows**. Mode **Daily** replaces the open period for that entity; **Historic** loads past quarters, split by document date.
 5. Masters (customer, item, plant, sales employee, internal transfer customers, users) change rarely; upload them from Admin when they change. Templates: [data-map/templates](../data-map/templates).
 6. Open **Admin > Tools**: the rules engine runs on each load; "Run the rules now" and "Rebuild roll-ups now" are there if a page looks stale.
-Which entities (orders, deliveries, receivables, collections, stock, credit notes) have an intake yet: check in the page; those pages show an empty state naming the export needed.
+Which entities (receivables, collections, stock, credit notes) have an intake yet: check in the page; those pages show an empty state naming the export needed.
 
 ## Item and sales-employee masters
 - **Admin > Item master:** upload the FG item master (XLSX). Laminate, Door, PVC sheet and Compact board items are kept; other categories are counted, not stored. Sizes convert to sq ft (8X4 = 32).
@@ -52,3 +52,6 @@ Admin > Rules & settings: every threshold (priority weights, which must total 10
 
 ## Demo data
 Data Intake > **Load demo data** fills the Desk with synthetic records labelled DEMO; **Clear demo** removes them. Clear demo before real use. Tools has a "test clock" (this browser only) for walking through the escalation ladder.
+
+## Upload fixes panel and aliases (21 Oct 2026)
+Every upload shows a "Fixes applied" panel: what the Desk fixed, the counts, what still needs the source, and the choices left to you (a suggested transfer customer, an unknown category or zone, an unmatched salesperson). Nothing is added unless you click. Admin › Aliases holds the editable tables: item category to product group, zone spelling, designation spelling, B1 salesperson name to employee code, and employee ID prefix to plant. List of problems and what the Desk does about each: [Data upload problems and fixes](upload-issues.md).

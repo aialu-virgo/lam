@@ -14,12 +14,10 @@ const res=[];const ok=(n,c,d)=>{res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
  await page.context().close();}
 /* empty database: ships empty */
 {const {page,errs}=await open(browser,{store:{}});await page.waitForTimeout(2000);
- const pages=['overview','sales','orders','receivables','inventory','today','actions','team'];const out=[];
+ const pages=['overview','sales','receivables','inventory','today','actions','team'];const out=[];
  for(const p of pages){await page.evaluate(x=>{location.hash='#/'+x},p);await page.waitForTimeout(500);out.push(p+': '+(await page.innerText('#pg')).replace(/\n+/g,' ').slice(0,110))}
  console.log(out.join('\n'));
  const t=await page.innerText('#pg');ok('empty: no error banners',!errs.filter(e=>!/ERR_FAILED/.test(e)).length,JSON.stringify(errs.filter(e=>!/ERR_FAILED/.test(e))));
- await page.evaluate(()=>{location.hash='#/orders'});await page.waitForTimeout(400);
- const o=await page.innerText('#pg');ok('Orders empty state names the export',/Sales order export needed/.test(o)&&/Delivery export needed/.test(o)&&/data-map\/sales-order.md/.test(o),'');
  await page.evaluate(()=>{location.hash='#/receivables'});await page.waitForTimeout(400);
  const rv=await page.innerText('#pg');ok('Receivables empty state names exports',/Receivable export needed/.test(rv)&&/Collection export needed/.test(rv),'');
  await page.evaluate(()=>{location.hash='#/inventory'});await page.waitForTimeout(400);

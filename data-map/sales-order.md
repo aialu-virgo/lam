@@ -1,8 +1,8 @@
 ---
 title: Data map — Sales order
 summary: Sales orders: no export yet; exact B1 ORDR/RDR1 query columns for open orders and O2D; S/4 only shows an order-creation date on invoiced lines.
-status: draft
-updated: 2026-10-20
+status: not used (D31)
+updated: 2026-10-21
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -14,6 +14,8 @@ related:
 ---
 
 # Sales order (SAP export)
+
+> **D31 (Vijay, 21 Oct 2026):** not used. Orders & Dispatch was removed from scope; no export of this entity is needed. Kept for history.
 **Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Sales order · **Status:** **no sales order export uploaded.**
 
 ## Source and export

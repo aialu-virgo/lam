@@ -282,22 +282,16 @@ a.btn{text-decoration:none;display:inline-block}
     }
     return { headers: headers, rows: rows, facts: facts };
   }
-  /* Open-item demo stores for orders, deliveries, receivables, collections and stock. All values invented. */
+  /* Open-item demo stores for receivables, collections and stock (orders and deliveries dropped, D31). All values invented. */
   function ops(o) {
     var R = rng(o.seed || 21), today = o.today, plants = o.plants || [], groups = ['Laminate', 'Door', 'PVC sheet', 'Compact board'];
     function addDays(s, n) { return new Date(Date.parse(s + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10); }
     function ymShift(ym, k) { var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + k; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return y + '-' + pad(m + 1, 2); }
-    var out = { orders: [], deliveries: [], receivables: [], collections: [], stock: [] };
+    var out = { receivables: [], collections: [], stock: [] };
     plants.forEach(function (p, pi) {
-      var ord = [], del = [], rec = [], n;
-      n = 8 + Math.floor(R() * 6);
-      for (var i = 0; i < n; i++) { var age = 1 + Math.floor(R() * 14); ord.push(['DEMO-SO-' + p.code + '-' + (100 + i), addDays(today, -age), 'DEMOCU' + pad(1 + Math.floor(R() * 40), 6), groups[Math.floor(R() * 3)], 'DEMO Customer ' + (1 + Math.floor(R() * 40)) + ' Traders', Math.round((40000 + R() * 900000) / 100) * 100, 20 + Math.floor(R() * 200)]); }
-      n = 60;
-      for (i = 0; i < n; i++) { var oa = 3 + Math.floor(R() * 85), lead = 1 + Math.floor(R() * 6); del.push(['DEMO-SO-' + p.code + '-' + (500 + i), addDays(today, -oa), addDays(today, -oa + lead), groups[Math.floor(R() * 3)]]); }
+      var rec = [], n, i;
       n = 22 + Math.floor(R() * 10);
       for (i = 0; i < n; i++) { var cu = 1 + Math.floor(R() * 40), od = Math.floor(R() * 120) - 50, tot = Math.round((30000 + R() * 700000) / 100) * 100; rec.push(['DEMO-INV-' + p.code + '-' + (900 + i), 'DEMOCU' + pad(cu, 6), 'DEMO Customer ' + cu + ' Traders', addDays(today, -od), Math.round(tot * (0.5 + R() * 0.5)), tot]); }
-      out.orders.push({ plant: p.code, rows: ord });
-      out.deliveries.push({ plant: p.code, rows: del });
       out.receivables.push({ plant: p.code, asOn: today, rows: rec });
       out.stock.push({ plant: p.code, asOn: today, rows: groups.map(function (g, gi) { var on = 600 + Math.floor(R() * 3400), aged = Math.floor(on * (R() * 0.18)); return [g, on, aged, [Math.floor(on * 0.5), Math.floor(on * 0.3), aged]]; }) });
       (o.months || []).forEach(function (ym) { var total = Math.round((1800000 + R() * 2600000) / 1000) * 1000; var rcs = [], left = total, nr = 5; for (var ri = 0; ri < nr; ri++) { var amt = ri === nr - 1 ? left : Math.round(total / nr * (0.6 + R() * 0.8) / 100) * 100; amt = Math.min(amt, left); left -= amt; rcs.push(['DEMO-RCT-' + p.code + '-' + ym.replace('-', '') + '-' + (ri + 1), 1 + Math.floor(R() * 27), 'DEMOCU' + pad(1 + Math.floor(R() * 40), 6), amt]); }
@@ -318,8 +312,8 @@ var SEED_SUPER=['data@virgoasia.com','spa@virgoasia.com'];
 var ROLES=['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive','Coordinator (sales / CRR)','Accounts','Plant'];
 var GROUPS=['Laminate','Door','PVC sheet','Compact board'];
 var SEGMENT_NOTE='Segments are configurable (open question Q5).';
-var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'SO',label:'Sales order'},{k:'DL',label:'Delivery'},{k:'CN',label:'Credit note'},{k:'RC',label:'Receivable'},{k:'CL',label:'Collection'},{k:'ST',label:'Stock'}];
-var ODATA=[['Customer','API_BUSINESS_PARTNER'],['Item','API_PRODUCT_SRV'],['Sales order','API_SALES_ORDER_SRV'],['Delivery','API_OUTBOUND_DELIVERY_SRV'],['Invoice / credit note','API_BILLING_DOCUMENT_SRV'],['Receivable / collection','I_OperationalAcctgDocItem'],['Stock','API_MATERIAL_STOCK_SRV']];
+var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'CN',label:'Credit note'},{k:'RC',label:'Receivable'},{k:'CL',label:'Collection'},{k:'ST',label:'Stock'}];
+var ODATA=[['Customer','API_BUSINESS_PARTNER'],['Item','API_PRODUCT_SRV'],['Invoice / credit note','API_BILLING_DOCUMENT_SRV'],['Receivable / collection','I_OperationalAcctgDocItem'],['Stock','API_MATERIAL_STOCK_SRV']];
 var TEMPLATES={
  users:'email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code',
  plants:'plant_code,plant_name,plant_type,zone,state,b1_bpl_name,active',
@@ -542,7 +536,8 @@ function renderUpload(){
     h+='<div class="drop" id="u-drop"><b>Drop a CSV or XLSX here</b> or <label class="btn sm" for="u-file" style="display:inline-block">Choose file</label><input id="u-file" type="file" accept=".csv,.xlsx,.xls,.txt" style="position:absolute;opacity:0;width:1px;height:1px">'
      +'<div class="note" style="margin-top:6px">One file per entity per quarter, or a multi-quarter file split by document date. The file is read in this browser; nothing is sent anywhere else.</div>'
      +(st==='parsing'?'<div style="margin-top:10px"><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(U.msg||'Reading file...')+'</div></div>':'')+'</div>';
-    if(U.msg&&st==='idle')h+='<div class="banner err">'+esc(U.msg)+'</div>';
+    if(U.transferDone&&st==='idle')h+=U.transferDone;
+    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+'</div>';
   }
   if(st==='mapping'||st==='validating'||st==='validated'||st==='loading'||st==='done'){
     h+='<div class="banner info"><span><b>'+esc(U.name)+'</b> &middot; '+fmtN(U.rows.length)+' data rows &middot; '+U.headers.length+' columns &middot; detected source <b>'+(U.sys==='B1'?'SAP B1':'SAP S/4HANA')+'</b>'+(U.savedMap?' &middot; saved mapping applied':'')+'</span><button class="btn sm" data-act="u-reset" '+(locked?'disabled':'')+'>Choose another file</button></div>';
@@ -585,6 +580,7 @@ function resultHtml(){
   var h='<div class="hd"><h2>Validation result</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?'Some rows rejected':'All rows pass')+'</span></div>';
   h+='<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Good rows loading</small><b>'+fmtN(r.good)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b></div>'+(r.preHist&&r.preHist.rows?'<div class="kpi"><small>Before history start (FY25-26 and earlier)</small><b>'+fmtN(r.preHist.rows)+'</b><small>not loaded, no action needed</small></div>':'')
    +'<div class="kpi"><small>Out of scope (kept in record)</small><b>'+fmtN(r.other.rows)+'</b></div><div class="kpi"><small>Internal transfers (flagged)</small><b>'+fmtN(r.xfer.rows)+'</b><small>'+fmtN(r.xferMaster)+' via the Admin list</small></div></div>';
+  h+=invoiceFixes(r);
   if(r.dateInfo.mixed)h+='<div class="banner warn"><span>This file mixes real date cells and dd/mm/yyyy text. Day and month were swapped back on '+fmtN(r.dateInfo.swapped)+' date cells ('+fmtN(r.dateInfo.unfixable)+' could not be fixed). Resulting range <b>'+esc(r.minDate||'-')+' to '+esc(r.maxDate||'-')+'</b>.</span><label class="chip"><input type="checkbox" id="u-confd" data-chg="confd" '+(U.confirmDates?'checked':'')+' '+(locked?'disabled':'')+'> I confirm this range</label></div>';
   else h+='<div class="note">Dates run '+esc(r.minDate||'-')+' to '+esc(r.maxDate||'-')+'.</div>';
   if(r.fanout)h+='<div class="note">S/4 fan-out: '+fmtN(r.fanout)+' surplus repeated rows removed (same document and item). Not an error.</div>';
@@ -697,25 +693,31 @@ async function onFile(file){
   var mode=U.mode,period=U.period,ent=U.entity;
   U=newU();U.mode=mode;U.period=period;U.entity=ent;U.stage='parsing';U.msg='Reading '+file.name+' ('+fmtBytes(file.size)+'). Large XLSX files can take a minute.';U.name=file.name;U.size=file.size;
   renderUpload();await tick();
+  var sheetsSeen0=null;
   try{
     var rows;
     if(/\.(xlsx|xls)$/i.test(file.name)){
       if(typeof XLSX==='undefined')throw new Error('The spreadsheet reader did not load. Check the connection, or save the file as CSV.');
       var buf=await file.arrayBuffer();await tick();
       var names=XLSX.read(buf,{type:'array',bookSheets:true}).SheetNames||[];
-      var pick=names.find(function(n){return /^(data|sapui5 export)$/i.test(n)})||names.find(function(n){return !/^filter$/i.test(n)})||names[0];
-      U.msg='Parsing sheet "'+pick+'"...';renderUpload();await tick();
+      var heads={};try{var wh=XLSX.read(buf,{type:'array',sheetRows:2,dense:true});names.forEach(function(n){var rr=XLSX.utils.sheet_to_json(wh.Sheets[n]||{},{header:1,raw:true,defval:'',blankrows:false});heads[n]=(rr[0]||[]).map(function(x){return x==null?'':String(x)})})}catch(e){}
+      var kindOf=function(n){return heads[n]&&heads[n].length?detect(heads[n]):{type:'empty'}};
+      var pick=names.find(function(n){return /^(data|sapui5 export)$/i.test(n)&&kindOf(n).type==='invoice'})||names.find(function(n){return kindOf(n).type==='invoice'})||names.find(function(n){return /^(data|sapui5 export)$/i.test(n)})||names.find(function(n){return heads[n]&&heads[n].length&&!/^filter$/i.test(n)})||names.find(function(n){return !/^filter$/i.test(n)})||names[0];
+      U.sheetPicked=pick;U.sheetsSeen=names.map(function(n){var k=kindOf(n);return n+' ('+(k.type==='invoice'?'invoice export':k.type==='master'?k.what+' list':k.type==='empty'?'empty':(heads[n]||[]).slice(0,4).join(', ')+(heads[n]&&heads[n].length>4?'...':''))+')'});
+      sheetsSeen0=U.sheetsSeen;U.msg='Parsing sheet "'+pick+'"...';renderUpload();await tick();
       var wb=XLSX.read(buf,{type:'array',sheets:pick,dense:true,cellDates:false,cellNF:false,cellStyles:false,cellFormula:false,cellHTML:false});
       rows=XLSX.utils.sheet_to_json(wb.Sheets[pick],{header:1,raw:true,defval:'',blankrows:false});
     }else{
       var txt=await file.text();await tick();rows=parseCSV(txt);
     }
-    if(!rows.length)throw new Error('The file is empty.');
+    if(!rows.length){U=newU();U.mode=mode;U.period=period;U.msg='The sheet is empty'+(U.sheetsSeen?'':'')+'. Expected the B1 Combine Sale export (sheet DATA: docnum, CardCode, BPLName ...) or the S/4 Sales Register (sheet SAPUI5 Export: Invoice Document Number, Plant, Invoice Date ...).'+(sheetsSeen0&&sheetsSeen0.length?' Sheets in the workbook: '+sheetsSeen0.join('; ')+'.':'');renderUpload();return}
     var headers=rows[0].map(function(x){return x==null?'':String(x)});
     var d=detect(headers);
+    var sheetsSeen=U.sheetsSeen,sheetPicked=U.sheetPicked;
+    if(d.type==='master'&&d.what==='transfers'){U=newU();U.mode=mode;U.period=period;U.offer={file:file,rows:rows,what:'transfers'};U.msg='This file is the internal-transfer list (CardCode, CardName, Tranfser), not the sales export'+(sheetsSeen&&sheetsSeen.length>1?'. Sheets in the workbook: '+sheetsSeen.join('; ')+'. Save the DATA sheet as the CSV, or load the whole XLSX':'')+'. You can load it as the Internal-transfer list instead.';renderUpload();return}
     if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}
-    if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;U.msg='The headers match no known file. Expected an invoice export from SAP B1 (docnum, CardCode, BPLName ...) or the S/4 sales register (Invoice Document Number, Plant ...).';renderUpload();return}
-    U.headers=headers;U.rows=rows.slice(1);U.sys=d.sys;U.map=defaultMap(headers,d.sys);
+    if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;U.msg='The headers match no known file'+(rows.length<2?' (the sheet has no data rows)':'')+'. Found: '+(headers.filter(Boolean).slice(0,8).join(', ')||'no header row')+(sheetsSeen&&sheetsSeen.length?'. Sheets in the workbook: '+sheetsSeen.join('; '):'')+'. Expected the B1 Combine Sale export (sheet DATA: docnum, CardCode, BPLName ...) or the S/4 Sales Register (sheet SAPUI5 Export: Invoice Document Number, Plant, Invoice Date ...). For a master, use Admin.';renderUpload();return}
+    U.headers=headers;U.sheetPicked=sheetPicked;U.rows=rows.slice(1);U.sys=d.sys;U.map=defaultMap(headers,d.sys);
     var sv=S.mappings[d.sys+'_invoice'];
     if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
     U.stage='mapping';U.msg='';
@@ -741,11 +743,13 @@ function validYMD(t){if(!t||t.m<1||t.m>12||t.d<1||t.d>31||t.y<1990||t.y>2100)ret
 function groupOf(sys,cat,tt){
   var c=norm(cat).toUpperCase();
   if(sys==='S4'){
+    var al4=catGroupAlias(cat);if(al4!==undefined&&c!=='ZABLAM'&&c!=='ZCRLAM'&&c!=='ZCBPVC')return al4;
     if(c==='ZCBPVC')return 'PVC sheet';
     if(c==='ZABLAM'||c==='ZCRLAM'){var t=norm(tt).toUpperCase();if(t==='DOOR')return 'Door';if(t.indexOf('COMPACT')>=0)return 'Compact board';return 'Laminate'}
     return null;
   }
   if(!c)return null;
+  var al=catGroupAlias(cat);if(al!==undefined)return al;
   if(c.indexOf('DECORATIVE LAMINATE')===0)return c.indexOf('DOOR')>=0?'Door':'Laminate';
   if(c.indexOf('PVC SHEET')===0)return 'PVC sheet';
   if(c.indexOf('COMPACT')>=0)return 'Compact board';
@@ -775,7 +779,7 @@ async function runValidation(){
   var sys=U.sys,map=U.map,rows=U.rows,n=rows.length;
   var resolve=plantResolver();
   var g=gridQuarters(),lo=qStartYm(g.list[0]),hi=qEndYm(g.cur);
-  var res={preHist:{rows:0,value:0},read:n,good:0,rejected:0,warned:0,fanout:0,injection:0,reasons:{},rejects:[],groups:{},other:{rows:0,value:0},xfer:{rows:0,value:0},quarters:{},pm:new Map(),unknownPlants:{},dateInfo:{mixed:false,swapped:0,unfixable:0},minDate:null,maxDate:null,missingSize:0,noLineCol:map.line<0};
+  var res={af:{dateKinds:{},lineSynth:0,dupNoLine:0,catAlias:0,catSpellings:0,catUnknown:{},catBlank:0,zoneNorm:0,zoneSpellings:0,zoneUnknown:{},junk:{zone:0,itype:0,pos:0},xferSuggest:{},spNames:{},blankSp:0,spFilled:0,spUnlinked:0},preHist:{rows:0,value:0},read:n,good:0,rejected:0,warned:0,fanout:0,injection:0,reasons:{},rejects:[],groups:{},other:{rows:0,value:0},xfer:{rows:0,value:0},quarters:{},pm:new Map(),unknownPlants:{},dateInfo:{mixed:false,swapped:0,unfixable:0},minDate:null,maxDate:null,missingSize:0,noLineCol:map.line<0};
   var cols=function(k){return map[k]==null?-1:map[k]};
   var cDoc=cols('doc'),cLine=cols('line'),cDate=cols('date'),cPlant=cols('plant'),cCust=cols('cust'),cName=cols('cname'),cItem=cols('item'),cQty=cols('qty'),cNet=cols('net'),cType=cols('itype'),cCat=cols('cat'),cTT=cols('tt'),cSize=cols('size'),cSp=cols('sp'),cAcct=cols('acct'),cZone=cols('zone');
   /* pass 1: date kinds */
@@ -787,6 +791,8 @@ async function runValidation(){
   if(U.mode==='daily'&&periodSel==='auto')periodSel=g.cur;
   if(periodSel!=='auto')allowed={lo:qStartYm(periodSel),hi:qEndYm(periodSel),label:qLabel(periodSel)};
   function rej(i,doc,line,field,reason,val){res.rejected++;res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,doc,line,field,reason,val==null?'':val])}
+  var catSp={},zoneSp={},own=ownNames(),hxp=headerIndex(U.headers),cPos=('place of supply' in hxp)?hxp['place of supply']:-1,linker=null;
+  if(sys==='S4'){var blank0=0,cset=new Set();for(var bi=0;bi<n;bi++){if(cSp<0||!String(rows[bi][cSp]==null?'':rows[bi][cSp]).trim()){blank0++;cset.add(String(rows[bi][cCust]).trim())}}if(blank0>0){U.progressMsg='Linking S/4 customers to B1 salespeople...';renderUpload();await tick();linker=await buildB1Linker(cset);res.af.link=linker}}
   var T0=Date.now();
   for(i=0;i<n;i++){
     if(Date.now()-T0>40){T0=Date.now();U.progress=Math.round(i/n*100);U.progressMsg='Checking row '+fmtN(i)+' of '+fmtN(n);var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%';var pm=$('#i-upload .bar+.note');if(pm)pm.textContent=U.progressMsg;await tick()}
@@ -806,7 +812,7 @@ async function runValidation(){
     else if(sys==='S4'&&!line)miss='Line';
     if(miss){rej(i,doc,line,miss,'Mandatory field empty',''); continue}
     /* invoice type */
-    if(cType>=0){var ty=norm(r[cType]);if(ty!==''){var okT=sys==='S4'?ty==='f2':ty==='gst tax invoice';if(!okT){rej(i,doc,line,'Invoice type','Not an invoice document type',r[cType]);continue}}}
+    if(cType>=0){var ty=norm(r[cType]);if(ty!==''){var okT=sys==='S4'?ty==='f2':ty==='gst tax invoice';if(!okT){if(isJunk(r[cType])){res.af.junk.itype++;res.af.junkRows=(res.af.junkRows||0)+1;res.af.junkValue=(res.af.junkValue||0)+(toNum(r[cNet])||0);continue}rej(i,doc,line,'Invoice type','Not an invoice document type',r[cType]);continue}}}
     /* numbers */
     var qty=toNum(r[cQty]),net=toNum(r[cNet]);
     if(isNaN(qty)){rej(i,doc,line,'Quantity','Quantity is not a number',r[cQty]);continue}
@@ -816,6 +822,7 @@ async function runValidation(){
     /* date */
     var dt=parseDateCell(r[cDate]);
     if(!dt){rej(i,doc,line,'Document date','Date not readable',r[cDate]);continue}
+    res.af.dateKinds[dt.kind]=(res.af.dateKinds[dt.kind]||0)+1;
     if(swap&&dt.kind==='serial'){var m0=dt.m;dt.m=dt.d;dt.d=m0;res.dateInfo.swapped++;if(!validYMD(dt)){res.dateInfo.unfixable++;rej(i,doc,line,'Document date','Date cannot be repaired (day over 12)',r[cDate]);continue}}
     if(!validYMD(dt)){rej(i,doc,line,'Document date','Date not valid',r[cDate]);continue}
     var ym=dt.y+'-'+pad(dt.m);
@@ -828,10 +835,14 @@ async function runValidation(){
     var pl=resolve(sys,r[cPlant]);
     if(!pl){var nm=String(r[cPlant]).trim();res.unknownPlants[nm]=(res.unknownPlants[nm]||0)+1;rej(i,doc,line,'Plant / branch','Unknown plant or branch code',nm);continue}
     if(pl.active===false){rej(i,doc,line,'Plant / branch','Plant is switched off in Admin',pl.plant_code);continue}
-    /* duplicate */
-    var ln=line;
-    if(!ln){var c0=(lineCtr.get(doc)||0)+1;lineCtr.set(doc,c0);ln=String(c0)}
-    var dk=doc+'|'+ln;
+    /* duplicate. Without LineNum: lines are numbered in row order per document, and a repeat of document + item + quantity + value is removed (counted). */
+    var ln=line,dk=null;
+    if(cLine<0&&sys==='B1'){
+      dk=doc+'|'+(cItem>=0?norm(r[cItem]):'')+'|'+qty+'|'+(Math.round(net*100)/100);
+      if(seen.has(dk)){res.af.dupNoLine++;continue}
+    }
+    if(!ln){var c0=(lineCtr.get(doc)||0)+1;lineCtr.set(doc,c0);ln=String(c0);res.af.lineSynth++}
+    if(!dk)dk=doc+'|'+ln;
     if(seen.has(dk)){
       if(sys==='S4'){res.fanout++;continue}
       if(cLine>=0){rej(i,doc,line,'Document + line','Duplicate document and line',doc+'/'+line);continue}
@@ -839,10 +850,15 @@ async function runValidation(){
     seen.add(dk);
     /* scope */
     var cat=cCat>=0?r[cCat]:'',grp=groupOf(sys,cat,cTT>=0?r[cTT]:'');
+    var catS=String(cat==null?'':cat).trim(),zr=zoneNorm(cZone>=0?r[cZone]:'');
+    if(grp&&catS&&(catS!==catS.toUpperCase()||/\s{2,}|[^A-Za-z0-9 ]/.test(catS))&&!(sys==='S4')){res.af.catAlias++;catSp[catS]=1}
+    if(!grp){if(!catS)res.af.catBlank++;else if(aliasGet('category',catS)==null&&!(sys==='B1'&&/^DECORATIVE LAMINATE|^PVC SHEET|COMPACT/i.test(catS)))res.af.catUnknown[catS]=(res.af.catUnknown[catS]||0)+1}
+    if(cZone>=0){var zraw=String(r[cZone]==null?'':r[cZone]).trim();if(zraw){if(zr.known){if(zr.via){res.af.zoneNorm++;zoneSp[zraw]=1}}else if(isJunk(zraw))res.af.junk.zone++;else res.af.zoneUnknown[zraw]=(res.af.zoneUnknown[zraw]||0)+1}}
+    if(cPos>=0&&isJunk(r[cPos]))res.af.junk.pos++;
     var val=Math.round(net*100)/100;
     if(!grp){res.other.rows++;res.other.value+=val;res.good++;continue}
     var xf=false;
-    if(sys==='B1'){var ac=cAcct>=0?norm(r[cAcct]):'',zn=cZone>=0?String(r[cZone]||'').trim().toUpperCase():'';var byRule=ac==='sales gst - stock outward'||zn==='BRANCH'||zn==='FACTORY',byMaster=tset.has(String(r[cCust]).trim().toUpperCase());xf=byRule||byMaster;if(byMaster)res.xferMaster++}
+    if(sys==='B1'){var ac=cAcct>=0?norm(r[cAcct]):'',zn=zr.z;var byRule=ac==='sales gst - stock outward'||zn==='BRANCH'||zn==='FACTORY',byMaster=tset.has(String(r[cCust]).trim().toUpperCase());xf=byRule||byMaster;if(byMaster)res.xferMaster++}
     var size=cSize>=0?r[cSize]:'',sq=sqftOf(size,qty);if(sq==null){sq=0;res.missingSize++;res.warned++}
     if(xf){res.xfer.rows++;res.xfer.value+=val}
     var G=res.groups[grp]||(res.groups[grp]={rows:0,value:0,sheets:0});
@@ -851,6 +867,9 @@ async function runValidation(){
     var pk=pl.plant_code+'|'+ym,P=res.pm.get(pk);
     if(!P){P={plant:pl.plant_code,ym:ym,agg:new Map(),docs:new Map()};res.pm.set(pk,P)}
     var cust=String(r[cCust]).trim(),cn=cName>=0?String(r[cName]==null?'':r[cName]).trim().slice(0,60):'',sp=cSp>=0?String(r[cSp]==null?'':r[cSp]).trim().slice(0,50):'';
+    if(sys==='S4'&&!sp){res.af.blankSp++;if(linker){var lkp=linker.map.get(cust);if(lkp){sp=String(lkp).slice(0,50);res.af.spFilled++}else res.af.spUnlinked++}}
+    if(!xf&&sys==='B1'&&own.length){var cnu=cn.toUpperCase();if(own.some(function(o){return cnu.indexOf(o)>=0})){var xo=res.af.xferSuggest[cust]||(res.af.xferSuggest[cust]={name:cn,rows:0,value:0});xo.rows++;xo.value+=val}}
+    if(!xf&&sp)res.af.spNames[sp]=(res.af.spNames[sp]||0)+1;
     var ak=cust+'|'+sp+'|'+grp+'|'+(xf?1:0),A=P.agg.get(ak);
     if(!A){A=[cust,cn,sp,grp,xf?1:0,0,0,0,0,0];P.agg.set(ak,A)}
     A[6]++;A[7]+=qty;A[8]+=sq;A[9]+=val;
@@ -861,6 +880,7 @@ async function runValidation(){
     res.good++;
   }
   res.warned+=res.injection;
+  res.af.catSpellings=Object.keys(catSp).length;res.af.zoneSpellings=Object.keys(zoneSp).length;
   U.res=res;U.stage='validated';U.confirmDates=false;U.reason='';U.progress=100;
   renderUpload();
 }
@@ -944,7 +964,7 @@ async function runLoad(opts){
   var upl={at:nowISO(),by:by,sys:sys,entity:'INV',file:U.name,size:U.size,mode:U.mode,periodLabel:U.period==='auto'?(Object.keys(r.quarters).length>1?'Auto: '+Object.keys(r.quarters).length+' quarters':Object.keys(r.quarters).map(qLabel).join(', ')):qLabel(U.period),
     read:r.read,loaded:failed?0:r.good,rejected:r.rejected,warned:r.warned,fanout:r.fanout,injection:r.injection,status:status,demo:demo||undefined,
     quarters:Object.keys(r.quarters),plantMonths:done,docsWritten:docsW,bytes:bytes,
-    before_history_start:r.preHist?r.preHist.rows:0,groups:r.groups,out_of_scope:r.other,internal_transfers:r.xfer,dateRepair:r.dateInfo.mixed?{swapped:r.dateInfo.swapped,min:r.minDate,max:r.maxDate}:null,
+    before_history_start:r.preHist?r.preHist.rows:0,fixes:{line_numbers_created:r.af.lineSynth,repeated_lines_removed:r.af.dupNoLine,category_rows_normalised:r.af.catAlias,zone_rows_normalised:r.af.zoneNorm,junk:r.af.junk,s4_sales_exec_filled:r.af.spFilled,s4_sales_exec_blank:r.af.blankSp,date_kinds:r.af.dateKinds},groups:r.groups,out_of_scope:r.other,internal_transfers:r.xfer,dateRepair:r.dateInfo.mixed?{swapped:r.dateInfo.swapped,min:r.minDate,max:r.maxDate}:null,
     mapping:Object.keys(U.map).reduce(function(o,k){o[k]=U.map[k]>=0?U.headers[U.map[k]]:null;return o},{}),closedQuarters:closedNow,reloadReason:closedTouched.length?U.reason:undefined,error:failed?dbErrText(failed):undefined};
   try{
     await dset('uploads/'+uid,upl);
@@ -1147,18 +1167,18 @@ async function savePot(isNew,id){
   try{await dset('potential/'+key,doc);closeDlg();toast('Saved r'+rev+' as Draft')}catch(e){dlgErr(dbErrText(e))}
 }
 /* ---- master CSV uploads ---- */
-async function masterUpload(what,file){
+async function masterUpload(what,file,rowsIn){
   var show=function(h){S.upMsg=h;var m=$('#up-msg');if(m)m.innerHTML=h};S.upMsg='';
   try{
-    var rows=parseCSV(await file.text());if(rows.length<2){show('<div class="banner err">The file has no data rows.</div>');return}
+    var rows=rowsIn||parseCSV(await file.text());if(rows.length<2){show('<div class="banner err">The file has no data rows.</div>');return}
     var hd=rows[0].map(function(x){return norm(x)}),idx=function(k){return hd.indexOf(k)},get=function(r,k){var i=idx(k);return i<0?'':String(r[i]==null?'':r[i]).trim()};
     var need=TEMPLATES[what].toLowerCase().split(',');var missingCols=need.filter(function(c){return c!=='sales_employee_code'&&c!=='territory'&&c!=='source_note'&&idx(c)<0&&!(what==='plants'&&(c==='zone'||c==='state'||c==='b1_bpl_name'))});
     if(missingCols.length){show('<div class="banner err">Missing columns: '+esc(missingCols.join(', '))+'. Download the template.</div>');return}
-    var bad=[],ok=[],seen={};
+    var bad=[],ok=[],seen={},fixN=0;
     rows.slice(1).forEach(function(r,i){
       var rn=i+2;
       if(what==='transfers'){
-        var tc=get(r,'cardcode').toUpperCase(),tf=get(r,'tranfser');
+        var tc0=get(r,'cardcode'),tc=tc0.toUpperCase(),tf=get(r,'tranfser');if(tc!==tc0)fixN++;
         if(!tc)bad.push([rn,'','CardCode is empty']);else if(seen[tc])bad.push([rn,tc,'Duplicate CardCode in file']);else{seen[tc]=1;ok.push({code:tc,name:get(r,'cardname'),flag:!/^(n|no|0|false)$/i.test(tf),raw_flag:tf.slice(0,20)})}
       }else if(what==='users'){
         var u={email:get(r,'email').toLowerCase(),name:get(r,'name'),role:get(r,'role'),department:get(r,'department'),plant_codes:get(r,'plant_codes'),reports_to_email:get(r,'reports_to_email').toLowerCase(),whatsapp_number:get(r,'whatsapp_number').replace(/[\s+\-]/g,''),today_cap:Number(get(r,'today_cap')||5),active:!/^(n|no|false|0)$/i.test(get(r,'active')),sales_employee_code:get(r,'sales_employee_code')};
@@ -1200,7 +1220,8 @@ async function masterUpload(what,file){
         await dset('potential/'+k,Object.assign({share_pct:''},ex||{},o,{status:'Draft',rev:rev,revisions:((ex&&ex.revisions)||[]).concat([rv]).slice(-40),_id:undefined}))}
       saved++;
     }
-    show((saved?'<div class="banner ok">Loaded '+saved+' row(s).'+(what==='potential'?' Each is a new revision in Draft.':'')+'</div>':'')+(bad.length?'<div class="banner err" style="display:block"><b>'+bad.length+' row(s) rejected.</b><div class="tw" style="margin-top:6px;max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Key</th><th>Reason</th></tr></thead><tbody>'+bad.slice(0,60).map(function(b){return '<tr><td class="num">'+b[0]+'</td><td class="break">'+esc(b[1])+'</td><td>'+esc(b[2])+'</td></tr>'}).join('')+'</tbody></table></div></div>':''));
+    var fxp=fixesPanel([{st:'info',t:'Rows read',n:rows.length-1,d:''},{st:fixN?'fixed':'info',t:'Codes and emails tidied (trimmed, case)',n:fixN,d:''},{st:bad.length?'need':'info',t:'Rows rejected',n:bad.length,d:bad.length?'Listed below. Fix them in the source file.':'None.'}],'Fixes applied');
+    show(fxp+(saved?'<div class="banner ok">Loaded '+saved+' row(s).'+(what==='potential'?' Each is a new revision in Draft.':'')+'</div>':'')+(bad.length?'<div class="banner err" style="display:block"><b>'+bad.length+' row(s) rejected.</b><div class="tw" style="margin-top:6px;max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Key</th><th>Reason</th></tr></thead><tbody>'+bad.slice(0,60).map(function(b){return '<tr><td class="num">'+b[0]+'</td><td class="break">'+esc(b[1])+'</td><td>'+esc(b[2])+'</td></tr>'}).join('')+'</tbody></table></div></div>':''));
   }catch(e){show('<div class="banner err">'+esc(dbErrText(e))+'</div>')}
 }
 
@@ -1302,9 +1323,8 @@ var SETTING_DEFS=[
  ['qoq_decline_pct','QoQ decline threshold %',-5,'Assumed (Q9)'],['qoq_min_base_inr','QoQ rule: minimum prior base (₹)',500000,'Assumed (new)'],['qoq_classes','QoQ rule: customer classes',"A,B",'Assumed (new)'],
  ['status_green_pct','Status green from Ach %',100,'Assumed (Q13)'],['status_orange_pct','Status orange from Ach %',90,'Assumed (Q13)'],
  ['shortfall_from_pct','R1: evaluate open month after % of working days',80,'Assumed (new)'],['max_new_per_rule_per_run','Max new actions per rule per run',20,'Assumed (new)'],
- ['due_R1','Due (working days) R1 plan shortfall',3,'Assumed (new)'],['due_R2','Due R2 overdue receivable',2,'Assumed (new)'],['due_R3','Due R3 order beyond TAT',1,'Assumed (new)'],['due_R4','Due R4 ageing stock',5,'Assumed (new)'],['due_R5','Due R5 rejected rows',1,'Assumed (new)'],['due_R6','Due R6 missing plan',3,'Assumed (new)'],['due_R7','Due R7 QoQ decline',5,'Assumed (new)'],
+ ['due_R1','Due (working days) R1 plan shortfall',3,'Assumed (new)'],['due_R2','Due R2 overdue receivable',2,'Assumed (new)'],['due_R4','Due R4 ageing stock',5,'Assumed (new)'],['due_R5','Due R5 rejected rows',1,'Assumed (new)'],['due_R6','Due R6 missing plan',3,'Assumed (new)'],['due_R7','Due R7 QoQ decline',5,'Assumed (new)'],
  ['rcv_days','R2: days past due',30,'Assumed (new)'],['rcv_min_inr','R2: minimum overdue (₹)',100000,'Assumed (new)'],
- ['tat_days','Dispatch TAT plan (working days)',3,'Assumed (new)'],['tat_min_orders','R3: minimum late orders',3,'Assumed (new)'],
  ['stock_age_days','R4: stock age (days)',180,'Assumed (new)'],['stock_age_min_sheets','R4: minimum aged sheets',500,'Assumed (new)'],['stock_over_pct','R4: stock days over plan %',125,'Assumed (new)'],['stock_days_target','Stock days plan',30,'Assumed (new)'],
  ['reject_min','R5: minimum rejected rows',1,'Assumed (new)'],['plan_lead_days','R6: days before quarter start',7,'Assumed (new)'],
  ['remind_days_before','Escalation: reminder days before due',1,'Assumed (Q11)'],['L1_days','Escalation L1 (days overdue)',1,'Assumed (Q11)'],['L2_days','Escalation L2 (days overdue)',3,'Assumed (Q11)'],['L3_days','Escalation L3 (days overdue)',7,'Assumed (Q11)'],
@@ -1312,6 +1332,7 @@ var SETTING_DEFS=[
  ['default_share_uplift_pts','Default share uplift (points)',2,'Assumed (Q4)'],
  ['overdue_share_days','K10 overdue share: days past due',60,'Assumed (new)'],
  ['history_start','History start quarter (D28: nothing earlier is loaded or shown), format FY26-Q1','FY26-Q1','D28 (Vijay)'],
+ ['own_company_names','Group company names (comma separated): customers with these in the name are suggested as internal transfers','VIRGO','Assumed (new)'],
  ['holidays','Holidays (YYYY-MM-DD, comma separated)','','Assumed (new)'],['month_compare','Month comparison (same_position_prior_quarter or previous_month)','same_position_prior_quarter','Assumed (Q8)']];
 var CFG={};SETTING_DEFS.forEach(function(d){CFG[d[0]]=d[2]});
 CFG.role_caps={};
@@ -1483,18 +1504,18 @@ function spOk(sc,name){
   var m=spMatch(name);return !!(m&&!m.ambiguous&&(sc.sp.indexOf(norm(m.name))>=0||sc.sp.indexOf(norm(m.code))>=0));
 }
 /* what a role may open (role-matrix.md, department table) */
-var DEPT_PAGES={Sales:['overview','sales','orders','team'],CRR:['orders','sales','team'],Accounts:['receivables','team'],Plant:['orders','inventory','team'],HO:['overview','sales','orders','receivables','inventory','team']};
+var DEPT_PAGES={Sales:['overview','sales','team'],CRR:['sales','team'],Accounts:['receivables','team'],Plant:['inventory','team'],HO:['overview','sales','receivables','inventory','team']};
 function pagesFor(u){
   var base=['today'];if(!u)return [];
   var r=u.role;
-  if(r==='Super admin')return ['overview','sales','orders','receivables','inventory','today','actions','team','intake','admin'];
-  if(r==='Management / HO')return ['overview','sales','orders','receivables','inventory','today','actions','team','intake','admin'];
+  if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','intake','admin'];
+  if(r==='Management / HO')return ['overview','sales','receivables','inventory','today','actions','team','intake','admin'];
   if(r==='HOD'){var p=DEPT_PAGES[u.department]||DEPT_PAGES.Sales;return p.filter(function(x){return x!=='sales'||true}).concat(['today','actions','admin'])}
-  if(r==='Branch / depot manager')return ['overview','sales','orders','receivables','inventory','today','actions','team','admin'];
+  if(r==='Branch / depot manager')return ['overview','sales','receivables','inventory','today','actions','team','admin'];
   if(r==='Sales executive')return ['sales','today','actions','team'];
-  if(r==='Coordinator (sales / CRR)')return ['orders','sales','today','actions','team'];
+  if(r==='Coordinator (sales / CRR)')return ['sales','today','actions','team'];
   if(r==='Accounts')return ['receivables','today','actions','team'];
-  if(r==='Plant')return ['orders','inventory','today','actions','team'];
+  if(r==='Plant')return ['inventory','today','actions','team'];
   return base;
 }
 function canPage(u,pg){return pagesFor(u).indexOf(pg)>=0}
@@ -1819,7 +1840,7 @@ function ownerFor(rule,ctx){
   var bm=ctx.plant?bmFor(ctx.plant):null,hod=hodFor(ctx.dept||'Sales'),mg=mgmtUsers()[0],sa=usersOfRole('Super admin')[0];
   var chain;
   if(rule==='R2')chain=[ctx.plant?accountsFor(ctx.plant):null,bm,hodFor('Accounts'),mg,sa];
-  else if(rule==='R3'||rule==='R4')chain=[ctx.plant?plantUserFor(ctx.plant):null,bm,hodFor('Plant'),mg,sa];
+  else if(rule==='R4')chain=[ctx.plant?plantUserFor(ctx.plant):null,bm,hodFor('Plant'),mg,sa];
   else if(rule==='R5')chain=[ctx.uploader?uByEmail(ctx.uploader):null,sa];
   else if(rule==='R7'&&ctx.kind==='group')chain=[hodFor('Sales'),mg,sa];
   else if(rule==='R7'&&ctx.kind==='person')chain=[ctx.sp?userBySp(ctx.sp):null,bm,hodFor('Sales'),mg,sa];
@@ -1831,7 +1852,7 @@ function ownerFor(rule,ctx){
 /* ---- candidate builders ---- */
 function mkCand(rule,key,period,o){
   var own=ownerFor(rule,o.ctx||{});
-  var dept={R1:'Sales',R2:'Accounts',R3:'Plant',R4:'Plant',R5:'HO',R6:'Sales',R7:'Sales'}[rule];
+  var dept={R1:'Sales',R2:'Accounts',R4:'Plant',R5:'HO',R6:'Sales',R7:'Sales'}[rule];
   return {id:actionIdOf(rule,[key,period]),rule:rule,period:period,title:o.title,source:o.source,owner:own.u?own.u.email:'',ownerUp:own.up,department:dept,plant:o.plant||'',group:o.group||'',customer:o.customer||'',
     due:addWD(TODAY(),CFG['due_'+rule]||3),next_step:o.next,value:Math.round(o.value||0),meta:o.meta||{}};
 }
@@ -1863,18 +1884,6 @@ function evalR2(){
       source:{label:'Rule R2 · Receivables › '+(o.name||o.cust),page:'receivables',plant:o.plant},next:'Call '+(o.name||o.cust)+'. Overdue '+fmtMoney(o.amt)+' on '+o.n+' invoice'+(o.n>1?'s':'')+', oldest '+o.oldest+' days. Record the promised payment date and amount in your reply.',meta:{n:o.n,oldest:o.oldest}}))});
   return {out:out,live:true};
 }
-function evalR3(){
-  var out=[];if(!(S.orders||[]).length)return {out:out,live:null};
-  var t=TODAY();
-  S.orders.forEach(function(d){
-    var late=[];(d.rows||[]).forEach(function(r){var o={no:r[0],date:r[1],group:r[3],open:r[5]};var age=wdBetween(addDays(o.date,1),t);var tat=planTat(d.plant,o.group);if(age>tat)late.push({no:o.no,age:age,open:o.open})});
-    if(late.length>=CFG.tat_min_orders){var v=late.reduce(function(a,x){return a+x.open},0),worst=late.reduce(function(a,x){return Math.max(a,x.age)},0);
-      out.push(mkCand('R3',d.plant,'open',{title:'Orders beyond TAT · '+plantShort(d.plant),plant:d.plant,value:v,ctx:{plant:d.plant},source:{label:'Rule R3 · Orders & Dispatch › '+plantShort(d.plant)+' · '+late.length+' orders late',page:'orders',plant:d.plant},
-        next:'Confirm the dispatch date for each listed order, or name the blocker (stock, vehicle, credit hold). Reply with the ETA.',meta:{late:late.length,worst:worst}}))}
-  });
-  return {out:out,live:true};
-}
-function planTat(plant,group){return CFG.tat_days}
 function evalR4(){
   var out=[];if(!(S.stock||[]).length)return {out:out,live:null};
   S.stock.forEach(function(d){(d.rows||[]).forEach(function(r){
@@ -1964,11 +1973,11 @@ async function evalR7(){
 async function runEngine(){
   var u=effUser();if(!u||GLOBAL_ROLES.indexOf(u.role)<0||readOnly()||S.engBlock)return;
   if(!S.loaded.actions||!S.loaded.uploads||!S.loaded.potential||!S.loaded.settings||!DS.ready)return;
-  var sig=[DS.ver,DS.custVer,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.orders.length,S.stock.length,S.users.length].join('|');
+  var sig=[DS.ver,DS.custVer,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.stock.length,S.users.length].join('|');
   if(S.engSig===sig||S.engBusy)return;
   S.engBusy=true;S.engSig=sig;S.engStatus='Checking rules...';
   try{
-    var res=[evalR1(),evalR2(),evalR3(),evalR4(),evalR5(),evalR6()];res.push(await evalR7());
+    var res=[evalR1(),evalR2(),evalR4(),evalR5(),evalR6()];res.push(await evalR7());
     var all=[];res.forEach(function(r){all=all.concat(r.out)});
     /* existing actions are never duplicated; new ones capped per rule per run, largest value first */
     var have={};S.actions.forEach(function(a){have[a.id]=1});
@@ -1992,7 +2001,7 @@ async function runEngine(){
     var tYm=TODAY().slice(0,7),cq=curQuarterKey();
     for(var j=0;j<S.actions.length;j++){
       var a2=S.actions[j];if(!evald[a2.rule]||a2.cleared||LIVE_ST.indexOf(a2.status)<0||isRuleMade(a2)===false)continue;
-      if(['R1','R2','R3','R4','R6'].indexOf(a2.rule)<0)continue;
+      if(['R1','R2','R4','R6'].indexOf(a2.rule)<0)continue;
       if(a2.rule==='R1'&&qKeyOfYm(a2.period)!==cq)continue;if(a2.rule==='R6'&&a2.period!==cq&&a2.period!==nextQ(cq))continue;
       if(!liveIds[a2.id]){await saveAction(Object.assign({},a2,{cleared:true,updated:nowISO(),thread:(a2.thread||[]).concat([{at:nowISO(),by:'Desk rule '+a2.rule,kind:'cleared',text:'Condition cleared. The assigner verifies the closure.'}])}))}
     }
@@ -2189,7 +2198,7 @@ function listHtml(u,today){
   var h='<section class="card"><div class="hd"><h2>Actions · '+active.length+' open</h2><span class="note">Ranked by priority score. '+esc(u.role==='Sales executive'?'Own actions only.':'Within your scope.')+'</span></div>'
    +'<div class="row"><div class="fld"><label for="af-s">Status</label><select id="af-s" data-chg="acf" data-k="status">'+opts(ALL_ST.map(function(x){return [x,x]}),f.status,'All')+'</select></div>'
    +'<div class="fld"><label for="af-o">Owner</label><select id="af-o" data-chg="acf" data-k="owner">'+opts(owners,f.owner,'All')+'</select></div>'
-   +'<div class="fld"><label for="af-r">Source</label><select id="af-r" data-chg="acf" data-k="rule">'+opts([['M','Manual'],['R1','R1 Plan shortfall'],['R2','R2 Overdue receivable'],['R3','R3 Order beyond TAT'],['R4','R4 Ageing stock'],['R5','R5 Rejected rows'],['R6','R6 Missing plan'],['R7','R7 QoQ decline']],f.rule,'All')+'</select></div>'
+   +'<div class="fld"><label for="af-r">Source</label><select id="af-r" data-chg="acf" data-k="rule">'+opts([['M','Manual'],['R1','R1 Plan shortfall'],['R2','R2 Overdue receivable'],['R4','R4 Ageing stock'],['R5','R5 Rejected rows'],['R6','R6 Missing plan'],['R7','R7 QoQ decline']],f.rule,'All')+'</select></div>'
    +'<div class="fld"><label for="af-q">Search</label><input id="af-q" class="in" data-in="acq" value="'+esc(f.q||'')+'" placeholder="title, ID, customer"></div></div>';
   h+=ranked.length?'<div class="tw"><table><thead><tr><th>ID</th><th>Action</th><th>Owner</th><th>Due</th><th>Status</th><th>Priority</th><th class="num">Value at risk</th></tr></thead><tbody>'+ranked.map(function(x){var a=x.a;return '<tr class="clk" data-act="open-action" data-id="'+esc(a.id)+'"><td class="mono">'+esc(a.ref)+'</td><td><a href="#/action/'+esc(a.id)+'">'+esc(a.title)+'</a><div class="note">'+esc(ruleLabel(a))+(a.plant?' · '+esc(plantShort(a.plant)):'')+'</div></td><td>'+esc(who(a.owner))+'</td><td style="white-space:nowrap">'+esc(dueTxt(a,today))+'</td><td>'+pillFor(a.status)+(a.need_help?' <span class="pill part">Help</span>':'')+'</td><td>'+prioPill(prioLabel(x.s.score))+' <span class="note mono">'+x.s.score.toFixed(0)+'</span></td><td class="num">'+(a.value?fmtMoney(a.value):'—')+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty">No actions match. Rules run on page load and on each upload.</div>';
   if(blocked.length)h+='<details class="strip"><summary>Blocked · '+blocked.length+'</summary>'+blocked.map(function(a){return '<div class="note"><a href="#/action/'+esc(a.id)+'">'+esc(a.title)+'</a> · '+esc(who(a.owner))+' · '+esc(a.blocked_reason||'')+'</div>'}).join('')+'</details>';
@@ -2709,9 +2718,9 @@ document.addEventListener('change',function(ev){var t=ev.target;if(t.getAttribut
 /* ================= Team & Scorecard ================= */
 var ROLE_KPIS={
  'Super admin':['K24','K21','K17'],'Management / HO':['K1','K2','K3','K5','K6','K9','K10','K20','K23'],
- 'HOD':null,'Branch / depot manager':['K1','K2','K3','K4','K7','K8','K9','K10','K14','K15','K23','K25'],'Sales executive':['K1','K2','K3','K4','K7','K8'],
- 'Coordinator (sales / CRR)':['K12','K13','K14','K22'],'Accounts':['K9','K10','K11'],'Plant':['K12','K13','K14','K15','K16']};
-var DEPT_KPIS={Sales:['K1','K3','K8'],CRR:['K12','K13','K14'],Accounts:['K9','K10','K11'],Plant:['K12','K15','K16'],HO:['K1','K3']};
+ 'HOD':null,'Branch / depot manager':['K1','K2','K3','K4','K7','K8','K9','K10','K15','K23','K25'],'Sales executive':['K1','K2','K3','K4','K7','K8'],
+ 'Coordinator (sales / CRR)':['K1','K3','K22'],'Accounts':['K9','K10','K11'],'Plant':['K1','K15','K16']};
+var DEPT_KPIS={Sales:['K1','K3','K8'],CRR:['K1','K3','K22'],Accounts:['K9','K10','K11'],Plant:['K1','K15','K16'],HO:['K1','K3']};
 var COMMON=['K17','K18','K19'];
 function kpiIdsFor(u){var base=u.role==='HOD'?(DEPT_KPIS[u.department]||DEPT_KPIS.Sales).concat(['K17','K19','K20','K25']):(ROLE_KPIS[u.role]||[]).slice();COMMON.forEach(function(k){if(base.indexOf(k)<0)base.push(k)});return base}
 function spKeyOf(u){var cands=[norm(u.sales_employee_code),norm(u.name)].filter(Boolean);var mc=SM.byCode[norm(u.sales_employee_code)];if(mc)cands.push(norm(mc.name));var keys=Object.keys(DS.spIdx);for(var i=0;i<keys.length;i++)if(cands.indexOf(norm(keys[i]))>=0)return keys[i];return null}
@@ -2748,7 +2757,6 @@ function kpiCompute(id,u,ctx){
    case 'K9':{var co=collectionFigs(ctx,f&&f.plants);Object.assign(K,{name:'Collection achievement %',kind:'pct',actual:co.ach,plan:co.plan>0?100:null,detail:co.detail,none:co.plan<=0,pending:!co.have});break}
    case 'K10':{var rv=recvStats(f&&f.plants);Object.assign(K,{name:'Overdue share %',kind:'pct',actual:rv.have?rv.overShare:null,plan:15,lower:true,detail:rv.have?'':'Needs the receivable export',pending:!rv.have});break}
    case 'K11':{var rv2=recvStats(f&&f.plants);Object.assign(K,{name:'Ageing profile (0–30 / 31–60 / 61–90 / 90+)',kind:'text',text:rv2.have?rv2.buckets.map(function(b){return fmtMoney(b)}).join(' / '):'—',none:true,pending:!rv2.have});break}
-   case 'K12':case 'K13':case 'K14':{var od=orderStats(f&&f.plants);var map={K12:['On-time dispatch %','pct',od.have?od.onTime:null,90,false],K13:['Order-to-dispatch days','days',od.have?od.o2d:null,CFG.tat_days,true],K14:['Open orders beyond TAT','n',od.have?od.late:null,0,true]};var m=map[id];Object.assign(K,{name:m[0],kind:m[1],actual:m[2],plan:m[3],lower:m[4],pending:!od.have,detail:od.have?'':'Needs the sales order and delivery exports'});break}
    case 'K15':case 'K16':{var st=stockStats(f&&f.plants);var m2=id==='K15'?['Stock days','days',st.have?st.days:null,CFG.stock_days_target,true]:['Aged stock %','pct',st.have?st.agedPct:null,10,true];Object.assign(K,{name:m2[0],kind:m2[1],actual:m2[2],plan:m2[3],lower:m2[4],pending:!st.have,detail:st.have?'':'Needs the stock export'});break}
    case 'K17':Object.assign(K,{name:'On-time closure %',kind:'pct',actual:pct(cur.onTime,cur.done),plan:90,last:pct(prv.onTime,prv.done),detail:cur.onTime+' of '+cur.done+' on time'});break;
    case 'K18':Object.assign(K,{name:'Response within 1 day %',kind:'pct',actual:pct(cur.quick,cur.assigned),plan:90,last:pct(prv.quick,prv.assigned),detail:cur.quick+' of '+cur.assigned+' assigned'});break;
@@ -2824,7 +2832,7 @@ function personTrend(p,f,ctx){
   }
   if(noData())return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
   if(f==null)return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
-  return trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch history (sales order and delivery exports) is not loaded yet, so there is no 12-quarter dispatch series.</p>':'')+drillPanel(ctx);
+  return trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch KPIs were dropped (D31).</p>':'')+drillPanel(ctx);
 }
 
 /* salespeople from the sales-employee master that match the B1 names: scorecards for people who are not Desk users */
@@ -2846,11 +2854,9 @@ function teamSalespeople(ctx,u){
 Object.assign(handlers,{'team-sp':function(t){S.team.sp=t.getAttribute('data-k');S.team.who='';S.lastHtml='';schedule()}});
 
 /* ---- src/60-ops.js ---- */
-/* ================= v0.9 Orders & Dispatch, Receivables, Inventory (open-item stores) ================= */
+/* ================= v0.9 Receivables, Inventory (open-item stores; Orders & Dispatch removed, D31) ================= */
 /* No export for these yet: the stores stay empty until the exports are wired. Pages then show the dashed empty state naming the export. */
 var NEED={
- orders:{name:'Sales order export',how:'SAP B1 ORDR / RDR1 (DocNum, DocDate, CardCode, ItemCode, Quantity, LineTotal, WhsCode) · S/4 VBAK / VBAP (API_SALES_ORDER_SRV)',file:'data-map/sales-order.md'},
- delivery:{name:'Delivery export',how:'SAP B1 ODLN / DLN1 (DocNum, DocDate, BaseRef) · S/4 LIKP / LIPS (API_OUTBOUND_DELIVERY_SRV)',file:'data-map/delivery.md'},
  recv:{name:'Receivable export',how:'SAP B1 open OINV + JDT1 (DocDueDate, DocTotal, PaidToDate) · S/4 ACDOCA / BSID (I_OperationalAcctgDocItem)',file:'data-map/receivable.md'},
  coll:{name:'Collection export',how:'SAP B1 ORCT (DocNum, DocDate, CardCode, DocTotal) · S/4 ACDOCA incoming payment (DZ)',file:'data-map/collection.md'},
  stock:{name:'Stock export',how:'SAP B1 OITW (ItemCode, WhsCode, OnHand) · S/4 MARD / MATDOC (API_MATERIAL_STOCK_SRV)',file:'data-map/stock.md'}};
@@ -2862,15 +2868,6 @@ function inScopeDocs(list,ctx){return list.filter(function(d){return plantInScop
 function plantSet(plants){return plants instanceof Set?plants:null}
 
 /* ---- statistics shared with the scorecard ---- */
-function orderStats(plants){
-  var sc=SC(),os=S.orders.filter(function(d){return plantInScope(sc,d.plant)&&(!plants||plants.has(d.plant))}),ds=S.deliv.filter(function(d){return plantInScope(sc,d.plant)&&(!plants||plants.has(d.plant))});
-  var have=os.length>0||ds.length>0;if(!have)return {have:false};
-  var t=TODAY(),late=0,lateInr=0,open=0,openInr=0;
-  os.forEach(function(d){d.rows.forEach(function(r){open++;openInr+=r[5];var age=wdBetween(addDays(r[1],1),t);if(age>planTat(d.plant,r[3])){late++;lateInr+=r[5]}})});
-  var q=curQuarterKey(),disp=0,ontime=0,days=0;
-  ds.forEach(function(d){d.rows.forEach(function(r){if(quarterOf(r[2])!==q)return;disp++;var age=wdBetween(addDays(r[1],1),r[2]);days+=age;if(age<=planTat(d.plant,r[3]))ontime++})});
-  return {have:true,open:open,openInr:openInr,late:late,lateInr:lateInr,disp:disp,onTime:disp?ontime/disp*100:null,o2d:disp?days/disp:null};
-}
 function recvItems(plants){var sc=SC(),out=[];S.recv.forEach(function(d){if(!plantInScope(sc,d.plant)||(plants&&!plants.has(d.plant)))return;d.rows.forEach(function(r){out.push({plant:d.plant,inv:r[0],cust:r[1],name:r[2],due:r[3],open:r[4],total:r[5]})})});return out}
 function recvStats(plants){
   var it=recvItems(plants);if(!it.length)return {have:false,buckets:[0,0,0,0],notDue:0,total:0,overShare:null};
@@ -2907,27 +2904,6 @@ function collectionFigs(ctx,plants){
 }
 
 /* ---- Orders & Dispatch ---- */
-function pageOrders(){
-  var ctx=viewCtx(),os=inScopeDocs(S.orders,ctx),ds=inScopeDocs(S.deliv,ctx);
-  if(!os.length&&!ds.length)return needPanel(['orders','delivery'],'No open orders or deliveries are loaded.');
-  var plants=ctx.f.plant?new Set([ctx.f.plant]):ctx.plants,st=orderStats(plants),t=TODAY();
-  var late=[],rows=[];
-  os.forEach(function(d){d.rows.forEach(function(r){var age=wdBetween(addDays(r[1],1),t),tat=planTat(d.plant,r[3]);rows.push({plant:d.plant,no:r[0],date:r[1],cust:r[2],group:r[3],name:r[4],inr:r[5],sh:r[6],age:age,tat:tat});if(age>tat)late.push(rows[rows.length-1])})});
-  var cards=[
-   kpiCard({color:'indigo',chip:'☰',title:'Open orders',value:fmtN(st.open),sub:fmtMoney(st.openInr)+' open value',status:'none',pillTxt:'No plan',rows:[['Plan','—'],['Var','—'],['Ach %','—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['12-qtr trend','—']]}),
-   kpiCard({color:'red',chip:'!',title:'K14 · Open orders beyond TAT',value:fmtN(st.late),sub:fmtMoney(st.lateInr)+' at risk · plan 0',status:st.late===0?'green':st.late<=2?'orange':'red',ach:st.late===0?100:Math.max(0,100-st.late*10),rows:[['Plan','0'],['Var','+'+st.late],['Ach %','—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['12-qtr trend','—']]}),
-   kpiCard({color:'sky',chip:'⏱',title:'K13 · Order-to-dispatch days',value:st.o2d!=null?st.o2d.toFixed(1)+' d':'—',sub:'Average working days, order date to dispatch, this quarter.',status:st.o2d==null?'none':statusOf(st.o2d/CFG.tat_days*100,true),ach:st.o2d!=null?Math.min(100,CFG.tat_days/Math.max(st.o2d,.1)*100):null,rows:[['Plan TAT',CFG.tat_days+' d'],['Var',st.o2d!=null?(st.o2d-CFG.tat_days>=0?'+':'−')+Math.abs(st.o2d-CFG.tat_days).toFixed(1)+' d':'—'],['Ach %',st.o2d!=null?fmtAch(CFG.tat_days/Math.max(st.o2d,.1)*100):'—'],['Last Qtr','—'],['QoQ %','—'],['12-qtr trend','—']]}),
-   kpiCard({color:'green',chip:'✓',title:'K12 · On-time dispatch %',value:st.onTime!=null?st.onTime.toFixed(1)+'%':'—',sub:'Dispatched within plan TAT, this quarter ('+fmtN(st.disp)+' orders).',status:st.onTime==null?'none':statusOf(st.onTime/90*100),ach:st.onTime!=null?st.onTime/90*100:null,rows:[['Plan','90%'],['Var',st.onTime!=null?(st.onTime-90>=0?'+':'−')+Math.abs(st.onTime-90).toFixed(1)+' pts':'—'],['Ach %',st.onTime!=null?fmtAch(st.onTime/90*100):'—'],['Last Qtr','—'],['QoQ %','—'],['12-qtr trend','—']]})];
-  var byP={};rows.forEach(function(r){var k=r.plant+'|'+r.group,o=byP[k]||(byP[k]={plant:r.plant,group:r.group,n:0,inr:0,late:0,lateInr:0,oldest:0,tat:r.tat});o.n++;o.inr+=r.inr;if(r.age>r.tat){o.late++;o.lateInr+=r.inr}o.oldest=Math.max(o.oldest,r.age)});
-  var h='<div class="kpirow">'+cards.join('')+'</div>';
-  h+='<section class="card"><div class="hd"><h2>Open orders by plant and product group · vs plan TAT</h2></div><div class="tw tall"><table class="std"><thead><tr><th>Plant</th><th>Group</th><th class="num">Open orders</th><th class="num">Open value</th><th class="num">Plan TAT</th><th class="num">Oldest (WD)</th><th class="num">Beyond TAT</th><th class="num">Value beyond TAT</th></tr></thead><tbody>'
-   +Object.keys(byP).map(function(k){return byP[k]}).sort(function(a,b){return b.lateInr-a.lateInr}).filter(function(o){var q=(S.f.search||'').toLowerCase();return !q||plantShort(o.plant).toLowerCase().indexOf(q)>=0}).map(function(o){return '<tr><td>'+esc(plantShort(o.plant))+'</td><td>'+esc(o.group)+'</td><td class="num">'+o.n+'</td><td class="num">'+fmtMoney(o.inr)+'</td><td class="num">'+o.tat+' d</td><td class="num">'+o.oldest+'</td><td class="num '+(o.late?'dn':'')+'">'+o.late+'</td><td class="num">'+fmtMoney(o.lateInr)+'</td></tr>'}).join('')
-   +'<tr class="tot"><td colspan="2"><b>Total</b></td><td class="num">'+rows.length+'</td><td class="num">'+fmtMoney(st.openInr)+'</td><td class="num">'+CFG.tat_days+' d</td><td class="num">—</td><td class="num">'+st.late+'</td><td class="num">'+fmtMoney(st.lateInr)+'</td></tr></tbody></table></div>';
-  h+='<p class="note">TAT plan default is '+CFG.tat_days+' working days (Assumed, editable in Admin › Settings). Age counts working days from the order date. Order-line grain is out of scope (decision D9); the SAP order number is the source reference.</p></section>';
-  h+='<section class="card"><div class="hd"><h2>Orders beyond TAT · '+late.length+'</h2></div>'+(late.length?'<div class="tw tall"><table><thead><tr><th>Source</th><th>Order no</th><th>Date</th><th>Plant</th><th>Customer</th><th>Group</th><th class="num">Age (WD)</th><th class="num">Open value</th></tr></thead><tbody>'+late.sort(function(a,b){return b.age-a.age}).slice(0,60).map(function(r){return '<tr><td class="mono">SO</td><td class="mono">'+esc(r.no)+'</td><td>'+esc(r.date)+'</td><td>'+esc(plantShort(r.plant))+'</td><td class="break">'+esc(r.cust)+' '+esc(r.name||'')+'</td><td>'+esc(r.group)+'</td><td class="num dn">'+r.age+' (+'+(r.age-r.tat)+')</td><td class="num">'+fmtMoney(r.inr)+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty sm">No open order is beyond its TAT.</div>')+'</section>';
-  return h;
-}
-
 /* ---- Receivables ---- */
 function pageReceivables(){
   var ctx=viewCtx(),rs=inScopeDocs(S.recv,ctx),cs=inScopeDocs(S.coll,ctx);
@@ -3002,7 +2978,7 @@ function drillColl(ctx){
 S.adminTab='users';S.rbBusy=false;
 function adminTabs(){
   var r=effRole();
-  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['settings','Rules & settings'],['tools','Tools']];
+  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['aliases','Aliases'],['settings','Rules & settings'],['tools','Tools']];
   return [['potential','Market potential']];
 }
 function buildAdmin(){
@@ -3014,8 +2990,8 @@ function refreshAdmin(){
   var el=$('#a-body');if(!el)return;
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
   var focusId=document.activeElement&&document.activeElement.id,t=S.adminTab;
-  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():potentialHtml();
-  if(el.getAttribute('data-h')!==String(html.length)+t||t!=='settings'){el.innerHTML=html;el.setAttribute('data-h',String(html.length)+t)}
+  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():t==='aliases'?aliasesHtml():potentialHtml();
+  if(el.getAttribute('data-h')!==String(html.length)+t||(t!=='settings'&&t!=='aliases')){el.innerHTML=html;el.setAttribute('data-h',String(html.length)+t)}
   if(focusId){var f=document.getElementById(focusId);if(f&&f.focus){f.focus();try{var v=f.value;if(f.setSelectionRange&&f.type!=='number'&&f.type!=='email'&&f.type!=='date')f.setSelectionRange(v.length,v.length)}catch(e){}}}
 }
 /* ---- plan permissions ---- */
@@ -3194,8 +3170,7 @@ async function demoOps(){
   g.list.forEach(function(k){qMonths(k).forEach(function(m){if(m<=today.slice(0,7))months.push(m)})});
   var plan=qMonths(g.cur).concat(qMonths(prevQ(g.cur)));
   var o=DemoGen.ops({today:today,plants:plants,months:months,planMonths:plan,seed:31});
-  for(var i=0;i<o.orders.length;i++)await dset('orders/'+o.orders[i].plant,Object.assign({demo:true},o.orders[i]));
-  for(i=0;i<o.deliveries.length;i++)await dset('deliveries/'+o.deliveries[i].plant,Object.assign({demo:true},o.deliveries[i]));
+  var i;
   for(i=0;i<o.receivables.length;i++)await dset('receivables/'+o.receivables[i].plant,Object.assign({demo:true},o.receivables[i]));
   for(i=0;i<o.stock.length;i++)await dset('stock/'+o.stock[i].plant,Object.assign({demo:true},o.stock[i]));
   for(i=0;i<o.collections.length;i++){var c=o.collections[i];await dset('collections/'+c.plant+'-'+c.ym,Object.assign({demo:true},c))}
@@ -3203,7 +3178,7 @@ async function demoOps(){
 async function demoActions(){
   var t=TODAY(),mk=function(id,title,owner,assigner,due,val,extra){var now=nowISO();return Object.assign({id:id,ref:hashRef(id),rule:'M',title:title,source:{label:'DEMO manual action',page:'actions',plant:'1012'},owner:owner,assigner:assigner,creator:assigner,department:'Sales',plant:'1012',group:'',customer:'DEMOCU000007',due:due,next_step:'Update the status and the next date.',value:val,status:'Open',created:now,updated:now,dependents:0,period:'manual',meta:{},need_help:false,demo:true,thread:[{at:now,by:assigner,kind:'created',text:'DEMO action.'}]},extra||{})};
   var list=[];
-  for(var i=0;i<12;i++)list.push(mk('DEMO_A'+(i+1),'DEMO action '+(i+1)+(i%3===0?' · collect overdue':i%3===1?' · confirm dispatch':' · review plan'),'bm.a@demo','hod.sales@demo',addDays(t,i-3),(i+1)*150000,{plant:'1012',customer:'DEMOCU'+pad(i+2,6)}));
+  for(var i=0;i<12;i++)list.push(mk('DEMO_A'+(i+1),'DEMO action '+(i+1)+(i%3===0?' · collect overdue':i%3===1?' · confirm payment plan':' · review plan'),'bm.a@demo','hod.sales@demo',addDays(t,i-3),(i+1)*150000,{plant:'1012',customer:'DEMOCU'+pad(i+2,6)}));
   list.push(mk('DEMO_LAD','DEMO ladder example · overdue receivable','se.s1@demo','coord.a@demo',addDays(t,2),850000,{status:'In progress',plant:'1012'}));
   list.push(mk('DEMO_VER','DEMO closure waiting for verification','bm.a@demo','hod.sales@demo',addDays(t,1),0,{status:'Done',closure:'Dispatched and confirmed with the customer.',done_at:nowISO()}));
   list.push(mk('DEMO_S1','DEMO call customer','se.s1@demo','bm.a@demo',addDays(t,1),300000,{plant:'1012'}));
@@ -3263,7 +3238,7 @@ function roleFromDesignation(d){
 function buildSM(list){
   SM.list=list||[];SM.byCode={};SM.byName={};SM.byBase={};SM.byB1={};SM.cache={};
   SM.list.forEach(function(p){
-    SM.byCode[norm(p.code)]=p;if(p.alt&&!SM.byCode[norm(p.alt)])SM.byCode[norm(p.alt)]=p;
+    SM.byCode[norm(p.code)]=p;SM.byCode[norm(normEmpId(p.code))]=p;if(p.alt&&!SM.byCode[norm(p.alt)])SM.byCode[norm(p.alt)]=p;
     if(p.b1name){var k1=nameKey(p.b1name);(SM.byB1[k1]=SM.byB1[k1]||[]).push(p)}
     var k=nameKey(p.name);(SM.byName[k]=SM.byName[k]||[]).push(p);
     var b=nameKey(splitSuffix(p.name)[0]);if(b!==k)(SM.byBase[b]=SM.byBase[b]||[]).push(p);else(SM.byBase[b]=SM.byBase[b]||[]).push(p);
@@ -3280,9 +3255,12 @@ function spMatch(raw){
     if(suf){var m=arr.filter(function(p){var pn=nameKey(p.plantRaw||'');return pn&&(pn.indexOf(suf)>=0||suf.indexOf(pn)>=0)});if(m.length===1)return m[0]}
     return 'ambiguous';
   };
-  var c=pick(SM.byB1[k]);if(c){res=c;how='B1 name column'}
+  var c=null,al=aliasGet('salesperson',raw);if(al){var ap=SM.byCode[norm(al)]||SM.byCode[norm(normEmpId(al))];if(ap){res=ap;how='saved alias'}}
+  if(res){}
+  else if(c=pick(SM.byB1[k])){res=c;how='B1 name column'}
   else if(c=pick(SM.byName[k])){res=c;how='exact'}
   else{c=pick(SM.byName[base]);if(c){res=c;how='suffix removed'}else{c=pick(SM.byBase[base]);if(c){res=c;how='suffix removed'}}}
+  if(!res){var fz=fuzzyMatch(raw);if(fz&&!fz.ambiguous){res=fz.p;how=fz.how}}
   if(res==='ambiguous')res={ambiguous:true};else if(res)res=Object.assign({how:how},res);
   SM.cache[raw]=res;return res;
 }
@@ -3342,7 +3320,7 @@ async function itemParse(){
     var cCode=ix('Item No.'),cCat=ix('Item Category');
     if(cCode<0||cCat<0)throw new Error('Columns "Item No." and "Item Category" were not found in sheet "'+pick+'". Expected the item master (sheet FG).');
     var cUom=ix('Inventory UoM'),cAct=ix('Active'),cThk=ix('Thickness'),cSize=ix('Size');
-    var res={sheet:pick,read:rows.length-1,loaded:0,rejected:0,warned:0,outOfScope:0,byGroup:{},rejects:[],warn:{noSize:0,notPcs:0,dupCode:0},items:[],cats:{}};
+    var res={sheet:pick,read:rows.length-1,loaded:0,rejected:0,warned:0,outOfScope:0,byGroup:{},rejects:[],warn:{noSize:0,notPcs:0,dupCode:0},items:[],cats:{},catUnknown:{}};
     var seen={},T0=Date.now();
     for(var i=1;i<rows.length;i++){
       if(Date.now()-T0>40){T0=Date.now();st.msg='Checking item '+fmtN(i)+' of '+fmtN(rows.length-1);schedule();await tick()}
@@ -3352,7 +3330,7 @@ async function itemParse(){
       seen[code]=1;
       var cat=cellStr(r[cCat]),grp=groupOf('B1',cat,'');
       res.cats[cat||'(blank)']=(res.cats[cat||'(blank)']||0)+1;
-      if(!grp){res.outOfScope++;continue}
+      if(!grp){res.outOfScope++;if(cat&&aliasGet('category',cat)==null)res.catUnknown[cat]=(res.catUnknown[cat]||0)+1;continue}
       var size=cSize>=0?cellStr(r[cSize]):'',sq=sqftOf(size,1);
       if(sq==null){res.warn.noSize++;res.warned++;sq=0}
       var uom=cUom>=0?normUom(r[cUom]):'';if(uom&&uom!=='Pcs'){res.warn.notPcs++;res.warned++}
@@ -3392,6 +3370,7 @@ function itemsHtml(){
   if(st&&st.stage==='working')h+='<div><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(st.msg)+'</div></div>';
   if(st&&st.res&&(st.stage==='checked'||st.stage==='loading'||st.stage==='done')){
     var r=st.res;
+    h+=itemFixes(r);
     h+='<div class="hd"><h2>Check result · '+esc(st.name)+' · sheet '+esc(r.sheet)+'</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?'Some rows rejected':'All rows pass')+'</span></div>'
      +'<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>In scope, loading</small><b>'+fmtN(r.loaded)+'</b></div><div class="kpi"><small>Out of scope</small><b>'+fmtN(r.outOfScope)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b><small>'+r.warn.noSize+' without a readable size · '+r.warn.notPcs+' unit not Pcs</small></div></div>'
      +'<div class="tw"><table><thead><tr><th>Item category (as in the file)</th><th class="num">Items</th><th>Group</th></tr></thead><tbody>'+Object.keys(r.cats).sort(function(a,b){return r.cats[b]-r.cats[a]}).slice(0,30).map(function(c){var g=groupOf('B1',c==='(blank)'?'':c,'');return '<tr><td>'+esc(c)+'</td><td class="num">'+fmtN(r.cats[c])+'</td><td>'+(g?'<span class="pill ok">'+g+'</span>':'<span class="pill mute">out of scope</span>')+'</td></tr>'}).join('')+'</tbody></table></div>';
@@ -3422,11 +3401,11 @@ async function sempCheckS4(st){
   var hx=function(pre){for(var i=0;i<hd.length;i++)if(hd[i].indexOf(pre)===0)return i;return -1};
   var cW=hx('*workerid'),cFull=hx('fullname'),cFn=hx('*firstname'),cLn=hx('*lastname'),cMail=hx('email'),cPh=hx('phonenumber'),cMob=hx('mobilephonenumber'),cEnd=hx('*enddate');
   var old=SM.list.slice(),oldBy=SM.byName,before=matchStats();
-  var res={sheets:['CSV (S/4 workforce layout)'],read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0},s4:true,needs:[],merge:{matched:0,added:0,kept:0,ambiguous:0}};
+  var res={sheets:['CSV (S/4 workforce layout)'],read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0},s4:true,needs:[],merge:{matched:0,added:0,kept:0,ambiguous:0},fx:{ids:0}};
   var seen={},used={},oldToNew={};
   for(var i=1;i<rows.length;i++){
-    var r=rows[i],code=cellStr(r[cW]),name=cellStr(cFull>=0?r[cFull]:'')||(cellStr(cFn>=0?r[cFn]:'')+' '+cellStr(cLn>=0?r[cLn]:'')).trim();
-    if(!code&&!name)continue;res.read++;
+    var r=rows[i],rawCode=cellStr(r[cW]),code=normEmpId(rawCode),name=cellStr(cFull>=0?r[cFull]:'')||(cellStr(cFn>=0?r[cFn]:'')+' '+cellStr(cLn>=0?r[cLn]:'')).trim();
+    if(!code&&!name)continue;res.read++;if(code!==rawCode)res.fx.ids++;
     if(!code){res.rejected++;res.rejects.push([i+1,'','CSV','*WorkerID','Mandatory field empty','']);continue}
     if(!name){res.rejected++;res.rejects.push([i+1,code,'CSV','FullName','Mandatory field empty','']);continue}
     var k=norm(code);if(seen[k]){res.rejected++;res.rejects.push([i+1,code,'CSV','*WorkerID','Duplicate WorkerID (already read at row '+seen[k]+')','']);continue}seen[k]=i+1;
@@ -3439,11 +3418,12 @@ async function sempCheckS4(st){
     if(o){used[norm(o.code)]=1;res.merge.matched++;oldToNew[norm(o.code)]=code;
       res.people.push([code,o.name,o.zone,o.plant,o.plantRaw,o.designation,o.role,mail||o.email||'',wa||o.wa||'',o.slp||'',o.b1name||'',o.reportsTo||'',ed||o.ended||'',o.code])}
     else{res.merge.added++;res.needs.push([i+1,code,name,pick.length>1?'Several people in the master share this name; add plant and designation':'New person: needs plant and designation']);
-      res.people.push([code,name.slice(0,80),'','','','','',mail,wa,'','','',ed,''])}
+      res.people.push([code,name.slice(0,80),'','','','','',mail,wa,'','','',ed,code!==rawCode?rawCode:''])}
   }
   /* people in the master but not in the file are kept as they are */
   old.forEach(function(o){if(used[norm(o.code)])return;res.merge.kept++;res.people.push([o.code,o.name,o.zone,o.plant,o.plantRaw,o.designation,o.role,o.email||'',o.wa||'',o.slp||'',o.b1name||'',o.reportsTo||'',o.ended||'',o.alt||''])});
-  res.people.forEach(function(a){if(a[11]&&oldToNew[norm(a[11])])a[11]=oldToNew[norm(a[11])]});
+  res.people.forEach(function(a){if(a[11]&&oldToNew[norm(a[11])])a[11]=oldToNew[norm(a[11])];else if(a[11])a[11]=normEmpId(a[11])});
+  afSempPass(res,old);
   res.people.forEach(function(a){res.byZone[a[2]||'(none)']=(res.byZone[a[2]||'(none)']||0)+1;res.byRole[a[6]||'(no matching role)']=(res.byRole[a[6]||'(no matching role)']||0)+1});
   res.loaded=res.people.length;res.ended=res.people.filter(function(a){return a[12]}).length;res.warned+=res.needs.length;
   var save=SM.list;buildSM(res.people.map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12],alt:a[13]}}));
@@ -3456,7 +3436,7 @@ async function sempCheck(){
     if(st.src.csv&&isWorkerCsv(st.src.csvRows)){st.res=await sempCheckS4(st);st.stage='checked';st.msg='';DS.cache={};S.lastHtml='';schedule();return}
     var ticked=st.sheets.filter(function(s){return s.ticked}).map(function(s){return s.name});
     if(!ticked.length)throw new Error('Tick at least one sheet.');
-    var res={sheets:ticked,read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0}};
+    var res={sheets:ticked,read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0},needs:[],fx:{ids:0}};
     var seen={},plantsOk={};S.plants.forEach(function(p){plantsOk[p.plant_code]=p});
     for(var si=0;si<ticked.length;si++){
       var rows=await sheetRows(st.src,ticked[si]);if(!rows.length)continue;
@@ -3464,9 +3444,9 @@ async function sempCheck(){
       var cCode=ix('Employee Code'),cFull=ix('FullName'),cFn=ix('*FirstName'),cLn=ix('*LastName'),cMob=ix('Mobile No.'),cMail=ix('Email'),cDes=ix('Designation'),cZone=ix('Zone'),cPN=ix('Plant Name'),cCC=ix('*CompanyCode'),cSlp=ix('B1 SlpCode'),cB1=ix('B1 Sales Employee Name'),cRep=ix('Reports To (Employee Code)'),cEnd=Math.max(ix('EndDate'),ix('*EndDate'),ix('End Date'));
       if(cCode<0||(cFull<0&&cFn<0)){res.rejects.push([0,ticked[si],'','Sheet','Sheet "'+ticked[si]+'" has no Employee Code and FullName columns; skipped','']);res.rejected++;continue}
       for(var i=1;i<rows.length;i++){
-        var r=rows[i],code=cellStr(r[cCode]);
+        var r=rows[i],rawCode=cellStr(r[cCode]),code=normEmpId(rawCode);
         if(!code&&!cellStr(cFull>=0?r[cFull]:''))continue;/* blank formatted row */
-        res.read++;
+        res.read++;if(code!==rawCode)res.fx.ids++;
         var name=cellStr(cFull>=0?r[cFull]:'')||(cellStr(cFn>=0?r[cFn]:'')+' '+cellStr(cLn>=0?r[cLn]:'')).trim();
         if(!code){res.rejected++;res.rejects.push([i+1,'',ticked[si],'Employee Code','Mandatory field empty','']);continue}
         if(!name){res.rejected++;res.rejects.push([i+1,code,ticked[si],'FullName','Mandatory field empty','']);continue}
@@ -3483,9 +3463,10 @@ async function sempCheck(){
         if(!role&&des){res.unmappedDes[des]=(res.unmappedDes[des]||0)+1}
         res.byRole[role||'(no matching role)']=(res.byRole[role||'(no matching role)']||0)+1;res.byZone[zone||'(none)']=(res.byZone[zone||'(none)']||0)+1;
         var endD=cEnd>=0?cellStr(r[cEnd]):'';if(endD)res.ended=(res.ended||0)+1;
-        res.people.push([code,name.slice(0,80),zone,plant,(cPN>=0?cellStr(r[cPN]):'').slice(0,60),des.slice(0,50),role,mail,wa,(cSlp>=0?cellStr(r[cSlp]):'').replace(/\.0$/,''),(cB1>=0?cellStr(r[cB1]):'').slice(0,100),(cRep>=0?cellStr(r[cRep]):'').replace(/\.0$/,''),endD.slice(0,20)]);res.loaded++;
+        res.people.push([code,name.slice(0,80),zone,plant,(cPN>=0?cellStr(r[cPN]):'').slice(0,60),des.slice(0,50),role,mail,wa,(cSlp>=0?cellStr(r[cSlp]):'').replace(/\.0$/,''),(cB1>=0?cellStr(r[cB1]):'').slice(0,100),normEmpId((cRep>=0?cellStr(r[cRep]):'').replace(/\.0$/,'')),endD.slice(0,20),code!==rawCode?rawCode:'']);res.loaded++;
       }
     }
+    afSempPass(res,[]);
     /* match B1 names (all names in the loaded sales data) with the people just read */
     var save=SM.list;buildSM(res.people.map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12],alt:a[13]}}));
     DS.cache={};res.match=matchStats();res.unmatched=unmatchedSp();
@@ -3501,7 +3482,7 @@ async function sempLoad(){
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null;
   try{
     await dset('salesmaster/main',{z:await gz(JSON.stringify(r.people)),n:r.people.length,at:nowISO(),by:by,file:st.name,sheets:r.sheets,read:r.read,rejected:r.rejected,upload:uid,demo:st.demo||undefined,fmt:'gz-json v3: [code,name,zone,plant,plantRaw,designation,role,email,whatsapp,slpCode,b1Name,reportsToCode,endDate,altCode]'});
-    await dset('uploads/'+uid,{at:nowISO(),by:by,sys:'B1',entity:'SE',file:st.name,size:st.size||0,mode:'master',periodLabel:'Sales employees: '+r.sheets.join(', '),read:r.read,loaded:r.loaded,rejected:r.rejected+r.unmatched.length,warned:r.warned,status:(r.rejected||r.unmatched.length)?'Partial':'Loaded',demo:st.demo||undefined,match:{names:r.match.names,matched:r.match.matched,rate:r.match.rate}});
+    await dset('uploads/'+uid,{at:nowISO(),by:by,sys:'B1',entity:'SE',file:st.name,size:st.size||0,mode:'master',periodLabel:'Sales employees: '+r.sheets.join(', '),read:r.read,loaded:r.loaded,rejected:r.rejected+r.unmatched.length,warned:r.warned,status:(r.rejected||r.unmatched.length)?'Partial':'Loaded',demo:st.demo||undefined,fixes:r.fx||null,match:{names:r.match.names,matched:r.match.matched,rate:r.match.rate}});
     var rows=[];r.rejects.forEach(function(x){rows.push(x)});r.unmatched.forEach(function(u,i){rows.push([i+1,u.name,'','Salesperson (B1 name)',u.why,u.lines])});(r.needs||[]).forEach(function(n){rows.push([n[0],n[1],'CSV','Plant and designation',n[3],n[2]])});
     if(rows.length){var rr=rows.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:rows.length,demo:st.demo||undefined})}
     if(r.unmatched.length&&S.users.length){
@@ -3524,7 +3505,7 @@ function sempHtml(){
   h+='<p class="note" style="margin:0"><b>S/4 workforce CSV</b> ("Lam Employee Master", *WorkerID header): upload it alone, no sheets to tick. It merges into the loaded master by FullName and adds new people. Otherwise, workbook "Sales Employee Master": the zone sheets (ZONE 1 to ZONE 5) hold the laminate staff and are ticked by default; the product-line sheets (ACP, ALU, PVC, MDF, TAS IND, TAS ALU) repeat one zone-head row, and Plant is a plant list. Each person is linked to a plant and zone. B1 sales rows carry a name only, so names are matched to <b>FullName</b>, first exactly, then without the " - &lt;branch&gt;" suffix; a name shared by two people is matched only when the branch suffix settles it.</p>';
   if(m){var ms=matchStats();h+='<div class="kpis"><div class="kpi"><small>People in the master</small><b>'+fmtN(m.n)+'</b><small>'+esc((m.sheets||[]).join(', '))+'</small></div><div class="kpi"><small>B1 names matched</small><b>'+(ms.rate!=null?ms.matched+' / '+ms.names:'—')+'</b><small>'+(ms.rate!=null?ms.rate.toFixed(1)+'% of names · '+(ms.lineRate||0).toFixed(1)+'% of invoice lines':'no sales data yet')+'</small></div><div class="kpi"><small>Loaded</small><b style="font-size:14px;font-family:var(--font)">'+esc(istStr(m.at))+'</b><small>'+esc((m.by||'').split('@')[0])+' · '+esc(m.file||'')+'</small></div></div>';
     var um=unmatchedSp();
-    if(um.length)h+='<details class="strip" open><summary>Unmatched B1 salesperson names · '+um.length+'</summary><div class="tw" style="max-height:260px;overflow:auto"><table><thead><tr><th>Name in the sales data</th><th class="num">Invoice lines</th><th>Why</th></tr></thead><tbody>'+um.slice(0,200).map(function(u){return '<tr><td class="break">'+esc(u.name)+'</td><td class="num">'+fmtN(u.lines)+'</td><td>'+esc(u.why)+'</td></tr>'}).join('')+'</tbody></table></div><div class="row"><button class="btn sm" data-act="mst-unmatched-csv">Download unmatched list (CSV)</button></div><p class="note">Unmatched names keep their own name in every figure; nothing is dropped. The uploader gets action R8 to fix them.</p></details>';
+    if(um.length){var uml={};um.forEach(function(u){uml[u.name]=u.lines});h+='<details class="strip" open><summary>Unmatched B1 salesperson names · '+um.length+'</summary><div class="note">Click the right person to save an alias; it applies at once.</div>'+sugTable(um.map(function(u){return u.name}),uml)+'<div class="row"><button class="btn sm" data-act="mst-unmatched-csv">Download unmatched list (CSV)</button></div><p class="note">Unmatched names keep their own name in every figure; nothing is dropped.</p></details>'}
   }else h+='<div class="empty">No sales-employee master yet. Upload the workbook.</div>';
   if(st&&st.msg&&(st.stage==='idle'||st.stage==='sheets'))h+='<div class="banner err">'+esc(st.msg)+'</div>';
   if(st&&st.stage==='working')h+='<div><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(st.msg)+'</div></div>';
@@ -3535,6 +3516,7 @@ function sempHtml(){
      +'<div class="kpis"><div class="kpi"><small>People read</small><b>'+fmtN(r.read)+'</b><small>sheets '+esc(r.sheets.join(', '))+'</small></div><div class="kpi"><small>Loading</small><b>'+fmtN(r.loaded)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b><small>'+(r.ended?r.ended+' with an end date (inactive, still matched) · ':'')+r.warn.noPlant+' no plant · '+r.warn.unknownPlant+' plant not in master · '+r.warn.noEmail+' no email · '+r.warn.badMobile+' mobile not 10 digits</small></div>'
      +'<div class="kpi"><small>Match rate to B1 names</small><b>'+(r.match.rate!=null?r.match.rate.toFixed(1)+'%':'—')+'</b><small>'+(r.match.rate!=null?r.match.matched+' of '+r.match.names+' names · '+(r.match.lineRate||0).toFixed(1)+'% of invoice lines':'no sales data loaded to match against')+(r.matchBefore&&r.matchBefore.rate!=null?' · before this file: '+r.matchBefore.rate.toFixed(1)+'% ('+r.matchBefore.matched+' of '+r.matchBefore.names+')':'')+'</small></div></div>'+(r.s4?'<div class="banner info"><span>S/4 workforce layout merged into the loaded master by FullName: <b>'+r.merge.matched+'</b> matched (zone, plant, role, B1 name and reports-to kept; WorkerID is the new code, the old code is kept as alt code; email and phone updated) · <b>'+r.merge.added+'</b> new people · <b>'+r.merge.kept+'</b> in the master but not in this file, kept as they are.</span></div>':'')
      +'<div class="grid2"><div class="tw"><table><thead><tr><th>Zone</th><th class="num">People</th></tr></thead><tbody>'+Object.keys(r.byZone).sort().map(function(z){return '<tr><td>'+esc(z)+'</td><td class="num">'+fmtN(r.byZone[z])+'</td></tr>'}).join('')+'</tbody></table></div><div class="tw"><table><thead><tr><th>Desk role proposed from designation (Assumed)</th><th class="num">People</th></tr></thead><tbody>'+Object.keys(r.byRole).sort().map(function(z){return '<tr><td>'+esc(z)+'</td><td class="num">'+fmtN(r.byRole[z])+'</td></tr>'}).join('')+'</tbody></table></div></div>';
+    h+=sempFixes(r);
     if(Object.keys(r.unmappedDes).length)h+='<p class="note">Designations with no matching Desk role (set the role in Users when the person needs access): '+Object.keys(r.unmappedDes).map(function(d){return esc(d)+' ('+r.unmappedDes[d]+')'}).join(', ')+'.</p>';
     if(r.needs&&r.needs.length)h+='<details class="strip" open><summary>New people · needs plant and designation · '+r.needs.length+'</summary><div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>WorkerID</th><th>Name</th><th>Note</th></tr></thead><tbody>'+r.needs.slice(0,200).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono">'+esc(x[1])+'</td><td>'+esc(x[2])+'</td><td>'+esc(x[3])+'</td></tr>'}).join('')+'</tbody></table></div><div class="row"><button class="btn sm" data-act="mst-needs-csv">Download this list (CSV)</button></div><p class="note">They load with a blank zone, plant and role. Add those in a later upload of the zone workbook (same names merge) or set the role in Users.</p></details>';
     if(r.rejected)h+='<div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Code</th><th>Sheet</th><th>Field</th><th>Reason</th></tr></thead><tbody>'+r.rejects.slice(0,100).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono">'+esc(x[1])+'</td><td>'+esc(x[2])+'</td><td>'+esc(x[3])+'</td><td>'+esc(x[4])+'</td></tr>'}).join('')+'</tbody></table></div>';
@@ -3572,12 +3554,11 @@ S.f={mode:'QTD',q:'',m:'',from:'',to:'',plant:'',sp:'',group:'',search:''};
 S.acF={status:'',owner:'',rule:'',q:''};S.logF={kind:'',by:'',q:'',from:''};S.acTab='list';S.threadId=null;
 S.actions=[];S.followups=[];S.phasing=[];S.rollDocs={};S.rollLoaded=false;S.orders=[];S.deliv=[];S.recv=[];S.coll=[];S.stock=[];S.potVer=0;S.viewAs=null;S.demoMode=false;
 var PAGES=[
- ['overview','Overview','Overview'],['sales','Sales','Overview'],['orders','Orders & Dispatch','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
+ ['overview','Overview','Overview'],['sales','Sales','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
  ['today','Today','Team'],['actions','Action Center','Team'],['team','Team & Scorecard','Team'],['intake','Data Intake','Data'],['admin','Admin','Data']];
 var TITLES={
  overview:['Overview','Net sales and growth against market potential. Comparison is always the previous quarter.'],
  sales:['Sales','Branch → salesperson → customer → SAP document · A/B/C customer tiles'],
- orders:['Orders & Dispatch','Open orders and order-to-dispatch days against the plan TAT'],
  receivables:['Receivables','Ageing buckets and collection plan against actual'],
  inventory:['Inventory','Stock against plan, stock days and ageing'],
  today:['Today','Your top actions, ranked and capped for your role'],
@@ -3585,7 +3566,7 @@ var TITLES={
  team:['Team & Scorecard','KRA / KPI plan against actual per person and role'],
  intake:['Data Intake','SAP B1 now, S/4HANA ready. CSV or XLSX. Every row keeps its SAP reference.'],
  admin:['Admin','Users, plants, market potential with revisions, rules and settings.']};
-var PERIOD_PAGES=['overview','sales','team'],FILTER_PAGES=['overview','sales','team','orders','receivables','inventory'];
+var PERIOD_PAGES=['overview','sales','team'],FILTER_PAGES=['overview','sales','team','receivables','inventory'];
 
 function route(){
   var h=(location.hash||'').replace(/^#\/?/,''),parts=h.split('/'),pg=parts[0]||'';
@@ -3616,7 +3597,6 @@ function navTags(u,open){
   var oa=openActionCount(u);if(oa)t.actions=mk(oa,'red','Open actions in your scope');
   t.team=mk('TEAM','teal');
   if(sa){t.intake=mk('LIVE','ind');t.admin=mk('RULES','vio','Rules, settings and plans')}else t.intake=mk('VIEW','ind');
-  if(!S.orders.length&&!S.deliv.length)t.orders=mk('DATA','','Sales order and delivery exports not loaded');
   if(!S.recv.length&&!S.coll.length)t.receivables=mk('DATA','','Receivable and collection exports not loaded');
   if(!S.stock.length)t.inventory=mk('DATA','','Stock export not loaded');
   return t;
@@ -3688,7 +3668,7 @@ function pageHtml(u){
   if(pg==='actions')return S.threadId?pageThread(S.threadId):pageActions();
   var body='';
   if(pg==='overview')body=pageOverview();else if(pg==='sales')body=pageSales();else if(pg==='team')body=pageTeam();
-  else if(pg==='orders')body=pageOrders();else if(pg==='receivables')body=pageReceivables();else if(pg==='inventory')body=pageInventory();
+  else if(pg==='receivables')body=pageReceivables();else if(pg==='inventory')body=pageInventory();
   return ctrlBar(pg)+body;
 }
 function renderAll(){
@@ -3809,6 +3789,342 @@ document.addEventListener('input',function(ev){
   },250);
 });
 
+/* ---- src/85-autofix.js ---- */
+/* ================= Auto-fix pass (Vijay, 21 Oct 2026): upload files as SAP gives them, show what was fixed =================
+ * Alias tables live in settings/alias_<kind> (database rule: admin write). Seeds are in code. Nothing is changed silently:
+ * every fix is counted and shown in the "Fixes applied" panel of the upload; what only the source can fix is named. */
+S.alias={category:{},zone:{},designation:{},salesperson:{},plantprefix:{}};
+var ZONE_CANON=['ZONE1','ZONE2','ZONE3','ZONE4','ZONE5','BRANCH','FACTORY','ACP'];
+var CAT_CANON=['Laminate','Door','PVC sheet','Compact board','Out of scope'];
+function seedZone(){var o={};for(var i=1;i<=5;i++){o['zone'+i]='ZONE'+i;o['zone '+i]='ZONE'+i;o['zone 0'+i]='ZONE'+i}o.branch='BRANCH';o.factory='FACTORY';o.acp='ACP';return o}
+var ALIAS_KINDS={
+ category:{label:'Item category → product group',hint:'B1 "Catagory" or S/4 Product Type. Applies when a file is checked. "Out of scope" keeps the row in the record but outside the four groups.',canon:CAT_CANON,
+  seed:{'decorative laminate':'Laminate','decorative laminates':'Laminate','decorative laminate door':'Door','decorative laminates door':'Door','pvc sheet':'PVC sheet','pvc sheets':'PVC sheet','compact laminate':'Compact board','compact board':'Compact board','compact laminates':'Compact board','acp':'Out of scope','aluminium composite panel':'Out of scope','cladding':'Out of scope'}},
+ zone:{label:'Zone spelling → zone',hint:'Used for the internal-transfer rule (BRANCH or FACTORY). Applies when a file is checked.',canon:ZONE_CANON,seed:seedZone()},
+ designation:{label:'Designation spelling → designation',hint:'Applies when a sales-employee file is checked. The Desk role is proposed from the chosen designation.',canon:null,
+  seed:{'sales executive':'Sales Executive','sale executive':'Sales Executive','sales exec':'Sales Executive','sales executives':'Sales Executive','sr sales executive':'Sr. Sales Executive','senior sales executive':'Sr. Sales Executive','branch manager':'Branch Manager','branch head':'Branch Manager','depot manager':'Depot Manager'}},
+ salesperson:{label:'B1 salesperson name → employee code',hint:'One click in a list of unmatched names saves a row here. Applies at once, no reload.',canon:null,seed:{}},
+ plantprefix:{label:'Employee ID prefix → plant code',hint:'The part of the employee ID before the number (E-XXX in E-XXX-0123). The Desk also learns prefixes from people whose plant is already known.',canon:null,seed:{}}
+};
+function akey(s){return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function aliasKeyFor(kind,raw){return kind==='plantprefix'?String(raw||'').toUpperCase().replace(/[^A-Z0-9\-]/g,''):akey(raw)}
+function aliasGet(kind,raw){
+  var k=aliasKeyFor(kind,raw);if(!k)return null;
+  var sv=S.alias[kind];if(sv&&Object.prototype.hasOwnProperty.call(sv,k))return sv[k]==='-'?null:sv[k];
+  var sd=ALIAS_KINDS[kind].seed;return sd&&Object.prototype.hasOwnProperty.call(sd,k)?sd[k]:null;
+}
+function aliasRows(kind){
+  var rows=[],sv=S.alias[kind]||{},sd=ALIAS_KINDS[kind].seed||{};
+  Object.keys(sd).forEach(function(k){var v=Object.prototype.hasOwnProperty.call(sv,k)?sv[k]:sd[k];rows.push({k:k,v:v,src:Object.prototype.hasOwnProperty.call(sv,k)?'edited':'seed'})});
+  Object.keys(sv).forEach(function(k){if(!Object.prototype.hasOwnProperty.call(sd,k))rows.push({k:k,v:sv[k],src:'saved'})});
+  return rows.sort(function(a,b){return a.k<b.k?-1:1});
+}
+function ingestAliases(docs){
+  var next={category:{},zone:{},designation:{},salesperson:{},plantprefix:{}};
+  (docs||[]).forEach(function(x){var m=/^alias_(\w+)$/.exec(x._id||'');if(m&&next[m[1]]&&x.map&&typeof x.map==='object')next[m[1]]=x.map});
+  var changed=JSON.stringify(next)!==JSON.stringify(S.alias);S.alias=next;
+  if(changed)onAliasChange();
+}
+function onAliasChange(){
+  try{SM.cache={};if(DS.ready){rebuildMaps();DS.ver++;DS.cache={}}}catch(e){}
+  S.lastHtml='';S.engSig=null;schedule();
+}
+async function aliasSave(kind,key,val){
+  if(!superOnly('edit alias tables'))return false;
+  var k=aliasKeyFor(kind,key);if(!k||val==null||String(val).trim()===''){toast('Both sides are needed');return false}
+  var map=Object.assign({},S.alias[kind]||{});map[k]=String(val).trim();
+  try{await dset('settings/alias_'+kind,{map:map,at:nowISO(),by:whoAmI()});S.alias[kind]=map;onAliasChange();return true}
+  catch(e){toast('Not saved: '+dbErrText(e));return false}
+}
+async function aliasDel(kind,key){
+  if(!superOnly('edit alias tables'))return;
+  var map=Object.assign({},S.alias[kind]||{}),sd=ALIAS_KINDS[kind].seed||{};
+  if(Object.prototype.hasOwnProperty.call(sd,key))map[key]='-';else delete map[key];
+  try{await dset('settings/alias_'+kind,{map:map,at:nowISO(),by:whoAmI()});S.alias[kind]=map;onAliasChange()}catch(e){toast('Not saved: '+dbErrText(e))}
+}
+
+/* ---- category, zone, junk ---- */
+function catGroupAlias(cat){var a=aliasGet('category',cat);if(a==null)return undefined;return a==='Out of scope'?null:a}
+function zoneNorm(raw){
+  var s=String(raw==null?'':raw).trim();if(!s)return {z:'',known:true,blank:true};
+  var a=aliasGet('zone',s);if(a&&ZONE_CANON.indexOf(a)>=0)return {z:a,known:true,via:'alias'};
+  var c=s.toUpperCase().replace(/[^A-Z0-9]/g,''),m=/^ZONE0*([1-9])$/.exec(c);if(m)return {z:'ZONE'+m[1],known:true,via:s.toUpperCase()==='ZONE'+m[1]?'':'rule'};
+  if(ZONE_CANON.indexOf(c)>=0)return {z:c,known:true,via:s.toUpperCase()===c?'':'rule'};
+  return {z:c,known:false};
+}
+function isJunk(v){var s=String(v==null?'':v).trim();if(!s)return false;return s.length<=2||/^[^a-z0-9]+$/i.test(s)||/^(z+|x+)$/i.test(s)||/^(null|none|n\/?a|na|test|nil)$/i.test(s)}
+function ownNames(){return String(CFG.own_company_names||'').split(/[,;]+/).map(function(x){return x.trim().toUpperCase()}).filter(Boolean)}
+
+/* ---- employee ids, designations, plant prefixes ---- */
+function normEmpId(c){
+  var s=String(c==null?'':c).trim();if(!s)return '';
+  var m=/^([A-Za-z]+-[A-Za-z]+)\s*\/\s*0*(\d{1,6})$/.exec(s);/* only the slash form is rewritten; E-XXX-0123 is already the target form */
+  if(m)return m[1].toUpperCase()+'-'+pad(m[2],4);
+  return s;
+}
+function idPrefix(c){var m=/^(.*?)[\/\-]\s*\d+$/.exec(String(c||'').trim());return m?m[1].toUpperCase():''}
+function learnPrefixes(people){
+  /* people: arrays [code,name,zone,plant,...]; majority plant per prefix among people whose plant is known */
+  var t={};
+  people.forEach(function(p){var pf=idPrefix(p[0]),pl=p[3];if(!pf||!pl)return;(t[pf]=t[pf]||{})[pl]=(t[pf][pl]||0)+1});
+  var out={};Object.keys(t).forEach(function(pf){var best=null,tot=0;Object.keys(t[pf]).forEach(function(pl){tot+=t[pf][pl];if(!best||t[pf][pl]>t[pf][best])best=pl});if(t[pf][best]/tot>=0.6)out[pf]={plant:best,n:t[pf][best],of:tot}});
+  return out;
+}
+function prefixPlant(pf,learned){var a=aliasGet('plantprefix',pf);if(a)return {plant:a,how:'edited table'};var l=learned[pf];return l?{plant:l.plant,how:'learned from '+l.n+' of '+l.of+' people'}:null}
+function desCanonMap(rawList){
+  /* seed and edited aliases first; otherwise group spellings that differ only in case, spacing or punctuation and keep the most frequent */
+  var cnt={},groups={},out={};
+  rawList.forEach(function(d){if(!d)return;cnt[d]=(cnt[d]||0)+1});
+  Object.keys(cnt).forEach(function(d){var a=aliasGet('designation',d);if(a){out[d]={to:a,via:'alias'};return}var k=akey(d).replace(/\s/g,'');(groups[k]=groups[k]||[]).push(d)});
+  Object.keys(groups).forEach(function(k){var g=groups[k].sort(function(a,b){return cnt[b]-cnt[a]||(a<b?-1:1)}),best=g[0];g.forEach(function(d){out[d]={to:best,via:d===best?'':'spelling'}})});
+  return out;
+}
+
+/* ---- sales-person name matching: aliases, spacing, initials, edit distance ---- */
+function compactKey(s){return nameKey(splitSuffix(s)[0]).replace(/\s+/g,'')}
+function tokensOf(s){return nameKey(splitSuffix(s)[0]).split(' ').filter(Boolean)}
+function editDist(a,b,max){
+  if(Math.abs(a.length-b.length)>max)return max+1;
+  var prev=[],cur=[],i,j;for(j=0;j<=b.length;j++)prev[j]=j;
+  for(i=1;i<=a.length;i++){cur[0]=i;var rowMin=cur[0];for(j=1;j<=b.length;j++){cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));if(cur[j]<rowMin)rowMin=cur[j]}if(rowMin>max)return max+1;var t=prev;prev=cur;cur=t}
+  return prev[b.length];
+}
+function initialsMatch(ta,tb){
+  if(ta.length!==tb.length||ta.length<2)return false;var init=false;
+  for(var i=0;i<ta.length;i++){var a=ta[i],b=tb[i];if(a===b)continue;if(a.length===1&&b[0]===a){init=true;continue}if(b.length===1&&a[0]===b){init=true;continue}return false}
+  return init;
+}
+function fuzzyMatch(raw){
+  /* returns {p:person,how} for a unique fuzzy hit, {ambiguous:true} for several, null for none */
+  var cp=compactKey(raw);if(!cp)return null;
+  var hit=SM.list.filter(function(p){return compactKey(p.name)===cp||(p.b1name&&compactKey(p.b1name)===cp)});
+  var uniq=function(a){var o={},r=[];a.forEach(function(p){if(!o[p.code]){o[p.code]=1;r.push(p)}});return r};
+  hit=uniq(hit);if(hit.length===1)return {p:hit[0],how:'spacing or punctuation'};if(hit.length>1)return {ambiguous:true};
+  var ta=tokensOf(raw);
+  hit=uniq(SM.list.filter(function(p){return initialsMatch(ta,tokensOf(p.name))}));
+  if(hit.length===1)return {p:hit[0],how:'initials'};if(hit.length>1)return {ambiguous:true};
+  if(cp.length>=8){
+    var dg=cp.replace(/\D/g,'');
+    hit=uniq(SM.list.filter(function(p){var pc=compactKey(p.name);return pc.replace(/\D/g,'')===dg&&editDist(cp,pc,2)<=2}));
+    if(hit.length===1)return {p:hit[0],how:'spelling (1-2 letters)'};if(hit.length>1)return {ambiguous:true};
+  }
+  return null;
+}
+function spSuggest(raw,n){
+  var cp=compactKey(raw),ta=tokensOf(raw),out=[];
+  SM.list.forEach(function(p){
+    var pc=compactKey(p.name),d=editDist(cp,pc,6),tb=tokensOf(p.name),ov=0;
+    ta.forEach(function(t){if(tb.indexOf(t)>=0)ov++});
+    var score=d<=6?(10-d):0;score+=ov*3;if(initialsMatch(ta,tb))score+=6;
+    if(score>=5)out.push({code:p.code,name:p.name,plant:p.plant||'',score:score});
+  });
+  return out.sort(function(a,b){return b.score-a.score}).slice(0,n||3);
+}
+
+/* ---- panel ---- */
+function fixesPanel(items,title){
+  items=items.filter(Boolean);
+  var nf=items.filter(function(x){return x.st==='fixed'}).length,nn=items.filter(function(x){return x.st==='need'}).length,ns=items.filter(function(x){return x.st==='sugg'}).length;
+  var pill={fixed:['ok','Fixed'],need:['miss','Needs the source'],info:['mute','Note'],sugg:['part','Your call']};
+  return '<details class="strip fixes" open><summary>'+esc(title||'Fixes applied')+' · '+nf+' fixed'+(ns?' · '+ns+' for you to decide':'')+' · '+nn+' need the source</summary><div class="tw"><table><thead><tr><th>Status</th><th>What</th><th class="num">Count</th><th>Detail</th></tr></thead><tbody>'
+   +items.map(function(x){return '<tr><td><span class="pill '+pill[x.st][0]+'">'+pill[x.st][1]+'</span></td><td>'+esc(x.t)+'</td><td class="num">'+(x.n==null?'':fmtN(x.n))+'</td><td class="break">'+(x.d||'')+'</td></tr>'}).join('')
+   +'</tbody></table></div></details>';
+}
+function mapRow(kind,raw,n,idx){
+  var K=ALIAS_KINDS[kind];
+  return '<tr><td class="break">'+esc(raw)+'</td><td class="num">'+fmtN(n)+'</td><td><select id="afm-'+kind+'-'+idx+'" class="in">'+K.canon.map(function(c){return '<option>'+esc(c)+'</option>'}).join('')+'</select></td><td><button class="btn sm" data-act="af-map" data-kind="'+kind+'" data-i="'+idx+'" data-raw="'+esc(raw)+'">Save mapping</button></td></tr>';
+}
+function mapTable(kind,obj,head){
+  var ks=Object.keys(obj).sort(function(a,b){return obj[b]-obj[a]}).slice(0,15);
+  if(!ks.length)return '';
+  return '<div class="tw" style="max-height:200px;overflow:auto"><table><thead><tr><th>'+esc(head)+'</th><th class="num">Rows</th><th>Map to</th><th></th></tr></thead><tbody>'+ks.map(function(k,i){return mapRow(kind,k,obj[k],i)}).join('')+'</tbody></table></div>'+(Object.keys(obj).length>15?'<div class="note">'+(Object.keys(obj).length-15)+' more not shown.</div>':'');
+}
+function sugRows(names,lines){
+  return names.map(function(nm,i){
+    var s=spSuggest(nm,3);
+    return '<tr><td class="break">'+esc(nm)+'</td><td class="num">'+fmtN(lines[nm]||0)+'</td><td>'+(s.length?s.map(function(x){return '<button class="btn sm" data-act="af-sp" data-raw="'+esc(nm)+'" data-code="'+esc(x.code)+'" title="Save as an alias">'+esc(x.name)+(x.plant?' · '+esc(x.plant):'')+'</button>'}).join(' '):'<span class="note">no close match; add the person or the B1 name in the master</span>')+'</td></tr>';
+  }).join('');
+}
+function sugTable(names,lines){
+  if(!names.length)return '';
+  return '<div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th>Name in the sales data</th><th class="num">Lines</th><th>Click the right person to save an alias</th></tr></thead><tbody>'+sugRows(names.slice(0,25),lines)+'</tbody></table></div>'+(names.length>25?'<div class="note">'+(names.length-25)+' more names not shown.</div>':'');
+}
+
+/* ---- invoice upload: panel ---- */
+function invoiceFixes(r){
+  var af=r.af||{},it=[],fmtK=af.dateKinds||{};
+  it.push({st:'info',t:'File layout',n:null,d:esc((U.sys==='B1'?'SAP B1 Combine Sale':'SAP S/4HANA Sales Register')+(U.sheetPicked?', sheet "'+U.sheetPicked+'"':'')+'. '+U.rows.length.toLocaleString('en-IN')+' data rows.')});
+  var kinds=[['serial','date cells'],['text','text dd/mm/yyyy'],['iso','text YYYY-MM-DD']].filter(function(k){return fmtK[k[0]]}).map(function(k){return fmtK[k[0]].toLocaleString('en-IN')+' '+k[1]}).join(', ');
+  it.push({st:r.dateInfo.mixed?'fixed':'info',t:r.dateInfo.mixed?'Dates: day and month swapped back':'Dates read',n:r.dateInfo.mixed?r.dateInfo.swapped:null,d:esc((kinds||'none')+'. Range '+(r.minDate||'-')+' to '+(r.maxDate||'-')+'.')+(r.dateInfo.mixed?' Confirm the range below before loading.':'')+(r.dateInfo.unfixable?' <b>'+r.dateInfo.unfixable+' could not be repaired and are rejected.</b>':'')});
+  if(r.preHist&&r.preHist.rows)it.push({st:'info',t:'Before history start ('+qLabel(histStart())+')',n:r.preHist.rows,d:'Not loaded and not rejected; no action needed (D28).'});
+  if(r.noLineCol)it.push({st:'fixed',t:'No LineNum column: line numbers created',n:af.lineSynth||0,d:'Numbered 1, 2, 3 ... in file row order within each document, so the same file always gives the same numbers.'});
+  if(af.dupNoLine)it.push({st:'fixed',t:'Repeated lines removed (same document, item, quantity and value)',n:af.dupNoLine,d:'Only because the file has no LineNum. If a document genuinely has two identical lines, add LineNum to the saved query.'});
+  if(U.sys==='B1'){
+    var hx=headerIndex(U.headers),noSlp=!('slpcode' in hx),noWhs=!('whscode' in hx);
+    if(noSlp||noWhs)it.push({st:'info',t:(noSlp?'SlpCode':'')+(noSlp&&noWhs?' and ':'')+(noWhs?'WhsCode':'')+' not in the file',n:null,d:'Salespeople are matched by name and the plant by branch name. Adding the columns makes both exact.'});
+  }
+  /* transfers */
+  it.push({st:'info',t:'Internal transfers flagged (excluded from sales)',n:r.xfer.rows,d:esc(fmtN(r.xferMaster)+' by the Admin transfer list; the rest by account or zone rule.')});
+  var xs=Object.keys(af.xferSuggest||{});
+  if(xs.length){
+    xs.sort(function(a,b){return af.xferSuggest[b].value-af.xferSuggest[a].value});
+    it.push({st:'sugg',t:'Customers named like the Virgo group, counted as sales',n:xs.length,d:'<div class="tw" style="max-height:200px;overflow:auto"><table><thead><tr><th>CardCode</th><th>Name</th><th class="num">Rows</th><th class="num">Net value</th><th></th></tr></thead><tbody>'+xs.slice(0,20).map(function(c){var o=af.xferSuggest[c];return '<tr><td class="mono">'+esc(c)+'</td><td class="break">'+esc(o.name)+'</td><td class="num">'+fmtN(o.rows)+'</td><td class="num">'+fmtMoney(o.value)+'</td><td><button class="btn sm" data-act="af-xf" data-code="'+esc(c)+'" data-name="'+esc(o.name)+'">Add to transfer list</button></td></tr>'}).join('')+'</tbody></table></div><div class="row" style="margin-top:6px"><button class="btn sm pri" data-act="af-xf-all">Add all '+xs.length+'</button><span class="note">Suggestions only: nothing is added until you click.</span></div>'});
+  }
+  /* category */
+  if(af.catAlias)it.push({st:'fixed',t:'Category spellings normalised through the alias table',n:af.catAlias,d:esc(af.catSpellings+' spelling'+(af.catSpellings===1?'':'s')+' seen. Edit in Admin › Aliases.')});
+  var cu=af.catUnknown||{};
+  if(Object.keys(cu).length)it.push({st:'sugg',t:'Categories outside the four groups, not mapped',n:Object.keys(cu).reduce(function(a,k){return a+cu[k]},0),d:'<div class="note">Rows stay in the record. Map a category to a group to bring it in, or to Out of scope to stop listing it.</div>'+mapTable('category',cu,'Category in the file')});
+  if(af.catBlank)it.push({st:'need',t:'Category blank',n:af.catBlank,d:'The item is not in the item master. Add the item in SAP (or the item master upload), then reload.'});
+  /* zone and junk */
+  if(af.zoneNorm)it.push({st:'fixed',t:'Zone spellings normalised',n:af.zoneNorm,d:esc(af.zoneSpellings+' spellings seen.')});
+  var zu=af.zoneUnknown||{};
+  if(Object.keys(zu).length)it.push({st:'sugg',t:'Zone values not recognised',n:Object.keys(zu).reduce(function(a,k){return a+zu[k]},0),d:mapTable('zone',zu,'Zone in the file')});
+  var jk=af.junk||{};
+  if(jk.zone||jk.pos)it.push({st:'info',t:'Junk values counted, used nowhere',n:(jk.zone||0)+(jk.pos||0),d:esc('Zone '+(jk.zone||0)+', Place of Supply '+(jk.pos||0)+'. Clean the masters in SAP when convenient.')});
+  if(af.junkRows)it.push({st:'need',t:'Rows with a junk Invoice Type skipped (not rejected)',n:af.junkRows,d:esc('Value '+fmtMoney(af.junkValue||0)+' not loaded. The Invoice Type is a stray character such as "z"; correct it in SAP and reload if these are real invoices.')});
+  /* salespeople */
+  if(af.spNames){
+    var names=Object.keys(af.spNames).filter(Boolean),un=[],mt=0,viaFuzzy=0;
+    names.forEach(function(n){var m=spMatch(n);if(m&&!m.ambiguous){mt++;if(m.how&&/spacing|initials|spelling|alias/.test(m.how))viaFuzzy++}else un.push(n)});
+    if(SM.ready){
+      it.push({st:viaFuzzy?'fixed':'info',t:'Salesperson names matched to the sales-employee master',n:mt,d:esc(mt+' of '+names.length+' names ('+(names.length?(mt/names.length*100).toFixed(1):'0')+'%).'+(viaFuzzy?' '+viaFuzzy+' matched through case, spacing, punctuation, initials, a close spelling or a saved alias.':''))});
+      if(un.length){un.sort(function(a,b){return af.spNames[b]-af.spNames[a]});it.push({st:'sugg',t:'Salesperson names with no match',n:un.length,d:sugTable(un,af.spNames)})}
+    }else if(names.length)it.push({st:'need',t:'No sales-employee master loaded',n:names.length,d:'Load the master in Admin › Sales employees so names can be matched.'});
+  }
+  /* S/4 */
+  if(U.sys==='S4'){
+    if(r.fanout)it.push({st:'fixed',t:'S/4 repeated rows removed (same document and item)',n:r.fanout,d:'The report repeats each line once per price group.'});
+    if(af.blankSp){
+      var lk=af.link||{};
+      if(af.spFilled)it.push({st:'fixed',t:'Sales Executive empty: salesperson taken from the customer\'s B1 sales',n:af.spFilled,d:esc(af.spFilled+' rows filled from '+lk.matched+' customers found in loaded B1 sales (the salesperson with the largest B1 value).')+(af.spUnlinked?' '+af.spUnlinked+' rows have a customer not found in B1.':'')});
+      else it.push({st:'need',t:'Sales Executive empty and cannot be filled from B1',n:af.blankSp,d:esc(lk.why||'No B1 sales are loaded to link from.')+' The S/4 report needs the sales-employee partner function added.'});
+    }
+    it.push({st:'need',t:'Credit memos are absent from the S/4 register',n:null,d:'Net sales are overstated until credit-memo billing types are added to the report (check Q-D4).'});
+  }else it.push({st:'need',t:'Credit notes are not in this export',n:null,d:'Net sales are overstated by the value of credit notes until a credit-note export is loaded (not built yet).'});
+  /* history */
+  var g=gridQuarters(),miss=g.list.filter(function(k){return k!==g.cur&&covStatus('INV',k).st==='miss'&&!(r.quarters&&r.quarters[k])});
+  if(miss.length)it.push({st:'need',t:'Quarters with no history loaded',n:miss.length,d:esc(miss.map(qLabel).join(', ')+'. QoQ and the trend need them: export the missing months from SAP.')});
+  return fixesPanel(it,'Fixes applied');
+}
+
+/* ---- B1 customer to salesperson link for S/4 (reads stored B1 chunks of the latest months) ---- */
+async function buildB1Linker(custCodes){
+  var cells=Object.keys(S.cells).filter(function(k){return /^INV_/.test(k)}).sort().reverse(),jobs=[];
+  for(var i=0;i<cells.length&&jobs.length<40;i++){var c=S.cells[cells[i]];Object.keys(c.plants||{}).forEach(function(p){var x=c.plants[p];if(x.sys==='B1'&&jobs.length<40)jobs.push({p:p,ym:c.ym,info:x})})}
+  var map=new Map(),nB1=0;
+  for(var j=0;j<jobs.length;j++){
+    var jb=jobs[j];
+    try{for(var k=0;k<(jb.info.chunks||0);k++){var snap=await dget('inv/B1-'+jb.p+'-'+jb.ym+'-'+k);if(!snap.exists)continue;var o=JSON.parse(await ungz(snap.data().z));
+      o.a.forEach(function(r){if(r[4]||!r[2])return;var e=map.get(r[0]);if(!e){e={};map.set(r[0],e);nB1++}e[r[2]]=(e[r[2]]||0)+r[9]})}}catch(e){}
+  }
+  var best=new Map(),matched=0;
+  custCodes.forEach(function(cc){var e=map.get(cc);if(!e)return;var top=null;Object.keys(e).forEach(function(s){if(!top||e[s]>e[top])top=s});best.set(cc,top);matched++});
+  var ex=Array.from(custCodes).slice(0,2).join(', '),bx=Array.from(map.keys()).slice(0,2).join(', ');
+  return {map:best,matched:matched,b1Customers:nB1,
+    why:!jobs.length?'No B1 sales are loaded to link from.':(matched?'':'Customer codes cannot be linked: S/4 codes ('+ex+') are not B1 CardCodes ('+bx+'), and the Desk stores no GSTIN to link on.')};
+}
+
+/* ---- sales-employee file: panel ---- */
+function sempFixes(r){
+  var f=r.fx||{},it=[];
+  it.push({st:'info',t:'File layout',n:null,d:esc((r.s4?'S/4 workforce CSV':'Sales Employee Master workbook')+', '+(r.sheets||[]).join(', '))});
+  if(f.ids)it.push({st:'fixed',t:'Employee IDs normalised (E-XXX/123 becomes E-XXX-0123)',n:f.ids,d:'The old spelling is kept as an alternate code, so earlier references still match.'});
+  if(f.plantInferred)it.push({st:'fixed',t:'Plant filled from the ID prefix',n:f.plantInferred,d:esc((f.prefixes||[]).slice(0,8).map(function(x){return x.pf+' → '+x.plant+' ('+x.how+')'}).join('; '))+' Edit prefixes in Admin › Aliases.'});
+  if(f.desFixed)it.push({st:'fixed',t:'Designation spellings normalised',n:f.desFixed,d:esc(f.desFrom+' spellings became '+f.desTo+'.')+' Edit in Admin › Aliases.'});
+  if(f.noPlant)it.push({st:'need',t:'People still without a plant',n:f.noPlant,d:'Listed below. Fill the plant in the source file (*CompanyCode or Plant Name).'});
+  if(f.noDes)it.push({st:'need',t:'People without a designation',n:f.noDes,d:'Add the designation in the source file.'});
+  if(r.warn&&r.warn.noEmail)it.push({st:'need',t:'No email address',n:r.warn.noEmail,d:'The Desk cannot sign them in until an email is on the record. Fill Email in the source file.'});
+  it.push({st:'need',t:'The Desk cannot read viewers\' email addresses',n:null,d:'A new user is added by Viewer ID once (Admin › Users › Viewer ID). This cannot be fixed from our side.'});
+  if(r.match&&r.match.names){
+    var un=(r.unmatched||[]).map(function(u){return u.name}),lines={};(r.unmatched||[]).forEach(function(u){lines[u.name]=u.lines});
+    it.push({st:r.matchBefore&&r.match.rate>r.matchBefore.rate?'fixed':'info',t:'B1 salesperson names matched',n:r.match.matched,d:esc('Match rate '+(r.match.rate!=null?r.match.rate.toFixed(1):'-')+'% of '+r.match.names+' names'+(r.matchBefore&&r.matchBefore.rate!=null?' (before this file: '+r.matchBefore.rate.toFixed(1)+'%)':'')+'.')});
+    if(un.length)it.push({st:'sugg',t:'Names still unmatched',n:un.length,d:'<div class="note">Suggestions come from the people in this file. Saved aliases apply at once.</div>'+sugTable(un,lines)});
+  }
+  return fixesPanel(it,'Fixes applied');
+}
+
+/* ---- handlers ---- */
+Object.assign(handlers,{
+ 'af-map':async function(t){
+   var kind=t.getAttribute('data-kind'),raw=t.getAttribute('data-raw'),i=t.getAttribute('data-i'),sel=document.getElementById('afm-'+kind+'-'+i);
+   if(!sel)return;if(await aliasSave(kind,raw,sel.value)){toast('Saved: '+raw+' → '+sel.value);if(U&&U.stage==='validated'){U.stage='validating';U.progressMsg='Checking again with the new mapping...';renderUpload();await runValidation()}else if(S.mst.items&&S.mst.items.stage==='checked'&&S.mst.items.src){await itemParse()}}
+ },
+ 'af-sp':async function(t){
+   var raw=t.getAttribute('data-raw'),code=t.getAttribute('data-code');
+   if(await aliasSave('salesperson',raw,code)){toast('Saved: '+raw+' → '+code);S.lastHtml='';if(U&&U.stage==='validated')renderUpload();schedule();var m=S.mst&&S.mst.semp;if(m&&m.stage==='checked'){await sempCheck()}}
+ },
+ 'af-xf':async function(t){
+   if(!superOnly('add to the transfer list'))return;
+   var c=(t.getAttribute('data-code')||'').toUpperCase();await dset('transfers/'+slug(c),{code:c,name:t.getAttribute('data-name')||'',flag:true,added_by_suggestion:true});toast('Added '+c+' to the transfer list');
+   if(U&&U.stage==='validated'){U.stage='validating';renderUpload();await runValidation()}
+ },
+ 'af-xf-all':async function(){
+   if(!superOnly('add to the transfer list')||!U||!U.res)return;var xs=U.res.af.xferSuggest||{},ks=Object.keys(xs);
+   for(var i=0;i<ks.length;i++)await dset('transfers/'+slug(ks[i].toUpperCase()),{code:ks[i].toUpperCase(),name:xs[ks[i]].name,flag:true,added_by_suggestion:true});
+   toast('Added '+ks.length+' accounts to the transfer list');U.stage='validating';renderUpload();await runValidation();
+ },
+ 'u-load-as-transfers':async function(){
+   if(!superOnly('load the transfer list')||!U||!U.offer)return;var f=U.offer;S.upMsg='';await masterUpload('transfers',f.file,f.rows);
+   var done=S.upMsg||'';U=newU();U.transferDone='<div class="banner ok"><span>Loaded as the Internal-transfer list.</span></div>'+done;renderUpload();
+ },
+ 'al-add':async function(t){
+   var kind=t.getAttribute('data-kind'),a=document.getElementById('al-r-'+kind),b=document.getElementById('al-c-'+kind);if(!a||!b)return;
+   if(await aliasSave(kind,a.value,b.value)){a.value='';if(b.tagName==='INPUT')b.value=''}
+ },
+ 'al-del':function(t){return aliasDel(t.getAttribute('data-kind'),t.getAttribute('data-k'))}
+});
+
+/* ---- Admin › Aliases ---- */
+function aliasesHtml(){
+  var h='<section class="card"><div class="hd"><h2>Aliases and normalisations</h2></div><p class="note" style="margin:0">Every spelling table the auto-fix pass uses. Seeded with the current rules; Super admin edits. Each change is saved to the database and applies at the next check (names and prefixes apply at once). Nothing here changes stored data silently: uploads list what was fixed.</p></section>';
+  Object.keys(ALIAS_KINDS).forEach(function(kind){
+    var K=ALIAS_KINDS[kind],rows=aliasRows(kind);
+    var inCanon=K.canon?'<select id="al-c-'+kind+'" class="in">'+K.canon.map(function(c){return '<option>'+esc(c)+'</option>'}).join('')+'</select>':'<input id="al-c-'+kind+'" class="in" placeholder="'+(kind==='plantprefix'?'plant code, e.g. 1012':kind==='salesperson'?'employee code':'designation')+'">';
+    h+='<section class="card"><div class="hd"><h2>'+esc(K.label)+' &middot; '+rows.length+'</h2></div><p class="note" style="margin:0">'+esc(K.hint)+'</p>'
+     +'<div class="row"><div class="fld"><label for="al-r-'+kind+'">'+(kind==='plantprefix'?'ID prefix':'Spelling in the file')+'</label><input id="al-r-'+kind+'" class="in"></div><div class="fld"><label for="al-c-'+kind+'">Becomes</label>'+inCanon+'</div><div class="fld"><label>&nbsp;</label><button class="btn pri sm" data-act="al-add" data-kind="'+kind+'">Add or change</button></div></div>'
+     +(rows.length?'<div class="tw" style="max-height:260px;overflow:auto"><table><thead><tr><th>Spelling</th><th>Becomes</th><th>From</th><th></th></tr></thead><tbody>'+rows.map(function(x){return '<tr><td class="break">'+esc(x.k)+'</td><td class="break">'+esc(x.v==='-'?'(switched off)':x.v)+'</td><td><span class="pill '+(x.src==='seed'?'mute':'part')+'">'+x.src+'</span></td><td><button class="btn sm" data-act="al-del" data-kind="'+kind+'" data-k="'+esc(x.k)+'">'+(x.src==='seed'?'Switch off':'Remove')+'</button></td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty sm">No rows yet.</div>');
+    if(kind==='plantprefix'){var lp=learnPrefixes(SM.list.map(function(p){return [p.code,p.name,p.zone,p.plant]}));var ks=Object.keys(lp).sort();h+='<div class="note">Learned from the loaded master ('+ks.length+' prefixes): '+(ks.length?ks.slice(0,40).map(function(k){return esc(k+' → '+lp[k].plant)}).join(' · '):'none yet')+'</div>'}
+    h+='</section>';
+  });
+  return h;
+}
+
+/* ---- sales-employee auto-fix pass: designations, plant from ID prefix, still-missing lists ---- */
+function afSempPass(res,existing){
+  var fx=res.fx=res.fx||{ids:0},ppl=res.people;
+  var dm=desCanonMap(ppl.map(function(p){return p[5]})),rawSet={},toSet={};
+  ppl.forEach(function(p){var d=p[5];if(!d)return;var m=dm[d];rawSet[d]=1;if(m&&m.to!==d){p[5]=m.to;fx.desFixed=(fx.desFixed||0)+1}toSet[p[5]]=1});
+  fx.desFrom=Object.keys(rawSet).length;fx.desTo=Object.keys(toSet).length;
+  /* role from the chosen designation, where the file gave none */
+  ppl.forEach(function(p){var role=roleFromDesignation(p[5]);if(!p[6]||(fx.desFixed&&p[5]&&role))p[6]=role||p[6]});
+  /* plant from the ID prefix, learned from people whose plant is known (this file plus the loaded master) */
+  var known=ppl.concat((existing||[]).map(function(o){return [o.code,o.name,o.zone,o.plant]}));
+  var learned=learnPrefixes(known),plantsOk={};S.plants.forEach(function(p){plantsOk[p.plant_code]=1});
+  fx.plantInferred=0;fx.prefixes=[];var seenPf={};
+  ppl.forEach(function(p){
+    if(p[3])return;var pf=idPrefix(p[0]);if(!pf)return;var pp=prefixPlant(pf,learned);
+    if(pp&&plantsOk[pp.plant]){p[3]=pp.plant;fx.plantInferred++;if(!seenPf[pf]){seenPf[pf]=1;fx.prefixes.push({pf:pf,plant:pp.plant,how:pp.how})}}
+  });
+  res.byRole={};res.unmappedDes={};res.byZone={};
+  ppl.forEach(function(p){res.byRole[p[6]||'(no matching role)']=(res.byRole[p[6]||'(no matching role)']||0)+1;res.byZone[p[2]||'(none)']=(res.byZone[p[2]||'(none)']||0)+1;if(!p[6]&&p[5])res.unmappedDes[p[5]]=(res.unmappedDes[p[5]]||0)+1});
+  /* only people who still lack a plant or designation are listed */
+  var byCode={};ppl.forEach(function(p){byCode[norm(p[0])]=p});
+  if(res.s4){res.needs=res.needs.filter(function(n){var p=byCode[norm(n[1])];return p&&(!p[3]||!p[5])}).map(function(n){var p=byCode[norm(n[1])];return [n[0],n[1],n[2],(!p[3]&&!p[5]?'needs plant and designation':!p[3]?'needs plant':'needs designation')]})}
+  else{res.needs=ppl.filter(function(p){return !p[3]}).map(function(p){return ['',p[0],p[1],'needs plant']})}
+  fx.noPlant=ppl.filter(function(p){return !p[3]}).length;fx.noDes=ppl.filter(function(p){return !p[5]}).length;
+  res.warn=res.warn||{};res.warn.noPlant=fx.noPlant;
+}
+
+/* ---- item master upload: panel ---- */
+function itemFixes(r){
+  var it=[{st:'info',t:'File layout',n:null,d:esc('Sheet "'+r.sheet+'", '+fmtN(r.read)+' items read.')},
+   {st:r.outOfScope?'info':'info',t:'Not laminates (counted, not stored)',n:r.outOfScope,d:'Kept out by item category; see the list below to bring a category in.'}];
+  var cu=r.catUnknown||{};if(Object.keys(cu).length)it.push({st:'sugg',t:'Categories outside the four groups',n:Object.keys(cu).reduce(function(a,k){return a+cu[k]},0),d:'<div class="note">Map a category to a group to bring it in, or to Out of scope to stop listing it. The file is checked again after each click.</div>'+mapTable('category',cu,'Category in the file')});
+  if(r.warn&&r.warn.noSize)it.push({st:'need',t:'Items without a readable size',n:r.warn.noSize,d:'Sheet counts and sq ft need the size. Add it in SAP.'});
+  if(r.rejected)it.push({st:'need',t:'Rows rejected',n:r.rejected,d:'Blank or duplicate item codes. Listed below.'});
+  return fixesPanel(it,'Fixes applied');
+}
+
 /* ---- src/99-expose.js ---- */
 /* test hooks (read-only helpers for the self-test; no data) */
 window.__dbg={demoLoad:demoLoad,demoClear:demoClear,hasRealData:hasRealData,S:S,DS:DS,CFG:CFG,sumF:sumF,quarterSeries:quarterSeries,trendStats:trendStats,stretchOf:stretchOf,planQ:planQ,planW:planW,resolvePeriod:resolvePeriod,qoqOf:qoqOf,walk:walk,WD:WD,wdBetween:wdBetween,scoreOf:scoreOf,rankSort:rankSort,TODAY:TODAY,qMonths:qMonths,monthsLoaded:monthsLoaded,viewCtx:viewCtx,figs:figs,priorMonth:priorMonth,closedQuarters:closedQuarters,curQuarterKey:curQuarterKey,effUser:effUser,buildDraft:buildDraft,custAgg:custAgg,loadCust:loadCust,classMap:classMap,todayCandidates:todayCandidates,capFor:capFor,scopeOf:scopeOf,fillTpl:fillTpl,addDays:addDays,addWD:addWD,hashRef:hashRef,runLadder:runLadder,runEngine:runEngine,kpiCompute:kpiCompute,itemsHtml:itemsHtml,sempHtml:sempHtml,spMatch:spMatch,spCanon:spCanon,SM:SM,matchStats:matchStats,unmatchedSp:unmatchedSp,nameKey:nameKey};
@@ -3853,11 +4169,9 @@ async function boot(){
     subscribe('audit',db.collection('audit'),function(d){S.audit=d});
     subscribe('actions',db.collection('actions'),function(d){S.actions=d});
     subscribe('followups',db.collection('followups'),function(d){S.followups=d});
-    subscribe('settings',db.collection('settings'),function(d){var m=d.find(function(x){return x._id==='main'});S.settings=m||null;applySettings(m);DS.cache={}});
+    subscribe('settings',db.collection('settings'),function(d){var m=d.find(function(x){return x._id==='main'});S.settings=m||null;applySettings(m);ingestAliases(d);DS.cache={}});
     subscribe('phasing',db.collection('phasing'),function(d){S.phasing=d;DS.cache={}});
     subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
-    subscribe('orders',db.collection('orders'),function(d){S.orders=d});
-    subscribe('deliveries',db.collection('deliveries'),function(d){S.deliv=d});
     subscribe('receivables',db.collection('receivables'),function(d){S.recv=d});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});
     subscribe('stock',db.collection('stock'),function(d){S.stock=d});

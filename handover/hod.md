@@ -15,7 +15,7 @@ related:
 You run one department. Pages and actions follow your department. All figures in the examples are DEMO.
 
 ## What you see
-- All plants, filtered by department: Sales sees Overview, Sales, Orders & Dispatch, Team & Scorecard; Accounts sees Receivables; Plant sees Orders & Dispatch and Inventory; CRR sees Orders & Dispatch and Sales (customer and document view). Check your department in the page.
+- All plants, filtered by department: Sales sees Overview, Sales, Team & Scorecard; Accounts sees Receivables; Plant sees Inventory; CRR sees Sales (customer and document view). Check your department in the page.
 - Action Center lists your department's actions.
 - You propose department plans and approve P2, P4 and P5 (not your own).
 Every table follows one layout: Potential, Target, Actual, Var, Ach %, Share %, Last Qtr, QoQ %, Trend, with a total row. Growth is quarter on quarter only; there is no last-year comparison. A quarter with partial history shows QoQ greyed with "incomplete history". Achievement is not shown for a target that is not approved.

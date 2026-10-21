@@ -12,10 +12,10 @@ related:
 ---
 
 # Coordinator (sales / CRR) guide
-You track orders, dispatch and customers for your plants, and you are the usual sender of follow-up drafts. All figures in the examples are DEMO.
+You track customers for your plants (Orders & Dispatch was removed, D31), and you are the usual sender of follow-up drafts. All figures in the examples are DEMO.
 
 ## What you see
-- Orders & Dispatch for your plants, Sales (customer and document view only: no target, potential or scorecard columns), Action Center.
+- Sales (customer and document view only: no target, potential or scorecard columns), Action Center.
 - You can raise an action for a customer in your scope.
 Every table follows one layout: Potential, Target, Actual, Var, Ach %, Share %, Last Qtr, QoQ %, Trend, with a total row. Growth is quarter on quarter only; there is no last-year comparison. A quarter with partial history shows QoQ greyed with "incomplete history". Achievement is not shown for a target that is not approved.
 

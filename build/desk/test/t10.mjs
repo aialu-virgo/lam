@@ -3,7 +3,7 @@ import fs from 'fs';
 const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
 const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
 const browser = await chromium.launch();
-const pages=['overview','sales','orders','receivables','inventory','today','actions','team','intake','admin'];
+const pages=['overview','sales','receivables','inventory','today','actions','team','intake','admin'];
 const out=[];
 for(const [w,h] of [[360,740],[768,1000],[1440,900]]) for(const scheme of ['light','dark']){
   const {page,errs}=await open(browser,{store,size:{width:w,height:h},scheme});

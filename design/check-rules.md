@@ -2,7 +2,7 @@
 title: Check rules
 summary: Upload validation rules (V1-V12) and the seven rules that raise actions (R1-R7: shortfall, overdue receivable, order beyond TAT, ageing stock, rejected rows, missing plan, QoQ decline), each with trigger, threshold, owner, due date, next-step text and a worked example.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-20
+updated: 2026-10-21
 related:
   - design/_index.md
   - data-map/invoice.md
@@ -20,6 +20,8 @@ related:
 ---
 
 # Check rules
+
+> **D31 (Vijay, 21 Oct 2026):** rule R3 (order beyond TAT) is removed, with the settings `tat_days`, `tat_min_orders` and `due_R3`. The section R3 below is kept for history and is not evaluated. Orders and deliveries are no longer intake entities (V7 now has no delivery example).
 **Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §6 Created by, §7 Validation, §4 Rules use QoQ
 

@@ -16,7 +16,7 @@ fs.writeFileSync(SP+'store-demo.json',JSON.stringify(store));
 const cols={};Object.keys(store).forEach(k=>{const c=k.split('/')[0];cols[c]=(cols[c]||0)+1});
 console.log(cols);
 console.log(errs.filter(e=>!/ERR_FAILED/.test(e)));
-for (const pg of ['overview','sales','today','actions','team','orders','receivables','inventory']) {
+for (const pg of ['overview','sales','today','actions','team','receivables','inventory']) {
   await page.evaluate(p=>{location.hash='#/'+p},pg);
   await page.waitForTimeout(2500);
   const txt=await page.innerText('#pg');

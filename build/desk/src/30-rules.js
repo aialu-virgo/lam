@@ -75,7 +75,7 @@ function ownerFor(rule,ctx){
   var bm=ctx.plant?bmFor(ctx.plant):null,hod=hodFor(ctx.dept||'Sales'),mg=mgmtUsers()[0],sa=usersOfRole('Super admin')[0];
   var chain;
   if(rule==='R2')chain=[ctx.plant?accountsFor(ctx.plant):null,bm,hodFor('Accounts'),mg,sa];
-  else if(rule==='R3'||rule==='R4')chain=[ctx.plant?plantUserFor(ctx.plant):null,bm,hodFor('Plant'),mg,sa];
+  else if(rule==='R4')chain=[ctx.plant?plantUserFor(ctx.plant):null,bm,hodFor('Plant'),mg,sa];
   else if(rule==='R5')chain=[ctx.uploader?uByEmail(ctx.uploader):null,sa];
   else if(rule==='R7'&&ctx.kind==='group')chain=[hodFor('Sales'),mg,sa];
   else if(rule==='R7'&&ctx.kind==='person')chain=[ctx.sp?userBySp(ctx.sp):null,bm,hodFor('Sales'),mg,sa];
@@ -87,7 +87,7 @@ function ownerFor(rule,ctx){
 /* ---- candidate builders ---- */
 function mkCand(rule,key,period,o){
   var own=ownerFor(rule,o.ctx||{});
-  var dept={R1:'Sales',R2:'Accounts',R3:'Plant',R4:'Plant',R5:'HO',R6:'Sales',R7:'Sales'}[rule];
+  var dept={R1:'Sales',R2:'Accounts',R4:'Plant',R5:'HO',R6:'Sales',R7:'Sales'}[rule];
   return {id:actionIdOf(rule,[key,period]),rule:rule,period:period,title:o.title,source:o.source,owner:own.u?own.u.email:'',ownerUp:own.up,department:dept,plant:o.plant||'',group:o.group||'',customer:o.customer||'',
     due:addWD(TODAY(),CFG['due_'+rule]||3),next_step:o.next,value:Math.round(o.value||0),meta:o.meta||{}};
 }
@@ -119,18 +119,6 @@ function evalR2(){
       source:{label:'Rule R2 · Receivables › '+(o.name||o.cust),page:'receivables',plant:o.plant},next:'Call '+(o.name||o.cust)+'. Overdue '+fmtMoney(o.amt)+' on '+o.n+' invoice'+(o.n>1?'s':'')+', oldest '+o.oldest+' days. Record the promised payment date and amount in your reply.',meta:{n:o.n,oldest:o.oldest}}))});
   return {out:out,live:true};
 }
-function evalR3(){
-  var out=[];if(!(S.orders||[]).length)return {out:out,live:null};
-  var t=TODAY();
-  S.orders.forEach(function(d){
-    var late=[];(d.rows||[]).forEach(function(r){var o={no:r[0],date:r[1],group:r[3],open:r[5]};var age=wdBetween(addDays(o.date,1),t);var tat=planTat(d.plant,o.group);if(age>tat)late.push({no:o.no,age:age,open:o.open})});
-    if(late.length>=CFG.tat_min_orders){var v=late.reduce(function(a,x){return a+x.open},0),worst=late.reduce(function(a,x){return Math.max(a,x.age)},0);
-      out.push(mkCand('R3',d.plant,'open',{title:'Orders beyond TAT · '+plantShort(d.plant),plant:d.plant,value:v,ctx:{plant:d.plant},source:{label:'Rule R3 · Orders & Dispatch › '+plantShort(d.plant)+' · '+late.length+' orders late',page:'orders',plant:d.plant},
-        next:'Confirm the dispatch date for each listed order, or name the blocker (stock, vehicle, credit hold). Reply with the ETA.',meta:{late:late.length,worst:worst}}))}
-  });
-  return {out:out,live:true};
-}
-function planTat(plant,group){return CFG.tat_days}
 function evalR4(){
   var out=[];if(!(S.stock||[]).length)return {out:out,live:null};
   S.stock.forEach(function(d){(d.rows||[]).forEach(function(r){
@@ -220,11 +208,11 @@ async function evalR7(){
 async function runEngine(){
   var u=effUser();if(!u||GLOBAL_ROLES.indexOf(u.role)<0||readOnly()||S.engBlock)return;
   if(!S.loaded.actions||!S.loaded.uploads||!S.loaded.potential||!S.loaded.settings||!DS.ready)return;
-  var sig=[DS.ver,DS.custVer,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.orders.length,S.stock.length,S.users.length].join('|');
+  var sig=[DS.ver,DS.custVer,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.stock.length,S.users.length].join('|');
   if(S.engSig===sig||S.engBusy)return;
   S.engBusy=true;S.engSig=sig;S.engStatus='Checking rules...';
   try{
-    var res=[evalR1(),evalR2(),evalR3(),evalR4(),evalR5(),evalR6()];res.push(await evalR7());
+    var res=[evalR1(),evalR2(),evalR4(),evalR5(),evalR6()];res.push(await evalR7());
     var all=[];res.forEach(function(r){all=all.concat(r.out)});
     /* existing actions are never duplicated; new ones capped per rule per run, largest value first */
     var have={};S.actions.forEach(function(a){have[a.id]=1});
@@ -248,7 +236,7 @@ async function runEngine(){
     var tYm=TODAY().slice(0,7),cq=curQuarterKey();
     for(var j=0;j<S.actions.length;j++){
       var a2=S.actions[j];if(!evald[a2.rule]||a2.cleared||LIVE_ST.indexOf(a2.status)<0||isRuleMade(a2)===false)continue;
-      if(['R1','R2','R3','R4','R6'].indexOf(a2.rule)<0)continue;
+      if(['R1','R2','R4','R6'].indexOf(a2.rule)<0)continue;
       if(a2.rule==='R1'&&qKeyOfYm(a2.period)!==cq)continue;if(a2.rule==='R6'&&a2.period!==cq&&a2.period!==nextQ(cq))continue;
       if(!liveIds[a2.id]){await saveAction(Object.assign({},a2,{cleared:true,updated:nowISO(),thread:(a2.thread||[]).concat([{at:nowISO(),by:'Desk rule '+a2.rule,kind:'cleared',text:'Condition cleared. The assigner verifies the closure.'}])}))}
     }
