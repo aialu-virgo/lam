@@ -52,7 +52,7 @@ function senseHtml(x){
   var draft=x.share_pct!==''&&x.share_pct!=null?leafTgt(x.potential_value_inr,x.share_pct):null;
   var tot=P.tgt-(approvedOf(x)?leafTgt(approvedOf(x).potential_value_inr,approvedOf(x).share_pct):0)+(draft!=null?draft:0);
   var sr=stretchOf(tot>0?tot:null,lastOk?lastA:null,ts);
-  return '<div class="callout '+(sr.state==='stretch'?'warn':'')+'"><b>Sense-check · '+esc(plantShort(x.plant_code))+' · '+esc(x.product_group)+' (all segments)</b><br>Last quarter actual '+(lastOk?fmtMoney(lastA):'incomplete')+(sr.required!=null?' · target '+fmtMoney(tot)+' needs <b>'+fmtPct(sr.required,true)+'</b> QoQ; 12-qtr average is <b>'+fmtPct(sr.avg,true)+'</b>. '+(sr.state==='stretch'?'<span class="pill part">Stretch</span> for discussion, never blocks approval.':'Within '+CFG.stretch_multiple+'× the average.'):' · no Stretch check (history too short or no target).')+'</div>';
+  return '<div class="callout '+(sr.state==='stretch'?'warn':'')+'"><b>Sense-check · '+esc(plantShort(x.plant_code))+' · '+esc(x.product_group)+' (all segments)</b><br>Last quarter actual '+(lastOk?fmtMoney(lastA):'incomplete')+(sr.required!=null?' · target '+fmtMoney(tot)+' needs <b>'+fmtPct(sr.required,true)+'</b> QoQ; average of the quarters loaded is <b>'+fmtPct(sr.avg,true)+'</b>. '+(sr.state==='stretch'?'<span class="pill part">Stretch</span> for discussion, never blocks approval.':'Within '+CFG.stretch_multiple+'× the average.'):' · no Stretch check (history too short or no target).')+'</div>';
 }
 /* ---- settings tab ---- */
 function settingsHtml(){
@@ -68,6 +68,7 @@ async function saveSettings(){
     if(typeof d[2]==='number'){var n=Number(v);if(v===''||isNaN(n))errs.push(d[1]+' must be a number');else doc[d[0]]=n}else doc[d[0]]=v});
   if(doc.w_U+doc.w_V+doc.w_C+doc.w_A+doc.w_D!==100)errs.push('Priority weights must total 100 (they total '+(doc.w_U+doc.w_V+doc.w_C+doc.w_A+doc.w_D)+')');
   if(doc.month_compare!=='same_position_prior_quarter'&&doc.month_compare!=='previous_month')errs.push('Month comparison must be same_position_prior_quarter or previous_month. There is no last-year option.');
+  if(!/^FY\d\d-Q[1-4]$/.test(doc.history_start||''))errs.push('History start must look like FY26-Q1');
   if(doc.holidays&&doc.holidays.split(/[,;\s]+/).filter(Boolean).some(function(h){return !/^\d{4}-\d\d-\d\d$/.test(h)}))errs.push('Holidays must be YYYY-MM-DD dates');
   doc.role_caps={};ROLES.forEach(function(r){var v=document.getElementById('cap-'+slug(r)).value.trim();if(v){var n=Number(v);if(!(n>=1&&n<=20&&Math.floor(n)===n))errs.push('Cap for '+r+' must be 1 to 20');else doc.role_caps[r]=n}});
   if(errs.length){$('#st-msg').innerHTML='<div class="banner err">'+esc(errs.join('. '))+'</div>';return}

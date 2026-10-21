@@ -2,7 +2,7 @@
 title: Comparison basis
 summary: QoQ only: quarter, month, QTD, YTD and custom comparisons, the Q1 to prior-FY Q4 crossover, new-entity and partial-history handling, and what the D9 storage grain forces.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-20
+updated: 2026-10-21
 related:
   - design/_index.md
   - data-map/target-phasing.md
@@ -25,6 +25,8 @@ related:
 
 ## The one rule
 Growth is **quarter on quarter (QoQ) only**: a period is compared with the period **one quarter earlier**. Same month, same quarter or YTD of last FY, and YoY, are not shown, not selectable, not computed and not exported. The rules engine has one comparison function, `prior(period)`, which shifts a period back by exactly three months. There is no function that shifts by twelve. QA check 9 greps the build for any 12-month shift.
+
+**History window (D28, Vijay):** history starts at Q1 FY26 (setting `history_start`, default `FY26-Q1`, Super admin only). Nothing dated before 1 Apr 2025 is loaded or shown. Rows before it are counted at intake as "Before history start", not rejected, with no action. Intake and every view derive their windows from the setting. The first quarter shows "No prior quarter loaded" instead of a QoQ. Period control and YTD are unchanged (QoQ only).
 
 ## Calendar (all dates IST)
 - FY runs April–March and is named by the year it ends: **FY27 = Apr 2026 – Mar 2027**. Q1 = Apr–Jun, Q2 = Jul–Sep, Q3 = Oct–Dec, Q4 = Jan–Mar.

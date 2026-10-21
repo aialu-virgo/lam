@@ -123,7 +123,7 @@ function pageInventory(){
   return h;
 }
 
-/* ---- collections: 12-quarter series for a scorecard (Accounts' primary KPI) ---- */
+/* ---- collections: quarter series since history start for a scorecard (Accounts' primary KPI) ---- */
 function collSeries(plants){
   var cur=curQuarterKey(),qs=closedQuarters().concat([cur]);
   return qs.map(function(q){

@@ -19,11 +19,15 @@ var SETTING_DEFS=[
  ['stretch_multiple','Stretch multiple of average QoQ',2,'Brief §4'],['stretch_floor_pct','Stretch floor % (when average is 0 or less)',0,'Assumed (new)'],['min_pairs','Minimum QoQ pairs for trend and Stretch',4,'Assumed (new)'],['trend_band_pct','Trend direction band ± %',1,'Assumed (new)'],
  ['default_share_uplift_pts','Default share uplift (points)',2,'Assumed (Q4)'],
  ['overdue_share_days','K10 overdue share: days past due',60,'Assumed (new)'],
+ ['history_start','History start quarter (D28: nothing earlier is loaded or shown), format FY26-Q1','FY26-Q1','D28 (Vijay)'],
  ['holidays','Holidays (YYYY-MM-DD, comma separated)','','Assumed (new)'],['month_compare','Month comparison (same_position_prior_quarter or previous_month)','same_position_prior_quarter','Assumed (Q8)']];
 var CFG={};SETTING_DEFS.forEach(function(d){CFG[d[0]]=d[2]});
 CFG.role_caps={};
-function applySettings(doc){SETTING_DEFS.forEach(function(d){CFG[d[0]]=d[2]});CFG.role_caps={};if(doc){Object.keys(doc).forEach(function(k){if(k==='role_caps'&&doc[k])CFG.role_caps=doc[k];else if(k in CFG&&doc[k]!==''&&doc[k]!=null)CFG[k]=(typeof CFG[k]==='number')?Number(doc[k]):doc[k]})}HOL=null}
+function applySettings(doc){SETTING_DEFS.forEach(function(d){CFG[d[0]]=d[2]});CFG.role_caps={};if(doc){Object.keys(doc).forEach(function(k){if(k==='role_caps'&&doc[k])CFG.role_caps=doc[k];else if(k in CFG&&doc[k]!==''&&doc[k]!=null)CFG[k]=(typeof CFG[k]==='number')?Number(doc[k]):doc[k]})}if(!/^FY\d\d-Q[1-4]$/.test(String(CFG.history_start||'')))CFG.history_start='FY26-Q1';HOL=null}
 var HOL=null;
+function histStart(){return /^FY\d\d-Q[1-4]$/.test(String(CFG.history_start||''))?CFG.history_start:'FY26-Q1'}
+function histLoYm(){return qStartYm(histStart())}
+function preHist(ms){var lo=histLoYm();return ms.some(function(m){return m<lo})}
 function holidaySet(){if(!HOL){HOL={};String(CFG.holidays||'').split(/[,;\s]+/).forEach(function(x){if(/^\d{4}-\d\d-\d\d$/.test(x))HOL[x]=1})}return HOL}
 
 /* ---- dates (all ISO strings, IST calendar) ---- */
@@ -48,7 +52,8 @@ function ymRange(a,b){var o=[],x=a;while(x<=b&&o.length<400){o.push(x);x=shiftYm
 function priorMonth(ym){return shiftYm(ym,CFG.month_compare==='previous_month'?-1:-3)}
 function priorQuarterMonth(ym){return shiftYm(ym,-3)}
 function curQuarterKey(){return qKeyOfYm(TODAY().slice(0,7))}
-function closedQuarters(){var cur=curQuarterKey(),k=cur,l=[];for(var i=0;i<12;i++){k=prevQ(k);l.unshift(k)}return l}
+function closedQuartersFrom(cur){var k=cur,l=[],hs=histStart();for(var i=0;i<12;i++){k=prevQ(k);if(k<hs)break;l.unshift(k)}return l}
+function closedQuarters(){return closedQuartersFrom(curQuarterKey())}
 function fyQuarters(fyq){/* quarters of the FY of key, up to key */var m=/^FY(\d\d)-Q(\d)$/.exec(fyq),o=[];for(var q=1;q<=+m[2];q++)o.push('FY'+m[1]+'-Q'+q);return o}
 
 /* ---- window: months with the fraction of each month that counts ---- */
@@ -98,6 +103,7 @@ function resolvePeriod(f,today){
 /* ---- QoQ ---- */
 function qoqOf(A,P,ctx){
   ctx=ctx||{};
+  if(ctx.noPrior)return {v:null,state:'nohist',txt:'No prior quarter loaded'};
   if(ctx.incomplete)return {v:null,state:'incomplete',txt:'incomplete history'};
   if(P==null)return {v:null,state:'none',txt:'no prior quarter'};
   if(P<=0){if(A>0)return {v:null,state:'new',txt:'New, no prior quarter'};if(A===0&&P===0)return {v:null,state:'zero',txt:'—'};return {v:null,state:'na',txt:'n/a'}}
@@ -114,7 +120,7 @@ function trendStats(series){
   for(i=3;i<n;i++){var ok=true,s=0;for(var j=i-3;j<=i;j++){if(series[j]==null){ok=false;break}s+=series[j]}if(ok)ma[i]=s/4}
   var avg=qoqs.length?qoqs.reduce(function(a,b){return a+b},0)/qoqs.length:null;
   var sx=0,sy=0,sxx=0,sxy=0,k=0;for(i=0;i<n;i++){if(series[i]!=null){var x=i+1,y=series[i];sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;k++}}
-  var slope=null,icpt=null;if(k>=2){var den=k*sxx-sx*sx;if(den!==0){slope=(k*sxy-sx*sy)/den;icpt=(sy-slope*sx)/k}}
+  var slope=null,icpt=null;if(k>=4){var den=k*sxx-sx*sx;if(den!==0){slope=(k*sxy-sx*sy)/den;icpt=(sy-slope*sx)/k}}
   var short=qoqs.length<CFG.min_pairs,dir='short';
   if(!short){dir=avg>CFG.trend_band_pct?'rising':avg<-CFG.trend_band_pct?'falling':'flat'}
   return {n:n,qoqs:qoqs,qoqAt:qoqAt,ma:ma,avg:avg,slope:slope,icpt:icpt,pairs:qoqs.length,short:short,dir:dir};
