@@ -321,7 +321,7 @@ a.btn{text-decoration:none;display:inline-block}
           if (R() < 0.25) continue;
           var wh = kind === 's4' ? p.code : p.code + '-' + (w === 0 ? 'FG' : 'W' + w), nb = kind === 'batch' ? 1 + Math.floor(R() * 3) : 1;
           for (var b = 0; b < nb; b++) {
-            var qty = 20 + Math.floor(R() * 580), price = 700 + Math.floor(R() * 900), age = Math.floor(R() * 300), ind = addDays(o.asOf, -age);
+            var qty = 3 + Math.floor(R() * 40), price = 700 + Math.floor(R() * 900), age = Math.floor(R() * 300), ind = addDays(o.asOf, -age);
             if (kind === 'oitw') rows.push([it, 'DEMO item ' + (ii + 1), wh, qty, 0, 0, price]);
             else if (kind === 's4') rows.push([it, 'DEMO item ' + (ii + 1), wh, 'FG' + (w + 1), qty, 0, R() < 0.1 ? 5 : 0, qty * price, ind]);
             else rows.push([it, 'DEMO item ' + (ii + 1), wh, 'DEMO-B' + p.code + '-' + ii + '-' + w + '-' + b, qty, ind, price]);
@@ -695,7 +695,7 @@ function histBodyHtml(){
   return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(u){
      var fn=u.file||'',isOpen=!!open[u._id];
-     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&(u.entity||'INV')==='INV'&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
      if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
      return tr}).join('')
    +'</tbody></table></div>'
@@ -3367,11 +3367,8 @@ function invLines(ctx,sn){
 }
 function pageInventory(){
   var ctx=viewCtx(),sc=stockScopeSnap();
-  if(!sc||!Object.keys(sc.plants).length){
-    var legacy=inScopeDocs(S.stock,ctx);
-    if(!legacy.length)return needPanel(['stock'],'No stock is loaded.')+'<p class="note">Upload the stock export in Data Intake (Super admin). B1: inventory status (OITW) or batch stock (OIBT); S/4: MB52.</p>';
-  }
-  var sn=sc.snap,L=invLines(ctx,sn),tot={sheets:0,sqft:0,value:0,hasV:false,over:0,ageK:0,days:0};
+  if(!sc||!Object.keys(sc.plants).length)return needPanel(['stock'],S.stockSnaps.length?'No stock snapshot covers your plants.':'No stock is loaded.')+'<p class="note">Upload the stock export in Data Intake (Super admin). B1: inventory status (OITW) or batch stock (OIBT); S/4: MB52 or Stock Overview Totals.</p>';
+  var sn=sc.snap,L=invLines(ctx,{as_of:sn.as_of,plants:sc.plants}),tot={sheets:0,sqft:0,value:0,hasV:false,over:0,ageK:0,days:0};
   L.forEach(function(x){tot.sheets+=x.sheets;tot.sqft+=x.sqft;if(x.value!=null){tot.value+=x.value;tot.hasV=true}if(x.age&&x.over!=null){tot.over+=x.over;tot.ageK+=x.age.reduce(function(a,b){return a+b},0)}});
   var dn=0,dd=0;L.forEach(function(x){if(x.days!=null){dn+=x.days*x.sheets;dd+=x.sheets}});var days=dd>0?dn/dd:null,tgt=CFG.stock_days_target;
   var agedPct=tot.ageK>0?tot.over/tot.ageK*100:null;
@@ -4722,7 +4719,7 @@ async function afterValidate(){
 
 /* ---- src/99-expose.js ---- */
 /* test hooks (read-only helpers for the self-test; no data) */
-window.__dbg={demoLoad:demoLoad,demoClear:demoClear,hasRealData:hasRealData,S:S,DS:DS,CFG:CFG,sumF:sumF,quarterSeries:quarterSeries,trendStats:trendStats,stretchOf:stretchOf,planQ:planQ,planW:planW,resolvePeriod:resolvePeriod,qoqOf:qoqOf,walk:walk,WD:WD,wdBetween:wdBetween,scoreOf:scoreOf,rankSort:rankSort,TODAY:TODAY,qMonths:qMonths,monthsLoaded:monthsLoaded,viewCtx:viewCtx,figs:figs,priorMonth:priorMonth,closedQuarters:closedQuarters,curQuarterKey:curQuarterKey,effUser:effUser,buildDraft:buildDraft,custAgg:custAgg,loadCust:loadCust,classMap:classMap,todayCandidates:todayCandidates,capFor:capFor,scopeOf:scopeOf,fillTpl:fillTpl,addDays:addDays,addWD:addWD,hashRef:hashRef,runLadder:runLadder,runEngine:runEngine,kpiCompute:kpiCompute,itemsHtml:itemsHtml,sempHtml:sempHtml,spMatch:spMatch,spCanon:spCanon,SM:SM,matchStats:matchStats,unmatchedSp:unmatchedSp,nameKey:nameKey};
+window.__dbg={stockDays:stockDays,dailySheets:dailySheets,demoLoad:demoLoad,demoClear:demoClear,hasRealData:hasRealData,S:S,DS:DS,CFG:CFG,sumF:sumF,quarterSeries:quarterSeries,trendStats:trendStats,stretchOf:stretchOf,planQ:planQ,planW:planW,resolvePeriod:resolvePeriod,qoqOf:qoqOf,walk:walk,WD:WD,wdBetween:wdBetween,scoreOf:scoreOf,rankSort:rankSort,TODAY:TODAY,qMonths:qMonths,monthsLoaded:monthsLoaded,viewCtx:viewCtx,figs:figs,priorMonth:priorMonth,closedQuarters:closedQuarters,curQuarterKey:curQuarterKey,effUser:effUser,buildDraft:buildDraft,custAgg:custAgg,loadCust:loadCust,classMap:classMap,todayCandidates:todayCandidates,capFor:capFor,scopeOf:scopeOf,fillTpl:fillTpl,addDays:addDays,addWD:addWD,hashRef:hashRef,runLadder:runLadder,runEngine:runEngine,kpiCompute:kpiCompute,itemsHtml:itemsHtml,sempHtml:sempHtml,spMatch:spMatch,spCanon:spCanon,SM:SM,matchStats:matchStats,unmatchedSp:unmatchedSp,nameKey:nameKey};
 
 
 /* ================= boot ================= */

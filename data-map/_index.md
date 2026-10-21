@@ -38,7 +38,7 @@ related:
 - [Data map — Receivable](receivable.md) — draft — no export; B1 query listed
 - [Data map — Sales employee](sales-employee.md) — draft — employee master mapped; no SlpCode
 - [Data map — Sales order](sales-order.md) — not used (D31)
-- [Data map — Stock](stock.md) — draft — no export; B1 query listed
+- [Data map — Stock](stock.md) — active — snapshot intake built (D34); B1 OITW/batch and S/4 layouts
 - [Data map — Target phasing](target-phasing.md) — draft — template ready, no data
 - [Data map — User master](user-master.md) — draft — template ready; People List not received
 - [Data map — Plant / warehouse](warehouse.md) — draft — no export; interim plant = warehouse

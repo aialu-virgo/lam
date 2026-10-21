@@ -106,7 +106,7 @@
           if (R() < 0.25) continue;
           var wh = kind === 's4' ? p.code : p.code + '-' + (w === 0 ? 'FG' : 'W' + w), nb = kind === 'batch' ? 1 + Math.floor(R() * 3) : 1;
           for (var b = 0; b < nb; b++) {
-            var qty = 20 + Math.floor(R() * 580), price = 700 + Math.floor(R() * 900), age = Math.floor(R() * 300), ind = addDays(o.asOf, -age);
+            var qty = 3 + Math.floor(R() * 40), price = 700 + Math.floor(R() * 900), age = Math.floor(R() * 300), ind = addDays(o.asOf, -age);
             if (kind === 'oitw') rows.push([it, 'DEMO item ' + (ii + 1), wh, qty, 0, 0, price]);
             else if (kind === 's4') rows.push([it, 'DEMO item ' + (ii + 1), wh, 'FG' + (w + 1), qty, 0, R() < 0.1 ? 5 : 0, qty * price, ind]);
             else rows.push([it, 'DEMO item ' + (ii + 1), wh, 'DEMO-B' + p.code + '-' + ii + '-' + w + '-' + b, qty, ind, price]);

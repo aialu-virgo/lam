@@ -61,3 +61,6 @@ Data Intake › Upload history › Undo removes everything one upload still hold
 
 ## Skipped rows (D33, 21 Oct 2026)
 Rows with a problem are skipped; the good rows load at once and the skipped rows stay in the upload's list (Upload history: click the Skipped count). Status reads "Loaded · N rows skipped". A rule R5 action is raised only when skipped rows exceed `skip_alert_pct` of the rows read (Admin › Rules, default 2%). The date check, the multi-month stop and the replace-a-bigger-month confirm still stop a file; they are safety checks, not skipped rows.
+
+## Stock upload (D35, 21 Oct 2026)
+Data Intake accepts stock as a snapshot: B1 batch stock (best: it gives ageing), B1 OITW, S/4 MB52 or S/4 Stock Overview Totals. The as-on date is read from the file name or picked. Several warehouses of one plant are added together (map unknown warehouses in the Fixes applied panel or Admin › Aliases). Re-uploading the same date replaces that snapshot; Undo upload removes it. Export recipe: [Stock data map](../data-map/stock.md).

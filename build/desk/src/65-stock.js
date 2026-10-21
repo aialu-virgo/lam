@@ -314,11 +314,8 @@ function invLines(ctx,sn){
 }
 function pageInventory(){
   var ctx=viewCtx(),sc=stockScopeSnap();
-  if(!sc||!Object.keys(sc.plants).length){
-    var legacy=inScopeDocs(S.stock,ctx);
-    if(!legacy.length)return needPanel(['stock'],'No stock is loaded.')+'<p class="note">Upload the stock export in Data Intake (Super admin). B1: inventory status (OITW) or batch stock (OIBT); S/4: MB52.</p>';
-  }
-  var sn=sc.snap,L=invLines(ctx,sn),tot={sheets:0,sqft:0,value:0,hasV:false,over:0,ageK:0,days:0};
+  if(!sc||!Object.keys(sc.plants).length)return needPanel(['stock'],S.stockSnaps.length?'No stock snapshot covers your plants.':'No stock is loaded.')+'<p class="note">Upload the stock export in Data Intake (Super admin). B1: inventory status (OITW) or batch stock (OIBT); S/4: MB52 or Stock Overview Totals.</p>';
+  var sn=sc.snap,L=invLines(ctx,{as_of:sn.as_of,plants:sc.plants}),tot={sheets:0,sqft:0,value:0,hasV:false,over:0,ageK:0,days:0};
   L.forEach(function(x){tot.sheets+=x.sheets;tot.sqft+=x.sqft;if(x.value!=null){tot.value+=x.value;tot.hasV=true}if(x.age&&x.over!=null){tot.over+=x.over;tot.ageK+=x.age.reduce(function(a,b){return a+b},0)}});
   var dn=0,dd=0;L.forEach(function(x){if(x.days!=null){dn+=x.days*x.sheets;dd+=x.sheets}});var days=dd>0?dn/dd:null,tgt=CFG.stock_days_target;
   var agedPct=tot.ageK>0?tot.over/tot.ageK*100:null;
