@@ -12,7 +12,10 @@ const inp=await page.$('input[type=file]');await inp.setInputFiles(FILE);
 await page.waitForFunction(()=>window.__desk.U&&window.__desk.U.stage==='mapping'&&window.__desk.U.kind==='stock',null,{timeout:180000});
 const pre=await page.evaluate(()=>({sk:window.__desk.U.sk,asOf:window.__desk.U.asOf,map:window.__desk.U.map}));
 await page.click('[data-act="stk-validate"]');
-await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:600000});
+await page.waitForFunction(()=>['validated','done','mapping'].includes(window.__desk.U.stage),null,{timeout:600000});
+console.log('stage',await page.evaluate(()=>window.__desk.U.stage+' '+(window.__desk.U.msg||'')));
+if(await page.evaluate(()=>window.__desk.U.stage==='validated')){await page.click('[data-act="stk-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:600000})}
+console.log('done',await page.evaluate(()=>window.__desk.U.doneMsg));
 await page.waitForTimeout(3000);
 const res=await page.evaluate(()=>{const u=window.__desk.U.res;return {kind:u.kind,asOf:u.asOf,read:u.read,good:u.good,rejected:u.rejected,reasons:u.reasons,zero:u.zero,other:{rows:u.other.rows,sheets:u.other.sheets},unknownWh:u.unknownWh,warn:u.warn,fx:u.fx,itemMaster:u.itemMaster}});
 const after=await page.evaluate(()=>window.__mockStore());
