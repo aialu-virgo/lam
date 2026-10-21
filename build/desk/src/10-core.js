@@ -13,7 +13,7 @@ var SETTING_DEFS=[
  ['due_R1','Due (working days) R1 plan shortfall',3,'Assumed (new)'],['due_R2','Due R2 overdue receivable',2,'Assumed (new)'],['due_R4','Due R4 ageing stock',5,'Assumed (new)'],['due_R5','Due R5 rejected rows',1,'Assumed (new)'],['due_R6','Due R6 missing plan',3,'Assumed (new)'],['due_R7','Due R7 QoQ decline',5,'Assumed (new)'],
  ['rcv_days','R2: days past due',30,'Assumed (new)'],['rcv_min_inr','R2: minimum overdue (₹)',100000,'Assumed (new)'],
  ['stock_age_days','R4: stock age (days)',180,'Assumed (new)'],['stock_age_min_sheets','R4: minimum aged sheets',500,'Assumed (new)'],['stock_over_pct','R4: stock days over plan %',125,'Assumed (new)'],['stock_days_target','Stock days plan',30,'Assumed (new)'],
- ['reject_min','R5: minimum rejected rows',1,'Assumed (new)'],['plan_lead_days','R6: days before quarter start',7,'Assumed (new)'],
+ ['skip_alert_pct','R5: raise an action only when skipped rows exceed this % of the rows read',2,'Vijay (D33)'],['plan_lead_days','R6: days before quarter start',7,'Assumed (new)'],
  ['remind_days_before','Escalation: reminder days before due',1,'Assumed (Q11)'],['L1_days','Escalation L1 (days overdue)',1,'Assumed (Q11)'],['L2_days','Escalation L2 (days overdue)',3,'Assumed (Q11)'],['L3_days','Escalation L3 (days overdue)',7,'Assumed (Q11)'],
  ['stretch_multiple','Stretch multiple of average QoQ',2,'Brief §4'],['stretch_floor_pct','Stretch floor % (when average is 0 or less)',0,'Assumed (new)'],['min_pairs','Minimum QoQ pairs for trend and Stretch',4,'Assumed (new)'],['trend_band_pct','Trend direction band ± %',1,'Assumed (new)'],
  ['default_share_uplift_pts','Default share uplift (points)',2,'Assumed (Q4)'],

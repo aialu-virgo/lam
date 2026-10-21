@@ -137,7 +137,7 @@ function stockDays(plant,g,onhand){
 function evalR5(){
   var out=[],t=TODAY();
   S.uploads.forEach(function(u){
-    if(u.status==='Undone'||!(u.rejected>=CFG.reject_min))return;if(diffDays(t,(u.at||'').slice(0,10))>14)return;
+    if(u.status==='Undone'||!(u.read>0&&u.rejected>0&&u.rejected/u.read*100>CFG.skip_alert_pct))return;if(diffDays(t,(u.at||'').slice(0,10))>14)return;
     out.push(mkCand('R5',u._id,'upload',{title:'Rejected rows · '+(u.file||'upload'),value:0,ctx:{uploader:u.by},source:{label:'Rule R5 · Data Intake › upload history · '+fmtN(u.rejected)+' rows rejected of '+fmtN(u.read),page:'intake'},
       next:'Fix the '+fmtN(u.rejected)+' rejected rows in the SAP export or the column mapping, then re-upload the same file. The rejected-rows report is in Data Intake.',meta:{}}));
   });
