@@ -1,4 +1,4 @@
-/* ================= v0.9 shell, routing, handlers ================= */
+/* ================= v1.0 shell, routing, handlers ================= */
 S.f={mode:'QTD',q:'',m:'',from:'',to:'',plant:'',sp:'',group:'',search:''};
 S.acF={status:'',owner:'',rule:'',q:''};S.logF={kind:'',by:'',q:'',from:''};S.acTab='list';S.threadId=null;
 S.actions=[];S.followups=[];S.phasing=[];S.rollDocs={};S.rollLoaded=false;S.orders=[];S.deliv=[];S.recv=[];S.coll=[];S.stock=[];S.potVer=0;S.viewAs=null;S.demoMode=false;
@@ -68,7 +68,7 @@ function navHtml(u){
   }).join('');
 }
 function shellHtml(u){
-  return '<div class="app"><aside class="side"><div class="brand">'+brandLogo()+'<div><b>Lam Performance Desk</b><small>desk-v1.0</small></div></div>'+navHtml(u)
+  return '<div class="app"><aside class="side"><div class="brand">'+brandLogo()+'<div><b>Laminates Performance Desk</b><small>desk-v1.0</small></div></div>'+navHtml(u)
    +'<div class="me"><b>'+esc(S.viewer&&S.viewer.name||u.name||'Viewer')+'</b><span>'+esc(S.role||'')+'</span><span class="note break">'+esc(S.viewer&&S.viewer.email||'')+'</span>'
    +(S.role==='Super admin'?'<label class="note" for="va-sel">View as role</label><select id="va-sel" class="in" data-chg="viewas"><option value="">Myself (Super admin)</option>'+S.users.filter(function(x){return x.active!==false&&x.email!==(S.viewer&&S.viewer.email)}).sort(function(a,b){return a.role<b.role?-1:a.role>b.role?1:a.name<b.name?-1:1}).map(function(x){return '<option value="'+esc(x.email)+'"'+(S.viewAs===x.email?' selected':'')+'>'+esc(x.role+' · '+x.name)+'</option>'}).join('')+'</select>':'')
    +'</div></aside><main class="main"><div class="top" id="top"></div><div id="banners"></div><div id="pg"></div></main></div>';

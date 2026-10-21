@@ -1,4 +1,4 @@
-<title>Virgo Lam Performance Desk</title>
+<title>Virgo Laminates Performance Desk</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
@@ -203,7 +203,7 @@ a.btn{text-decoration:none;display:inline-block}
 <div id="toast" class="toast" hidden></div>
 
 <script>
-/* Synthetic invoice generator for the Virgo Lam Performance Desk.
+/* Synthetic invoice generator for the Virgo Laminates Performance Desk.
  * Every value is invented. Nothing here is real Virgo data.
  * Used two ways: inlined into the page (Load demo data) and by make-test-files.mjs (test files).
  * Output is never committed (see .gitignore rules in .claude/rules/git.md). */
@@ -408,7 +408,9 @@ async function auditW(ev,q,extra){
 }
 function isPlanLocked(q){return !!((S.periods[q]&&S.periods[q].plan_locked)||(S.planlocks&&S.planlocks[q]))}
 function dget(path){return dbRetry(function(){return S.db.doc(path).get()})}
-function dataOf(snap){return snap.docs.map(function(d){var x=d.data();x._id=d.id;return x})}
+/* snapshot data arrives frozen: copy before adding _id or mutating */
+function thaw(v){try{return typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v))}catch(e){return JSON.parse(JSON.stringify(v))}}
+function dataOf(snap){return snap.docs.map(function(d){var x=thaw(d.data()||{});x._id=d.id;return x})}
 function subscribe(name,q,assign){
   q.onSnapshot(function(snap){try{assign(dataOf(snap))}catch(e){S.errs[name]='could not decode ('+((e&&e.message)||e)+')';S.err=(S.err||'')+'Could not read '+name+': '+S.errs[name]+' ';schedule();return}S.loaded[name]=true;delete S.errs[name];schedule()},function(e){var c=(e&&e.code)||(e&&e.message)||'error';S.errs[name]=c;S.err=(S.err||'')+'Could not read '+name+': '+c+' ';schedule()});
 }
@@ -3607,7 +3609,7 @@ function navHtml(u){
   }).join('');
 }
 function shellHtml(u){
-  return '<div class="app"><aside class="side"><div class="brand">'+brandLogo()+'<div><b>Lam Performance Desk</b><small>desk-v1.0</small></div></div>'+navHtml(u)
+  return '<div class="app"><aside class="side"><div class="brand">'+brandLogo()+'<div><b>Laminates Performance Desk</b><small>desk-v1.0</small></div></div>'+navHtml(u)
    +'<div class="me"><b>'+esc(S.viewer&&S.viewer.name||u.name||'Viewer')+'</b><span>'+esc(S.role||'')+'</span><span class="note break">'+esc(S.viewer&&S.viewer.email||'')+'</span>'
    +(S.role==='Super admin'?'<label class="note" for="va-sel">View as role</label><select id="va-sel" class="in" data-chg="viewas"><option value="">Myself (Super admin)</option>'+S.users.filter(function(x){return x.active!==false&&x.email!==(S.viewer&&S.viewer.email)}).sort(function(a,b){return a.role<b.role?-1:a.role>b.role?1:a.name<b.name?-1:1}).map(function(x){return '<option value="'+esc(x.email)+'"'+(S.viewAs===x.email?' selected':'')+'>'+esc(x.role+' · '+x.name)+'</option>'}).join('')+'</select>':'')
    +'</div></aside><main class="main"><div class="top" id="top"></div><div id="banners"></div><div id="pg"></div></main></div>';

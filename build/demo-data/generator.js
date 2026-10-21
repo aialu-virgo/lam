@@ -1,4 +1,4 @@
-/* Synthetic invoice generator for the Virgo Lam Performance Desk.
+/* Synthetic invoice generator for the Virgo Laminates Performance Desk.
  * Every value is invented. Nothing here is real Virgo data.
  * Used two ways: inlined into the page (Load demo data) and by make-test-files.mjs (test files).
  * Output is never committed (see .gitignore rules in .claude/rules/git.md). */

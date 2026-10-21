@@ -1,4 +1,4 @@
-<title>Virgo Lam Performance Desk</title>
+<title>Virgo Laminates Performance Desk</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
@@ -237,7 +237,9 @@ async function auditW(ev,q,extra){
 }
 function isPlanLocked(q){return !!((S.periods[q]&&S.periods[q].plan_locked)||(S.planlocks&&S.planlocks[q]))}
 function dget(path){return dbRetry(function(){return S.db.doc(path).get()})}
-function dataOf(snap){return snap.docs.map(function(d){var x=d.data();x._id=d.id;return x})}
+/* snapshot data arrives frozen: copy before adding _id or mutating */
+function thaw(v){try{return typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v))}catch(e){return JSON.parse(JSON.stringify(v))}}
+function dataOf(snap){return snap.docs.map(function(d){var x=thaw(d.data()||{});x._id=d.id;return x})}
 function subscribe(name,q,assign){
   q.onSnapshot(function(snap){try{assign(dataOf(snap))}catch(e){S.errs[name]='could not decode ('+((e&&e.message)||e)+')';S.err=(S.err||'')+'Could not read '+name+': '+S.errs[name]+' ';schedule();return}S.loaded[name]=true;delete S.errs[name];schedule()},function(e){var c=(e&&e.code)||(e&&e.message)||'error';S.errs[name]=c;S.err=(S.err||'')+'Could not read '+name+': '+c+' ';schedule()});
 }
