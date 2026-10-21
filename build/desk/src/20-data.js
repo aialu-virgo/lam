@@ -138,13 +138,14 @@ function filtPlants(sc,fp){/* Set of plants for the current filter */
 /* ---- completeness (coverage grid decides whether QoQ may be trusted) ---- */
 function cellRef(){var r=0;Object.keys(S.cells).forEach(function(k){var c=S.cells[k];if(c.entity==='INV')r=Math.max(r,Object.keys(c.plants||{}).length)});return r}
 function monthLoaded(ym,plants){
+  if(ym<histLoYm())return false;/* D28: before history start nothing counts as loaded */
   var c=S.cells['INV_'+ym];if(!c)return false;
   var have=Object.keys(c.plants||{});
   if(plants&&plants.size){var n=0;plants.forEach(function(p){if(c.plants[p])n++});return n===plants.size}
   var ref=cellRef();return ref>0&&have.length>=Math.ceil(ref*0.9);
 }
 function monthsLoaded(ms,plants){return ms.length>0&&ms.every(function(m){return monthLoaded(m,plants)})}
-function anyMonthData(ms,plants){return ms.some(function(m){var c=S.cells['INV_'+m];if(!c)return false;if(plants&&plants.size){var h=false;plants.forEach(function(p){if(c.plants[p])h=true});return h}return Object.keys(c.plants||{}).length>0})}
+function anyMonthData(ms,plants){return ms.some(function(m){if(m<histLoYm())return false;var c=S.cells['INV_'+m];if(!c)return false;if(plants&&plants.size){var h=false;plants.forEach(function(p){if(c.plants[p])h=true});return h}return Object.keys(c.plants||{}).length>0})}
 
 /* ---- customer detail: read on demand from the stored chunks (aggregate rows only) ---- */
 async function loadCust(plants,yms){
@@ -282,7 +283,7 @@ function personPlan(sp,w,onlyPlant,onlyGroup){
   });
   return out;
 }
-/* series of 12 closed quarters + current: actual, target, ach for a filter */
+/* series of closed quarters since history start (up to 12) + current: actual, target, ach for a filter */
 function quarterSeries(f,personSp){
   var cur=curQuarterKey(),qs=closedQuarters().concat([cur]),out=[];
   qs.forEach(function(q,i){

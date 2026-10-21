@@ -354,7 +354,7 @@ function qKeyOfYm(ym){return fyOf(+ym.slice(0,4),+ym.slice(5,7)).key}
 function istNow(){var d=new Date(Date.now()+19800000);return{y:d.getUTCFullYear(),m:d.getUTCMonth()+1,d:d.getUTCDate()}}
 function nextQ(key){var m=/^FY(\d\d)-Q(\d)$/.exec(key);var fy=+m[1],q=+m[2];if(q===4){fy++;q=1}else q++;return'FY'+pad(fy%100)+'-Q'+q}
 function prevQ(key){var m=/^FY(\d\d)-Q(\d)$/.exec(key);var fy=+m[1],q=+m[2];if(q===1){fy--;q=4}else q--;return'FY'+pad(fy%100)+'-Q'+q}
-function gridQuarters(){var n=istNow(),cur=fyOf(n.y,n.m).key,list=[],k=cur;for(var i=0;i<12;i++){k=prevQ(k);list.unshift(k)}list.push(cur);return{list:list,cur:cur}}
+function gridQuarters(){var n=istNow(),cur=fyOf(n.y,n.m).key,list=closedQuartersFrom(cur);list.push(cur);return{list:list,cur:cur}}
 function qStartYm(key){return qMonths(key)[0]}
 function qEndYm(key){return qMonths(key)[2]}
 function ymDays(ym){return new Date(Date.UTC(+ym.slice(0,4),+ym.slice(5,7),0)).getUTCDate()}
@@ -583,7 +583,7 @@ function resultHtml(){
   var qrows=qs.map(function(k){var q=r.quarters[k];var closed=S.periods[k]&&S.periods[k].status==='closed';return '<tr><td>'+qLabel(k)+'</td><td class="num">'+fmtN(q.rows)+'</td><td class="num">'+q.plants.size+'</td><td class="num">'+q.months.size+' of 3</td><td>'+(closed?'<span class="pill miss">Closed, locked</span>':'<span class="pill ok">Open</span>')+'</td></tr>'}).join('');
   var grows=GROUPS.map(function(g){var x=r.groups[g]||{rows:0,value:0};return '<tr><td>'+g+'</td><td class="num">'+fmtN(x.rows)+'</td><td class="num">'+fmtMoney(x.value)+'</td></tr>'}).join('');
   var h='<div class="hd"><h2>Validation result</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?'Some rows rejected':'All rows pass')+'</span></div>';
-  h+='<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Good rows loading</small><b>'+fmtN(r.good)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b></div>'
+  h+='<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Good rows loading</small><b>'+fmtN(r.good)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b></div>'+(r.preHist&&r.preHist.rows?'<div class="kpi"><small>Before history start (FY25-26 and earlier)</small><b>'+fmtN(r.preHist.rows)+'</b><small>not loaded, no action needed</small></div>':'')
    +'<div class="kpi"><small>Out of scope (kept in record)</small><b>'+fmtN(r.other.rows)+'</b></div><div class="kpi"><small>Internal transfers (flagged)</small><b>'+fmtN(r.xfer.rows)+'</b><small>'+fmtN(r.xferMaster)+' via the Admin list</small></div></div>';
   if(r.dateInfo.mixed)h+='<div class="banner warn"><span>This file mixes real date cells and dd/mm/yyyy text. Day and month were swapped back on '+fmtN(r.dateInfo.swapped)+' date cells ('+fmtN(r.dateInfo.unfixable)+' could not be fixed). Resulting range <b>'+esc(r.minDate||'-')+' to '+esc(r.maxDate||'-')+'</b>.</span><label class="chip"><input type="checkbox" id="u-confd" data-chg="confd" '+(U.confirmDates?'checked':'')+' '+(locked?'disabled':'')+'> I confirm this range</label></div>';
   else h+='<div class="note">Dates run '+esc(r.minDate||'-')+' to '+esc(r.maxDate||'-')+'.</div>';
@@ -635,7 +635,7 @@ function renderCov(){
      +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>':'')
      +(effRole()!=='Super admin'||readOnly()?'<span class="note">Closing, reopening and reloading a quarter is for a Super admin.</span>':(c.closed?'<button class="btn sm" data-act="reopen" data-q="'+p[1]+'">Reopen quarter (reason required, logged)</button>':(c.st!=='miss'?'<button class="btn sm" data-act="close-q" data-q="'+p[1]+'">Close quarter</button>':'')))+'</div></div>';
   }
-  el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; last 12 FY quarters</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
+  el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; quarters since '+qLabel(histStart())+' (history start, D28)</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
    +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det
    +'<p class="note">FY runs April to March; Q1 = Apr to Jun. A partial quarter greys its QoQ figures with "incomplete history" in the business views. Tap a cell for detail. Closed quarters are locked; reloading needs Super admin and is logged. Q3 FY27 is the current quarter, shown for reference. Other entities arrive later.</p>';
 }
@@ -775,7 +775,7 @@ async function runValidation(){
   var sys=U.sys,map=U.map,rows=U.rows,n=rows.length;
   var resolve=plantResolver();
   var g=gridQuarters(),lo=qStartYm(g.list[0]),hi=qEndYm(g.cur);
-  var res={read:n,good:0,rejected:0,warned:0,fanout:0,injection:0,reasons:{},rejects:[],groups:{},other:{rows:0,value:0},xfer:{rows:0,value:0},quarters:{},pm:new Map(),unknownPlants:{},dateInfo:{mixed:false,swapped:0,unfixable:0},minDate:null,maxDate:null,missingSize:0,noLineCol:map.line<0};
+  var res={preHist:{rows:0,value:0},read:n,good:0,rejected:0,warned:0,fanout:0,injection:0,reasons:{},rejects:[],groups:{},other:{rows:0,value:0},xfer:{rows:0,value:0},quarters:{},pm:new Map(),unknownPlants:{},dateInfo:{mixed:false,swapped:0,unfixable:0},minDate:null,maxDate:null,missingSize:0,noLineCol:map.line<0};
   var cols=function(k){return map[k]==null?-1:map[k]};
   var cDoc=cols('doc'),cLine=cols('line'),cDate=cols('date'),cPlant=cols('plant'),cCust=cols('cust'),cName=cols('cname'),cItem=cols('item'),cQty=cols('qty'),cNet=cols('net'),cType=cols('itype'),cCat=cols('cat'),cTT=cols('tt'),cSize=cols('size'),cSp=cols('sp'),cAcct=cols('acct'),cZone=cols('zone');
   /* pass 1: date kinds */
@@ -821,8 +821,9 @@ async function runValidation(){
     var ym=dt.y+'-'+pad(dt.m);
     var iso=ym+'-'+pad(dt.d);
     if(!res.minDate||iso<res.minDate)res.minDate=iso;if(!res.maxDate||iso>res.maxDate)res.maxDate=iso;
+    if(ym<histLoYm()){res.preHist.rows++;continue}/* D28: before history start; counted, not a reject, no action */
     if(allowed){if(ym<allowed.lo||ym>allowed.hi){rej(i,doc,line,'Document date','Date outside period '+allowed.label+' (use Historic mode)',iso);continue}}
-    else if(ym<lo||ym>hi){rej(i,doc,line,'Document date','Date outside the 12-quarter window',iso);continue}
+    else if(ym<lo||ym>hi){rej(i,doc,line,'Document date','Date after the current quarter',iso);continue}
     /* plant */
     var pl=resolve(sys,r[cPlant]);
     if(!pl){var nm=String(r[cPlant]).trim();res.unknownPlants[nm]=(res.unknownPlants[nm]||0)+1;rej(i,doc,line,'Plant / branch','Unknown plant or branch code',nm);continue}
@@ -943,7 +944,7 @@ async function runLoad(opts){
   var upl={at:nowISO(),by:by,sys:sys,entity:'INV',file:U.name,size:U.size,mode:U.mode,periodLabel:U.period==='auto'?(Object.keys(r.quarters).length>1?'Auto: '+Object.keys(r.quarters).length+' quarters':Object.keys(r.quarters).map(qLabel).join(', ')):qLabel(U.period),
     read:r.read,loaded:failed?0:r.good,rejected:r.rejected,warned:r.warned,fanout:r.fanout,injection:r.injection,status:status,demo:demo||undefined,
     quarters:Object.keys(r.quarters),plantMonths:done,docsWritten:docsW,bytes:bytes,
-    groups:r.groups,out_of_scope:r.other,internal_transfers:r.xfer,dateRepair:r.dateInfo.mixed?{swapped:r.dateInfo.swapped,min:r.minDate,max:r.maxDate}:null,
+    before_history_start:r.preHist?r.preHist.rows:0,groups:r.groups,out_of_scope:r.other,internal_transfers:r.xfer,dateRepair:r.dateInfo.mixed?{swapped:r.dateInfo.swapped,min:r.minDate,max:r.maxDate}:null,
     mapping:Object.keys(U.map).reduce(function(o,k){o[k]=U.map[k]>=0?U.headers[U.map[k]]:null;return o},{}),closedQuarters:closedNow,reloadReason:closedTouched.length?U.reason:undefined,error:failed?dbErrText(failed):undefined};
   try{
     await dset('uploads/'+uid,upl);
@@ -1310,11 +1311,15 @@ var SETTING_DEFS=[
  ['stretch_multiple','Stretch multiple of average QoQ',2,'Brief §4'],['stretch_floor_pct','Stretch floor % (when average is 0 or less)',0,'Assumed (new)'],['min_pairs','Minimum QoQ pairs for trend and Stretch',4,'Assumed (new)'],['trend_band_pct','Trend direction band ± %',1,'Assumed (new)'],
  ['default_share_uplift_pts','Default share uplift (points)',2,'Assumed (Q4)'],
  ['overdue_share_days','K10 overdue share: days past due',60,'Assumed (new)'],
+ ['history_start','History start quarter (D28: nothing earlier is loaded or shown), format FY26-Q1','FY26-Q1','D28 (Vijay)'],
  ['holidays','Holidays (YYYY-MM-DD, comma separated)','','Assumed (new)'],['month_compare','Month comparison (same_position_prior_quarter or previous_month)','same_position_prior_quarter','Assumed (Q8)']];
 var CFG={};SETTING_DEFS.forEach(function(d){CFG[d[0]]=d[2]});
 CFG.role_caps={};
-function applySettings(doc){SETTING_DEFS.forEach(function(d){CFG[d[0]]=d[2]});CFG.role_caps={};if(doc){Object.keys(doc).forEach(function(k){if(k==='role_caps'&&doc[k])CFG.role_caps=doc[k];else if(k in CFG&&doc[k]!==''&&doc[k]!=null)CFG[k]=(typeof CFG[k]==='number')?Number(doc[k]):doc[k]})}HOL=null}
+function applySettings(doc){SETTING_DEFS.forEach(function(d){CFG[d[0]]=d[2]});CFG.role_caps={};if(doc){Object.keys(doc).forEach(function(k){if(k==='role_caps'&&doc[k])CFG.role_caps=doc[k];else if(k in CFG&&doc[k]!==''&&doc[k]!=null)CFG[k]=(typeof CFG[k]==='number')?Number(doc[k]):doc[k]})}if(!/^FY\d\d-Q[1-4]$/.test(String(CFG.history_start||'')))CFG.history_start='FY26-Q1';HOL=null}
 var HOL=null;
+function histStart(){return /^FY\d\d-Q[1-4]$/.test(String(CFG.history_start||''))?CFG.history_start:'FY26-Q1'}
+function histLoYm(){return qStartYm(histStart())}
+function preHist(ms){var lo=histLoYm();return ms.some(function(m){return m<lo})}
 function holidaySet(){if(!HOL){HOL={};String(CFG.holidays||'').split(/[,;\s]+/).forEach(function(x){if(/^\d{4}-\d\d-\d\d$/.test(x))HOL[x]=1})}return HOL}
 
 /* ---- dates (all ISO strings, IST calendar) ---- */
@@ -1339,7 +1344,8 @@ function ymRange(a,b){var o=[],x=a;while(x<=b&&o.length<400){o.push(x);x=shiftYm
 function priorMonth(ym){return shiftYm(ym,CFG.month_compare==='previous_month'?-1:-3)}
 function priorQuarterMonth(ym){return shiftYm(ym,-3)}
 function curQuarterKey(){return qKeyOfYm(TODAY().slice(0,7))}
-function closedQuarters(){var cur=curQuarterKey(),k=cur,l=[];for(var i=0;i<12;i++){k=prevQ(k);l.unshift(k)}return l}
+function closedQuartersFrom(cur){var k=cur,l=[],hs=histStart();for(var i=0;i<12;i++){k=prevQ(k);if(k<hs)break;l.unshift(k)}return l}
+function closedQuarters(){return closedQuartersFrom(curQuarterKey())}
 function fyQuarters(fyq){/* quarters of the FY of key, up to key */var m=/^FY(\d\d)-Q(\d)$/.exec(fyq),o=[];for(var q=1;q<=+m[2];q++)o.push('FY'+m[1]+'-Q'+q);return o}
 
 /* ---- window: months with the fraction of each month that counts ---- */
@@ -1389,6 +1395,7 @@ function resolvePeriod(f,today){
 /* ---- QoQ ---- */
 function qoqOf(A,P,ctx){
   ctx=ctx||{};
+  if(ctx.noPrior)return {v:null,state:'nohist',txt:'No prior quarter loaded'};
   if(ctx.incomplete)return {v:null,state:'incomplete',txt:'incomplete history'};
   if(P==null)return {v:null,state:'none',txt:'no prior quarter'};
   if(P<=0){if(A>0)return {v:null,state:'new',txt:'New, no prior quarter'};if(A===0&&P===0)return {v:null,state:'zero',txt:'—'};return {v:null,state:'na',txt:'n/a'}}
@@ -1405,7 +1412,7 @@ function trendStats(series){
   for(i=3;i<n;i++){var ok=true,s=0;for(var j=i-3;j<=i;j++){if(series[j]==null){ok=false;break}s+=series[j]}if(ok)ma[i]=s/4}
   var avg=qoqs.length?qoqs.reduce(function(a,b){return a+b},0)/qoqs.length:null;
   var sx=0,sy=0,sxx=0,sxy=0,k=0;for(i=0;i<n;i++){if(series[i]!=null){var x=i+1,y=series[i];sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;k++}}
-  var slope=null,icpt=null;if(k>=2){var den=k*sxx-sx*sx;if(den!==0){slope=(k*sxy-sx*sy)/den;icpt=(sy-slope*sx)/k}}
+  var slope=null,icpt=null;if(k>=4){var den=k*sxx-sx*sx;if(den!==0){slope=(k*sxy-sx*sy)/den;icpt=(sy-slope*sx)/k}}
   var short=qoqs.length<CFG.min_pairs,dir='short';
   if(!short){dir=avg>CFG.trend_band_pct?'rising':avg<-CFG.trend_band_pct?'falling':'flat'}
   return {n:n,qoqs:qoqs,qoqAt:qoqAt,ma:ma,avg:avg,slope:slope,icpt:icpt,pairs:qoqs.length,short:short,dir:dir};
@@ -1572,13 +1579,14 @@ function filtPlants(sc,fp){/* Set of plants for the current filter */
 /* ---- completeness (coverage grid decides whether QoQ may be trusted) ---- */
 function cellRef(){var r=0;Object.keys(S.cells).forEach(function(k){var c=S.cells[k];if(c.entity==='INV')r=Math.max(r,Object.keys(c.plants||{}).length)});return r}
 function monthLoaded(ym,plants){
+  if(ym<histLoYm())return false;/* D28: before history start nothing counts as loaded */
   var c=S.cells['INV_'+ym];if(!c)return false;
   var have=Object.keys(c.plants||{});
   if(plants&&plants.size){var n=0;plants.forEach(function(p){if(c.plants[p])n++});return n===plants.size}
   var ref=cellRef();return ref>0&&have.length>=Math.ceil(ref*0.9);
 }
 function monthsLoaded(ms,plants){return ms.length>0&&ms.every(function(m){return monthLoaded(m,plants)})}
-function anyMonthData(ms,plants){return ms.some(function(m){var c=S.cells['INV_'+m];if(!c)return false;if(plants&&plants.size){var h=false;plants.forEach(function(p){if(c.plants[p])h=true});return h}return Object.keys(c.plants||{}).length>0})}
+function anyMonthData(ms,plants){return ms.some(function(m){if(m<histLoYm())return false;var c=S.cells['INV_'+m];if(!c)return false;if(plants&&plants.size){var h=false;plants.forEach(function(p){if(c.plants[p])h=true});return h}return Object.keys(c.plants||{}).length>0})}
 
 /* ---- customer detail: read on demand from the stored chunks (aggregate rows only) ---- */
 async function loadCust(plants,yms){
@@ -1716,7 +1724,7 @@ function personPlan(sp,w,onlyPlant,onlyGroup){
   });
   return out;
 }
-/* series of 12 closed quarters + current: actual, target, ach for a filter */
+/* series of closed quarters since history start (up to 12) + current: actual, target, ach for a filter */
 function quarterSeries(f,personSp){
   var cur=curQuarterKey(),qs=closedQuarters().concat([cur]),out=[];
   qs.forEach(function(q,i){
@@ -2335,7 +2343,7 @@ function figs(ent,ctx,opts){
   var pset=f.plant?new Set([f.plant]):f.plants;
   var incomplete=!monthsLoaded(res.curMonths,pset)||(res.prior?!monthsLoaded(res.priorMonths,pset):false);
   if(!res.curMonths.length)incomplete=true;
-  var q=res.prior?qoqOf(A.n,P.n,{incomplete:incomplete}):{v:null,state:'none',txt:''};
+  var q=res.prior?qoqOf(A.n,P.n,{incomplete:incomplete,noPrior:preHist(res.priorMonths||[])}):{v:null,state:'none',txt:''};
   var hasT=pl.any&&pl.tgt>0;
   var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete};
   o.var=hasT?A.n-pl.tgt:null;o.varPct=hasT?(A.n-pl.tgt)/pl.tgt*100:null;o.ach=hasT?A.n/pl.tgt*100:null;o.share=(pl.any&&pl.pot>0)?A.n/pl.pot*100:null;
@@ -2346,6 +2354,7 @@ function fmtAch(v,lower){if(v==null)return '<span class="note">—</span>';var s
 function qoqCell(q){
   if(!q||q.state==='none')return '<span class="note">—</span>';
   if(q.state==='ok')return '<span class="'+(q.v>=0?'up':'dn')+'">'+fmtPct(q.v,true)+'</span>';
+  if(q.state==='nohist')return '<span class="note" title="History starts at '+esc(qLabel(histStart()))+'">No prior quarter loaded</span>';
   if(q.state==='incomplete')return '<span class="note" title="Prior or current quarter is not fully loaded">incomplete history</span>';
   if(q.state==='new')return '<span class="note">New, no prior quarter</span>';
   return '<span class="note">'+esc(q.txt)+'</span>';
@@ -2402,7 +2411,7 @@ function salesKpis(ctx,o,series){
 }
 function trendWord(o){return o.trend?(o.trend.short?'history too short':arrow(o.trend.dir)):'—'}
 
-/* ---- trend card: 12 closed quarters + current, target markers, QoQ line, MA4, trend line, Stretch ---- */
+/* ---- trend card: closed quarters since history start (up to 12) + current, target markers, QoQ line, MA4, trend line, Stretch ---- */
 function trendCard(title,ent,ctx,personSp,id,opts){
   opts=opts||{};
   var f=Object.assign({plants:ctx.plants},ctx.base,ent||{});var sp=personSp!=null?personSp:(f.sp!=null?f.sp:undefined);
@@ -2420,8 +2429,8 @@ function trendCard(title,ent,ctx,personSp,id,opts){
     if(s.tgt!=null)svg+='<line x1="'+(bx-3)+'" x2="'+(bx+w+3)+'" y1="'+y(s.tgt)+'" y2="'+y(s.tgt)+'" stroke="var(--orange)" stroke-width="2.5"><title>'+s.label+' target '+fmtMoney(s.tgt)+'</title></line>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="ax">'+esc(s.label.replace(' FY',' '))+(s.isCur?'*':'')+'</text>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+26)+'" text-anchor="middle" class="ax a-'+statusOf(s.ach)+'">'+(s.ach!=null?s.ach.toFixed(0)+'%':'—')+'</text>';
-    var qv=i>0?ts.qoqAt[i]:null;if(s.isCur){var pv=ser[i-1].A;qv=(s.A!=null&&pv!=null&&pv>0&&cur.N!==Infinity)?null:qv}
-    svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+40)+'" text-anchor="middle" class="ax '+(qv==null?'':qv>=0?'up':'dn')+'">'+(s.isCur?'QTD':(qv==null?'—':(qv>0?'+':'')+qv.toFixed(1).replace('-','−')))+'</text>';
+    var qv=i>0?ts.qoqAt[i]:null;var noPriorQ=(i===0&&s.q===histStart());if(s.isCur){var pv=ser[i-1].A;qv=(s.A!=null&&pv!=null&&pv>0&&cur.N!==Infinity)?null:qv}
+    svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+40)+'" text-anchor="middle" class="ax '+(qv==null?'':qv>=0?'up':'dn')+'">'+(s.isCur?'QTD':(noPriorQ?'no prior':qv==null?'—':(qv>0?'+':'')+qv.toFixed(1).replace('-','−')))+'</text>';
   });
   /* previous-quarter marker on the current bar */
   var pv2=ser.length>1?ser[ser.length-2].A:null;if(pv2!=null)svg+='<line x1="'+(x(n-1)+bw*.1)+'" x2="'+(x(n-1)+bw*.9)+'" y1="'+y(pv2)+'" y2="'+y(pv2)+'" stroke="var(--ink)" stroke-dasharray="3 2" stroke-width="1.5"><title>Previous quarter '+fmtMoney(pv2)+'</title></line>';
@@ -2433,17 +2442,17 @@ function trendCard(title,ent,ctx,personSp,id,opts){
   /* Stretch / required QoQ against the current quarter's target */
   var lastClosed=closed[closed.length-1],req='';
   if(cur.tgt!=null&&lastClosed&&lastClosed.A!=null){var sr=stretchOf(cur.tgt,lastClosed.A,ts);
-    req='<div class="callout '+(sr.state==='stretch'?'warn':'')+'">Target '+fmtMoney(cur.tgt)+' needs <b>'+fmtPct(sr.required,true)+'</b> QoQ'+(ts.avg!=null&&!ts.short?'; 12-qtr average is <b>'+fmtPct(ts.avg,true)+'</b>':'')+'. '+(sr.state==='stretch'?'<span class="pill part">Stretch</span> more than '+CFG.stretch_multiple+'× the average, flagged for discussion.':sr.state==='ok'?'Within '+CFG.stretch_multiple+'× the average.':'History too short for a Stretch check.')+'</div>'}
+    req='<div class="callout '+(sr.state==='stretch'?'warn':'')+'">Target '+fmtMoney(cur.tgt)+' needs <b>'+fmtPct(sr.required,true)+'</b> QoQ'+(ts.avg!=null&&!ts.short?'; average of the quarters loaded is <b>'+fmtPct(ts.avg,true)+'</b>':'')+'. '+(sr.state==='stretch'?'<span class="pill part">Stretch</span> more than '+CFG.stretch_multiple+'× the average, flagged for discussion.':sr.state==='ok'?'Within '+CFG.stretch_multiple+'× the average.':'History too short for a Stretch check.')+'</div>'}
   var sumr='<div class="tsum"><div><small>Average QoQ growth ('+ts.pairs+' step'+(ts.pairs===1?'':'s')+', arithmetic)</small><b>'+(ts.avg!=null?fmtPct(ts.avg,true):'—')+'</b></div><div><small>Direction</small><b>'+(ts.short?'history too short':arrow(ts.dir))+'</b></div><div><small>Latest quarter</small><b>'+esc(cur.label)+(cur.N!==Infinity?' to date':'')+'</b></div></div>';
   var legend='<div class="legend"><span><i class="sw" style="background:var(--brand)"></i>Actual (hatched = to date)</span><span><i class="sw" style="background:var(--orange)"></i>Target marker</span><span><i class="sw dash"></i>Previous quarter</span><span><i class="sw" style="background:var(--slate)"></i>4-quarter moving average</span><span><i class="sw" style="background:var(--sky)"></i>Trend line</span></div>';
-  return '<section class="card" id="trend-'+id+'"><div class="hd"><h2>'+esc(title)+'</h2><span class="note">12 closed quarters '+qLabel(closed[0].q)+' to '+qLabel(closed[closed.length-1].q)+' + '+esc(cur.label)+' to date</span></div>'
+  return '<section class="card" id="trend-'+id+'"><div class="hd"><h2>'+esc(title)+'</h2><span class="note">'+(closed.length?closed.length+' closed quarter'+(closed.length===1?'':'s')+' '+qLabel(closed[0].q)+' to '+qLabel(closed[closed.length-1].q)+' + ':'No closed quarter yet, ')+esc(cur.label)+' to date &middot; history starts '+esc(qLabel(histStart()))+'</span></div>'
    +svg+'<div class="note">Under each bar: achievement % of that quarter\'s target, then QoQ % (each quarter against the one before; a gap breaks the chain). Tap a bar to drill: quarter → month → SAP document.</div>'+legend+sumr+req+'</section>';
 }
 function drillPanel(ctx){
   var d=S.drill;if(!d)return '';
   if(d.kind==='coll')return drillColl(ctx);
   var q=d.q,ms=qMonths(q),f=Object.assign({plants:ctx.plants},ctx.base);if(d.sp)f.sp=d.sp;if(d.pl&&!d.sp)f.plants=new Set(d.pl.split(','));
-  var rows=ms.map(function(m){var A=sumF(f,[m]),pm=priorMonth(m),P=sumF(f,[pm]),inc=!monthLoaded(m,ctx.plants)||!monthLoaded(pm,ctx.plants);var qo=qoqOf(A.n,P.n,{incomplete:inc});
+  var rows=ms.map(function(m){var A=sumF(f,[m]),pm=priorMonth(m),P=sumF(f,[pm]),inc=!monthLoaded(m,ctx.plants)||!monthLoaded(pm,ctx.plants);var qo=qoqOf(A.n,P.n,{incomplete:inc,noPrior:preHist([pm])});
     return '<tr class="clk" data-act="drill-m" data-m="'+m+'"><td>'+ymLabel(m)+' ›</td><td class="num">'+fmtMoney(A.n)+'</td><td class="num">'+fmtMoney(P.n)+' <span class="note">'+ymLabel(pm)+'</span></td><td class="num">'+qoqCell(qo)+'</td><td class="num">'+fmtN(A.d)+'</td></tr>'}).join('');
   var h='<section class="card" id="drillp"><div class="hd"><h2>Drill-down · '+qLabel(q)+(d.sp?' · '+esc(d.sp):'')+'</h2><button class="btn sm" data-act="drill-close">Close</button></div>'
    +'<div class="crumbs"><button class="chip" data-act="drill-close">Trend</button> › <button class="chip'+(d.m?'':' on')+'" data-act="drill-qonly">'+qLabel(q)+'</button>'+(d.m?' › <button class="chip" data-act="drill-m" data-m="'+d.m+'">'+ymLabel(d.m)+'</button> › <span class="chip on">SAP documents</span>':'')+'</div>'
@@ -2493,14 +2502,14 @@ function pageOverview(){
   var cardsQ=[];
   cardsQ.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · Net sales · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. Credit notes: no feed yet.',status:statusOf(tot.ach),
     ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],
-     ['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
+     ['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['Quarter trend',trendWord(tot)]]}));
   cardsQ.push(qtyCard(ctx,tot));
   var col=collectionFigs(ctx);
   cardsQ.push(col.card);
   cardsQ.push(kpiCard({color:'orange',chip:'+',title:'K7 · New customers',value:'—',sub:'Needs the customer first-seen index (four earlier quarters).',pending:true,pendingTxt:'Pending',pendingMsg:'Needs four earlier quarters of history to find first-time customers; shown as pending, not zero.',
-    rows:[['Addressable','pending rules'],['Target','No plan (P6)'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %','—'],['12-qtr trend','—']]}));
+    rows:[['Addressable','pending rules'],['Target','No plan (P6)'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %','—'],['Quarter trend','—']]}));
   var h='<div class="kpirow">'+cardsQ.join('')+'</div>';
-  h+=trendCard('12-quarter trend · Net sales',{},ctx,undefined,'ov');
+  h+=trendCard('Quarters since '+qLabel(histStart())+' · Net sales',{},ctx,undefined,'ov');
   h+=drillPanel(ctx);
   /* branch chart + alerts */
   h+='<div class="grid2">'+branchChart(ctx)+alertsCard()+'</div>';
@@ -2518,7 +2527,7 @@ function matchSearch(r){var q=(S.f.search||'').toLowerCase();return !q||(r.label
 function qtyCard(ctx,tot){
   var res=ctx.res,q=planQty(ctx),sh=tot.sh,ach=q.tgt>0?sh/q.tgt*100:null;
   return kpiCard({color:'violet',chip:'▦',title:'Quantity · '+res.label,value:fmtSheets(sh),sub:'= '+fmtSqft(tot.sq)+' (item size).',status:statusOf(ach),ach:ach,
-   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(sh/q.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(qoqOf(sh,tot.Psh,{incomplete:tot.incomplete})):'—'],['12-qtr trend',trendWord(tot)]]});
+   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(sh/q.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(qoqOf(sh,tot.Psh,{incomplete:tot.incomplete})):'—'],['Quarter trend',trendWord(tot)]]});
 }
 function planQty(ctx){
   if(ctx.sc.sp)return {pot:0,tgt:0};/* plant-level quantity plans are not an executive's target */
@@ -2546,7 +2555,7 @@ function ytdStrip(ctx){
   var rows=qs.map(function(q){
     var ms=qMonths(q),isCur=q===cur,N=isCur?wdBetween(ms[0]+'-01',TODAY()):Infinity,w=walk(ms,N),A=sumF(f,w).n,loaded=isCur?anyMonthData(ms,ctx.plants):monthsLoaded(ms,ctx.plants);
     var pq=prevQ(q),pms=qMonths(pq),pw=walk(pms,N),P=sumF(f,pw).n,inc=!loaded||!monthsLoaded(pms,ctx.plants);
-    var pl=planW(f,w),qo=qoqOf(A,P,{incomplete:inc});
+    var pl=planW(f,w),qo=qoqOf(A,P,{incomplete:inc,noPrior:preHist(pms)});
     var crossover=/-Q1$/.test(q)?' (prior-FY crossover)':'';
     return '<tr><td>'+qLabel(q)+(isCur?' <span class="pill info">to date</span>':'')+'</td><td class="num">'+(pl.any?fmtMoney(pl.tgt):'—')+'</td><td class="num">'+fmtMoney(A)+'</td><td class="num">'+(pl.any&&pl.tgt>0?fmtAch(A/pl.tgt*100):'—')+'</td><td>'+qLabel(pq)+crossover+'</td><td class="num">'+qoqCell(qo)+'</td></tr>'});
   return '<section class="card"><div class="hd"><h2>YTD · '+qLabel(qs[qs.length-1]).split(' ')[1]+' so far · quarter by quarter</h2><span class="note">Not compared with any other year.</span></div><div class="tw"><table><thead><tr><th>Quarter</th><th class="num">Target</th><th class="num">Actual</th><th class="num">Ach %</th><th>Compared with</th><th class="num">QoQ step</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div></section>';
@@ -2560,7 +2569,7 @@ function targetRevisionCard(ctx,tot){
   var sr=stretchOf(P.tgt,lastOk?lastA:null,ts),revN=Math.max.apply(null,P.revs.map(function(x){return x.rev||1}).concat([1]));
   return '<section class="card"><div class="hd"><h2>Target revision · '+qLabel(q)+' · '+(ctx.f.plant?esc(plantShort(ctx.f.plant)):'all in scope')+'</h2>'+(sr.state==='stretch'?'<span class="pill part">Stretch</span>':sr.state==='ok'?'<span class="pill ok">Within range</span>':'<span class="pill mute">History too short</span>')+'</div>'
    +'<div class="kpis"><div class="kpi"><small>Original target</small><b>'+fmtMoney(P.orig)+'</b></div><div class="kpi"><small>Current '+(P.kind==='draft'?'draft':'approved')+' (r'+revN+')</small><b>'+fmtMoney(P.tgt)+'</b></div><div class="kpi"><small>Potential × share %</small><b style="font-size:14px">'+fmtMoney(P.pot)+' × '+(P.pot>0?(P.tgt/P.pot*100).toFixed(1):'—')+'%</b></div><div class="kpi"><small>Last quarter actual ('+qLabel(lastQ)+')</small><b>'+(lastOk?fmtMoney(lastA):'incomplete')+'</b></div></div>'
-   +'<div class="callout '+(sr.state==='stretch'?'warn':'')+'">'+(sr.required!=null?'Target needs <b>'+fmtPct(sr.required,true)+'</b> QoQ; 12-qtr average is <b>'+fmtPct(sr.avg,true)+'</b>. '+(sr.state==='stretch'?'More than '+CFG.stretch_multiple+'× the average: flagged Stretch for discussion. It never blocks approval.':'Not more than '+CFG.stretch_multiple+'× the average.'):'Not enough loaded history for a sense-check (needs '+CFG.min_pairs+' consecutive quarter pairs).')+'</div>'
+   +'<div class="callout '+(sr.state==='stretch'?'warn':'')+'">'+(sr.required!=null?'Target needs <b>'+fmtPct(sr.required,true)+'</b> QoQ; average of the quarters loaded is <b>'+fmtPct(sr.avg,true)+'</b>. '+(sr.state==='stretch'?'More than '+CFG.stretch_multiple+'× the average: flagged Stretch for discussion. It never blocks approval.':'Not more than '+CFG.stretch_multiple+'× the average.'):'Not enough loaded history for a sense-check (needs '+CFG.min_pairs+' consecutive quarter pairs).')+'</div>'
    +'<div class="row"><a class="btn sm" href="#/admin">Open revision trail</a></div><p class="note">'+(P.kind==='draft'?'Draft target: no approved target exists yet, so achievement is shown against the draft and labelled.':'Achievement is shown against the current approved target; the original is kept.')+'</p></section>';
 }
 
@@ -2597,7 +2606,7 @@ function pageSales(){
     var rl=tot.sh>0?tot.A/tot.sh:null,rlP=tot.Psh>0?tot.P/tot.Psh:null;
     cards.push(kpiCard({color:'green',chip:'%',title:'Realisation · ₹ per sheet',value:rl!=null?'₹ '+fmtN(Math.round(rl)):'—',sub:'Net sales ÷ sheets'+(tot.sq>0?' (₹ '+(tot.A/tot.sq).toFixed(1)+' per sq ft).':'.'),status:'none',pillTxt:'No plan',rows:[['Potential','n/a'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',rl!=null&&rlP!=null?qoqCell(qoqOf(rl,rlP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
     h+='<div class="kpirow">'+cards.join('')+'</div>';
-    h+=trendCard('12-quarter trend · Net sales'+(sc.sp?' (own)':''),{},ctx,undefined,'sl');
+    h+=trendCard('Quarters since '+qLabel(histStart())+' · Net sales'+(sc.sp?' (own)':''),{},ctx,undefined,'sl');
     h+=drillPanel(ctx);
     h+=classTiles(ctx,haveCust,tot);
     h+=leaderboard(ctx);
@@ -2801,21 +2810,21 @@ function pageTeam(){
     h+='<section class="card"><div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(p.role)+'</h2><span class="note">'+kt2.on+' of '+kt2.scored+' scored KPIs on plan · '+esc(ctx.res.label)+'</span></div>'+kt2.html+'</section>';
     var f=userFilter(p,ctx);
     h+=personTrend(p,f,ctx);
-  }else h+='<div class="note">Tap a person to see the scorecard and the 12-quarter trend.</div>';
+  }else h+='<div class="note">Tap a person to see the scorecard and the quarter trend since '+qLabel(histStart())+'.</div>';
   return h;
 }
 Object.assign(handlers,{'team-who':function(t){S.team.who=t.getAttribute('data-e');S.lastHtml='';schedule()}});
 
-/* the 12-quarter trend card of a person's scorecard: primary KPI per kra-kpi.md */
+/* the quarter trend since '+qLabel(histStart())+' card of a person's scorecard: primary KPI per kra-kpi.md */
 function personTrend(p,f,ctx){
   if(p.role==='Accounts'){
     var pl=f&&f.plants?f.plants:SC().plants;
-    if(!collAvailable(pl))return '<section class="card"><div class="hd"><h2>12-quarter trend · Collections · '+esc(p.name)+'</h2></div>'+needPanel(['coll'],'No collection history is loaded, so the Accounts scorecard has no trend yet.')+'</section>';
-    return trendCard('12-quarter trend · Collections · '+p.name,{plants:pl},ctx,undefined,'tm',{series:collSeries(pl),kind:'coll'})+drillPanel(ctx);
+    if(!collAvailable(pl))return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Collections · '+esc(p.name)+'</h2></div>'+needPanel(['coll'],'No collection history is loaded, so the Accounts scorecard has no trend yet.')+'</section>';
+    return trendCard('Quarters since '+qLabel(histStart())+' · Collections · '+p.name,{plants:pl},ctx,undefined,'tm',{series:collSeries(pl),kind:'coll'})+drillPanel(ctx);
   }
-  if(noData())return '<section class="card"><div class="hd"><h2>12-quarter trend · Net sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
-  if(f==null)return '<section class="card"><div class="hd"><h2>12-quarter trend · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
-  return trendCard('12-quarter trend · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch history (sales order and delivery exports) is not loaded yet, so there is no 12-quarter dispatch series.</p>':'')+drillPanel(ctx);
+  if(noData())return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
+  if(f==null)return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
+  return trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch history (sales order and delivery exports) is not loaded yet, so there is no 12-quarter dispatch series.</p>':'')+drillPanel(ctx);
 }
 
 /* salespeople from the sales-employee master that match the B1 names: scorecards for people who are not Desk users */
@@ -2830,7 +2839,7 @@ function teamSalespeople(ctx,u){
    +rows.map(function(r){return '<tr class="clk'+(S.team.sp===r.x.k?' sel':'')+'" data-act="team-sp" data-k="'+esc(r.x.k)+'"><td><b>'+esc(r.x.k)+'</b> <span class="note mono">'+esc(r.x.m.code)+'</span></td><td>'+esc(r.x.m.zone||'—')+'</td><td>'+esc(r.x.m.plant?plantShort(r.x.m.plant):(r.x.m.plantRaw||'—'))+'</td><td>'+esc(r.x.m.designation||'—')+'</td><td class="num">'+fmtMoney(r.o.A)+'</td><td class="num">'+fmtAch(r.o.ach)+'</td><td class="num">'+qoqCell(r.o.qoq)+'</td></tr>'}).join('')+'</tbody></table></div><p class="note">Names match the master exactly or after removing the " - &lt;branch&gt;" suffix. Facts only; no ranking label.</p>';
   if(S.team.sp&&list.some(function(x){return x.k===S.team.sp})){
     var m=spMeta(S.team.sp),p={name:S.team.sp,email:'',role:'Sales executive',department:'Sales',sales_employee_code:m.code,plant_codes:m.plant||''},kt=kpiTable(p,ctx);
-    h+='<div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(m.zone||'')+' · '+esc(m.plant?plantName(m.plant):(m.plantRaw||''))+'</h2><span class="note">'+kt.on+' of '+kt.scored+' scored KPIs on plan</span></div>'+kt.html+trendCard('12-quarter trend · Net sales · '+p.name,{},ctx,S.team.sp,'tp')+drillPanel(ctx);
+    h+='<div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(m.zone||'')+' · '+esc(m.plant?plantName(m.plant):(m.plantRaw||''))+'</h2><span class="note">'+kt.on+' of '+kt.scored+' scored KPIs on plan</span></div>'+kt.html+trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,{},ctx,S.team.sp,'tp')+drillPanel(ctx);
   }
   return h+'</section>';
 }
@@ -2962,7 +2971,7 @@ function pageInventory(){
   return h;
 }
 
-/* ---- collections: 12-quarter series for a scorecard (Accounts' primary KPI) ---- */
+/* ---- collections: quarter series since history start for a scorecard (Accounts' primary KPI) ---- */
 function collSeries(plants){
   var cur=curQuarterKey(),qs=closedQuarters().concat([cur]);
   return qs.map(function(q){
@@ -3043,7 +3052,7 @@ function senseHtml(x){
   var draft=x.share_pct!==''&&x.share_pct!=null?leafTgt(x.potential_value_inr,x.share_pct):null;
   var tot=P.tgt-(approvedOf(x)?leafTgt(approvedOf(x).potential_value_inr,approvedOf(x).share_pct):0)+(draft!=null?draft:0);
   var sr=stretchOf(tot>0?tot:null,lastOk?lastA:null,ts);
-  return '<div class="callout '+(sr.state==='stretch'?'warn':'')+'"><b>Sense-check · '+esc(plantShort(x.plant_code))+' · '+esc(x.product_group)+' (all segments)</b><br>Last quarter actual '+(lastOk?fmtMoney(lastA):'incomplete')+(sr.required!=null?' · target '+fmtMoney(tot)+' needs <b>'+fmtPct(sr.required,true)+'</b> QoQ; 12-qtr average is <b>'+fmtPct(sr.avg,true)+'</b>. '+(sr.state==='stretch'?'<span class="pill part">Stretch</span> for discussion, never blocks approval.':'Within '+CFG.stretch_multiple+'× the average.'):' · no Stretch check (history too short or no target).')+'</div>';
+  return '<div class="callout '+(sr.state==='stretch'?'warn':'')+'"><b>Sense-check · '+esc(plantShort(x.plant_code))+' · '+esc(x.product_group)+' (all segments)</b><br>Last quarter actual '+(lastOk?fmtMoney(lastA):'incomplete')+(sr.required!=null?' · target '+fmtMoney(tot)+' needs <b>'+fmtPct(sr.required,true)+'</b> QoQ; average of the quarters loaded is <b>'+fmtPct(sr.avg,true)+'</b>. '+(sr.state==='stretch'?'<span class="pill part">Stretch</span> for discussion, never blocks approval.':'Within '+CFG.stretch_multiple+'× the average.'):' · no Stretch check (history too short or no target).')+'</div>';
 }
 /* ---- settings tab ---- */
 function settingsHtml(){
@@ -3059,6 +3068,7 @@ async function saveSettings(){
     if(typeof d[2]==='number'){var n=Number(v);if(v===''||isNaN(n))errs.push(d[1]+' must be a number');else doc[d[0]]=n}else doc[d[0]]=v});
   if(doc.w_U+doc.w_V+doc.w_C+doc.w_A+doc.w_D!==100)errs.push('Priority weights must total 100 (they total '+(doc.w_U+doc.w_V+doc.w_C+doc.w_A+doc.w_D)+')');
   if(doc.month_compare!=='same_position_prior_quarter'&&doc.month_compare!=='previous_month')errs.push('Month comparison must be same_position_prior_quarter or previous_month. There is no last-year option.');
+  if(!/^FY\d\d-Q[1-4]$/.test(doc.history_start||''))errs.push('History start must look like FY26-Q1');
   if(doc.holidays&&doc.holidays.split(/[,;\s]+/).filter(Boolean).some(function(h){return !/^\d{4}-\d\d-\d\d$/.test(h)}))errs.push('Holidays must be YYYY-MM-DD dates');
   doc.role_caps={};ROLES.forEach(function(r){var v=document.getElementById('cap-'+slug(r)).value.trim();if(v){var n=Number(v);if(!(n>=1&&n<=20&&Math.floor(n)===n))errs.push('Cap for '+r+' must be 1 to 20');else doc.role_caps[r]=n}});
   if(errs.length){$('#st-msg').innerHTML='<div class="banner err">'+esc(errs.join('. '))+'</div>';return}

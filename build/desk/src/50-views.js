@@ -24,7 +24,7 @@ function figs(ent,ctx,opts){
   var pset=f.plant?new Set([f.plant]):f.plants;
   var incomplete=!monthsLoaded(res.curMonths,pset)||(res.prior?!monthsLoaded(res.priorMonths,pset):false);
   if(!res.curMonths.length)incomplete=true;
-  var q=res.prior?qoqOf(A.n,P.n,{incomplete:incomplete}):{v:null,state:'none',txt:''};
+  var q=res.prior?qoqOf(A.n,P.n,{incomplete:incomplete,noPrior:preHist(res.priorMonths||[])}):{v:null,state:'none',txt:''};
   var hasT=pl.any&&pl.tgt>0;
   var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete};
   o.var=hasT?A.n-pl.tgt:null;o.varPct=hasT?(A.n-pl.tgt)/pl.tgt*100:null;o.ach=hasT?A.n/pl.tgt*100:null;o.share=(pl.any&&pl.pot>0)?A.n/pl.pot*100:null;
@@ -35,6 +35,7 @@ function fmtAch(v,lower){if(v==null)return '<span class="note">—</span>';var s
 function qoqCell(q){
   if(!q||q.state==='none')return '<span class="note">—</span>';
   if(q.state==='ok')return '<span class="'+(q.v>=0?'up':'dn')+'">'+fmtPct(q.v,true)+'</span>';
+  if(q.state==='nohist')return '<span class="note" title="History starts at '+esc(qLabel(histStart()))+'">No prior quarter loaded</span>';
   if(q.state==='incomplete')return '<span class="note" title="Prior or current quarter is not fully loaded">incomplete history</span>';
   if(q.state==='new')return '<span class="note">New, no prior quarter</span>';
   return '<span class="note">'+esc(q.txt)+'</span>';
@@ -91,7 +92,7 @@ function salesKpis(ctx,o,series){
 }
 function trendWord(o){return o.trend?(o.trend.short?'history too short':arrow(o.trend.dir)):'—'}
 
-/* ---- trend card: 12 closed quarters + current, target markers, QoQ line, MA4, trend line, Stretch ---- */
+/* ---- trend card: closed quarters since history start (up to 12) + current, target markers, QoQ line, MA4, trend line, Stretch ---- */
 function trendCard(title,ent,ctx,personSp,id,opts){
   opts=opts||{};
   var f=Object.assign({plants:ctx.plants},ctx.base,ent||{});var sp=personSp!=null?personSp:(f.sp!=null?f.sp:undefined);
@@ -109,8 +110,8 @@ function trendCard(title,ent,ctx,personSp,id,opts){
     if(s.tgt!=null)svg+='<line x1="'+(bx-3)+'" x2="'+(bx+w+3)+'" y1="'+y(s.tgt)+'" y2="'+y(s.tgt)+'" stroke="var(--orange)" stroke-width="2.5"><title>'+s.label+' target '+fmtMoney(s.tgt)+'</title></line>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="ax">'+esc(s.label.replace(' FY',' '))+(s.isCur?'*':'')+'</text>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+26)+'" text-anchor="middle" class="ax a-'+statusOf(s.ach)+'">'+(s.ach!=null?s.ach.toFixed(0)+'%':'—')+'</text>';
-    var qv=i>0?ts.qoqAt[i]:null;if(s.isCur){var pv=ser[i-1].A;qv=(s.A!=null&&pv!=null&&pv>0&&cur.N!==Infinity)?null:qv}
-    svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+40)+'" text-anchor="middle" class="ax '+(qv==null?'':qv>=0?'up':'dn')+'">'+(s.isCur?'QTD':(qv==null?'—':(qv>0?'+':'')+qv.toFixed(1).replace('-','−')))+'</text>';
+    var qv=i>0?ts.qoqAt[i]:null;var noPriorQ=(i===0&&s.q===histStart());if(s.isCur){var pv=ser[i-1].A;qv=(s.A!=null&&pv!=null&&pv>0&&cur.N!==Infinity)?null:qv}
+    svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+40)+'" text-anchor="middle" class="ax '+(qv==null?'':qv>=0?'up':'dn')+'">'+(s.isCur?'QTD':(noPriorQ?'no prior':qv==null?'—':(qv>0?'+':'')+qv.toFixed(1).replace('-','−')))+'</text>';
   });
   /* previous-quarter marker on the current bar */
   var pv2=ser.length>1?ser[ser.length-2].A:null;if(pv2!=null)svg+='<line x1="'+(x(n-1)+bw*.1)+'" x2="'+(x(n-1)+bw*.9)+'" y1="'+y(pv2)+'" y2="'+y(pv2)+'" stroke="var(--ink)" stroke-dasharray="3 2" stroke-width="1.5"><title>Previous quarter '+fmtMoney(pv2)+'</title></line>';
@@ -122,17 +123,17 @@ function trendCard(title,ent,ctx,personSp,id,opts){
   /* Stretch / required QoQ against the current quarter's target */
   var lastClosed=closed[closed.length-1],req='';
   if(cur.tgt!=null&&lastClosed&&lastClosed.A!=null){var sr=stretchOf(cur.tgt,lastClosed.A,ts);
-    req='<div class="callout '+(sr.state==='stretch'?'warn':'')+'">Target '+fmtMoney(cur.tgt)+' needs <b>'+fmtPct(sr.required,true)+'</b> QoQ'+(ts.avg!=null&&!ts.short?'; 12-qtr average is <b>'+fmtPct(ts.avg,true)+'</b>':'')+'. '+(sr.state==='stretch'?'<span class="pill part">Stretch</span> more than '+CFG.stretch_multiple+'× the average, flagged for discussion.':sr.state==='ok'?'Within '+CFG.stretch_multiple+'× the average.':'History too short for a Stretch check.')+'</div>'}
+    req='<div class="callout '+(sr.state==='stretch'?'warn':'')+'">Target '+fmtMoney(cur.tgt)+' needs <b>'+fmtPct(sr.required,true)+'</b> QoQ'+(ts.avg!=null&&!ts.short?'; average of the quarters loaded is <b>'+fmtPct(ts.avg,true)+'</b>':'')+'. '+(sr.state==='stretch'?'<span class="pill part">Stretch</span> more than '+CFG.stretch_multiple+'× the average, flagged for discussion.':sr.state==='ok'?'Within '+CFG.stretch_multiple+'× the average.':'History too short for a Stretch check.')+'</div>'}
   var sumr='<div class="tsum"><div><small>Average QoQ growth ('+ts.pairs+' step'+(ts.pairs===1?'':'s')+', arithmetic)</small><b>'+(ts.avg!=null?fmtPct(ts.avg,true):'—')+'</b></div><div><small>Direction</small><b>'+(ts.short?'history too short':arrow(ts.dir))+'</b></div><div><small>Latest quarter</small><b>'+esc(cur.label)+(cur.N!==Infinity?' to date':'')+'</b></div></div>';
   var legend='<div class="legend"><span><i class="sw" style="background:var(--brand)"></i>Actual (hatched = to date)</span><span><i class="sw" style="background:var(--orange)"></i>Target marker</span><span><i class="sw dash"></i>Previous quarter</span><span><i class="sw" style="background:var(--slate)"></i>4-quarter moving average</span><span><i class="sw" style="background:var(--sky)"></i>Trend line</span></div>';
-  return '<section class="card" id="trend-'+id+'"><div class="hd"><h2>'+esc(title)+'</h2><span class="note">12 closed quarters '+qLabel(closed[0].q)+' to '+qLabel(closed[closed.length-1].q)+' + '+esc(cur.label)+' to date</span></div>'
+  return '<section class="card" id="trend-'+id+'"><div class="hd"><h2>'+esc(title)+'</h2><span class="note">'+(closed.length?closed.length+' closed quarter'+(closed.length===1?'':'s')+' '+qLabel(closed[0].q)+' to '+qLabel(closed[closed.length-1].q)+' + ':'No closed quarter yet, ')+esc(cur.label)+' to date &middot; history starts '+esc(qLabel(histStart()))+'</span></div>'
    +svg+'<div class="note">Under each bar: achievement % of that quarter\'s target, then QoQ % (each quarter against the one before; a gap breaks the chain). Tap a bar to drill: quarter → month → SAP document.</div>'+legend+sumr+req+'</section>';
 }
 function drillPanel(ctx){
   var d=S.drill;if(!d)return '';
   if(d.kind==='coll')return drillColl(ctx);
   var q=d.q,ms=qMonths(q),f=Object.assign({plants:ctx.plants},ctx.base);if(d.sp)f.sp=d.sp;if(d.pl&&!d.sp)f.plants=new Set(d.pl.split(','));
-  var rows=ms.map(function(m){var A=sumF(f,[m]),pm=priorMonth(m),P=sumF(f,[pm]),inc=!monthLoaded(m,ctx.plants)||!monthLoaded(pm,ctx.plants);var qo=qoqOf(A.n,P.n,{incomplete:inc});
+  var rows=ms.map(function(m){var A=sumF(f,[m]),pm=priorMonth(m),P=sumF(f,[pm]),inc=!monthLoaded(m,ctx.plants)||!monthLoaded(pm,ctx.plants);var qo=qoqOf(A.n,P.n,{incomplete:inc,noPrior:preHist([pm])});
     return '<tr class="clk" data-act="drill-m" data-m="'+m+'"><td>'+ymLabel(m)+' ›</td><td class="num">'+fmtMoney(A.n)+'</td><td class="num">'+fmtMoney(P.n)+' <span class="note">'+ymLabel(pm)+'</span></td><td class="num">'+qoqCell(qo)+'</td><td class="num">'+fmtN(A.d)+'</td></tr>'}).join('');
   var h='<section class="card" id="drillp"><div class="hd"><h2>Drill-down · '+qLabel(q)+(d.sp?' · '+esc(d.sp):'')+'</h2><button class="btn sm" data-act="drill-close">Close</button></div>'
    +'<div class="crumbs"><button class="chip" data-act="drill-close">Trend</button> › <button class="chip'+(d.m?'':' on')+'" data-act="drill-qonly">'+qLabel(q)+'</button>'+(d.m?' › <button class="chip" data-act="drill-m" data-m="'+d.m+'">'+ymLabel(d.m)+'</button> › <span class="chip on">SAP documents</span>':'')+'</div>'
@@ -182,14 +183,14 @@ function pageOverview(){
   var cardsQ=[];
   cardsQ.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · Net sales · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. Credit notes: no feed yet.',status:statusOf(tot.ach),
     ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],
-     ['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
+     ['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['Quarter trend',trendWord(tot)]]}));
   cardsQ.push(qtyCard(ctx,tot));
   var col=collectionFigs(ctx);
   cardsQ.push(col.card);
   cardsQ.push(kpiCard({color:'orange',chip:'+',title:'K7 · New customers',value:'—',sub:'Needs the customer first-seen index (four earlier quarters).',pending:true,pendingTxt:'Pending',pendingMsg:'Needs four earlier quarters of history to find first-time customers; shown as pending, not zero.',
-    rows:[['Addressable','pending rules'],['Target','No plan (P6)'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %','—'],['12-qtr trend','—']]}));
+    rows:[['Addressable','pending rules'],['Target','No plan (P6)'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %','—'],['Quarter trend','—']]}));
   var h='<div class="kpirow">'+cardsQ.join('')+'</div>';
-  h+=trendCard('12-quarter trend · Net sales',{},ctx,undefined,'ov');
+  h+=trendCard('Quarters since '+qLabel(histStart())+' · Net sales',{},ctx,undefined,'ov');
   h+=drillPanel(ctx);
   /* branch chart + alerts */
   h+='<div class="grid2">'+branchChart(ctx)+alertsCard()+'</div>';
@@ -207,7 +208,7 @@ function matchSearch(r){var q=(S.f.search||'').toLowerCase();return !q||(r.label
 function qtyCard(ctx,tot){
   var res=ctx.res,q=planQty(ctx),sh=tot.sh,ach=q.tgt>0?sh/q.tgt*100:null;
   return kpiCard({color:'violet',chip:'▦',title:'Quantity · '+res.label,value:fmtSheets(sh),sub:'= '+fmtSqft(tot.sq)+' (item size).',status:statusOf(ach),ach:ach,
-   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(sh/q.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(qoqOf(sh,tot.Psh,{incomplete:tot.incomplete})):'—'],['12-qtr trend',trendWord(tot)]]});
+   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(sh/q.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(qoqOf(sh,tot.Psh,{incomplete:tot.incomplete})):'—'],['Quarter trend',trendWord(tot)]]});
 }
 function planQty(ctx){
   if(ctx.sc.sp)return {pot:0,tgt:0};/* plant-level quantity plans are not an executive's target */
@@ -235,7 +236,7 @@ function ytdStrip(ctx){
   var rows=qs.map(function(q){
     var ms=qMonths(q),isCur=q===cur,N=isCur?wdBetween(ms[0]+'-01',TODAY()):Infinity,w=walk(ms,N),A=sumF(f,w).n,loaded=isCur?anyMonthData(ms,ctx.plants):monthsLoaded(ms,ctx.plants);
     var pq=prevQ(q),pms=qMonths(pq),pw=walk(pms,N),P=sumF(f,pw).n,inc=!loaded||!monthsLoaded(pms,ctx.plants);
-    var pl=planW(f,w),qo=qoqOf(A,P,{incomplete:inc});
+    var pl=planW(f,w),qo=qoqOf(A,P,{incomplete:inc,noPrior:preHist(pms)});
     var crossover=/-Q1$/.test(q)?' (prior-FY crossover)':'';
     return '<tr><td>'+qLabel(q)+(isCur?' <span class="pill info">to date</span>':'')+'</td><td class="num">'+(pl.any?fmtMoney(pl.tgt):'—')+'</td><td class="num">'+fmtMoney(A)+'</td><td class="num">'+(pl.any&&pl.tgt>0?fmtAch(A/pl.tgt*100):'—')+'</td><td>'+qLabel(pq)+crossover+'</td><td class="num">'+qoqCell(qo)+'</td></tr>'});
   return '<section class="card"><div class="hd"><h2>YTD · '+qLabel(qs[qs.length-1]).split(' ')[1]+' so far · quarter by quarter</h2><span class="note">Not compared with any other year.</span></div><div class="tw"><table><thead><tr><th>Quarter</th><th class="num">Target</th><th class="num">Actual</th><th class="num">Ach %</th><th>Compared with</th><th class="num">QoQ step</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div></section>';
@@ -249,6 +250,6 @@ function targetRevisionCard(ctx,tot){
   var sr=stretchOf(P.tgt,lastOk?lastA:null,ts),revN=Math.max.apply(null,P.revs.map(function(x){return x.rev||1}).concat([1]));
   return '<section class="card"><div class="hd"><h2>Target revision · '+qLabel(q)+' · '+(ctx.f.plant?esc(plantShort(ctx.f.plant)):'all in scope')+'</h2>'+(sr.state==='stretch'?'<span class="pill part">Stretch</span>':sr.state==='ok'?'<span class="pill ok">Within range</span>':'<span class="pill mute">History too short</span>')+'</div>'
    +'<div class="kpis"><div class="kpi"><small>Original target</small><b>'+fmtMoney(P.orig)+'</b></div><div class="kpi"><small>Current '+(P.kind==='draft'?'draft':'approved')+' (r'+revN+')</small><b>'+fmtMoney(P.tgt)+'</b></div><div class="kpi"><small>Potential × share %</small><b style="font-size:14px">'+fmtMoney(P.pot)+' × '+(P.pot>0?(P.tgt/P.pot*100).toFixed(1):'—')+'%</b></div><div class="kpi"><small>Last quarter actual ('+qLabel(lastQ)+')</small><b>'+(lastOk?fmtMoney(lastA):'incomplete')+'</b></div></div>'
-   +'<div class="callout '+(sr.state==='stretch'?'warn':'')+'">'+(sr.required!=null?'Target needs <b>'+fmtPct(sr.required,true)+'</b> QoQ; 12-qtr average is <b>'+fmtPct(sr.avg,true)+'</b>. '+(sr.state==='stretch'?'More than '+CFG.stretch_multiple+'× the average: flagged Stretch for discussion. It never blocks approval.':'Not more than '+CFG.stretch_multiple+'× the average.'):'Not enough loaded history for a sense-check (needs '+CFG.min_pairs+' consecutive quarter pairs).')+'</div>'
+   +'<div class="callout '+(sr.state==='stretch'?'warn':'')+'">'+(sr.required!=null?'Target needs <b>'+fmtPct(sr.required,true)+'</b> QoQ; average of the quarters loaded is <b>'+fmtPct(sr.avg,true)+'</b>. '+(sr.state==='stretch'?'More than '+CFG.stretch_multiple+'× the average: flagged Stretch for discussion. It never blocks approval.':'Not more than '+CFG.stretch_multiple+'× the average.'):'Not enough loaded history for a sense-check (needs '+CFG.min_pairs+' consecutive quarter pairs).')+'</div>'
    +'<div class="row"><a class="btn sm" href="#/admin">Open revision trail</a></div><p class="note">'+(P.kind==='draft'?'Draft target: no approved target exists yet, so achievement is shown against the draft and labelled.':'Achievement is shown against the current approved target; the original is kept.')+'</p></section>';
 }

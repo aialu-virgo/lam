@@ -25,3 +25,4 @@ Drafted 20 Oct for M7; each is checked against the page at the acceptance walk-t
 **Admin and switch**
 - [Admin guide](admin-guide.md) — draft: uploads, coverage, reopen, users, potential, settings, demo
 - [S/4HANA switch notes](s4hana-switch.md) — draft: source change, OData card
+- [Data upload problems and fixes](upload-issues.md) — active

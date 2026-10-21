@@ -2,7 +2,7 @@
 title: Target model
 summary: Target = market potential x share %, phased to months, with the revision workflow, approvers, original vs current target, and the Stretch flag, with a hand-calculable example for QA check 12.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-20
+updated: 2026-10-21
 related:
   - design/_index.md
   - data-map/target-phasing.md
@@ -52,16 +52,16 @@ Every change to a potential figure, share %, or phasing creates a **revision**: 
 - Approval of mass changes: a batch (file upload) is one revision set, approved key by key or as a batch with one click that writes one revision per key.
 
 ## History as a sense-check
-Beside every target the page shows: last closed quarter's actual (`A_prev`), the 12-quarter trend and the **required QoQ** = `target ÷ A_prev − 1`. Text: "Target needs +x% QoQ; 12-qtr avg is +y%".
+Beside every target the page shows: last closed quarter's actual (`A_prev`), the quarter trend since history start (up to 12 quarters; D28) and the **required QoQ** = `target ÷ A_prev − 1`. Text: "Target needs +x% QoQ; average of the quarters loaded is +y%".
 
 ## Stretch flag
-Definitions (one series: the actuals of the level shown, 12 closed quarters Q3 FY24 to Q2 FY27):
-- `QoQ_i = (A_i − A_{i−1}) ÷ A_{i−1}`, 11 steps for 12 quarters.
-- **12-quarter average QoQ** = arithmetic mean of the QoQ steps (`avg`). **Assumed (new):** arithmetic, not compound; flagged here for SP Sir.
+Definitions (one series: the actuals of the level shown, closed quarters since `history_start` (D28; default Q1 FY26), at most 12; on 21 Oct 2026 that is 6 closed quarters, Q1 FY26 to Q2 FY27):
+- `QoQ_i = (A_i − A_{i−1}) ÷ A_{i−1}`, n−1 steps for n quarters.
+- **Average QoQ over the quarters available** = arithmetic mean of the QoQ steps (`avg`). **Assumed (new):** arithmetic, not compound; flagged here for SP Sir.
 - **Stretch** when `required QoQ > 2 × avg` (`stretch_multiple` = 2, editable). If `avg ≤ 0` the threshold is `2 × max(avg, stretch_floor_pct)` with `stretch_floor_pct` default **0%**, meaning any target above last quarter is flagged. Open question O-T1.
 - Needs at least `min_pairs` = 4 consecutive loaded QoQ steps (**Assumed (new)**); otherwise "n/a: history too short" and no flag.
-- **4-quarter moving average** `MA4_q` = mean of A_q and the three before; first value at quarter 4 (so 9 values for 12 quarters).
-- **Trend line:** least-squares line through the quarters numbered 1 to 12. **Direction** from `avg`: rising if > +1%, falling if < −1%, flat between (`trend_band_pct` = 1, **Assumed (new)**).
+- **4-quarter moving average** `MA4_q` = mean of A_q and the three before; first value at quarter 4 (n−3 values for n quarters; shown only once 4 quarters exist).
+- **Trend line:** least-squares line through the quarters available, numbered from 1; drawn only once at least 4 quarters exist. **Direction** from `avg`: rising if > +1%, falling if < −1%, flat between (`trend_band_pct` = 1, **Assumed (new)**).
 - Stretch is for discussion only. It never blocks approval.
 
 ## Worked example for QA check 12 (invented numbers, ₹ lakh, DEMO Plant A, product group Laminate)
