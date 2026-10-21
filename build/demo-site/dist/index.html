@@ -444,10 +444,18 @@ function dset(path,data){return dbRetry(function(){return S.db.doc(path).set(dat
 function ddel(path){return dbRetry(function(){return S.db.doc(path).delete()})}
 /* audit trail of lock and closed-quarter changes: written by Super admin only (database rule: admin write), read back by the integrity check */
 var AUD={};
+function whoAmI(){var v=S.viewer;if(!v)return 'unknown';if(v.email)return v.email;if(v.id)return 'uid:'+v.id;if(v.owner)return 'owner';return 'unknown'}
+/* real SAP data present: any non-demo upload, or any plant-month cell not flagged demo */
+function hasRealData(){
+  if(S.uploads.some(function(u){return !u.demo}))return true;
+  for(var k in S.cells){var pl=(S.cells[k]&&S.cells[k].plants)||{};for(var p in pl){if(!pl[p].demo)return true}}
+  return false;
+}
+var DEMO_OFF_MSG='Demo is disabled because real SAP data is loaded.';
 function sigOf(st,locked){return (st||'open')+'|'+(locked?1:0)}
 async function auditW(ev,q,extra){
   var id='a'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-  var doc=Object.assign({at:nowISO(),by:(S.viewer&&S.viewer.email)||'unknown',event:ev,q:q||''},extra||{});AUD[id]=doc;await dset('audit/'+id,doc);return id;
+  var doc=Object.assign({at:nowISO(),by:whoAmI(),event:ev,q:q||''},extra||{});AUD[id]=doc;await dset('audit/'+id,doc);return id;
 }
 function isPlanLocked(q){return !!((S.periods[q]&&S.periods[q].plan_locked)||(S.planlocks&&S.planlocks[q]))}
 function dget(path){return dbRetry(function(){return S.db.doc(path).get()})}
@@ -538,12 +546,13 @@ function renderBanner(){
   var none=!Object.keys(S.cells).length&&!S.uploads.length;
   var sa=effRole()==='Super admin'&&!readOnly();
   if(none&&!sa)h+='<div class="empty"><b>No data loaded.</b> A Super admin loads SAP data here.</div>';
-  else if(none)h+='<div class="empty"><b>No data loaded.</b> Upload a file below, or <button class="btn sm" data-act="demo-load">Load demo data</button> (labelled DEMO, removable with Clear demo).</div>';
+  else if(none&&!hasRealData())h+='<div class="empty"><b>No data loaded.</b> Upload a file below, or <button class="btn sm" data-act="demo-load">Load demo data</button> (labelled DEMO, removable with Clear demo).</div>';
   else{
     h+='<div class="kpis"><div class="kpi"><small>Invoice lines stored</small><b>'+fmtN(st.lines)+'</b></div><div class="kpi"><small>Database documents (transactions)</small><b>'+fmtN(st.docs)+' / '+fmtN(DOC_CAP)+'</b></div><div class="kpi"><small>Transaction data stored</small><b>'+fmtBytes(st.bytes)+'</b></div>'
     +'<div class="kpi"><small>Closed quarters</small><b>'+Object.keys(S.periods).filter(function(k){return S.periods[k].status==='closed'}).length+'</b></div></div>';
     if(!sa){}
     else if(S.uploads.some(function(u){return u.demo}))h+='<div class="banner warn"><span>DEMO data is in the database. Clear it before the real history load.</span><button class="btn sm" data-act="demo-clear">Clear demo</button></div>';
+    else if(hasRealData())h+='<div class="note">'+DEMO_OFF_MSG+'</div>';
     else h+='<div class="row"><button class="btn sm" data-act="demo-load">Load demo data</button></div>';
   }
   el.innerHTML=h;
@@ -902,6 +911,7 @@ function rollRowsOf(aggMap){
   return Array.from(rm.values()).map(function(o){return [o[0],o[1],o[2],o[3],o[4],o[5],Math.round(o[6]),Math.round(o[7]*100)/100]});
 }
 async function writeRoll(plant,ym,sys,rows,src,demo){
+  if(demo){var ex=S.rollDocs&&S.rollDocs[plant+'-'+ym],cp=S.cells['INV_'+ym]&&S.cells['INV_'+ym].plants&&S.cells['INV_'+ym].plants[plant];if((ex&&!ex.demo)||(cp&&!cp.demo))throw new Error('Demo roll write refused: '+plant+' '+ym)}
   await dset('roll/'+plant+'-'+ym,{plant:plant,ym:ym,sys:sys,n:rows.length,z:await gz(JSON.stringify(rows)),src:src,at:nowISO(),demo:demo||undefined});
 }
 async function packChunks(sys,P){
@@ -919,7 +929,8 @@ async function packChunks(sys,P){
   return out.map(function(c,i){return {id:sys+'-'+P.plant+'-'+P.ym+'-'+i,doc:{z:c.z,na:c.na,nh:c.nh,sys:sys,plant:P.plant,ym:P.ym,i:i,fmt:'gz-json v1: a=[cust,name,salesperson,group,transfer,docs,lines,sheets,sqft,net] h=[doc,day,cust,lines,sheets,net,transfer,sqft,salesperson (v0.9, D10), doc type INV (v0.9); older chunks have 8 fields]'}}});
 }
 async function runLoad(opts){
-  var r=U.res,sys=U.sys,demo=!!opts.demo,by=(S.viewer&&S.viewer.email)||'unknown';
+  var r=U.res,sys=U.sys,demo=!!opts.demo,by=whoAmI();
+  if(demo&&hasRealData()){toast(DEMO_OFF_MSG);throw new Error(DEMO_OFF_MSG)}
   U.stage='loading';cancelFlag=false;U.progress=0;U.progressMsg='Preparing...';renderUpload();await tick();
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   var pms=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1});
@@ -937,6 +948,8 @@ async function runLoad(opts){
         if(cancelFlag){stopped=true;break outer}
         var P=ps[pi];
         U.progressMsg='Writing '+ym+' plant '+P.plant+' ('+(done+1)+' of '+total+')';U.progress=Math.round(done/total*100);paintProgress();
+        var old0=cell.plants[P.plant];
+        if(demo&&old0&&!old0.demo)throw new Error('Demo write refused: '+P.plant+' '+ym+' holds real SAP data');
         var chunks=await packChunks(sys,P);
         var old=cell.plants[P.plant],lines=0,docsN=P.docs.size,net=0,sheets=0,cb=0;
         P.agg.forEach(function(a){lines+=a[6];if(!a[4]){net+=a[9];sheets+=a[7]}});
@@ -988,6 +1001,7 @@ function paintProgress(){var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.
 async function demoLoad(){
   if(effRole()!=='Super admin'||readOnly()){toast('Only a Super admin can load demo data');return}
   if(!window.DemoGen){toast('Demo generator not loaded');return}
+  if(hasRealData()){toast(DEMO_OFF_MSG);return}
   if(S.uploads.some(function(u){return u.demo})){toast('Demo data is already loaded');return}
   S.engBlock=true;/* the rules engine waits until the demo plans, people and stores are written */
   var codes=['1001','1011','1012','1013'];
@@ -3227,7 +3241,7 @@ async function demoActions(){
 }
 /* synthetic masters: written only when no real master is loaded; flagged demo so Clear demo removes only these */
 async function demoMasters(){
-  var by=(S.viewer&&S.viewer.email)||'demo',now=nowISO(),pl=function(c){return 'DEMO plant '+c};
+  var by=whoAmI(),now=nowISO(),pl=function(c){return 'DEMO plant '+c};
   if(!S.salesMaster){
     var P=[['DEMO-M-A','DEMO Manager A','Zone 1','1012','Branch Manager','Branch / depot manager','','DEMO-H-1'],['DEMO-M-B','DEMO Manager B','Zone 2','1013','Branch Manager','Branch / depot manager','','DEMO-H-1'],['DEMO-H-1','DEMO Head Sales','Zone 1','1011','Zonal Head','','','']];
     var sp=[['DEMO Sales 1','Zone 1','1012','DEMO-M-A'],['DEMO Sales 2','Zone 1','1012','DEMO-M-A'],['DEMO Sales 3','Zone 2','1013','DEMO-M-B'],['DEMO Sales 4','Zone 2','1013','DEMO-M-B'],['DEMO Sales 5','Zone 3','1011','DEMO-H-1'],['DEMO Sales 6','Zone 3','1001','DEMO-H-1']];
@@ -3257,7 +3271,8 @@ async function demoExtras(facts){
 }
 async function demoClearExtras(){
   var cols=[['actions',S.actions],['followups',S.followups],['orders',S.orders],['deliveries',S.deliv],['receivables',S.recv],['collections',S.coll],['stock',S.stock],['roll',Object.keys(S.rollDocs).map(function(k){return S.rollDocs[k]})],['users',S.users],['audit',S.audit]];
-  for(var c=0;c<cols.length;c++){var list=cols[c][1].filter(function(x){return x.demo});for(var i=0;i<list.length;i++)await ddel(cols[c][0]+'/'+list[i]._id)}
+  for(var c=0;c<cols.length;c++){var list=cols[c][1].filter(function(x){return x.demo});
+    if(cols[c][0]==='roll')list=list.filter(function(x){var ce=S.cells['INV_'+x.ym],cp=ce&&ce.plants&&ce.plants[x.plant];return !(cp&&!cp.demo)});/* never delete a roll doc that sits on a real plant-month */for(var i=0;i<list.length;i++)await ddel(cols[c][0]+'/'+list[i]._id)}
 }
 
 /* ---- src/75-masters.js ---- */
@@ -3383,7 +3398,7 @@ async function itemLoad(){
   if(!superOnly('load the item master'))return;
   var st=S.mst.items,r=st.res;if(!r||st.stage!=='checked')return;
   st.stage='loading';st.msg='Writing items...';schedule();await tick();
-  var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=(S.viewer&&S.viewer.email)||'unknown',failed=null,chunks=0;
+  var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,chunks=0;
   try{
     var per=3000,n=Math.ceil(r.items.length/per);
     for(var i=0;i<n;i++){var part=r.items.slice(i*per,(i+1)*per);st.msg='Writing chunk '+(i+1)+' of '+n;schedule();
@@ -3513,7 +3528,7 @@ async function sempLoad(){
   if(!superOnly('load the sales-employee master'))return;
   var st=S.mst.semp,r=st.res;if(!r||st.stage!=='checked')return;
   st.stage='loading';st.msg='Writing the master...';schedule();await tick();
-  var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=(S.viewer&&S.viewer.email)||'unknown',failed=null;
+  var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null;
   try{
     await dset('salesmaster/main',{z:await gz(JSON.stringify(r.people)),n:r.people.length,at:nowISO(),by:by,file:st.name,sheets:r.sheets,read:r.read,rejected:r.rejected,upload:uid,demo:st.demo||undefined,fmt:'gz-json v3: [code,name,zone,plant,plantRaw,designation,role,email,whatsapp,slpCode,b1Name,reportsToCode,endDate,altCode]'});
     await dset('uploads/'+uid,{at:nowISO(),by:by,sys:'B1',entity:'SE',file:st.name,size:st.size||0,mode:'master',periodLabel:'Sales employees: '+r.sheets.join(', '),read:r.read,loaded:r.loaded,rejected:r.rejected+r.unmatched.length,warned:r.warned,status:(r.rejected||r.unmatched.length)?'Partial':'Loaded',demo:st.demo||undefined,match:{names:r.match.names,matched:r.match.matched,rate:r.match.rate}});
@@ -3826,7 +3841,7 @@ document.addEventListener('input',function(ev){
 
 /* ---- src/99-expose.js ---- */
 /* test hooks (read-only helpers for the self-test; no data) */
-window.__dbg={S:S,DS:DS,CFG:CFG,sumF:sumF,quarterSeries:quarterSeries,trendStats:trendStats,stretchOf:stretchOf,planQ:planQ,planW:planW,resolvePeriod:resolvePeriod,qoqOf:qoqOf,walk:walk,WD:WD,wdBetween:wdBetween,scoreOf:scoreOf,rankSort:rankSort,TODAY:TODAY,qMonths:qMonths,monthsLoaded:monthsLoaded,viewCtx:viewCtx,figs:figs,priorMonth:priorMonth,closedQuarters:closedQuarters,curQuarterKey:curQuarterKey,effUser:effUser,buildDraft:buildDraft,custAgg:custAgg,loadCust:loadCust,classMap:classMap,todayCandidates:todayCandidates,capFor:capFor,scopeOf:scopeOf,fillTpl:fillTpl,addDays:addDays,addWD:addWD,hashRef:hashRef,runLadder:runLadder,runEngine:runEngine,kpiCompute:kpiCompute,itemsHtml:itemsHtml,sempHtml:sempHtml,spMatch:spMatch,spCanon:spCanon,SM:SM,matchStats:matchStats,unmatchedSp:unmatchedSp,nameKey:nameKey};
+window.__dbg={demoLoad:demoLoad,demoClear:demoClear,hasRealData:hasRealData,S:S,DS:DS,CFG:CFG,sumF:sumF,quarterSeries:quarterSeries,trendStats:trendStats,stretchOf:stretchOf,planQ:planQ,planW:planW,resolvePeriod:resolvePeriod,qoqOf:qoqOf,walk:walk,WD:WD,wdBetween:wdBetween,scoreOf:scoreOf,rankSort:rankSort,TODAY:TODAY,qMonths:qMonths,monthsLoaded:monthsLoaded,viewCtx:viewCtx,figs:figs,priorMonth:priorMonth,closedQuarters:closedQuarters,curQuarterKey:curQuarterKey,effUser:effUser,buildDraft:buildDraft,custAgg:custAgg,loadCust:loadCust,classMap:classMap,todayCandidates:todayCandidates,capFor:capFor,scopeOf:scopeOf,fillTpl:fillTpl,addDays:addDays,addWD:addWD,hashRef:hashRef,runLadder:runLadder,runEngine:runEngine,kpiCompute:kpiCompute,itemsHtml:itemsHtml,sempHtml:sempHtml,spMatch:spMatch,spCanon:spCanon,SM:SM,matchStats:matchStats,unmatchedSp:unmatchedSp,nameKey:nameKey};
 
 
 /* ================= boot ================= */

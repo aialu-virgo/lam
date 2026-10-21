@@ -12,11 +12,11 @@ await page.screenshot({path:SP+'theme/demo-login.png'});
 async function login(user,newpw){
   await page.fill('#dl-u',user);await page.fill('#dl-p','Demo@123');await page.click('#dl-form button[type=submit]');
   await page.waitForSelector('#dl-n1',{timeout:20000});await page.fill('#dl-n1',newpw);await page.fill('#dl-n2',newpw);await page.click('#dl-form button[type=submit]');
-  await page.waitForSelector('.side',{timeout:150000});await page.waitForTimeout(3500);
+  await page.waitForFunction(u=>window.__dbg&&window.__dbg.S.viewer&&window.__dbg.S.viewer.email===u&&window.__dbg.S.role&&!document.body.classList.contains('dm-prep')&&document.querySelector('.side'),user,{timeout:200000});await page.waitForTimeout(3500);
 }
 await login('demo.salesexec@demo','Newpass1x');
 t=await page.innerText('body');
-ok('sales exec opens the Desk with the new brand header',/Laminates Performance Desk|Lam Desk/.test(t)&&/DEMO/.test(t),t.slice(0,80).replace(/\n/g,' '));
+ok('sales exec opens the Desk with the new brand header',/Laminates (Performance )?Desk/.test(t)&&/DEMO/.test(t),t.slice(0,300).replace(/\n/g,' '));
 const sc=await page.evaluate(()=>{const d=window.__dbg;return {role:d.effUser().role,keys:Object.keys(d.DS.spIdx).join('|'),brand:getComputedStyle(document.querySelector('.btn.pri')||document.body).backgroundColor}});
 ok('sales exec scoped to own salesperson only',sc.role==='Sales executive'&&/^DEMO Sales \d$/.test(sc.keys),JSON.stringify(sc));
 await page.evaluate(()=>{location.hash='#/sales'});await page.waitForTimeout(2500);
