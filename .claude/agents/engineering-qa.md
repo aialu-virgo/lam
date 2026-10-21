@@ -1,7 +1,7 @@
 ---
 name: engineering-qa
 model: haiku
-description: Engineering QA for the Virgo Lam Performance Desk. Use to test a build against the 12 acceptance checks and the role matrix, or to run a blind second check of any output before it goes to the Principals. Never fixes, only reports.
+description: Engineering QA for the Virgo Laminates Performance Desk. Use to test a build against the 12 acceptance checks and the role matrix, or to run a blind second check of any output before it goes to the Principals. Never fixes, only reports.
 title: Agent — Engineering QA
 summary: Tests every build against the 12 acceptance checks and the role matrix; reports, never fixes.
 status: active

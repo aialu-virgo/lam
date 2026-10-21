@@ -16,7 +16,7 @@ async function login(user,newpw){
 }
 await login('demo.salesexec@demo','Newpass1x');
 t=await page.innerText('body');
-ok('sales exec opens the Desk with the new brand header',/Lam Performance Desk|Lam Desk/.test(t)&&/DEMO/.test(t),t.slice(0,80).replace(/\n/g,' '));
+ok('sales exec opens the Desk with the new brand header',/Laminates Performance Desk|Lam Desk/.test(t)&&/DEMO/.test(t),t.slice(0,80).replace(/\n/g,' '));
 const sc=await page.evaluate(()=>{const d=window.__dbg;return {role:d.effUser().role,keys:Object.keys(d.DS.spIdx).join('|'),brand:getComputedStyle(document.querySelector('.btn.pri')||document.body).backgroundColor}});
 ok('sales exec scoped to own salesperson only',sc.role==='Sales executive'&&/^DEMO Sales \d$/.test(sc.keys),JSON.stringify(sc));
 await page.evaluate(()=>{location.hash='#/sales'});await page.waitForTimeout(2500);

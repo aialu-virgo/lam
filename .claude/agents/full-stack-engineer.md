@@ -1,7 +1,7 @@
 ---
 name: full-stack-engineer
 model: sonnet
-description: Full-Stack Engineer for the Virgo Lam Performance Desk. Use to build and publish the artifact to an approved design: shared database, roles and row-level access, Data Intake, Admin masters, Action Center, Today and follow-up drafts. Builds only to an approved design.
+description: Full-Stack Engineer for the Virgo Laminates Performance Desk. Use to build and publish the artifact to an approved design: shared database, roles and row-level access, Data Intake, Admin masters, Action Center, Today and follow-up drafts. Builds only to an approved design.
 title: Agent — Full-Stack Engineer
 summary: Builds and publishes the Desk artifact to the approved design: shared database, roles, intake, Action Center, follow-up drafts.
 status: active
