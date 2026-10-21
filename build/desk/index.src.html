@@ -413,8 +413,8 @@ function resultHtml(){
   var qs=Object.keys(r.quarters).sort();
   var qrows=qs.map(function(k){var q=r.quarters[k];var closed=S.periods[k]&&S.periods[k].status==='closed';return '<tr><td>'+qLabel(k)+'</td><td class="num">'+fmtN(q.rows)+'</td><td class="num">'+q.plants.size+'</td><td class="num">'+q.months.size+' of 3</td><td>'+(closed?'<span class="pill miss">Closed, locked</span>':'<span class="pill ok">Open</span>')+'</td></tr>'}).join('');
   var grows=GROUPS.map(function(g){var x=r.groups[g]||{rows:0,value:0};return '<tr><td>'+g+'</td><td class="num">'+fmtN(x.rows)+'</td><td class="num">'+fmtMoney(x.value)+'</td></tr>'}).join('');
-  var h='<div class="hd"><h2>Validation result</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?'Some rows rejected':'All rows pass')+'</span></div>';
-  h+='<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Good rows loading</small><b>'+fmtN(r.good)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b></div>'+(r.preHist&&r.preHist.rows?'<div class="kpi"><small>Before history start (FY25-26 and earlier)</small><b>'+fmtN(r.preHist.rows)+'</b><small>not loaded, no action needed</small></div>':'')
+  var h='<div class="hd"><h2>Validation result</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?fmtN(r.rejected)+' rows will be skipped':'All rows pass')+'</span></div>';
+  h+='<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Good rows loading</small><b>'+fmtN(r.good)+'</b></div><div class="kpi"><small>Rows skipped (rejected)</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b></div>'+(r.preHist&&r.preHist.rows?'<div class="kpi"><small>Before history start (FY25-26 and earlier)</small><b>'+fmtN(r.preHist.rows)+'</b><small>not loaded, no action needed</small></div>':'')
    +'<div class="kpi"><small>Out of scope (kept in record)</small><b>'+fmtN(r.other.rows)+'</b></div><div class="kpi"><small>Internal transfers (flagged)</small><b>'+fmtN(r.xfer.rows)+'</b><small>'+fmtN(r.xferMaster)+' via the Admin list</small></div></div>';
   h+=invoiceFixes(r);
   h+=sanityHtml(r,locked);
@@ -493,10 +493,10 @@ function histBodyHtml(){
   if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
   if(!all.length)return '<div class="empty sm">No upload matches these filters.</div>';
   var open=S.hist.open;
-  return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Rej.</th><th>Status</th><th></th></tr></thead><tbody>'
+  return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(u){
      var fn=u.file||'',isOpen=!!open[u._id];
-     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+fmtN(u.rejected)+'</td><td><span class="pill '+(u.status==='Loaded'?'ok':u.status==='Failed'?'miss':'part')+'">'+esc(u.status)+'</span></td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Rejected rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&(u.entity||'INV')==='INV'&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&(u.entity||'INV')==='INV'&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
      if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
      return tr}).join('')
    +'</tbody></table></div>'
@@ -838,10 +838,10 @@ async function runLoad(opts){
       }
     }
   }
-  var status=failed?'Failed':(stopped||r.rejected?'Partial':'Loaded');
+  var status=failed?'Failed':(stopped?'Partial':'Loaded');
   if(failed)status='Failed';
   var upl={at:nowISO(),by:by,sys:sys,entity:'INV',file:U.name,size:U.size,mode:U.mode,periodLabel:U.period==='auto'?(Object.keys(r.quarters).length>1?'Auto: '+Object.keys(r.quarters).length+' quarters':Object.keys(r.quarters).map(qLabel).join(', ')):qLabel(U.period),
-    read:r.read,loaded:failed?0:r.good,rejected:r.rejected,warned:r.warned,fanout:r.fanout,injection:r.injection,status:status,demo:demo||undefined,
+    skipped:r.rejected,stopped:stopped||undefined,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,warned:r.warned,fanout:r.fanout,injection:r.injection,status:status,demo:demo||undefined,
     quarters:Object.keys(r.quarters),plantMonths:done,docsWritten:docsW,bytes:bytes,
     before_history_start:r.preHist?r.preHist.rows:0,fixes:{line_numbers_created:r.af.lineSynth,repeated_lines_removed:r.af.dupNoLine,category_rows_normalised:r.af.catAlias,zone_rows_normalised:r.af.zoneNorm,junk:r.af.junk,s4_sales_exec_filled:r.af.spFilled,s4_sales_exec_blank:r.af.blankSp,date_kinds:r.af.dateKinds},groups:r.groups,out_of_scope:r.other,internal_transfers:r.xfer,dateRepair:r.dateInfo.mixed?{swapped:r.dateInfo.swapped,min:r.minDate,max:r.maxDate}:null,
     mapping:Object.keys(U.map).reduce(function(o,k){o[k]=U.map[k]>=0?U.headers[U.map[k]]:null;return o},{}),closedQuarters:closedNow,reloadReason:closedTouched.length?U.reason:undefined,error:failed?dbErrText(failed):undefined};
@@ -851,7 +851,7 @@ async function runLoad(opts){
     if(!failed){await dset('mappings/'+sys+'_invoice',{map:upl.mapping,sys:sys,entity:'INV',at:nowISO(),by:by})}
   }catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed&&!stopped;
-  U.doneMsg=failed?('Load stopped: '+dbErrText(failed)+' '+done+' of '+total+' plant-months were stored.'):stopped?('Stopped. '+done+' of '+total+' plant-months stored. Load the file again to finish; stored months are replaced, not duplicated.'):('Loaded '+fmtN(loadedLines)+' lines in '+done+' plant-months ('+fmtBytes(bytes)+', '+docsW+' documents).'+(closedNow.length?' Closed: '+closedNow.map(qLabel).join(', ')+'.':''));
+  U.doneMsg=failed?('Load stopped: '+dbErrText(failed)+' '+done+' of '+total+' plant-months were stored.'):stopped?('Stopped. '+done+' of '+total+' plant-months stored. Load the file again to finish; stored months are replaced, not duplicated.'):('Loaded '+fmtN(loadedLines)+' lines in '+done+' plant-months ('+fmtBytes(bytes)+', '+docsW+' documents).'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':'')+(closedNow.length?' Closed: '+closedNow.map(qLabel).join(', ')+'.':''));
   renderUpload();
 }
 function isPast(qk){var n=istNow(),last=qEndYm(qk);return last<n.y+'-'+pad(n.m)}
@@ -1117,7 +1117,7 @@ var handlers={
  'demo-load':function(){return demoLoad()},
  'demo-clear':function(){return demoClear()},
  'u-reset':function(){U=newU();renderUpload()},
- 'u-validate':async function(){await saveMappingDraft();return runValidation()},
+ 'u-validate':async function(){await saveMappingDraft();await runValidation();return afterValidate()},
  'u-load':function(){if(!superOnly('load SAP data'))return;if(!canLoad(U.res,false)){toast('Not loaded: tick the confirmations the page asks for first');return}return runLoad({})},
  'u-cancel':function(){cancelFlag=true},
  'u-rejcsv':function(){var r=U.res;return download('rejected-rows.csv',csvLine(['row','doc_no','line','field','reason','value'])+'\n'+r.rejects.map(csvLine).join('\n'))},

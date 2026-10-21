@@ -249,7 +249,7 @@ function sempFixes(r){
 Object.assign(handlers,{
  'af-map':async function(t){
    var kind=t.getAttribute('data-kind'),raw=t.getAttribute('data-raw'),i=t.getAttribute('data-i'),sel=document.getElementById('afm-'+kind+'-'+i);
-   if(!sel)return;if(await aliasSave(kind,raw,sel.value)){toast('Saved: '+raw+' → '+sel.value);if(U&&U.stage==='validated'){U.stage='validating';U.progressMsg='Checking again with the new mapping...';renderUpload();await runValidation()}else if(S.mst.items&&S.mst.items.stage==='checked'&&S.mst.items.src){await itemParse()}}
+   if(!sel)return;if(await aliasSave(kind,raw,sel.value)){toast('Saved: '+raw+' → '+sel.value);if(U&&(U.stage==='validated'||U.stage==='done')){U.stage='validating';U.progressMsg='Checking again with the new mapping...';renderUpload();await runValidation();await afterValidate()}else if(S.mst.items&&S.mst.items.stage==='checked'&&S.mst.items.src){await itemParse()}}
  },
  'af-sp':async function(t){
    var raw=t.getAttribute('data-raw'),code=t.getAttribute('data-code');
@@ -258,12 +258,12 @@ Object.assign(handlers,{
  'af-xf':async function(t){
    if(!superOnly('add to the transfer list'))return;
    var c=(t.getAttribute('data-code')||'').toUpperCase();await dset('transfers/'+slug(c),{code:c,name:t.getAttribute('data-name')||'',flag:true,added_by_suggestion:true});toast('Added '+c+' to the transfer list');
-   if(U&&U.stage==='validated'){U.stage='validating';renderUpload();await runValidation()}
+   if(U&&(U.stage==='validated'||U.stage==='done')){U.stage='validating';renderUpload();await runValidation();await afterValidate()}
  },
  'af-xf-all':async function(){
    if(!superOnly('add to the transfer list')||!U||!U.res)return;var xs=U.res.af.xferSuggest||{},ks=Object.keys(xs);
    for(var i=0;i<ks.length;i++)await dset('transfers/'+slug(ks[i].toUpperCase()),{code:ks[i].toUpperCase(),name:xs[ks[i]].name,flag:true,added_by_suggestion:true});
-   toast('Added '+ks.length+' accounts to the transfer list');U.stage='validating';renderUpload();await runValidation();
+   toast('Added '+ks.length+' accounts to the transfer list');U.stage='validating';renderUpload();await runValidation();await afterValidate();
  },
  'u-load-as-transfers':async function(){
    if(!superOnly('load the transfer list')||!U||!U.offer)return;var f=U.offer;S.upMsg='';await masterUpload('transfers',f.file,f.rows);
@@ -371,14 +371,14 @@ function sanityHtml(r,locked){
   var z=r.sanity,h='',sa=effRole()==='Super admin'&&!readOnly();
   if(z&&z.suspect){
     var mx=0;Object.keys(z.hist).forEach(function(k){mx=Math.max(mx,z.hist[k])});
-    h+='<div class="banner err" style="display:block"><b>'+(z.hard?'Blocked: this file does not look like the month it is named for.':'Check the dates before loading.')+'</b><ul style="margin:6px 0 6px 18px;padding:0">'+z.reasons.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'
+    h+='<div class="banner err" style="display:block"><b>'+(z.hard?'Safety check stopped this file: it does not look like the month it is named for.':'Safety check stopped this file: check the dates before loading.')+'</b> <span class="note" style="color:inherit">(This is not about rejected rows; those are skipped and the rest loads.)</span><ul style="margin:6px 0 6px 18px;padding:0">'+z.reasons.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'
      +'<div class="tw hscroll" style="max-height:220px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Rows</th><th>Share</th></tr></thead><tbody>'+Object.keys(z.hist).sort().map(function(k){return '<tr><td>'+esc(ymLabel(k))+(k===z.exp?' <span class="pill ok">named month</span>':'')+(k>TODAY().slice(0,7)?' <span class="pill miss">future</span>':'')+'</td><td class="num">'+fmtN(z.hist[k])+'</td><td><i style="display:inline-block;height:8px;border-radius:4px;background:var(--brand);width:'+Math.max(2,Math.round(z.hist[k]/mx*160))+'px"></i> '+(z.hist[k]/z.total*100).toFixed(1)+'%</td></tr>'}).join('')+'</tbody></table></div>'
      +(z.swapOffer&&sa?'<div class="note" style="margin-top:6px">Date cells are never swapped on their own. If this file really has day and month the wrong way round on '+fmtN(z.swapOffer.rows)+' date cells, reading them swapped gives '+z.swapOffer.months.map(ymLabel).join(', ')+'. <button class="btn sm" data-act="u-swap-serial" '+(locked?'disabled':'')+'>Read those date cells swapped</button></div>':'')
      +'<label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="anyway" '+(U.anyway?'checked':'')+' '+(sa&&!locked?'':'disabled')+'> Load anyway (Super admin only)</label></div>';
   }
   var rk=replaceRisk(r);
   if(rk.length){
-    h+='<div class="banner warn" style="display:block"><b>This upload would replace '+rk.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more lines than the new data.</b> Replaced data cannot be restored by the Desk; you would have to upload it again.'
+    h+='<div class="banner warn" style="display:block"><b>Safety check stopped this file: it would replace '+rk.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more lines than the new data.</b> (Not a rejected-rows issue.) Replaced data cannot be restored by the Desk; you would have to upload it again.'
      +'<div class="tw hscroll" style="max-height:200px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Plant-months</th><th class="num">Lines held now</th><th class="num">Lines in this file</th></tr></thead><tbody>'+rk.map(function(x){return '<tr><td>'+esc(ymLabel(x.ym))+'</td><td class="num">'+x.plants+'</td><td class="num">'+fmtN(x.oldLines)+'</td><td class="num">'+fmtN(x.newLines)+'</td></tr>'}).join('')+'</tbody></table></div>'
      +'<label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="confrep" '+(U.confirmReplace?'checked':'')+' '+(sa&&!locked?'':'disabled')+'> I confirm: replace these months ('+rk.map(function(x){return ymLabel(x.ym)}).join(', ')+')</label></div>';
   }
@@ -433,3 +433,23 @@ Object.assign(handlers,{
  'u-swap-serial':async function(){if(!U||!U.res)return;U.swapSerial=true;U.stage='validating';U.progressMsg='Reading date cells swapped...';renderUpload();await runValidation()},
  'u-unswap':async function(){if(!U||!U.res)return;U.swapSerial=false;U.stage='validating';renderUpload();await runValidation()}
 });
+
+/* ================= D33 (21 Oct 2026, Vijay): skipped rows never block; good rows load at once ================= */
+function histStatusPill(u){
+  var st=u.status,sk=u.rejected||0;
+  if((st==='Loaded'||(st==='Partial'&&!u.stopped&&u.entity!=='INV'))&&sk>0)return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' row'+(sk===1?'':'s')+' skipped</span>';
+  if(st==='Partial'&&!u.stopped&&sk>0&&(u.entity||'INV')!=='INV')return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' rows skipped</span>';
+  return '<span class="pill '+(st==='Loaded'?'ok':st==='Failed'?'miss':'part')+'">'+esc(st)+'</span>';
+}
+async function afterValidate(){
+  /* load at once when no safety check stops the file; rows with problems are skipped and kept in the upload's list */
+  if(!U||U.stage!=='validated'||!U.res||window.__NOAUTOLOAD)return;
+  if(canLoad(U.res,false)&&!readOnly()&&effRole()==='Super admin'){toast('Loading '+fmtN(U.res.good)+' good rows; '+fmtN(U.res.rejected)+' skipped');await runLoad({});return}
+  var why=[];var z=U.res.sanity;
+  if(z&&z.suspect&&!U.anyway)why.push('the dates look wrong for this file');
+  if(replaceRisk(U.res).length&&!U.confirmReplace)why.push('it would replace months that hold more lines');
+  if(U.res.dateInfo.mixed&&!U.confirmDates)why.push('the swapped-date range needs your confirmation');
+  var closedQs=Object.keys(U.res.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
+  if(closedQs.length&&U.reason.trim().length<3)why.push('a closed quarter needs a reload reason');
+  if(why.length)toast('Not loaded yet: '+why.join('; ')+'. This is a safety check, not a rejected row.');
+}
