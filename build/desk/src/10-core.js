@@ -10,9 +10,8 @@ var SETTING_DEFS=[
  ['qoq_decline_pct','QoQ decline threshold %',-5,'Assumed (Q9)'],['qoq_min_base_inr','QoQ rule: minimum prior base (₹)',500000,'Assumed (new)'],['qoq_classes','QoQ rule: customer classes',"A,B",'Assumed (new)'],
  ['status_green_pct','Status green from Ach %',100,'Assumed (Q13)'],['status_orange_pct','Status orange from Ach %',90,'Assumed (Q13)'],
  ['shortfall_from_pct','R1: evaluate open month after % of working days',80,'Assumed (new)'],['max_new_per_rule_per_run','Max new actions per rule per run',20,'Assumed (new)'],
- ['due_R1','Due (working days) R1 plan shortfall',3,'Assumed (new)'],['due_R2','Due R2 overdue receivable',2,'Assumed (new)'],['due_R3','Due R3 order beyond TAT',1,'Assumed (new)'],['due_R4','Due R4 ageing stock',5,'Assumed (new)'],['due_R5','Due R5 rejected rows',1,'Assumed (new)'],['due_R6','Due R6 missing plan',3,'Assumed (new)'],['due_R7','Due R7 QoQ decline',5,'Assumed (new)'],
+ ['due_R1','Due (working days) R1 plan shortfall',3,'Assumed (new)'],['due_R2','Due R2 overdue receivable',2,'Assumed (new)'],['due_R4','Due R4 ageing stock',5,'Assumed (new)'],['due_R5','Due R5 rejected rows',1,'Assumed (new)'],['due_R6','Due R6 missing plan',3,'Assumed (new)'],['due_R7','Due R7 QoQ decline',5,'Assumed (new)'],
  ['rcv_days','R2: days past due',30,'Assumed (new)'],['rcv_min_inr','R2: minimum overdue (₹)',100000,'Assumed (new)'],
- ['tat_days','Dispatch TAT plan (working days)',3,'Assumed (new)'],['tat_min_orders','R3: minimum late orders',3,'Assumed (new)'],
  ['stock_age_days','R4: stock age (days)',180,'Assumed (new)'],['stock_age_min_sheets','R4: minimum aged sheets',500,'Assumed (new)'],['stock_over_pct','R4: stock days over plan %',125,'Assumed (new)'],['stock_days_target','Stock days plan',30,'Assumed (new)'],
  ['reject_min','R5: minimum rejected rows',1,'Assumed (new)'],['plan_lead_days','R6: days before quarter start',7,'Assumed (new)'],
  ['remind_days_before','Escalation: reminder days before due',1,'Assumed (Q11)'],['L1_days','Escalation L1 (days overdue)',1,'Assumed (Q11)'],['L2_days','Escalation L2 (days overdue)',3,'Assumed (Q11)'],['L3_days','Escalation L3 (days overdue)',7,'Assumed (Q11)'],
@@ -20,6 +19,7 @@ var SETTING_DEFS=[
  ['default_share_uplift_pts','Default share uplift (points)',2,'Assumed (Q4)'],
  ['overdue_share_days','K10 overdue share: days past due',60,'Assumed (new)'],
  ['history_start','History start quarter (D28: nothing earlier is loaded or shown), format FY26-Q1','FY26-Q1','D28 (Vijay)'],
+ ['own_company_names','Group company names (comma separated): customers with these in the name are suggested as internal transfers','VIRGO','Assumed (new)'],
  ['holidays','Holidays (YYYY-MM-DD, comma separated)','','Assumed (new)'],['month_compare','Month comparison (same_position_prior_quarter or previous_month)','same_position_prior_quarter','Assumed (Q8)']];
 var CFG={};SETTING_DEFS.forEach(function(d){CFG[d[0]]=d[2]});
 CFG.role_caps={};

@@ -2,20 +2,21 @@
 S.adminTab='users';S.rbBusy=false;
 function adminTabs(){
   var r=effRole();
-  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['settings','Rules & settings'],['tools','Tools']];
+  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['aliases','Aliases'],['settings','Rules & settings'],['tools','Tools']];
   return [['potential','Market potential']];
 }
 function buildAdmin(){
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
   $('#p-admin').innerHTML=(tabs.length>1?'<div class="tabs seg" role="tablist" style="align-self:flex-start">'+tabs.map(function(t){return '<button data-act="atab" data-t="'+t[0]+'" role="tab">'+t[1]+'</button>'}).join('')+'</div>':'')+'<div id="a-body"></div>';
 }
-function refreshAdmin(){
+function refreshAdmin(){var _e=$('#a-body');withScroll(_e,refreshAdmin0)}
+function refreshAdmin0(){
   document.querySelectorAll('[data-act="atab"]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-t')===S.adminTab))});
   var el=$('#a-body');if(!el)return;
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
   var focusId=document.activeElement&&document.activeElement.id,t=S.adminTab;
-  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():potentialHtml();
-  if(el.getAttribute('data-h')!==String(html.length)+t||t!=='settings'){el.innerHTML=html;el.setAttribute('data-h',String(html.length)+t)}
+  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():t==='aliases'?aliasesHtml():potentialHtml();
+  if(el.getAttribute('data-h')!==String(html.length)+t||(t!=='settings'&&t!=='aliases')){el.innerHTML=html;el.setAttribute('data-h',String(html.length)+t)}
   if(focusId){var f=document.getElementById(focusId);if(f&&f.focus){f.focus();try{var v=f.value;if(f.setSelectionRange&&f.type!=='number'&&f.type!=='email'&&f.type!=='date')f.setSelectionRange(v.length,v.length)}catch(e){}}}
 }
 /* ---- plan permissions ---- */
@@ -194,8 +195,7 @@ async function demoOps(){
   g.list.forEach(function(k){qMonths(k).forEach(function(m){if(m<=today.slice(0,7))months.push(m)})});
   var plan=qMonths(g.cur).concat(qMonths(prevQ(g.cur)));
   var o=DemoGen.ops({today:today,plants:plants,months:months,planMonths:plan,seed:31});
-  for(var i=0;i<o.orders.length;i++)await dset('orders/'+o.orders[i].plant,Object.assign({demo:true},o.orders[i]));
-  for(i=0;i<o.deliveries.length;i++)await dset('deliveries/'+o.deliveries[i].plant,Object.assign({demo:true},o.deliveries[i]));
+  var i;
   for(i=0;i<o.receivables.length;i++)await dset('receivables/'+o.receivables[i].plant,Object.assign({demo:true},o.receivables[i]));
   for(i=0;i<o.stock.length;i++)await dset('stock/'+o.stock[i].plant,Object.assign({demo:true},o.stock[i]));
   for(i=0;i<o.collections.length;i++){var c=o.collections[i];await dset('collections/'+c.plant+'-'+c.ym,Object.assign({demo:true},c))}
@@ -203,7 +203,7 @@ async function demoOps(){
 async function demoActions(){
   var t=TODAY(),mk=function(id,title,owner,assigner,due,val,extra){var now=nowISO();return Object.assign({id:id,ref:hashRef(id),rule:'M',title:title,source:{label:'DEMO manual action',page:'actions',plant:'1012'},owner:owner,assigner:assigner,creator:assigner,department:'Sales',plant:'1012',group:'',customer:'DEMOCU000007',due:due,next_step:'Update the status and the next date.',value:val,status:'Open',created:now,updated:now,dependents:0,period:'manual',meta:{},need_help:false,demo:true,thread:[{at:now,by:assigner,kind:'created',text:'DEMO action.'}]},extra||{})};
   var list=[];
-  for(var i=0;i<12;i++)list.push(mk('DEMO_A'+(i+1),'DEMO action '+(i+1)+(i%3===0?' · collect overdue':i%3===1?' · confirm dispatch':' · review plan'),'bm.a@demo','hod.sales@demo',addDays(t,i-3),(i+1)*150000,{plant:'1012',customer:'DEMOCU'+pad(i+2,6)}));
+  for(var i=0;i<12;i++)list.push(mk('DEMO_A'+(i+1),'DEMO action '+(i+1)+(i%3===0?' · collect overdue':i%3===1?' · confirm payment plan':' · review plan'),'bm.a@demo','hod.sales@demo',addDays(t,i-3),(i+1)*150000,{plant:'1012',customer:'DEMOCU'+pad(i+2,6)}));
   list.push(mk('DEMO_LAD','DEMO ladder example · overdue receivable','se.s1@demo','coord.a@demo',addDays(t,2),850000,{status:'In progress',plant:'1012'}));
   list.push(mk('DEMO_VER','DEMO closure waiting for verification','bm.a@demo','hod.sales@demo',addDays(t,1),0,{status:'Done',closure:'Dispatched and confirmed with the customer.',done_at:nowISO()}));
   list.push(mk('DEMO_S1','DEMO call customer','se.s1@demo','bm.a@demo',addDays(t,1),300000,{plant:'1012'}));

@@ -1,0 +1,11 @@
+import { chromium, open } from './run.mjs';import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+const browser=await chromium.launch();const st0=JSON.parse(JSON.stringify(store));Object.keys(st0).forEach(k=>{if(/^(cells|inv|roll|uploads|transfers)\//.test(k))delete st0[k]});
+const {page}=await open(browser,{store:st0});await page.waitForTimeout(3000);await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(600);
+const inp=await page.$('input[type=file]');await inp.setInputFiles(SP+'af/b1.csv');await page.waitForTimeout(2500);
+await page.click('[data-act="u-validate"]');await page.waitForFunction(()=>window.__desk.U&&window.__desk.U.res&&window.__desk.U.stage==='validated',null,{timeout:90000});
+console.log(JSON.stringify(await page.evaluate(()=>({rj:window.__desk.U.res.rejects,rs:window.__desk.U.res.reasons,map:window.__desk.U.map.itype,hd:window.__desk.U.headers.slice(0,6)}))));
+await page.click('[data-t="aliases"]').catch(()=>{});
+await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(400);await page.click('[data-t="aliases"]');await page.waitForTimeout(500);
+console.log((await page.innerText('#pg')).slice(0,700));
+await browser.close();

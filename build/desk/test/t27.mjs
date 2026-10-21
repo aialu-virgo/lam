@@ -18,7 +18,7 @@ for(const mode of ['master','nomaster']){
   ok(`${mode} ${email}: only own salesperson in the data`,r.keys===name,r.keys);
   ok(`${mode} ${email}: actual equals own`,Math.abs(r.A-r.own)<1&&r.A>0,r.A+' vs '+r.own);
   ok(`${mode} ${email}: target is the person's, not the plant-wide plan`,(r.tgt==null||r.tgt<r.plantTgt*0.5)&&(r.pot==null||true),`tgt ${r.tgt} plant-wide ${r.plantTgt}`);
-  for(const pg of ['overview','sales','team','orders','receivables']){
+  for(const pg of ['overview','sales','team','receivables']){
    await page.evaluate((pg)=>{location.hash='#/'+pg},pg);await page.waitForTimeout(1800);
    const t=await page.innerText('#pg').catch(()=> '');
    const others=['DEMO Sales 1','DEMO Sales 2','DEMO Sales 3','DEMO Sales 4','DEMO Sales 5','DEMO Sales 6','DEMO Sales 7'].filter(n=>n!==name&&t.includes(n));

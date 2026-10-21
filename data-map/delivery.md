@@ -1,8 +1,8 @@
 ---
 title: Data map — Delivery
 summary: Deliveries (dispatches): no export yet; exact B1 ODLN/DLN1 query columns; needed for dispatch TAT.
-status: draft
-updated: 2026-10-20
+status: not used (D31)
+updated: 2026-10-21
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -13,6 +13,8 @@ related:
 ---
 
 # Delivery (SAP export)
+
+> **D31 (Vijay, 21 Oct 2026):** not used. Orders & Dispatch was removed from scope; no export of this entity is needed. Kept for history.
 **Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Delivery · **Status:** **no delivery export uploaded.**
 
 ## Source and export

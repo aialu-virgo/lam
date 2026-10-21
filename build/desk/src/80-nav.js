@@ -3,12 +3,11 @@ S.f={mode:'QTD',q:'',m:'',from:'',to:'',plant:'',sp:'',group:'',search:''};
 S.acF={status:'',owner:'',rule:'',q:''};S.logF={kind:'',by:'',q:'',from:''};S.acTab='list';S.threadId=null;
 S.actions=[];S.followups=[];S.phasing=[];S.rollDocs={};S.rollLoaded=false;S.orders=[];S.deliv=[];S.recv=[];S.coll=[];S.stock=[];S.potVer=0;S.viewAs=null;S.demoMode=false;
 var PAGES=[
- ['overview','Overview','Overview'],['sales','Sales','Overview'],['orders','Orders & Dispatch','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
+ ['overview','Overview','Overview'],['sales','Sales','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
  ['today','Today','Team'],['actions','Action Center','Team'],['team','Team & Scorecard','Team'],['intake','Data Intake','Data'],['admin','Admin','Data']];
 var TITLES={
  overview:['Overview','Net sales and growth against market potential. Comparison is always the previous quarter.'],
  sales:['Sales','Branch → salesperson → customer → SAP document · A/B/C customer tiles'],
- orders:['Orders & Dispatch','Open orders and order-to-dispatch days against the plan TAT'],
  receivables:['Receivables','Ageing buckets and collection plan against actual'],
  inventory:['Inventory','Stock against plan, stock days and ageing'],
  today:['Today','Your top actions, ranked and capped for your role'],
@@ -16,7 +15,7 @@ var TITLES={
  team:['Team & Scorecard','KRA / KPI plan against actual per person and role'],
  intake:['Data Intake','SAP B1 now, S/4HANA ready. CSV or XLSX. Every row keeps its SAP reference.'],
  admin:['Admin','Users, plants, market potential with revisions, rules and settings.']};
-var PERIOD_PAGES=['overview','sales','team'],FILTER_PAGES=['overview','sales','team','orders','receivables','inventory'];
+var PERIOD_PAGES=['overview','sales','team'],FILTER_PAGES=['overview','sales','team','receivables','inventory'];
 
 function route(){
   var h=(location.hash||'').replace(/^#\/?/,''),parts=h.split('/'),pg=parts[0]||'';
@@ -47,7 +46,6 @@ function navTags(u,open){
   var oa=openActionCount(u);if(oa)t.actions=mk(oa,'red','Open actions in your scope');
   t.team=mk('TEAM','teal');
   if(sa){t.intake=mk('LIVE','ind');t.admin=mk('RULES','vio','Rules, settings and plans')}else t.intake=mk('VIEW','ind');
-  if(!S.orders.length&&!S.deliv.length)t.orders=mk('DATA','','Sales order and delivery exports not loaded');
   if(!S.recv.length&&!S.coll.length)t.receivables=mk('DATA','','Receivable and collection exports not loaded');
   if(!S.stock.length)t.inventory=mk('DATA','','Stock export not loaded');
   return t;
@@ -119,7 +117,7 @@ function pageHtml(u){
   if(pg==='actions')return S.threadId?pageThread(S.threadId):pageActions();
   var body='';
   if(pg==='overview')body=pageOverview();else if(pg==='sales')body=pageSales();else if(pg==='team')body=pageTeam();
-  else if(pg==='orders')body=pageOrders();else if(pg==='receivables')body=pageReceivables();else if(pg==='inventory')body=pageInventory();
+  else if(pg==='receivables')body=pageReceivables();else if(pg==='inventory')body=pageInventory();
   return ctrlBar(pg)+body;
 }
 function renderAll(){

@@ -2,7 +2,7 @@
 title: Plan model
 summary: Every plan type beyond the sales target (person split, collections, dispatch TAT, stock days, new customers, personal KPIs): grain, owner, entry route, actual source and approval.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-20
+updated: 2026-10-21
 related:
   - design/_index.md
   - data-map/market-potential.md
@@ -21,6 +21,8 @@ related:
 ---
 
 # Plan model
+
+> **D31 (Vijay, 21 Oct 2026):** plan type P4 (Dispatch TAT plan) and the setting `tat_days` are removed. P4 is retired; P5 to P7 keep their numbers. Admin no longer offers a TAT plan.
 **Owner:** Data Architect · **Milestone:** M1 · **Approval:** approved (interim, Vijay, 20 Oct 18:08, D13) 
 **Input:** [Brief Part B — design inputs](brief-part-b.md) §4
 

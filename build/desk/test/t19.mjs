@@ -10,8 +10,8 @@ const people=await page.evaluate(()=>[...document.querySelectorAll('[data-act="t
 for(const [em,name] of people){
   await page.evaluate(e=>{document.querySelector('[data-act="team-who"][data-e="'+e+'"]').click()},em);await page.waitForTimeout(1200);
   const info=await page.evaluate(()=>{const c=document.querySelector('[id^="trend-"]');return {card:!!c,bars:document.querySelectorAll('.bar-q').length,tgt:document.querySelectorAll('svg.trend line[stroke="var(--orange)"]').length,ma:!!document.querySelector('svg.trend polyline'),trend:!!document.querySelector('svg.trend line[stroke-dasharray="6 4"]'),ach:[...document.querySelectorAll('svg.trend text.a-green,svg.trend text.a-orange,svg.trend text.a-red')].length,empty:!!document.querySelector('#pg .empty.dashed, #pg .empty'),title:c?c.querySelector('h2').innerText:''}});
-  const good=info.card&&info.bars>=8&&info.ma;
-  ok(`${name}: 12-quarter trend card (bars ${info.bars}, target markers ${info.tgt}, MA ${info.ma}, trend line ${info.trend}, ach labels ${info.ach})`,good||info.empty,info.title);
+  const good=info.card&&info.bars>=5&&info.ma/* D28: 6 closed quarters since Q1 FY26 plus current, the first one partly loaded */;
+  ok(`${name}: quarter trend card (bars ${info.bars}, target markers ${info.tgt}, MA ${info.ma}, trend line ${info.trend}, ach labels ${info.ach})`,good||info.empty,info.title);
   if(good){await page.evaluate(()=>{const r=[...document.querySelectorAll('.bar-q')];r[r.length-2].dispatchEvent(new MouseEvent('click',{bubbles:true}))});await page.waitForTimeout(500);
     await page.locator('#drillp [data-act="drill-m"]').first().click();await page.waitForTimeout(1500);
     const tb=await page.locator('#drillp table').count(),rows=await page.locator('#drillp table').nth(1).locator('tbody tr').count().catch(()=>0);

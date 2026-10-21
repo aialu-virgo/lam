@@ -42,18 +42,18 @@ function spOk(sc,name){
   var m=spMatch(name);return !!(m&&!m.ambiguous&&(sc.sp.indexOf(norm(m.name))>=0||sc.sp.indexOf(norm(m.code))>=0));
 }
 /* what a role may open (role-matrix.md, department table) */
-var DEPT_PAGES={Sales:['overview','sales','orders','team'],CRR:['orders','sales','team'],Accounts:['receivables','team'],Plant:['orders','inventory','team'],HO:['overview','sales','orders','receivables','inventory','team']};
+var DEPT_PAGES={Sales:['overview','sales','team'],CRR:['sales','team'],Accounts:['receivables','team'],Plant:['inventory','team'],HO:['overview','sales','receivables','inventory','team']};
 function pagesFor(u){
   var base=['today'];if(!u)return [];
   var r=u.role;
-  if(r==='Super admin')return ['overview','sales','orders','receivables','inventory','today','actions','team','intake','admin'];
-  if(r==='Management / HO')return ['overview','sales','orders','receivables','inventory','today','actions','team','intake','admin'];
+  if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','intake','admin'];
+  if(r==='Management / HO')return ['overview','sales','receivables','inventory','today','actions','team','intake','admin'];
   if(r==='HOD'){var p=DEPT_PAGES[u.department]||DEPT_PAGES.Sales;return p.filter(function(x){return x!=='sales'||true}).concat(['today','actions','admin'])}
-  if(r==='Branch / depot manager')return ['overview','sales','orders','receivables','inventory','today','actions','team','admin'];
+  if(r==='Branch / depot manager')return ['overview','sales','receivables','inventory','today','actions','team','admin'];
   if(r==='Sales executive')return ['sales','today','actions','team'];
-  if(r==='Coordinator (sales / CRR)')return ['orders','sales','today','actions','team'];
+  if(r==='Coordinator (sales / CRR)')return ['sales','today','actions','team'];
   if(r==='Accounts')return ['receivables','today','actions','team'];
-  if(r==='Plant')return ['orders','inventory','today','actions','team'];
+  if(r==='Plant')return ['inventory','today','actions','team'];
   return base;
 }
 function canPage(u,pg){return pagesFor(u).indexOf(pg)>=0}

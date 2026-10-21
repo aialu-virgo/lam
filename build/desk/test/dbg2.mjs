@@ -1,0 +1,14 @@
+import { chromium, open } from './run.mjs';import fs from 'fs';import zlib from 'zlib';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-masters.json'));
+const doc=store['salesmaster/main'];const arr=JSON.parse(zlib.gunzipSync(Buffer.from(doc.z,'base64')).toString());
+const s4=arr.find(a=>a[1]==='DEMO Sales 4');s4[4]='DEMO plant 1012';
+arr.push(['E-DMX/1','DEMO Sales 4','Zone 2','1013','DEMO plant 1013','Sale Executive','Sales executive','','']);
+doc.z=zlib.gzipSync(Buffer.from(JSON.stringify(arr))).toString('base64');doc.n=arr.length;
+const codeS1=arr.find(a=>a[1]==='DEMO Sales 1')[0];console.log('codeS1',codeS1);
+store['users/se_s1_demo'].sales_employee_code=codeS1;
+console.log(JSON.stringify(store['users/se_s1_demo']));
+const browser=await chromium.launch();
+const {page}=await open(browser,{store,viewer:{email:'se.s1@demo',name:'S1'}});await page.waitForTimeout(3500);
+console.log(JSON.stringify(await page.evaluate(()=>{const d=window.__dbg;const sc=d.scopeOf(d.effUser());const o={sc:{sp:sc.sp,plants:sc.plants&&[...sc.plants]},keys:Object.keys(d.DS.spIdx),role:d.effUser().role,name:d.effUser().name};const f=n=>Math.round(d.sumF({plants:null,sp:n},d.qMonths('FY27-Q2')).n);o.per={};Object.keys(d.DS.spIdx).forEach(k=>o.per[k]=f(k));o.tot=Math.round(d.sumF({plants:null},d.qMonths('FY27-Q2')).n);return o})));
+await browser.close();

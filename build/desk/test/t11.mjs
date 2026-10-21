@@ -9,17 +9,15 @@ const res=[];const ok=(n,c,d)=>{res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
  const n0=Object.keys(st).length;
  const {page,errs}=await open(browser,{store:st});await page.waitForTimeout(14000);
  const r=await page.evaluate(()=>({rolls:Object.keys(window.__mockStore()).filter(k=>k.startsWith('roll/')).length,tot:Math.round(window.__dbg.sumF({plants:null},window.__dbg.qMonths('FY27-Q2')).n),status:window.__dbg.DS.status}));
- ok('v0.1 data: roll-ups rebuilt from stored chunks',r.rolls===129+3&&r.tot===28224877,JSON.stringify(r));
- const inv=await page.evaluate(()=>Object.keys(window.__mockStore()).filter(k=>k.startsWith('inv/')).length);ok('existing inv chunks untouched',inv===132,String(inv));
+ ok('v0.1 data: roll-ups rebuilt from stored chunks',r.rolls===78&&r.tot===26689923/* D28 fixture: 78 plant-months; total = sum of the stored chunks, Jul-Sep 2026 */,JSON.stringify(r));
+ const inv=await page.evaluate(()=>Object.keys(window.__mockStore()).filter(k=>k.startsWith('inv/')).length);ok('existing inv chunks untouched',inv===78,String(inv));
  await page.context().close();}
 /* empty database: ships empty */
 {const {page,errs}=await open(browser,{store:{}});await page.waitForTimeout(2000);
- const pages=['overview','sales','orders','receivables','inventory','today','actions','team'];const out=[];
+ const pages=['overview','sales','receivables','inventory','today','actions','team'];const out=[];
  for(const p of pages){await page.evaluate(x=>{location.hash='#/'+x},p);await page.waitForTimeout(500);out.push(p+': '+(await page.innerText('#pg')).replace(/\n+/g,' ').slice(0,110))}
  console.log(out.join('\n'));
  const t=await page.innerText('#pg');ok('empty: no error banners',!errs.filter(e=>!/ERR_FAILED/.test(e)).length,JSON.stringify(errs.filter(e=>!/ERR_FAILED/.test(e))));
- await page.evaluate(()=>{location.hash='#/orders'});await page.waitForTimeout(400);
- const o=await page.innerText('#pg');ok('Orders empty state names the export',/Sales order export needed/.test(o)&&/Delivery export needed/.test(o)&&/data-map\/sales-order.md/.test(o),'');
  await page.evaluate(()=>{location.hash='#/receivables'});await page.waitForTimeout(400);
  const rv=await page.innerText('#pg');ok('Receivables empty state names exports',/Receivable export needed/.test(rv)&&/Collection export needed/.test(rv),'');
  await page.evaluate(()=>{location.hash='#/inventory'});await page.waitForTimeout(400);

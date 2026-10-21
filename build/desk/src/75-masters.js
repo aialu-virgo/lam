@@ -15,7 +15,7 @@ function roleFromDesignation(d){
 function buildSM(list){
   SM.list=list||[];SM.byCode={};SM.byName={};SM.byBase={};SM.byB1={};SM.cache={};
   SM.list.forEach(function(p){
-    SM.byCode[norm(p.code)]=p;if(p.alt&&!SM.byCode[norm(p.alt)])SM.byCode[norm(p.alt)]=p;
+    SM.byCode[norm(p.code)]=p;SM.byCode[norm(normEmpId(p.code))]=p;if(p.alt&&!SM.byCode[norm(p.alt)])SM.byCode[norm(p.alt)]=p;
     if(p.b1name){var k1=nameKey(p.b1name);(SM.byB1[k1]=SM.byB1[k1]||[]).push(p)}
     var k=nameKey(p.name);(SM.byName[k]=SM.byName[k]||[]).push(p);
     var b=nameKey(splitSuffix(p.name)[0]);if(b!==k)(SM.byBase[b]=SM.byBase[b]||[]).push(p);else(SM.byBase[b]=SM.byBase[b]||[]).push(p);
@@ -32,9 +32,12 @@ function spMatch(raw){
     if(suf){var m=arr.filter(function(p){var pn=nameKey(p.plantRaw||'');return pn&&(pn.indexOf(suf)>=0||suf.indexOf(pn)>=0)});if(m.length===1)return m[0]}
     return 'ambiguous';
   };
-  var c=pick(SM.byB1[k]);if(c){res=c;how='B1 name column'}
+  var c=null,al=aliasGet('salesperson',raw);if(al){var ap=SM.byCode[norm(al)]||SM.byCode[norm(normEmpId(al))];if(ap){res=ap;how='saved alias'}}
+  if(res){}
+  else if(c=pick(SM.byB1[k])){res=c;how='B1 name column'}
   else if(c=pick(SM.byName[k])){res=c;how='exact'}
   else{c=pick(SM.byName[base]);if(c){res=c;how='suffix removed'}else{c=pick(SM.byBase[base]);if(c){res=c;how='suffix removed'}}}
+  if(!res){var fz=fuzzyMatch(raw);if(fz&&!fz.ambiguous){res=fz.p;how=fz.how}}
   if(res==='ambiguous')res={ambiguous:true};else if(res)res=Object.assign({how:how},res);
   SM.cache[raw]=res;return res;
 }
@@ -94,7 +97,7 @@ async function itemParse(){
     var cCode=ix('Item No.'),cCat=ix('Item Category');
     if(cCode<0||cCat<0)throw new Error('Columns "Item No." and "Item Category" were not found in sheet "'+pick+'". Expected the item master (sheet FG).');
     var cUom=ix('Inventory UoM'),cAct=ix('Active'),cThk=ix('Thickness'),cSize=ix('Size');
-    var res={sheet:pick,read:rows.length-1,loaded:0,rejected:0,warned:0,outOfScope:0,byGroup:{},rejects:[],warn:{noSize:0,notPcs:0,dupCode:0},items:[],cats:{}};
+    var res={sheet:pick,read:rows.length-1,loaded:0,rejected:0,warned:0,outOfScope:0,byGroup:{},rejects:[],warn:{noSize:0,notPcs:0,dupCode:0},items:[],cats:{},catUnknown:{}};
     var seen={},T0=Date.now();
     for(var i=1;i<rows.length;i++){
       if(Date.now()-T0>40){T0=Date.now();st.msg='Checking item '+fmtN(i)+' of '+fmtN(rows.length-1);schedule();await tick()}
@@ -104,7 +107,7 @@ async function itemParse(){
       seen[code]=1;
       var cat=cellStr(r[cCat]),grp=groupOf('B1',cat,'');
       res.cats[cat||'(blank)']=(res.cats[cat||'(blank)']||0)+1;
-      if(!grp){res.outOfScope++;continue}
+      if(!grp){res.outOfScope++;if(cat&&aliasGet('category',cat)==null)res.catUnknown[cat]=(res.catUnknown[cat]||0)+1;continue}
       var size=cSize>=0?cellStr(r[cSize]):'',sq=sqftOf(size,1);
       if(sq==null){res.warn.noSize++;res.warned++;sq=0}
       var uom=cUom>=0?normUom(r[cUom]):'';if(uom&&uom!=='Pcs'){res.warn.notPcs++;res.warned++}
@@ -144,6 +147,7 @@ function itemsHtml(){
   if(st&&st.stage==='working')h+='<div><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(st.msg)+'</div></div>';
   if(st&&st.res&&(st.stage==='checked'||st.stage==='loading'||st.stage==='done')){
     var r=st.res;
+    h+=itemFixes(r);
     h+='<div class="hd"><h2>Check result · '+esc(st.name)+' · sheet '+esc(r.sheet)+'</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?'Some rows rejected':'All rows pass')+'</span></div>'
      +'<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>In scope, loading</small><b>'+fmtN(r.loaded)+'</b></div><div class="kpi"><small>Out of scope</small><b>'+fmtN(r.outOfScope)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b><small>'+r.warn.noSize+' without a readable size · '+r.warn.notPcs+' unit not Pcs</small></div></div>'
      +'<div class="tw"><table><thead><tr><th>Item category (as in the file)</th><th class="num">Items</th><th>Group</th></tr></thead><tbody>'+Object.keys(r.cats).sort(function(a,b){return r.cats[b]-r.cats[a]}).slice(0,30).map(function(c){var g=groupOf('B1',c==='(blank)'?'':c,'');return '<tr><td>'+esc(c)+'</td><td class="num">'+fmtN(r.cats[c])+'</td><td>'+(g?'<span class="pill ok">'+g+'</span>':'<span class="pill mute">out of scope</span>')+'</td></tr>'}).join('')+'</tbody></table></div>';
@@ -174,11 +178,11 @@ async function sempCheckS4(st){
   var hx=function(pre){for(var i=0;i<hd.length;i++)if(hd[i].indexOf(pre)===0)return i;return -1};
   var cW=hx('*workerid'),cFull=hx('fullname'),cFn=hx('*firstname'),cLn=hx('*lastname'),cMail=hx('email'),cPh=hx('phonenumber'),cMob=hx('mobilephonenumber'),cEnd=hx('*enddate');
   var old=SM.list.slice(),oldBy=SM.byName,before=matchStats();
-  var res={sheets:['CSV (S/4 workforce layout)'],read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0},s4:true,needs:[],merge:{matched:0,added:0,kept:0,ambiguous:0}};
+  var res={sheets:['CSV (S/4 workforce layout)'],read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0},s4:true,needs:[],merge:{matched:0,added:0,kept:0,ambiguous:0},fx:{ids:0}};
   var seen={},used={},oldToNew={};
   for(var i=1;i<rows.length;i++){
-    var r=rows[i],code=cellStr(r[cW]),name=cellStr(cFull>=0?r[cFull]:'')||(cellStr(cFn>=0?r[cFn]:'')+' '+cellStr(cLn>=0?r[cLn]:'')).trim();
-    if(!code&&!name)continue;res.read++;
+    var r=rows[i],rawCode=cellStr(r[cW]),code=normEmpId(rawCode),name=cellStr(cFull>=0?r[cFull]:'')||(cellStr(cFn>=0?r[cFn]:'')+' '+cellStr(cLn>=0?r[cLn]:'')).trim();
+    if(!code&&!name)continue;res.read++;if(code!==rawCode)res.fx.ids++;
     if(!code){res.rejected++;res.rejects.push([i+1,'','CSV','*WorkerID','Mandatory field empty','']);continue}
     if(!name){res.rejected++;res.rejects.push([i+1,code,'CSV','FullName','Mandatory field empty','']);continue}
     var k=norm(code);if(seen[k]){res.rejected++;res.rejects.push([i+1,code,'CSV','*WorkerID','Duplicate WorkerID (already read at row '+seen[k]+')','']);continue}seen[k]=i+1;
@@ -191,11 +195,12 @@ async function sempCheckS4(st){
     if(o){used[norm(o.code)]=1;res.merge.matched++;oldToNew[norm(o.code)]=code;
       res.people.push([code,o.name,o.zone,o.plant,o.plantRaw,o.designation,o.role,mail||o.email||'',wa||o.wa||'',o.slp||'',o.b1name||'',o.reportsTo||'',ed||o.ended||'',o.code])}
     else{res.merge.added++;res.needs.push([i+1,code,name,pick.length>1?'Several people in the master share this name; add plant and designation':'New person: needs plant and designation']);
-      res.people.push([code,name.slice(0,80),'','','','','',mail,wa,'','','',ed,''])}
+      res.people.push([code,name.slice(0,80),'','','','','',mail,wa,'','','',ed,code!==rawCode?rawCode:''])}
   }
   /* people in the master but not in the file are kept as they are */
   old.forEach(function(o){if(used[norm(o.code)])return;res.merge.kept++;res.people.push([o.code,o.name,o.zone,o.plant,o.plantRaw,o.designation,o.role,o.email||'',o.wa||'',o.slp||'',o.b1name||'',o.reportsTo||'',o.ended||'',o.alt||''])});
-  res.people.forEach(function(a){if(a[11]&&oldToNew[norm(a[11])])a[11]=oldToNew[norm(a[11])]});
+  res.people.forEach(function(a){if(a[11]&&oldToNew[norm(a[11])])a[11]=oldToNew[norm(a[11])];else if(a[11])a[11]=normEmpId(a[11])});
+  afSempPass(res,old);
   res.people.forEach(function(a){res.byZone[a[2]||'(none)']=(res.byZone[a[2]||'(none)']||0)+1;res.byRole[a[6]||'(no matching role)']=(res.byRole[a[6]||'(no matching role)']||0)+1});
   res.loaded=res.people.length;res.ended=res.people.filter(function(a){return a[12]}).length;res.warned+=res.needs.length;
   var save=SM.list;buildSM(res.people.map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12],alt:a[13]}}));
@@ -208,7 +213,7 @@ async function sempCheck(){
     if(st.src.csv&&isWorkerCsv(st.src.csvRows)){st.res=await sempCheckS4(st);st.stage='checked';st.msg='';DS.cache={};S.lastHtml='';schedule();return}
     var ticked=st.sheets.filter(function(s){return s.ticked}).map(function(s){return s.name});
     if(!ticked.length)throw new Error('Tick at least one sheet.');
-    var res={sheets:ticked,read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0}};
+    var res={sheets:ticked,read:0,loaded:0,rejected:0,warned:0,rejects:[],people:[],byZone:{},byRole:{},unmappedDes:{},warn:{noEmail:0,noPlant:0,badMobile:0,badEmail:0,unknownPlant:0},needs:[],fx:{ids:0}};
     var seen={},plantsOk={};S.plants.forEach(function(p){plantsOk[p.plant_code]=p});
     for(var si=0;si<ticked.length;si++){
       var rows=await sheetRows(st.src,ticked[si]);if(!rows.length)continue;
@@ -216,9 +221,9 @@ async function sempCheck(){
       var cCode=ix('Employee Code'),cFull=ix('FullName'),cFn=ix('*FirstName'),cLn=ix('*LastName'),cMob=ix('Mobile No.'),cMail=ix('Email'),cDes=ix('Designation'),cZone=ix('Zone'),cPN=ix('Plant Name'),cCC=ix('*CompanyCode'),cSlp=ix('B1 SlpCode'),cB1=ix('B1 Sales Employee Name'),cRep=ix('Reports To (Employee Code)'),cEnd=Math.max(ix('EndDate'),ix('*EndDate'),ix('End Date'));
       if(cCode<0||(cFull<0&&cFn<0)){res.rejects.push([0,ticked[si],'','Sheet','Sheet "'+ticked[si]+'" has no Employee Code and FullName columns; skipped','']);res.rejected++;continue}
       for(var i=1;i<rows.length;i++){
-        var r=rows[i],code=cellStr(r[cCode]);
+        var r=rows[i],rawCode=cellStr(r[cCode]),code=normEmpId(rawCode);
         if(!code&&!cellStr(cFull>=0?r[cFull]:''))continue;/* blank formatted row */
-        res.read++;
+        res.read++;if(code!==rawCode)res.fx.ids++;
         var name=cellStr(cFull>=0?r[cFull]:'')||(cellStr(cFn>=0?r[cFn]:'')+' '+cellStr(cLn>=0?r[cLn]:'')).trim();
         if(!code){res.rejected++;res.rejects.push([i+1,'',ticked[si],'Employee Code','Mandatory field empty','']);continue}
         if(!name){res.rejected++;res.rejects.push([i+1,code,ticked[si],'FullName','Mandatory field empty','']);continue}
@@ -235,9 +240,10 @@ async function sempCheck(){
         if(!role&&des){res.unmappedDes[des]=(res.unmappedDes[des]||0)+1}
         res.byRole[role||'(no matching role)']=(res.byRole[role||'(no matching role)']||0)+1;res.byZone[zone||'(none)']=(res.byZone[zone||'(none)']||0)+1;
         var endD=cEnd>=0?cellStr(r[cEnd]):'';if(endD)res.ended=(res.ended||0)+1;
-        res.people.push([code,name.slice(0,80),zone,plant,(cPN>=0?cellStr(r[cPN]):'').slice(0,60),des.slice(0,50),role,mail,wa,(cSlp>=0?cellStr(r[cSlp]):'').replace(/\.0$/,''),(cB1>=0?cellStr(r[cB1]):'').slice(0,100),(cRep>=0?cellStr(r[cRep]):'').replace(/\.0$/,''),endD.slice(0,20)]);res.loaded++;
+        res.people.push([code,name.slice(0,80),zone,plant,(cPN>=0?cellStr(r[cPN]):'').slice(0,60),des.slice(0,50),role,mail,wa,(cSlp>=0?cellStr(r[cSlp]):'').replace(/\.0$/,''),(cB1>=0?cellStr(r[cB1]):'').slice(0,100),normEmpId((cRep>=0?cellStr(r[cRep]):'').replace(/\.0$/,'')),endD.slice(0,20),code!==rawCode?rawCode:'']);res.loaded++;
       }
     }
+    afSempPass(res,[]);
     /* match B1 names (all names in the loaded sales data) with the people just read */
     var save=SM.list;buildSM(res.people.map(function(a){return {code:a[0],name:a[1],zone:a[2],plant:a[3],plantRaw:a[4],designation:a[5],role:a[6],email:a[7],wa:a[8],slp:a[9],b1name:a[10],reportsTo:a[11],ended:a[12],alt:a[13]}}));
     DS.cache={};res.match=matchStats();res.unmatched=unmatchedSp();
@@ -253,7 +259,7 @@ async function sempLoad(){
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null;
   try{
     await dset('salesmaster/main',{z:await gz(JSON.stringify(r.people)),n:r.people.length,at:nowISO(),by:by,file:st.name,sheets:r.sheets,read:r.read,rejected:r.rejected,upload:uid,demo:st.demo||undefined,fmt:'gz-json v3: [code,name,zone,plant,plantRaw,designation,role,email,whatsapp,slpCode,b1Name,reportsToCode,endDate,altCode]'});
-    await dset('uploads/'+uid,{at:nowISO(),by:by,sys:'B1',entity:'SE',file:st.name,size:st.size||0,mode:'master',periodLabel:'Sales employees: '+r.sheets.join(', '),read:r.read,loaded:r.loaded,rejected:r.rejected+r.unmatched.length,warned:r.warned,status:(r.rejected||r.unmatched.length)?'Partial':'Loaded',demo:st.demo||undefined,match:{names:r.match.names,matched:r.match.matched,rate:r.match.rate}});
+    await dset('uploads/'+uid,{at:nowISO(),by:by,sys:'B1',entity:'SE',file:st.name,size:st.size||0,mode:'master',periodLabel:'Sales employees: '+r.sheets.join(', '),read:r.read,loaded:r.loaded,rejected:r.rejected+r.unmatched.length,warned:r.warned,status:(r.rejected||r.unmatched.length)?'Partial':'Loaded',demo:st.demo||undefined,fixes:r.fx||null,match:{names:r.match.names,matched:r.match.matched,rate:r.match.rate}});
     var rows=[];r.rejects.forEach(function(x){rows.push(x)});r.unmatched.forEach(function(u,i){rows.push([i+1,u.name,'','Salesperson (B1 name)',u.why,u.lines])});(r.needs||[]).forEach(function(n){rows.push([n[0],n[1],'CSV','Plant and designation',n[3],n[2]])});
     if(rows.length){var rr=rows.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:rows.length,demo:st.demo||undefined})}
     if(r.unmatched.length&&S.users.length){
@@ -276,7 +282,7 @@ function sempHtml(){
   h+='<p class="note" style="margin:0"><b>S/4 workforce CSV</b> ("Lam Employee Master", *WorkerID header): upload it alone, no sheets to tick. It merges into the loaded master by FullName and adds new people. Otherwise, workbook "Sales Employee Master": the zone sheets (ZONE 1 to ZONE 5) hold the laminate staff and are ticked by default; the product-line sheets (ACP, ALU, PVC, MDF, TAS IND, TAS ALU) repeat one zone-head row, and Plant is a plant list. Each person is linked to a plant and zone. B1 sales rows carry a name only, so names are matched to <b>FullName</b>, first exactly, then without the " - &lt;branch&gt;" suffix; a name shared by two people is matched only when the branch suffix settles it.</p>';
   if(m){var ms=matchStats();h+='<div class="kpis"><div class="kpi"><small>People in the master</small><b>'+fmtN(m.n)+'</b><small>'+esc((m.sheets||[]).join(', '))+'</small></div><div class="kpi"><small>B1 names matched</small><b>'+(ms.rate!=null?ms.matched+' / '+ms.names:'—')+'</b><small>'+(ms.rate!=null?ms.rate.toFixed(1)+'% of names · '+(ms.lineRate||0).toFixed(1)+'% of invoice lines':'no sales data yet')+'</small></div><div class="kpi"><small>Loaded</small><b style="font-size:14px;font-family:var(--font)">'+esc(istStr(m.at))+'</b><small>'+esc((m.by||'').split('@')[0])+' · '+esc(m.file||'')+'</small></div></div>';
     var um=unmatchedSp();
-    if(um.length)h+='<details class="strip" open><summary>Unmatched B1 salesperson names · '+um.length+'</summary><div class="tw" style="max-height:260px;overflow:auto"><table><thead><tr><th>Name in the sales data</th><th class="num">Invoice lines</th><th>Why</th></tr></thead><tbody>'+um.slice(0,200).map(function(u){return '<tr><td class="break">'+esc(u.name)+'</td><td class="num">'+fmtN(u.lines)+'</td><td>'+esc(u.why)+'</td></tr>'}).join('')+'</tbody></table></div><div class="row"><button class="btn sm" data-act="mst-unmatched-csv">Download unmatched list (CSV)</button></div><p class="note">Unmatched names keep their own name in every figure; nothing is dropped. The uploader gets action R8 to fix them.</p></details>';
+    if(um.length){var uml={};um.forEach(function(u){uml[u.name]=u.lines});h+='<details class="strip" open><summary>Unmatched B1 salesperson names · '+um.length+'</summary><div class="note">Click the right person to save an alias; it applies at once.</div>'+sugTable(um.map(function(u){return u.name}),uml)+'<div class="row"><button class="btn sm" data-act="mst-unmatched-csv">Download unmatched list (CSV)</button></div><p class="note">Unmatched names keep their own name in every figure; nothing is dropped.</p></details>'}
   }else h+='<div class="empty">No sales-employee master yet. Upload the workbook.</div>';
   if(st&&st.msg&&(st.stage==='idle'||st.stage==='sheets'))h+='<div class="banner err">'+esc(st.msg)+'</div>';
   if(st&&st.stage==='working')h+='<div><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(st.msg)+'</div></div>';
@@ -287,6 +293,7 @@ function sempHtml(){
      +'<div class="kpis"><div class="kpi"><small>People read</small><b>'+fmtN(r.read)+'</b><small>sheets '+esc(r.sheets.join(', '))+'</small></div><div class="kpi"><small>Loading</small><b>'+fmtN(r.loaded)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b><small>'+(r.ended?r.ended+' with an end date (inactive, still matched) · ':'')+r.warn.noPlant+' no plant · '+r.warn.unknownPlant+' plant not in master · '+r.warn.noEmail+' no email · '+r.warn.badMobile+' mobile not 10 digits</small></div>'
      +'<div class="kpi"><small>Match rate to B1 names</small><b>'+(r.match.rate!=null?r.match.rate.toFixed(1)+'%':'—')+'</b><small>'+(r.match.rate!=null?r.match.matched+' of '+r.match.names+' names · '+(r.match.lineRate||0).toFixed(1)+'% of invoice lines':'no sales data loaded to match against')+(r.matchBefore&&r.matchBefore.rate!=null?' · before this file: '+r.matchBefore.rate.toFixed(1)+'% ('+r.matchBefore.matched+' of '+r.matchBefore.names+')':'')+'</small></div></div>'+(r.s4?'<div class="banner info"><span>S/4 workforce layout merged into the loaded master by FullName: <b>'+r.merge.matched+'</b> matched (zone, plant, role, B1 name and reports-to kept; WorkerID is the new code, the old code is kept as alt code; email and phone updated) · <b>'+r.merge.added+'</b> new people · <b>'+r.merge.kept+'</b> in the master but not in this file, kept as they are.</span></div>':'')
      +'<div class="grid2"><div class="tw"><table><thead><tr><th>Zone</th><th class="num">People</th></tr></thead><tbody>'+Object.keys(r.byZone).sort().map(function(z){return '<tr><td>'+esc(z)+'</td><td class="num">'+fmtN(r.byZone[z])+'</td></tr>'}).join('')+'</tbody></table></div><div class="tw"><table><thead><tr><th>Desk role proposed from designation (Assumed)</th><th class="num">People</th></tr></thead><tbody>'+Object.keys(r.byRole).sort().map(function(z){return '<tr><td>'+esc(z)+'</td><td class="num">'+fmtN(r.byRole[z])+'</td></tr>'}).join('')+'</tbody></table></div></div>';
+    h+=sempFixes(r);
     if(Object.keys(r.unmappedDes).length)h+='<p class="note">Designations with no matching Desk role (set the role in Users when the person needs access): '+Object.keys(r.unmappedDes).map(function(d){return esc(d)+' ('+r.unmappedDes[d]+')'}).join(', ')+'.</p>';
     if(r.needs&&r.needs.length)h+='<details class="strip" open><summary>New people · needs plant and designation · '+r.needs.length+'</summary><div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>WorkerID</th><th>Name</th><th>Note</th></tr></thead><tbody>'+r.needs.slice(0,200).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono">'+esc(x[1])+'</td><td>'+esc(x[2])+'</td><td>'+esc(x[3])+'</td></tr>'}).join('')+'</tbody></table></div><div class="row"><button class="btn sm" data-act="mst-needs-csv">Download this list (CSV)</button></div><p class="note">They load with a blank zone, plant and role. Add those in a later upload of the zone workbook (same names merge) or set the role in Users.</p></details>';
     if(r.rejected)h+='<div class="tw" style="max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Code</th><th>Sheet</th><th>Field</th><th>Reason</th></tr></thead><tbody>'+r.rejects.slice(0,100).map(function(x){return '<tr><td class="num mono">'+x[0]+'</td><td class="mono">'+esc(x[1])+'</td><td>'+esc(x[2])+'</td><td>'+esc(x[3])+'</td><td>'+esc(x[4])+'</td></tr>'}).join('')+'</tbody></table></div>';

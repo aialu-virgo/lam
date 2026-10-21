@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 const require = createRequire('/opt/node22/lib/node_modules/');
 export const { chromium } = require('playwright');
 export const here = path.dirname(fileURLToPath(import.meta.url));
-export const dist = path.join(here, '../dist/index.html');
+export const dist = process.env.DIST || path.join(here, '../dist/index.html');
 export async function open(browser, { viewer, store, size = { width: 1440, height: 900 }, scheme = 'light', today, mode } = {}) {
   const ctx = await browser.newContext({ viewport: size, colorScheme: scheme });
   await ctx.route(/fonts\.googleapis|fonts\.gstatic/, r => r.abort());

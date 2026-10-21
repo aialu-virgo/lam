@@ -67,3 +67,10 @@ a.btn{text-decoration:none;display:inline-block}
 @media (max-width:860px){.ctrl{align-items:stretch}.main .top h1{font-size:19px}}
 @media (max-width:520px){.kval{font-size:24px}.ctrl .fld{flex:1 1 140px}.top .chips{width:100%}}
 .hb.clk{cursor:pointer;border-radius:8px;padding:2px 4px}.hb.clk:hover{background:var(--brand-soft)}.crumbs .chip{font-family:inherit}
+
+/* upload history (full width): file name wraps on desktop, truncates with an ellipsis at phone width; the row detail shows it in full */
+.hist td.hfile{max-width:340px;word-break:break-word}
+.hist tr.clk{cursor:pointer}.hist tr.hdet td{background:var(--soft2,var(--card));border-bottom:1px solid var(--line)}
+@media (max-width:520px){.hist td.hfile{max-width:120px}.hist td.hfile span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.hist:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.hist{-webkit-overflow-scrolling:touch}
