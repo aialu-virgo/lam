@@ -164,7 +164,7 @@ async function collUndo(uid){
   await Promise.all([0,1,2,3].map(async function(){while(q.length){var d=q.shift();if(d.plan!=null)await dset('collections/'+d._id,{plant:d.plant,ym:d.ym,total:0,n:0,rows:[],plan:d.plan,sys:'B1',src:'RCT',undone:uid});else await ddel('collections/'+d._id)}}));
   var mine={};pl.docs.forEach(function(d){mine['collections/'+d._id]=1});
   var rs=await bkRestore(uid,function(p){return !!mine[p]});await bkDelete(uid);
-  for(var pi=0;pi<pl.docs.length;pi++){var pd=pl.docs[pi];if(pd.plan!=null){var ps=await dget('collections/'+pd._id);if(ps.exists){var px=ps.data();if(px.plan!==pd.plan){px.plan=pd.plan;await dset('collections/'+pd._id,px)}}}}/* a plan entered since the upload is kept */
+  for(var pi=0;pi<pl.docs.length;pi++){var pd=pl.docs[pi];if(pd.plan!=null){var ps=await dget('collections/'+pd._id);if(ps.exists){var px=JSON.parse(JSON.stringify(ps.data()));if(px.plan!==pd.plan){px.plan=pd.plan;await dset('collections/'+pd._id,px)}}}}/* a plan entered since the upload is kept */
   await ddel('rejects/'+uid);
   if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:pl.months,undone_plant_months:pl.docs.length,restored:rs.n||undefined}))}
   await auditW('upload undone','',{upload:uid,file:((u&&u.file)||'').slice(0,120),months:pl.months,plant_months:pl.docs.length});

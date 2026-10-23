@@ -433,7 +433,7 @@ async function undoUpload(uid){
     var q=jobs.slice();await Promise.all([0,1,2,3,4].map(async function(){while(q.length){var path=q.shift();await ddel(path)}}));
     var okPm={};pl.months.forEach(function(ym){pl.mine[ym].forEach(function(p){okPm[p+'|'+ym]=1})});
     var rs=await bkRestore(uid,function(path){var m=/^inv\/[A-Za-z0-9]+-([^-]+)-(\d{4}-\d\d)-\d+$/.exec(path)||/^roll\/([^-]+)-(\d{4}-\d\d)$/.exec(path)||/^cellpart:(\d{4}-\d\d):(.+)$/.exec(path);if(!m)return false;return path.indexOf('cellpart:')===0?!!okPm[m[2]+'|'+m[1]]:!!okPm[m[1]+'|'+m[2]]});
-    for(var ri=0;ri<rs.cells.length;ri++){var cp=/^cellpart:(\d{4}-\d\d):(.+)$/.exec(rs.cells[ri].p),cs=await dget('cells/INV_'+cp[1]),cc=cs.exists?cs.data():{entity:'INV',ym:cp[1],plants:{}};if(!cc.plants)cc.plants={};cc.plants[cp[2]]=rs.cells[ri].d;await dset('cells/INV_'+cp[1],cc)}
+    for(var ri=0;ri<rs.cells.length;ri++){var cp=/^cellpart:(\d{4}-\d\d):(.+)$/.exec(rs.cells[ri].p),cs=await dget('cells/INV_'+cp[1]),cc=cs.exists?JSON.parse(JSON.stringify(cs.data())):{entity:'INV',ym:cp[1],plants:{}};if(!cc.plants)cc.plants={};cc.plants[cp[2]]=rs.cells[ri].d;await dset('cells/INV_'+cp[1],cc)}
     await bkDelete(uid);
     await ddel('rejects/'+uid);
     if(pl.act)await ddel('actions/'+pl.act._id);

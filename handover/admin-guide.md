@@ -79,3 +79,10 @@ Admin › Customers: upload B1 OCRD or the S/4 business partner list; each load 
 
 ## Upload history: replaced uploads (D41)
 An upload whose data nothing points to any more (a later upload covered the same months or date) is marked "Replaced by <file, date>" and hidden by default; tick "Show replaced" to list it.
+
+## Credit notes: per-plant coverage, and Undo that restores (D45)
+At load the credit-notes page asks "This file covers all branches": tick it only when the export holds every branch; untick for a partial export (only plants with rows are covered). Net is used per plant, and for a company, zone or group only when every plant in scope is covered; otherwise the page shows Invoiced and the tooltip names the plants still missing.
+
+When an upload replaces stored sales plant-months, collections, credit notes, a receivables snapshot or a stock snapshot, the Desk first copies what it replaces into a backup (collection `backups`, kept 30 days, deleted earlier if that upload is itself replaced or undone). **Undo restores the previous data** (only where no later upload has changed it again). Cost: roughly one backup document per 450 KB replaced and bytes about equal to the data replaced; a first load keeps no backup.
+
+An unrecognised receivables or credit-note file always reaches the column-mapping step (choose the entity, or use "Import as receivables / credit notes"); it is rejected only if the required fields are still unmapped after mapping.
