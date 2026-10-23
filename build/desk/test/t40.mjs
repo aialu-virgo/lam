@@ -22,7 +22,7 @@ await page.uncheck('#hf-rep');await page.waitForTimeout(300);
 const ids=await page.evaluate(()=>Object.entries(window.__mockStore()).filter(([k,v])=>k.startsWith('uploads/')).map(([k,v])=>[k.slice(8),v.at]).sort((a,b)=>a[1]<b[1]?1:-1).map(x=>x[0]));
 await page.click('[data-act="hist-undo"][data-id="'+ids[0]+'"]');await page.waitForTimeout(500);await page.click('[data-act="undo-go"]');await page.waitForTimeout(4000);
 const cells=await page.evaluate(()=>Object.keys(window.__mockStore()).filter(k=>/^cells\/INV_/.test(k)).length);
-ok('the Undo chain still works: undoing the active upload removes the stored month',cells===0,String(cells));
+ok('the Undo chain still works: undoing the active upload puts back the month it replaced (D45 backup); the older upload then holds it again',cells===1,String(cells));
 await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(600);
 n=await page.evaluate(()=>document.querySelectorAll('#i-hist tbody tr.clk').length);const t2=await page.innerText('#i-hist');
 ok('after the undo the older entry is no longer shown as replaced (the upload that replaced it is Undone)',n>=1&&/Undone/.test(t2)||n>=1,String(n)+' '+(t2.match(/(Replaced by|Undone)[^\n]*/g)||[]).join('|'));

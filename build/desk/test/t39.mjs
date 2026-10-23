@@ -57,6 +57,6 @@ const uid=await page.evaluate(()=>Object.entries(window.__mockStore()).filter(([
 const ht=await page.innerText('#i-hist');ok('history lists the file name and the skipped count',/Incoming_Payment_Report/.test(ht)&&/rows? skipped/.test(ht),'');
 await page.click('[data-act="hist-undo"][data-id="'+uid+'"]');await page.waitForTimeout(500);await page.click('[data-act="undo-go"]');await page.waitForTimeout(5000);
 m=await page.evaluate(()=>Object.fromEntries(Object.entries(window.__mockStore()).filter(([k])=>/^collections\//.test(k)).map(([k,v])=>[k,v])));
-ok('Undo removes the receipts of that upload but keeps the plan',!m['collections/1012-2026-03']&&m['collections/1012-2026-08']&&m['collections/1012-2026-08'].plan===123456&&m['collections/1012-2026-08'].total===0,Object.keys(m).join());
+ok('Undo of the re-upload puts back the receipts it replaced (D45 backup) and keeps the plan',!!m['collections/1012-2026-03']&&m['collections/1012-2026-08']&&m['collections/1012-2026-08'].plan===123456&&m['collections/1012-2026-08'].total>1,Object.keys(m).join());
 console.log(errs.filter(e=>!/ERR_FAILED/.test(e)).slice(0,3));
 console.log(res.join('\n'));await browser.close();
