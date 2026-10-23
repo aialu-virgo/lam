@@ -136,7 +136,8 @@ async function stockParse(){
 /* ---- write a snapshot, replace the same as_of, prune ---- */
 async function stockWrite(res,meta){
   var d8=compactYmd(res.asOf),id='snap_'+d8,old=S.stockRaw.find(function(x){return x._id===id}),plants={},uid=meta.uid,ci=0;
-  var pk=Object.keys(res.plants).sort();
+  var pk=Object.keys(res.plants).sort(),B=bkNew(uid,'ST',meta.demo);
+  if(old){bkAdd(B,'stock/'+id,old);S.stockRaw.forEach(function(d){if(d._id.indexOf('it_'+d8+'_')===0)bkAdd(B,'stock/'+d._id,d)});await bkFlush(B);meta.backup=bkSummary(B)}
   for(var pi=0;pi<pk.length;pi++){
     var p=pk[pi],P=res.plants[p],rows=P.rows,per=1500,n=Math.max(1,Math.ceil(rows.length/per)),groups={};
     Object.keys(P.groups).forEach(function(g){var G=P.groups[g];groups[g]={sheets:Math.round(G.sheets),sqft:Math.round(G.sqft),value:G.hasValue?Math.round(G.value):null,items:G.items.size,age:G.ageKnown>0?G.age.map(Math.round):null,over:G.ageKnown>0?Math.round(G.over):null,ageKnown:Math.round(G.ageKnown)}});
@@ -147,7 +148,7 @@ async function stockWrite(res,meta){
   /* the same as_of is replaced: chunks of the old snapshot beyond the new ones are removed */
   if(old){var ops=old.plants||{};for(var q in ops){var oc=ops[q].chunks||0,nc=plants[q]?plants[q].chunks:0;for(var j=nc;j<oc;j++)await ddel('stock/it_'+d8+'_'+q+'_'+j)}}
   await stockPrune(res.asOf);
-  return {chunks:ci,plants:pk.length};
+  return {chunks:ci,plants:pk.length,backup:bkSummary(B)};
 }
 function snapsSorted(){return S.stockSnaps.slice().sort(function(a,b){return a.as_of<b.as_of?1:-1})}
 function stockKeepSet(extraAsOf){
@@ -267,7 +268,7 @@ async function stockLoad(){
   try{info=await stockWrite(r,{uid:uid,file:U.name,by:by,demo:demo});
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
   }catch(e){failed=e}
-  var upl={at:nowISO(),by:by,sys:r.sys,entity:'ST',file:U.name,size:U.size,mode:'snapshot',periodLabel:'Stock as on '+fmtDate(r.asOf),as_of:r.asOf,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,
+  var upl={at:nowISO(),by:by,sys:r.sys,entity:'ST',file:U.name,size:U.size,mode:'snapshot',periodLabel:'Stock as on '+fmtDate(r.asOf),as_of:r.asOf,backup:info&&info.backup,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,
     plants:Object.keys(r.plants).length,other_rows:r.other.rows,fixes:{warehouses_mapped:r.fx.whMapped,zero_rows:r.zero,has_age:r.hasAge},error:failed?dbErrText(failed):undefined};
   try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+r.sys+'_stock_'+r.kind,{map:mp,sys:r.sys,entity:'ST',kind:r.kind,at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed;
@@ -293,7 +294,7 @@ document.addEventListener('change',function(ev){
 function stockUndoPlan(uid){var s=S.stockSnaps.find(function(x){return x.upload===uid});return s?{snap:s,as_of:s.as_of,plants:Object.keys(s.plants||{}).length}:null}
 async function stockUndo(uid){
   var pl=stockUndoPlan(uid),u=S.uploads.find(function(x){return x._id===uid});
-  if(pl)await stockDeleteSnap(pl.snap);
+  if(pl){await stockDeleteSnap(pl.snap);await bkRestore(uid)}await bkDelete(uid);
   await ddel('rejects/'+uid);
   if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:pl?[pl.as_of]:[],undone_plant_months:pl?pl.plants:0}))}
   await auditW('upload undone','',{upload:uid,file:((u&&u.file)||'').slice(0,120),as_of:pl?pl.as_of:'',plants:pl?pl.plants:0});
@@ -320,15 +321,15 @@ function pageInventory(){
   var dn=0,dd=0;L.forEach(function(x){if(x.days!=null){dn+=x.days*x.sheets;dd+=x.sheets}});var days=dd>0?dn/dd:null,tgt=CFG.stock_days_target;
   var agedPct=tot.ageK>0?tot.over/tot.ageK*100:null;
   var cards=[kpiCard({color:'indigo',chip:'▦',title:'Stock on hand · as on '+fmtDate(sn.as_of).replace(/^\w+ /,''),value:fmtSheets(tot.sheets),sub:'= '+fmtSqft(tot.sqft)+(tot.hasV?' · '+fmtMoney(tot.value):'')+'.',status:'none',pillTxt:'No plan',rows:[['Plan','—'],['Var','—'],['Ach %','—'],['Snapshots held',String(S.stockSnaps.length)],['QoQ %','—'],['Quarter trend','—']]}),
-   kpiCard({color:'violet',chip:'⏳',title:'K15 · Stock days',value:days!=null?days.toFixed(1)+' d':'—',sub:'On hand ÷ average daily sheets sold in the last 90 days to the as-of date.',status:days==null?'none':statusOf(days/tgt*100,true),ach:days!=null?Math.min(100,tgt/Math.max(days,.1)*100):null,rows:[['Plan',tgt+' d'],['Var',days!=null?(days-tgt>=0?'+':'−')+Math.abs(days-tgt).toFixed(1)+' d':'—'],['Ach %',days!=null?fmtAch(tgt/Math.max(days,.1)*100):'—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['Quarter trend','—']]}),
-   agedPct!=null?kpiCard({color:'orange',chip:'%',title:'K16 · Aged stock % (over '+CFG.stock_age_days+' days)',value:agedPct.toFixed(1)+'%',sub:fmtN(Math.round(tot.over))+' aged sheets.',status:statusOf(agedPct/10*100,true),ach:Math.min(100,10/Math.max(agedPct,.1)*100),rows:[['Plan','10% (Assumed)'],['Var',(agedPct-10>=0?'+':'−')+Math.abs(agedPct-10).toFixed(1)+' pt'],['Ach %',fmtAch(10/Math.max(agedPct,.1)*100)],['Last Qtr','no prior snapshot'],['QoQ %','—'],['Quarter trend','—']]}):
+   kpiCard({color:'violet',chip:'⏳',title:'K15 · Stock days',value:days!=null?days.toFixed(1)+' d':'—',sub:'On hand ÷ average daily sheets sold in the last 90 days to the as-of date.',status:days==null?'none':statusOf(achLower(days,tgt).ach),ach:days!=null?Math.min(100,achLower(days,tgt).ach):null,rows:[['Plan',tgt+' d'],['Var',days!=null?(days-tgt>=0?'+':'−')+Math.abs(days-tgt).toFixed(1)+' d':'—'],['Ach %',days!=null?fmtAchLower(achLower(days,tgt)):'—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['Quarter trend','—']]}),
+   agedPct!=null?kpiCard({color:'orange',chip:'%',title:'K16 · Aged stock % (over '+CFG.stock_age_days+' days)',value:agedPct.toFixed(1)+'%',sub:fmtN(Math.round(tot.over))+' aged sheets.',status:statusOf(achLower(agedPct,10).ach),ach:Math.min(100,achLower(agedPct,10).ach),rows:[['Plan','10% (Assumed)'],['Var',(agedPct-10>=0?'+':'−')+Math.abs(agedPct-10).toFixed(1)+' pt'],['Ach %',fmtAchLower(achLower(agedPct,10))],['Last Qtr','no prior snapshot'],['QoQ %','—'],['Quarter trend','—']]}):
     kpiCard({color:'orange',chip:'%',title:'K16 · Aged stock %',value:'—',sub:'Needs the batch export.',pending:true,pendingTxt:'Needs batch export',pendingMsg:'Ageing needs batch dates (B1 OIBT with InDate, or the S/4 batch creation date). The stock file loaded has none.',rows:[['Plan','10% (Assumed)'],['Var','—'],['Ach %','—'],['Last Qtr','—'],['QoQ %','—'],['Quarter trend','—']]})];
   var h='<div class="kpirow">'+cards.join('')+'</div>';
   /* plant x group table */
   var q=(S.f.search||'').toLowerCase(),rows=L.filter(function(r){return !q||(plantShort(r.plant)+r.group).toLowerCase().indexOf(q)>=0}).sort(function(a,b){return (b.days||0)-(a.days||0)});
   h+='<section class="card"><div class="hd"><h2>Stock vs plan · plant × product group</h2><span class="note">As on '+esc(fmtDate(sn.as_of))+' &middot; '+esc(sn.kind==='batch'?'batch export':sn.kind==='s4'?'S/4':'inventory status')+'</span></div><div class="tw tall"><table class="std"><thead><tr><th>Plant</th><th>Group</th><th class="num">On hand (sheets)</th><th class="num">sq ft</th><th class="num">Plan days</th><th class="num">Stock days</th><th class="num">Ach %</th><th>Status</th><th class="num">0–30</th><th class="num">31–60</th><th class="num">61–90</th><th class="num">90+</th></tr></thead><tbody>'
-   +rows.map(function(r){var ach=r.days!=null?tgt/Math.max(r.days,.1)*100:null,stt=r.days!=null?statusOf(r.days/tgt*100,true):'none';
-     return '<tr class="clk" data-act="inv-drill" data-plant="'+esc(r.plant)+'" data-group="'+esc(r.group)+'"><td>'+esc(plantShort(r.plant))+' ›</td><td>'+esc(r.group)+'</td><td class="num">'+fmtN(r.sheets)+'</td><td class="num">'+fmtN(r.sqft)+'</td><td class="num">'+tgt+'</td><td class="num">'+(r.days!=null?r.days.toFixed(1):'—')+'</td><td class="num">'+fmtAch(ach)+'</td><td>'+statusPill(stt)+'</td>'
+   +rows.map(function(r){var al=achLower(r.days,tgt),ach=r.days!=null?al.ach:null,stt=r.days!=null?statusOf(al.ach):'none';
+     return '<tr class="clk" data-act="inv-drill" data-plant="'+esc(r.plant)+'" data-group="'+esc(r.group)+'"><td>'+esc(plantShort(r.plant))+' ›</td><td>'+esc(r.group)+'</td><td class="num">'+fmtN(r.sheets)+'</td><td class="num">'+fmtN(r.sqft)+'</td><td class="num">'+tgt+'</td><td class="num">'+(r.days!=null?r.days.toFixed(1):'—')+'</td><td class="num">'+(r.days!=null?fmtAchLower(al):'—')+'</td><td>'+statusPill(stt)+'</td>'
      +(r.age?r.age.map(function(b){return '<td class="num">'+fmtN(b)+'</td>'}).join(''):'<td class="num note" colspan="4">needs batch export</td>')+'</tr>'}).join('')
    +'</tbody></table></div><p class="note">Stock days = sheets on hand ÷ average daily sheets sold in the last 90 days to the as-of date, per plant × product group. Click a row for the items. Rule R4 raises an action at '+fmtN(CFG.stock_age_min_sheets)+' aged sheets or '+CFG.stock_over_pct+'% of plan days.</p></section>';
   /* drill */

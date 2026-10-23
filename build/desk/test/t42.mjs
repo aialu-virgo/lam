@@ -9,7 +9,7 @@ st0['plants/1050']={plant_code:'1050',plant_name:'DEMO ACP plant',plant_type:'De
 let {page,errs}=await open(browser,{store:st0,autoload:true});await page.waitForTimeout(3500);
 await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(700);
 const up=async f=>{await page.click('[data-act="u-reset"]').catch(()=>{});const inp=await page.$('input[type=file]');await inp.setInputFiles(f);await page.waitForFunction(n=>window.__desk.U&&window.__desk.U.name===n&&['mapping','validated','done'].includes(window.__desk.U.stage),f.split('/').pop(),{timeout:20000}).catch(()=>{});await page.waitForTimeout(400)};
-const val=async()=>{await page.evaluate(()=>{const b=document.querySelector('[data-act="cn-validate"]');if(b&&!b.disabled)b.click()});await page.waitForFunction(()=>['validated','done'].includes(window.__desk.U.stage),null,{timeout:20000}).catch(()=>{});await page.waitForTimeout(1500)};
+const val=async(tick=true)=>{await page.evaluate(()=>{const b=document.querySelector('[data-act="cn-validate"]');if(b&&!b.disabled)b.click()});await page.waitForFunction(()=>['validated','done'].includes(window.__desk.U.stage),null,{timeout:20000}).catch(()=>{});await page.waitForTimeout(800);if(await page.evaluate(()=>window.__desk.U.stage)==='validated'){const cb=await page.$('[data-chg="cn-allbr"]');if(cb){const on=await cb.isChecked();if(on!==tick)await cb.click()}await page.click('[data-act="cn-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000})}await page.waitForTimeout(1200)};
 const cnStore=()=>page.evaluate(()=>Object.fromEntries(Object.entries(window.__mockStore()).filter(([k])=>/^creditnotes\//.test(k))));
 const B1H=['DocNum','LineNum','DocDate','CardCode','CardName','BPLName','ItemCode','Quantity','LineTotal','BaseRef'];
 const rowsB1=[
@@ -36,9 +36,9 @@ const d1012=m['creditnotes/1012-2026-08'],d1013=m['creditnotes/1013-2026-09'];
 ok('plant-month documents by product group with SAP reference per line',d1012&&d1012.groups.Laminate&&d1012.groups.Laminate.sheets===15&&Math.abs(d1012.groups.Laminate.value-3500)<0.01&&d1013&&d1013.groups.Laminate.sheets===4&&d1012.sys==='B1'&&!!d1012.upload,JSON.stringify(d1012&&d1012.groups));
 const lines=await page.evaluate(async d=>JSON.parse(await window.__desk.ungz(d)),d1012.z);
 ok('each stored line keeps document, line, item and base invoice',lines.length===2&&lines[0][0]==='5001'&&lines[0][4]==='DEMOFG00001'&&lines[0][8]==='9001',JSON.stringify(lines[0]));
-ok('coverage marks written for the three months; no ACP document',['2026-07','2026-08','2026-09'].every(y=>m['creditnotes/cov_'+y])&&!Object.keys(m).some(k=>/^creditnotes\/1050/.test(k)),Object.keys(m).join(','));
+ok('coverage marks written for the three months; no ACP document',['2026-07','2026-08','2026-09'].every(y=>Object.keys(m).some(k=>k.startsWith('creditnotes/cov_'+y)))&&!Object.keys(m).some(k=>/^creditnotes\/1050/.test(k)),Object.keys(m).join(','));
 /* re-upload idempotent */
-const sig=o=>JSON.stringify(Object.fromEntries(Object.entries(o).map(([k,v])=>[k,[v.groups&&v.groups.Laminate&&v.groups.Laminate.value,v.n]])));
+const sig=o=>JSON.stringify(Object.fromEntries(Object.entries(o).filter(([k])=>!/cov_/.test(k)).map(([k,v])=>[k,[v.groups&&v.groups.Laminate&&v.groups.Laminate.value,v.n]])));
 const b0=sig(m);await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(400);await up(AF+FN);await val();m=await cnStore();
 ok('re-upload is idempotent',sig(m)===b0,'');
 /* D40: the quarter is covered, Q2 FY27 is a closed quarter */
@@ -78,6 +78,6 @@ await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(60
 const uid=await page.evaluate(()=>Object.entries(window.__mockStore()).filter(([k,v])=>k.startsWith('uploads/')&&v.entity==='CN'&&v.file.indexOf('S4_credit')>=0).map(([k])=>k.slice(8))[0]);
 await page.click('[data-act="hist-undo"][data-id="'+uid+'"]');await page.waitForTimeout(500);await page.click('[data-act="undo-go"]');await page.waitForTimeout(4000);
 m=await cnStore();
-ok('Undo removes the plant-months of that upload',!m['creditnotes/1012-2026-08']&&!!m['creditnotes/1013-2026-09']&&!!m['creditnotes/1012-2026-10'],Object.keys(m).join(','));
+ok('Undo of the S/4 upload restores the August plant-month it replaced (D45 backup) and keeps the others',m['creditnotes/1012-2026-08']&&m['creditnotes/1012-2026-08'].sys==='B1'&&m['creditnotes/1012-2026-08'].groups.Laminate.sheets===15&&!!m['creditnotes/1013-2026-09']&&!!m['creditnotes/1012-2026-10']&&!m['creditnotes/1013-2026-08'],Object.keys(m).join(','));
 console.log(errs.filter(e=>!/ERR_FAILED/.test(e)).slice(0,3));
 console.log(res.join('\n'));await browser.close();

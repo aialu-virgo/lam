@@ -28,9 +28,10 @@ function figs(ent,ctx,opts){
   var incomplete=!monthsLoaded(res.curMonths,pset)||(res.prior?!monthsLoaded(res.priorMonths,pset):false);
   if(!res.curMonths.length)incomplete=true;
   var q=res.prior?qoqOf(bothNet?A.n:A0.n,bothNet?P.n:P0.n,{incomplete:incomplete,noPrior:preHist(res.priorMonths||[])}):{v:null,state:'none',txt:''};
-  q.tip=bothNet?'Net sales against net sales (credit notes loaded for both quarters).':(basis==='Net'?'Invoiced against invoiced: credit notes are not loaded for the prior quarter, so growth is not netted.':'Invoiced against invoiced.');
+  var uncAll=Array.from(new Set((cnA?cnA.uncovered:[]).concat(cnP?cnP.uncovered:[]))).sort();
+  q.tip=bothNet?'Net sales against net sales (credit notes loaded for every plant in scope, both quarters).':'Invoiced against invoiced: credit notes are not loaded for '+(uncAll.length?cnUncText(uncAll):'the plants in scope')+'.';
   var hasT=pl.any&&pl.tgt>0;
-  var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete,basis:basis,pBasis:pBasis,cn:cnA&&cnA.covered?cnA.value:null};
+  var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete,basis:basis,pBasis:pBasis,cn:cnA&&cnA.covered?cnA.value:null,cnUnc:cnA?cnA.uncovered:[],cnAny:!!(cnA&&cnA.anyLoaded)};
   o.var=hasT?A.n-pl.tgt:null;o.varPct=hasT?(A.n-pl.tgt)/pl.tgt*100:null;o.ach=hasT?A.n/pl.tgt*100:null;o.share=(pl.any&&pl.pot>0)?A.n/pl.pot*100:null;
   if(!opts.noTrend){var ser=quarterSeries(f,(f.sp!=null)?f.sp:undefined);var ts=trendOfSeries(ser);o.trend=ts;o.series=ser}
   return o;
@@ -54,7 +55,7 @@ function stdTable(first,rows,tot,opt){
   opt=opt||{};
   rows=rows.slice().sort(function(a,b){var av=a.o.var,bv=b.o.var;if(av==null&&bv==null)return b.o.A-a.o.A;if(av==null)return 1;if(bv==null)return -1;return av-bv});
   var bs=(tot&&tot.basis)||(rows[0]&&rows[0].o.basis)||'Invoiced';
-  var head='<tr><th>'+esc(first)+'</th>'+(opt.noPlan?'':'<th class="num">Potential</th><th class="num">Target</th>')+'<th class="num" title="'+(bs==='Net'?'Net sales = invoiced minus credit notes (D40)':'Invoiced sales; credit notes are not loaded for this period')+'">Actual · '+bs+'</th>'+(opt.noPlan?'':'<th class="num">Var</th><th class="num">Ach %</th><th class="num">Share %</th>')+'<th class="num">Last Qtr</th><th class="num">QoQ %</th><th>Trend</th></tr>';
+  var head='<tr><th>'+esc(first)+'</th>'+(opt.noPlan?'':'<th class="num">Potential</th><th class="num">Target</th>')+'<th class="num" title="'+(bs==='Net'?'Net sales = invoiced minus credit notes (D40)':'Invoiced sales; '+(rows[0]?cnNote(rows[0].o):'credit notes are not loaded'))+'">Actual · '+bs+'</th>'+(opt.noPlan?'':'<th class="num">Var</th><th class="num">Ach %</th><th class="num">Share %</th>')+'<th class="num">Last Qtr</th><th class="num">QoQ %</th><th>Trend</th></tr>';
   var line=function(label,o,total,attrs){
     return '<tr'+(total?' class="tot"':(attrs?' class="clk"':''))+(attrs||'')+'><td>'+label+'</td>'+(opt.noPlan?'':'<td class="num">'+(o.pot!=null?fmtMoney(o.pot):'—')+'</td><td class="num">'+tgtCell(o)+'</td>')
      +'<td class="num">'+fmtMoney(o.A)+'</td>'
@@ -65,7 +66,7 @@ function stdTable(first,rows,tot,opt){
 }
 function tableNote(ctx,extra){
   var r=ctx.res;
-  return '<p class="note">Columns: Potential · Target · Actual · Var · Ach % · Share % · Last Qtr · QoQ %'+' · Trend. Sorted by variance, worst first. '+(r.pro?'Potential and Target are to-date: pro-rated by working days ('+r.N+' of '+r.wdTot+'). ':'')+'Last Qtr and QoQ % compare with '+esc(r.priorLabel||'the previous quarter')+'. A row with no prior-quarter data shows "New, no prior quarter"; a row whose history is not fully loaded shows "incomplete history". Net sales exclude internal transfers; credit notes have no feed yet. '+(extra||'')+'</p>';
+  return '<p class="note">Columns: Potential · Target · Actual · Var · Ach % · Share % · Last Qtr · QoQ %'+' · Trend. Sorted by variance, worst first. '+(r.pro?'Potential and Target are to-date: pro-rated by working days ('+r.N+' of '+r.wdTot+'). ':'')+'Last Qtr and QoQ % compare with '+esc(r.priorLabel||'the previous quarter')+'. A row with no prior-quarter data shows "New, no prior quarter"; a row whose history is not fully loaded shows "incomplete history". Sales exclude internal transfers; the Actual column is labelled Invoiced or Net (credit notes, D40). '+(extra||'')+'</p>';
 }
 function miniBars(vals,color){
   var mx=Math.max.apply(null,vals.map(function(v){return v||0}).concat([1])),w=6,g=3,h=26;
@@ -186,7 +187,7 @@ function pageOverview(){
   var ctx=viewCtx();if(noData())return emptyData();
   var res=ctx.res,tot=figs({},ctx),spl=salesKpis(ctx,tot,tot.series);
   var cardsQ=[];
-  cardsQ.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. Credit notes: no feed yet.',status:statusOf(tot.ach),
+  cardsQ.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. '+cnNote(tot),status:statusOf(tot.ach),
     ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],
      ['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['Quarter trend',trendWord(tot)]]}));
   cardsQ.push(qtyCard(ctx,tot));

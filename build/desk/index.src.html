@@ -381,7 +381,7 @@ function renderUpload0(){
      +'<div class="note" style="margin-top:6px">One file per entity per quarter, or a multi-quarter file split by document date. The file is read in this browser; nothing is sent anywhere else.</div>'
      +(st==='parsing'?'<div style="margin-top:10px"><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(U.msg||'Reading file...')+'</div></div>':'')+'</div>';
     if(U.transferDone&&st==='idle')h+=U.transferDone;
-    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+'</div>';
+    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+(U.imp?'<button class="btn sm pri" data-act="imp-rc">Import as receivables</button><button class="btn sm pri" data-act="imp-cn">Import as credit notes</button>':'')+'</div>';
   }
   if(st==='mapping'||st==='validating'||st==='validated'||st==='loading'||st==='done'){
     h+='<div class="banner info"><span><b>'+esc(U.name)+'</b> &middot; '+fmtN(U.rows.length)+' data rows &middot; '+U.headers.length+' columns &middot; detected source <b>'+(U.sys==='B1'?'SAP B1':'SAP S/4HANA')+'</b>'+(U.savedMap?' &middot; saved mapping applied':'')+'</span><button class="btn sm" data-act="u-reset" '+(locked?'disabled':'')+'>Choose another file</button></div>';
@@ -604,7 +604,8 @@ async function onFile(file){
     if(d.type==='unknown'){var cdt=collDetect(headers);if(cdt){collStart(file,rows,headers,sheetPicked);return}var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
     if(d.type==='master'&&d.what==='transfers'){U=newU();U.mode=mode;U.period=period;U.offer={file:file,rows:rows,what:'transfers'};U.msg='This file is the internal-transfer list (CardCode, CardName, Tranfser), not the sales export'+(sheetsSeen&&sheetsSeen.length>1?'. Sheets in the workbook: '+sheetsSeen.join('; ')+'. Save the DATA sheet as the CSV, or load the whole XLSX':'')+'. You can load it as the Internal-transfer list instead.';renderUpload();return}
     if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}
-    if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;U.msg='The headers match no known file'+(rows.length<2?' (the sheet has no data rows)':'')+'. Found: '+(headers.filter(Boolean).slice(0,8).join(', ')||'no header row')+(sheetsSeen&&sheetsSeen.length?'. Sheets in the workbook: '+sheetsSeen.join('; '):'')+'. Expected the B1 Combine Sale export (sheet DATA: docnum, CardCode, BPLName ...) or the S/4 Sales Register (sheet SAPUI5 Export: Invoice Document Number, Plant, Invoice Date ...). For a master, use Admin.';renderUpload();return}
+    if(d.type==='unknown'&&rows.length>=2&&(ent==='RC'||ent==='CN')){var ug={sys:'B1',layout:'unrecognised layout, map the columns'};U=newU();U.mode=mode;U.period=period;if(ent==='RC')recvStart(file,rows,headers,ug,sheetPicked);else cnStart(file,rows,headers,ug,sheetPicked);return}
+    if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;if(rows.length>=2)U.imp={file:file,rows:rows,headers:headers,sheetPicked:sheetPicked};U.msg='The headers match no known file'+(rows.length<2?' (the sheet has no data rows)':'')+'. Found: '+(headers.filter(Boolean).slice(0,8).join(', ')||'no header row')+(sheetsSeen&&sheetsSeen.length?'. Sheets in the workbook: '+sheetsSeen.join('; '):'')+'. Expected the B1 Combine Sale export (sheet DATA: docnum, CardCode, BPLName ...) or the S/4 Sales Register (sheet SAPUI5 Export: Invoice Document Number, Plant, Invoice Date ...). For a master, use Admin.';renderUpload();return}
     U.headers=headers;U.sheetPicked=sheetPicked;U.rows=rows.slice(1);U.sys=d.sys;U.map=defaultMap(headers,d.sys);
     var sv=S.mappings[d.sys+'_invoice'];
     if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
@@ -818,7 +819,7 @@ async function runLoad(opts){
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   var pms=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1});
   var byYm={};pms.forEach(function(p){(byYm[p.ym]=byYm[p.ym]||[]).push(p)});
-  var yms=Object.keys(byYm).sort(),total=pms.length,done=0,bytes=0,docsW=0,failed=null,loadedLines=0,stopped=false;
+  var yms=Object.keys(byYm).sort(),total=pms.length,done=0,bytes=0,docsW=0,failed=null,loadedLines=0,stopped=false,B=bkNew(uid,'INV',demo);
   var reloadAudit=null,closedTouched=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
   try{
     if(closedTouched.length){await dset('log/'+uid,{at:nowISO(),by:by,event:'closed quarter reloaded',quarters:closedTouched,reason:U.reason||'',upload:uid,file:U.name});reloadAudit=await auditW('closed quarter reloaded',closedTouched.join(','),{quarters:closedTouched,from:nowISO(),reason:U.reason||'',upload:uid,demo:demo||undefined})}
@@ -832,6 +833,7 @@ async function runLoad(opts){
         var P=ps[pi];
         U.progressMsg='Writing '+ym+' plant '+P.plant+' ('+(done+1)+' of '+total+')';U.progress=Math.round(done/total*100);paintProgress();
         var old0=cell.plants[P.plant];
+        if(old0&&!old0.demo&&!demo){for(var bi=0;bi<(old0.chunks||0);bi++)await bkAddDb(B,'inv/'+old0.sys+'-'+P.plant+'-'+ym+'-'+bi);var rd0=S.rollDocs&&S.rollDocs[P.plant+'-'+ym];if(rd0)bkAdd(B,'roll/'+P.plant+'-'+ym,rd0);bkAdd(B,'cellpart:'+ym+':'+P.plant,old0);if(B.items.length>=6)await bkFlush(B)}
         if(demo&&old0&&!old0.demo)throw new Error('Demo write refused: '+P.plant+' '+ym+' holds real SAP data');
         var chunks=await packChunks(sys,P);
         var old=cell.plants[P.plant],lines=0,docsN=P.docs.size,net=0,sheets=0,cb=0;
@@ -845,6 +847,7 @@ async function runLoad(opts){
         await writeRoll(P.plant,ym,sys,rollRowsOf(P.agg),atNow,demo);
         bytes+=cb;loadedLines+=lines;done++;
       }
+      await bkFlush(B);
       await dset('cells/'+cellId,cell);S.cells[cellId]=cell;
       for(var si=0;si<stale.length;si++)await ddel(stale[si]);
     }
@@ -865,7 +868,7 @@ async function runLoad(opts){
   if(failed)status='Failed';
   var upl={at:nowISO(),by:by,sys:sys,entity:'INV',file:U.name,size:U.size,mode:U.mode,periodLabel:U.period==='auto'?(Object.keys(r.quarters).length>1?'Auto: '+Object.keys(r.quarters).length+' quarters':Object.keys(r.quarters).map(qLabel).join(', ')):qLabel(U.period),
     skipped:r.rejected,stopped:stopped||undefined,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,warned:r.warned,fanout:r.fanout,injection:r.injection,status:status,demo:demo||undefined,
-    quarters:Object.keys(r.quarters),plantMonths:done,docsWritten:docsW,bytes:bytes,
+    quarters:Object.keys(r.quarters),backup:bkSummary(B),plantMonths:done,docsWritten:docsW,bytes:bytes,
     before_history_start:r.preHist?r.preHist.rows:0,fixes:{line_numbers_created:r.af.lineSynth,repeated_lines_removed:r.af.dupNoLine,category_rows_normalised:r.af.catAlias,zone_rows_normalised:r.af.zoneNorm,junk:r.af.junk,s4_sales_exec_filled:r.af.spFilled,s4_sales_exec_blank:r.af.blankSp,date_kinds:r.af.dateKinds},groups:r.groups,out_of_scope:r.other,internal_transfers:r.xfer,dateRepair:r.dateInfo.mixed?{swapped:r.dateInfo.swapped,min:r.minDate,max:r.maxDate}:null,
     mapping:Object.keys(U.map).reduce(function(o,k){o[k]=U.map[k]>=0?U.headers[U.map[k]]:null;return o},{}),closedQuarters:closedNow,reloadReason:closedTouched.length?U.reason:undefined,error:failed?dbErrText(failed):undefined};
   try{
@@ -1267,6 +1270,7 @@ async function boot(){
     subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
     subscribe('receivables',db.collection('receivables'),function(d){S.recvRaw=d;ingestRecv()});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});
+    subscribe('backups',db.collection('backups'),function(d){S.backups=d;bkSchedule()});
     subscribe('customers',db.collection('customers'),function(d){S.custRaw=d;ingestCust()});
     subscribe('creditnotes',db.collection('creditnotes'),function(d){S.cnRaw=d;ingestCN()});
     subscribe('stock',db.collection('stock'),function(d){S.stockRaw=d;ingestStock()});
@@ -1276,7 +1280,7 @@ async function boot(){
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas};
 boot();
 })();
 </script>

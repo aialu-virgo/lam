@@ -134,8 +134,9 @@ async function recvLoad(){
   if(!superOnly('load receivables')||!U||!U.res||U.res.good<=0)return;
   var r=U.res,uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!U.demoFlag,d8=compactYmd(r.asOf),id='rsnap_'+d8,old=S.recvRaw.find(function(x){return x._id===id});
   U.stage='loading';U.progressMsg='Writing the snapshot...';recvRender();await tick();
-  var pk=Object.keys(r.plants).sort(),plants={},done=0;
+  var pk=Object.keys(r.plants).sort(),plants={},done=0,B=bkNew(uid,'RC',demo);
   try{
+    if(old){bkAdd(B,'receivables/'+id,old);S.recvRaw.forEach(function(d){if(d._id.indexOf('ri_'+d8+'_')===0)bkAdd(B,'receivables/'+d._id,d)});await bkFlush(B)}
     for(var pi=0;pi<pk.length;pi++){
       var p=pk[pi],P=r.plants[p],rows=P.rows,per=1200,n=Math.max(1,Math.ceil(rows.length/per));
       for(var c=0;c<n;c++)await dset('receivables/ri_'+d8+'_'+p+'_'+c,{z:await gz(JSON.stringify(rows.slice(c*per,(c+1)*per))),as_of:r.asOf,plant:p,i:c,n:rows.length,upload:uid,demo:demo||undefined,fmt:'gz-json v1: [doc,customer,name,due,open,total,docDate]'});
@@ -147,7 +148,7 @@ async function recvLoad(){
     var keep=recvKeep(r.asOf);for(var i=0;i<S.recvSnaps.length;i++){var s=S.recvSnaps[i];if(!keep[s.as_of]&&s.as_of!==r.asOf)await recvDeleteSnap(s)}
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
   }catch(e){failed=e}
-  var upl={at:nowISO(),by:by,sys:U.sys,entity:'RC',file:U.name,size:U.size,mode:'snapshot',periodLabel:'Receivables as on '+fmtDate(r.asOf),as_of:r.asOf,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plants:pk.length,fixes:{credit_items:r.credit.rows,acp_rows:r.acp.rows,zero_rows:r.zero,repeated_rows:r.dup,no_due_date:r.noDue},error:failed?dbErrText(failed):undefined};
+  var upl={at:nowISO(),by:by,sys:U.sys,entity:'RC',file:U.name,size:U.size,mode:'snapshot',periodLabel:'Receivables as on '+fmtDate(r.asOf),as_of:r.asOf,backup:bkSummary(B),read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plants:pk.length,fixes:{credit_items:r.credit.rows,acp_rows:r.acp.rows,zero_rows:r.zero,repeated_rows:r.dup,no_due_date:r.noDue},error:failed?dbErrText(failed):undefined};
   try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+rcMapKey(U.sys,U.layout),{map:mp,sys:U.sys,entity:'RC',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed;
   U.doneMsg=failed?('Load stopped: '+dbErrText(failed)):('Loaded open items as on '+fmtDate(r.asOf)+': '+fmtN(r.good)+' items, '+fmtMoney(r.open)+' open, in '+pk.length+' plants.'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':''));
@@ -184,7 +185,7 @@ function ingestRecv(){
 }
 async function recvUndo(uid){
   var s=S.recvSnaps.find(function(x){return x.upload===uid}),u=S.uploads.find(function(x){return x._id===uid});
-  if(s)await recvDeleteSnap(s);await ddel('rejects/'+uid);
+  if(s){await recvDeleteSnap(s);await bkRestore(uid)}await bkDelete(uid);await ddel('rejects/'+uid);
   if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:s?[s.as_of]:[],undone_plant_months:s?Object.keys(s.plants||{}).length:0}))}
   await auditW('upload undone','',{upload:uid,file:((u&&u.file)||'').slice(0,120),as_of:s?s.as_of:''});
   await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,as_of:s?s.as_of:''});
@@ -204,3 +205,8 @@ function recvCreditHtml(plants){
   rows.sort(function(a,b){return b.amt-a.amt});var tot=rows.reduce(function(a,x){return a+x.amt},0);
   return '<section class="card"><div class="hd"><h2>Credit items (unapplied)</h2><span class="note">'+fmtN(rows.length)+' items, '+fmtMoney(tot)+'. Negative open amounts, kept apart: not netted against invoices and not in the ageing.</span></div><div class="tw" style="max-height:260px;overflow:auto"><table class="std"><thead><tr><th>Customer</th><th>Plant</th><th>Document</th><th class="num">Credit ₹</th></tr></thead><tbody>'+rows.slice(0,60).map(function(x){return '<tr><td class="break"><b>'+esc(x.cust)+'</b> '+esc(custName(x.cust,x.name))+'</td><td>'+esc(plantShort(x.plant))+'</td><td class="mono">'+esc(x.doc)+'</td><td class="num">'+fmtMoney(x.amt)+'</td></tr>'}).join('')+'</tbody></table></div></section>';
 }
+/* an unrecognised file always reaches the mapping step: chosen entity, or the "Import as" buttons (D45) */
+Object.assign(handlers,{
+ 'imp-rc':function(){var i=U&&U.imp;if(!i)return;recvStart(i.file,i.rows,i.headers,{sys:'B1',layout:'unrecognised layout, map the columns'},i.sheetPicked)},
+ 'imp-cn':function(){var i=U&&U.imp;if(!i)return;cnStart(i.file,i.rows,i.headers,{sys:'B1',layout:'unrecognised layout, map the columns'},i.sheetPicked)}
+});

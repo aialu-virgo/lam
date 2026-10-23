@@ -22,7 +22,7 @@ function pageSales(){
   if(!coord){
     var tot=figs({},ctx),spl=salesKpis(ctx,tot,tot.series);
     var cards=[];
-    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded.',status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
+    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. '+cnNote(tot),status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
     cards.push(qtyCard(ctx,tot));
     var A=haveCust?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.cur):null,P=haveCust&&res.prior?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.prior):null;
     var nA=A?Array.from(A.values()).filter(function(c){return c.n>0}).length:null,nP=P?Array.from(P.values()).filter(function(c){return c.n>0}).length:null;
@@ -187,7 +187,7 @@ function kpiCompute(id,u,ctx){
   if(K.pending&&K.kind!=='text'){K.actual=null}
   /* achievement and status */
   if(K.plan!=null&&K.actual!=null&&K.kind!=='text'){
-    if(K.lower){K.ach=K.plan>0?K.actual/K.plan*100:(K.actual<=0?100:200);K.status=K.plan>0?statusOf(K.ach,true):(K.actual<=K.plan?'green':K.actual<=1?'orange':'red')}
+    if(K.lower){var al=achLower(K.actual,K.plan);K.ach=al.ach;K.within=al.within;K.status=K.plan>0?(al.within?'green':statusOf(K.ach)):(K.actual<=K.plan?'green':K.actual<=1?'orange':'red')}
     else{K.ach=K.plan>0?K.actual/K.plan*100:null;K.status=statusOf(K.ach)}
   }else K.status=K.none||K.kind==='text'?'none':'none';
   if(id==='K1'&&K.actual!=null){K.status=statusOf(K.actual)}
@@ -209,7 +209,7 @@ function kpiTable(u,ctx){
      var qoq='—';
      if(K.id==='K1'||K.id==='K2'||K.id==='K3')qoq=qoqCell(K.qoq);
      else if(K.last!=null&&K.actual!=null){var d=K.actual-K.last;qoq=K.kind==='pct'?'<span class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'−')+Math.abs(d).toFixed(1)+' pts</span>':(K.last>0?qoqCell(qoqOf(K.actual,K.last,{})):(d===0?'0':(d>0?'+':'−')+Math.abs(d)))}
-     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.ach!=null?fmtAch(K.ach,K.lower):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
+     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.within?'<b class="a-green">Within plan</b>':K.ach!=null?fmtAch(K.ach):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
   return {html:h,on:on,scored:scored,total:rows.length};
 }
 function teamPeople(u){

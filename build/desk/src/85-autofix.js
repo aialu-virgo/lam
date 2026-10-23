@@ -396,7 +396,8 @@ function undoPlan(uid){
   var aId=actionIdOf('R5',[uid,'upload']);
   return {u:u,mine:mine,months:Object.keys(mine).sort(),n:n,later:Math.max(0,(u.plantMonths||0)-n),actId:aId,act:S.actions.find(function(a){return a.id===aId}),fus:S.followups.filter(function(f){return f.action_id===aId})};
 }
-function undoDialog(uid){
+function undoDialog(uid){undoDialog0(uid);bkDialogNote(uid)}
+function undoDialog0(uid){
   var us=S.uploads.find(function(x){return x._id===uid});
   if(us&&(us.entity==='RC'||us.entity==='CN')){var rc=us.entity==='RC',ps=rc?S.recvSnaps.find(function(x){return x.upload===uid}):cnUndoPlan(uid);
     openDlg('<h3>Undo '+(rc?'receivables':'credit-note')+' upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>'+(rc?(ps?'Removes the open-items snapshot as on '+esc(ps.as_of)+' ('+Object.keys(ps.plants||{}).length+' plants)':'This upload no longer holds a snapshot (a later upload for the same date replaced it)'):'Removes '+ps.docs.filter(function(d){return !d.chunk}).length+' plant-months of credit notes in '+ps.months.length+' month'+(ps.months.length===1?'':'s')+' and their coverage marks')+'</b> that still point to this upload. The upload stays in history marked Undone, and the undo is logged.</div><p class="note">Undo cannot bring back data this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
@@ -430,6 +431,10 @@ async function undoUpload(uid){
     /* cells first, so the roll-up rebuilder never sees a month with chunks and no roll */
     for(var i=0;i<sets.length;i++){var ym=sets[i][0],c=sets[i][1];if(Object.keys(c.plants).length)await dset('cells/INV_'+ym,c);else await ddel('cells/INV_'+ym)}
     var q=jobs.slice();await Promise.all([0,1,2,3,4].map(async function(){while(q.length){var path=q.shift();await ddel(path)}}));
+    var okPm={};pl.months.forEach(function(ym){pl.mine[ym].forEach(function(p){okPm[p+'|'+ym]=1})});
+    var rs=await bkRestore(uid,function(path){var m=/^inv\/[A-Za-z0-9]+-([^-]+)-(\d{4}-\d\d)-\d+$/.exec(path)||/^roll\/([^-]+)-(\d{4}-\d\d)$/.exec(path)||/^cellpart:(\d{4}-\d\d):(.+)$/.exec(path);if(!m)return false;return path.indexOf('cellpart:')===0?!!okPm[m[2]+'|'+m[1]]:!!okPm[m[1]+'|'+m[2]]});
+    for(var ri=0;ri<rs.cells.length;ri++){var cp=/^cellpart:(\d{4}-\d\d):(.+)$/.exec(rs.cells[ri].p),cs=await dget('cells/INV_'+cp[1]),cc=cs.exists?cs.data():{entity:'INV',ym:cp[1],plants:{}};if(!cc.plants)cc.plants={};cc.plants[cp[2]]=rs.cells[ri].d;await dset('cells/INV_'+cp[1],cc)}
+    await bkDelete(uid);
     await ddel('rejects/'+uid);
     if(pl.act)await ddel('actions/'+pl.act._id);
     for(var f=0;f<pl.fus.length;f++)await ddel('followups/'+pl.fus[f]._id);

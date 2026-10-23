@@ -122,32 +122,41 @@ function cnResultHtml(locked){
   h+='<div class="tw hscroll" style="max-height:220px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Lines</th><th class="num">Sheets</th><th class="num">Credit notes</th></tr></thead><tbody>'+ms.map(function(m){var M=r.months[m];return '<tr><td>'+esc(ymLabel(m))+'</td><td class="num">'+fmtN(M.lines)+'</td><td class="num">'+fmtN(Math.round(M.sheets))+'</td><td class="num">'+fmtMoney(M.value)+'</td></tr>'}).join('')+'</tbody></table></div>';
   var rep=cnReplaceRisk(r);
   if(rep.length)h+='<div class="banner warn" style="display:block"><b>Safety check stopped this file: it would replace '+rep.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more credit-note lines than the new data.</b><div class="tw hscroll" style="max-height:160px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Plant-months</th><th class="num">Lines held now</th><th class="num">In this file</th></tr></thead><tbody>'+rep.map(function(x){return '<tr><td>'+esc(ymLabel(x.ym))+'</td><td class="num">'+x.plants+'</td><td class="num">'+fmtN(x.oldLines)+'</td><td class="num">'+fmtN(x.newLines)+'</td></tr>'}).join('')+'</tbody></table></div><label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="cn-confrep" '+(U.confirmReplace?'checked':'')+' '+(locked?'disabled':'')+'> I confirm: replace these months ('+rep.map(function(x){return ymLabel(x.ym)}).join(', ')+')</label></div>';
-  h+='<div class="row"><button class="btn pri" data-act="cn-load" '+(cnCanLoad()&&!locked?'':'disabled')+'>Load '+fmtN(r.good)+' credit-note lines</button>'+(r.rejected?'<button class="btn" data-act="u-rejcsv-cn">Download skipped rows (CSV)</button>':'')+(locked?'':'<button class="btn" data-act="u-reset">Cancel upload</button>')+'</div>';
+  h+='<div class="banner info" style="display:block"><label class="chip"><input type="checkbox" data-chg="cn-allbr" '+(U.allBranches?'checked':'')+' '+(locked?'disabled':'')+'> This file covers all branches</label><div class="note">Tick when the export holds every branch: a plant with no credit note in these months then counts as covered (it has none) and the Net view applies to it. Untick for a partial export: only plants with rows are covered. '+fmtN(Object.keys((function(){var o={};r.pm.forEach(function(P){o[P.plant]=1});return o})()).length)+' of '+cnLamPlants().length+' plants have rows in this file.</div></div>'
+  +'<div class="row"><button class="btn pri" data-act="cn-load" '+(cnCanLoad()&&!locked?'':'disabled')+'>Load '+fmtN(r.good)+' credit-note lines</button>'+(r.rejected?'<button class="btn" data-act="u-rejcsv-cn">Download skipped rows (CSV)</button>':'')+(locked?'':'<button class="btn" data-act="u-reset">Cancel upload</button>')+'</div>';
   return h;
 }
 async function cnValidate(){
-  U.stage='validating';U.progress=0;U.progressMsg='Starting...';U.confirmReplace=false;cnRender();await tick();
-  try{U.res=await cnParse();U.stage='validated'}catch(e){U.stage='mapping';U.msg='Could not check the file: '+((e&&e.message)||e)}
+  U.stage='validating';U.progress=0;U.progressMsg='Starting...';U.confirmReplace=false;U.allBranches=false;cnRender();await tick();
+  try{U.res=await cnParse();U.stage='validated';var lamN=cnLamPlants().length,withRows={};U.res.pm.forEach(function(P){withRows[P.plant]=1});U.allDefault=lamN>0&&Object.keys(withRows).length>lamN/2;U.allBranches=U.allDefault}catch(e){U.stage='mapping';U.msg='Could not check the file: '+((e&&e.message)||e)}
   cnRender();
 }
 async function cnLoad(){
   if(!superOnly('load credit notes')||!U||!U.res||!cnCanLoad())return;
   var r=U.res,uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!U.demoFlag,done=0,total=r.pm.size,atNow=nowISO();
   U.stage='loading';U.progressMsg='Writing...';cnRender();await tick();
-  var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice();
+  var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice(),B=bkNew(uid,'CN',demo);
+  var cnOld=function(plant,ym){return S.cnRaw.filter(function(d){return d.plant===plant&&d.ym===ym&&!d.cov})};
   try{
     await Promise.all([0,1,2,3].map(async function(){
-      while(q.length){var P=q.shift(),per=2500,n=Math.max(1,Math.ceil(P.lines.length/per)),id=P.plant+'-'+P.ym,groups={};
+      while(q.length){var P=q.shift(),olds=cnOld(P.plant,P.ym);olds.forEach(function(d){bkAdd(B,'creditnotes/'+d._id,d)});if(B.items.length>=20)await bkFlush(B);var per=2500,n=Math.max(1,Math.ceil(P.lines.length/per)),id=P.plant+'-'+P.ym,groups={};
         Object.keys(P.groups).forEach(function(g){var G=P.groups[g];groups[g]={sheets:Math.round(G.sheets),sqft:Math.round(G.sqft),value:Math.round(G.value*100)/100,lines:G.lines}});
         for(var c=1;c<n;c++)await dset('creditnotes/'+id+'~'+c,{plant:P.plant,ym:P.ym,chunk:c,z:await gz(JSON.stringify(P.lines.slice(c*per,(c+1)*per))),upload:uid,demo:demo||undefined});
         await dset('creditnotes/'+id,{plant:P.plant,ym:P.ym,groups:groups,n:P.lines.length,chunks:n,z:await gz(JSON.stringify(P.lines.slice(0,per))),fmt:'gz-json v1: [doc,line,day,customer,item,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sheets,value,baseDoc]',sys:U.sys,src:U.sys==='S4'?'billing credit memo':'ORIN/RIN1',upload:uid,at:atNow,demo:demo||undefined});
         done++;U.progress=Math.round(done/total*100);U.progressMsg='Writing plant-month '+done+' of '+total;var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%'}
     }));
-    for(var ci=0;ci<r.covMonths.length;ci++)await dset('creditnotes/cov_'+r.covMonths[ci],{ym:r.covMonths[ci],cov:true,upload:uid,at:atNow,demo:demo||undefined});
+    var lamAll=cnLamPlants();
+    if(U.allBranches){/* a covered plant-month with no row in this file now holds none: the old documents are removed (kept in the backup) */
+      for(var ci0=0;ci0<r.covMonths.length;ci0++)for(var li=0;li<lamAll.length;li++){var lp=lamAll[li];if(r.pm.has(lp+'|'+r.covMonths[ci0]))continue;var od=cnOld(lp,r.covMonths[ci0]);if(!od.length)continue;
+        od.forEach(function(d){bkAdd(B,'creditnotes/'+d._id,d)});await bkFlush(B);for(var oi=0;oi<od.length;oi++)await ddel('creditnotes/'+od[oi]._id)}
+    }
+    await bkFlush(B);
+    for(var ci=0;ci<r.covMonths.length;ci++){var cm=r.covMonths[ci],pls={};r.pm.forEach(function(P){if(P.ym===cm)pls[P.plant]=1});if(U.allBranches)lamAll.forEach(function(p){pls[p]=1});
+      await dset('creditnotes/cov_'+cm+'_'+uid,{ym:cm,cov:true,plants:Object.keys(pls).sort(),all_branches:!!U.allBranches,backup:bkSummary(B),upload:uid,at:atNow,demo:demo||undefined})}
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
   }catch(e){failed=e}
   var ms=Object.keys(r.months).sort();
-  var upl={at:nowISO(),by:by,sys:U.sys,entity:'CN',file:U.name,size:U.size,mode:'historic',periodLabel:r.covMonths.length?(ymLabel(r.covMonths[0])+(r.covMonths.length>1?' to '+ymLabel(r.covMonths[r.covMonths.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:r.covMonths,
+  var upl={at:nowISO(),by:by,sys:U.sys,entity:'CN',file:U.name,size:U.size,mode:'historic',periodLabel:r.covMonths.length?(ymLabel(r.covMonths[0])+(r.covMonths.length>1?' to '+ymLabel(r.covMonths[r.covMonths.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:r.covMonths,all_branches:!!U.allBranches,
     fixes:{other_rows:r.other.rows,acp_rows:r.acp.rows,repeated_lines:r.dup,amount_loaded:Math.round(r.value),sheets_loaded:Math.round(r.sheets)},error:failed?dbErrText(failed):undefined};
   try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+cnMapKey(U.sys,U.layout),{map:mp,sys:U.sys,entity:'CN',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed;
@@ -155,7 +164,7 @@ async function cnLoad(){
   cnRender();
 }
 Object.assign(handlers,{
- 'cn-validate':async function(){await cnValidate();if(U&&U.stage==='validated'&&!window.__NOAUTOLOAD&&cnCanLoad()&&effRole()==='Super admin'&&!readOnly()){toast('Loading '+fmtN(U.res.good)+' credit-note lines; '+fmtN(U.res.rejected)+' skipped');await cnLoad()}},
+ 'cn-validate':async function(){await cnValidate();if(U&&U.stage==='validated'&&!window.__NOAUTOLOAD&&cnCanLoad()&&U.allDefault&&effRole()==='Super admin'&&!readOnly()){toast('Loading '+fmtN(U.res.good)+' credit-note lines; '+fmtN(U.res.rejected)+' skipped');await cnLoad()}},
  'cn-load':function(){return cnLoad()},
  'u-rejcsv-cn':function(){var r=U.res;return download('skipped-credit-note-rows.csv',csvLine(['row','document','line','field','reason','value'])+'\n'+r.rejects.map(csvLine).join('\n'))}
 });
@@ -163,47 +172,69 @@ document.addEventListener('change',function(ev){
   var t=ev.target,c=t.getAttribute&&t.getAttribute('data-chg');
   if(c==='cn-map'){U.map[t.getAttribute('data-k')]=+t.value;U.savedMap=false;cnRender()}
   else if(c==='cn-confrep'){U.confirmReplace=t.checked;cnRender()}
+  else if(c==='cn-allbr'){U.allBranches=t.checked;cnRender()}
 });
+function cnLamPlants(){return S.plants.filter(function(p){return p.active!==false&&p.business!=='ACP'&&+p.plant_code<1050}).map(function(p){return p.plant_code})}
 function ingestCN(){
   S.cn=S.cnRaw.filter(function(d){return d.plant&&d.ym&&d.groups&&!d.chunk});
-  var cov={};S.cnRaw.forEach(function(d){if(d.cov&&d.ym)cov[d.ym]=d.upload||1});S.cnCov=cov;
+  var cov={},by={};
+  S.cn.forEach(function(d){(cov[d.ym]||(cov[d.ym]=new Set())).add(d.plant);(by[d.ym]||(by[d.ym]=[])).push(d)});
+  S.cnRaw.forEach(function(d){if(!d.cov||!d.ym)return;var st=cov[d.ym]||(cov[d.ym]=new Set());
+    if(d.plants)d.plants.forEach(function(p){st.add(p)});else cnLamPlants().forEach(function(p){st.add(p)})});/* a coverage mark without plants (older load) covers every plant */
+  S.cnCov=cov;S.cnBy=by;
   DS.cache={};S.lastHtml='';S.engSig=null;schedule();
 }
 function cnUndoPlan(uid){var docs=S.cnRaw.filter(function(d){return d.upload===uid&&!d.cov});var ms={};docs.forEach(function(d){ms[d.ym]=1});return {docs:docs,cov:S.cnRaw.filter(function(d){return d.upload===uid&&d.cov}),months:Object.keys(ms).sort()}}
 async function cnUndo(uid){
   var pl=cnUndoPlan(uid),u=S.uploads.find(function(x){return x._id===uid}),all=pl.docs.concat(pl.cov),q=all.slice();
   await Promise.all([0,1,2,3].map(async function(){while(q.length){var d=q.shift();await ddel('creditnotes/'+d._id)}}));
+  var curK={};S.cnRaw.forEach(function(d){if(d.plant&&d.ym&&!d.cov)curK[d.plant+'|'+d.ym]=1});
+  var mineK={};pl.docs.forEach(function(d){mineK[d.plant+'|'+d.ym]=1});
+  var rs=await bkRestore(uid,function(p){var m=/^creditnotes\/([^-]+)-(\d{4}-\d\d)/.exec(p);return !!(m&&(mineK[m[1]+'|'+m[2]]||(!curK[m[1]+'|'+m[2]]&&u&&(u.months||[]).indexOf(m[2])>=0)))});await bkDelete(uid);
   await ddel('rejects/'+uid);
-  if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:pl.months,undone_plant_months:pl.docs.filter(function(d){return !d.chunk}).length}))}
+  if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',restored:rs.n||undefined,undone_at:nowISO(),undone_by:whoAmI(),undone_months:pl.months,undone_plant_months:pl.docs.filter(function(d){return !d.chunk}).length}))}
   await auditW('upload undone','',{upload:uid,file:((u&&u.file)||'').slice(0,120),months:pl.months,plant_months:pl.docs.length});
   await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,months:pl.months});
   return pl;
 }
-/* ---- coverage grid row ---- */
+/* ---- coverage grid row: per plant-month ---- */
 function cnCov(qkey){
-  var months=qMonths(qkey),cur=TODAY().slice(0,7),elig=months.filter(function(m){return m<=cur}),present=elig.filter(function(m){return S.cnCov[m]}).length,detail=months.map(function(ym){return {ym:ym,plants:S.cn.filter(function(d){return d.ym===ym}).length}});
-  return {st:present===0?'miss':(present>=elig.length&&elig.length>0?'ok':'part'),detail:detail,ref:0,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
+  var months=qMonths(qkey),cur=TODAY().slice(0,7),elig=months.filter(function(m){return m<=cur}),pl=cnLamPlants(),total=pl.length*elig.length,present=0;
+  var detail=months.map(function(ym){var n=pl.filter(function(p){return S.cnCov[ym]&&S.cnCov[ym].has(p)}).length;if(ym<=cur)present+=n;return {ym:ym,plants:n}});
+  return {st:present===0?'miss':(total>0&&present>=total?'ok':'part'),detail:detail,ref:pl.length,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
 }
 
-/* ================= the Net view (D40) ================= */
-function cnMonthsCovered(ms){var cur=TODAY().slice(0,7),el=ms.filter(function(m){return m<=cur});return el.length>0&&el.every(function(m){return !!S.cnCov[m]})}
-/* credit notes for a filter and window: {value,sheets,sqft,covered}. w: [{ym,frac}] or [ym]. Not available per salesperson. */
+/* ================= the Net view (D40, per plant, D45) ================= */
+function cnUncText(list){return list.length?'plants '+list.slice(0,5).join(', ')+(list.length>5?' (+'+(list.length-5)+')':''):''}
+/* credit notes for a filter and window. Net is used only when every plant in scope is covered for every month up to today. */
 function cnFor(f,w){
-  w=wins(w);var ms=w.map(function(x){return x.ym}),out={value:0,sheets:0,sqft:0,covered:false};
+  w=wins(w);var ms=w.map(function(x){return x.ym}),out={value:0,sheets:0,sqft:0,covered:false,uncovered:[],anyLoaded:false};
   if(f.sp!=null)return out;
-  out.covered=cnMonthsCovered(ms);if(!out.covered)return out;
-  w.forEach(function(x){S.cn.forEach(function(d){if(d.ym!==x.ym)return;if(f.plants&&!f.plants.has(d.plant))return;if(f.plant&&d.plant!==f.plant)return;
+  var cur=TODAY().slice(0,7),el=ms.filter(function(m){return m<=cur}),lam=cnLamPlants(),scope=f.plant?[f.plant]:(f.plants?lam.filter(function(p){return f.plants.has(p)}):lam);
+  var unc={};
+  scope.forEach(function(p){el.forEach(function(m){if(S.cnCov[m]&&S.cnCov[m].has(p))out.anyLoaded=true;else unc[p]=1})});
+  out.uncovered=Object.keys(unc).sort();
+  out.covered=el.length>0&&scope.length>0&&out.uncovered.length===0;
+  if(!out.covered)return out;
+  w.forEach(function(x){(S.cnBy[x.ym]||[]).forEach(function(d){if(f.plants&&!f.plants.has(d.plant))return;if(f.plant&&d.plant!==f.plant)return;
     Object.keys(d.groups).forEach(function(g){if(f.group&&g!==f.group)return;var G=d.groups[g];out.value+=G.value*x.frac;out.sheets+=G.sheets*x.frac;out.sqft+=(G.sqft||0)*x.frac})})});
   return out;
+}
+/* one line for the K1 subtitle and tooltips */
+function cnNote(o){
+  if(o.basis==='Net')return 'Net · credit notes loaded for every plant in scope.';
+  var u=o.cnUnc||[];
+  if(!o.cnAny)return 'Invoiced · credit notes not loaded.';
+  return 'Invoiced · credit notes not loaded for '+(u.length?u.length+' plant'+(u.length===1?'':'s')+' ('+cnUncText(u)+')':'some plants')+'.';
 }
 function cnPanel(ctx,f){
   var res=ctx.res,ms=res.curMonths&&res.curMonths.length?res.curMonths:(res.cur||[]).map(function(x){return x.ym||x}),cur=TODAY().slice(0,7);
   var base=Object.assign({plants:ctx.plants},ctx.base);if(f)Object.assign(base,f);
   if(base.sp!=null)return '';
   var rows=ms.filter(function(m){return m<=cur}).map(function(m){
-    var A=sumF(base,[m]),cv=!!S.cnCov[m],C=cv?cnFor(base,[m]):null;
-    return '<tr><td>'+esc(ymLabel(m))+'</td><td class="num">'+fmtMoney(A.n)+'</td><td class="num">'+fmtN(Math.round(A.sh))+'</td>'+(cv?'<td class="num">'+fmtMoney(C.value)+'</td><td class="num">'+fmtN(Math.round(C.sheets))+'</td><td class="num"><b>'+fmtMoney(A.n-C.value)+'</b></td><td class="num"><b>'+fmtN(Math.round(A.sh-C.sheets))+'</b></td>':'<td class="note" colspan="4">Credit notes not loaded</td>')+'</tr>'}).join('');
+    var A=sumF(base,[m]),C=cnFor(base,[m]);
+    return '<tr><td>'+esc(ymLabel(m))+'</td><td class="num">'+fmtMoney(A.n)+'</td><td class="num">'+fmtN(Math.round(A.sh))+'</td>'+(C.covered?'<td class="num">'+fmtMoney(C.value)+'</td><td class="num">'+fmtN(Math.round(C.sheets))+'</td><td class="num"><b>'+fmtMoney(A.n-C.value)+'</b></td><td class="num"><b>'+fmtN(Math.round(A.sh-C.sheets))+'</b></td>':'<td class="note" colspan="4" title="'+esc(cnUncText(C.uncovered))+'">Credit notes not loaded'+(C.anyLoaded&&C.uncovered.length?' for '+C.uncovered.length+' plant'+(C.uncovered.length===1?'':'s'):'')+'</td>')+'</tr>'}).join('');
   if(!rows)return '';
-  var allCov=cnMonthsCovered(ms);
-  return '<section class="card"><div class="hd"><h2>Invoiced · Credit notes · Net</h2><span class="note">'+(allCov?'Net is the headline for this period':'Headline stays invoiced where credit notes are not loaded')+'</span></div><div class="tw hscroll"><table class="std"><thead><tr><th>Month</th><th class="num">Invoiced ₹</th><th class="num">Invoiced sheets</th><th class="num">Credit notes ₹</th><th class="num">Credit note sheets</th><th class="num">Net ₹</th><th class="num">Net sheets</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note">Net = invoiced − credit notes. Targets are set on invoiced sales. Once every month of a quarter has credit notes loaded, achievement and growth for that quarter use Net; earlier quarters stay on invoiced. Growth compares Net with Net only when both quarters have credit notes, otherwise invoiced with invoiced.</p></section>';
+  var allCov=cnFor(base,ms).covered;
+  return '<section class="card"><div class="hd"><h2>Invoiced · Credit notes · Net</h2><span class="note">'+(allCov?'Net is the headline for this period':'Headline stays invoiced where credit notes are not loaded for every plant in scope')+'</span></div><div class="tw hscroll"><table class="std"><thead><tr><th>Month</th><th class="num">Invoiced ₹</th><th class="num">Invoiced sheets</th><th class="num">Credit notes ₹</th><th class="num">Credit note sheets</th><th class="num">Net ₹</th><th class="num">Net sheets</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note">Net = invoiced − credit notes. Targets are set on invoiced sales. A plant uses Net only when all its months of the quarter are covered by a credit-note file; a company, zone or group total uses Net only when every plant in scope is covered. Growth compares Net with Net only when both quarters are covered, otherwise invoiced with invoiced.</p></section>';
 }

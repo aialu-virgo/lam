@@ -124,21 +124,23 @@ async function collLoad(){
   if(!superOnly('load collections')||!U||!U.res||!collCanLoad())return;
   var r=U.res,uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!U.demoFlag,done=0,total=r.pm.size;
   U.stage='loading';U.progressMsg='Writing...';collRender();await tick();
-  var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice(),atNow=nowISO();
+  var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice(),atNow=nowISO(),B=bkNew(uid,'CL',demo);
   try{
     await Promise.all([0,1,2,3].map(async function(){
       while(q.length){var P=q.shift(),old=S.coll.find(function(d){return d._id===P.plant+'-'+P.ym});
         var doc={plant:P.plant,ym:P.ym,total:Math.round(P.total*100)/100,n:P.rows.length,sys:'B1',src:'RCT',upload:uid,at:atNow,demo:demo||undefined};
         if(old&&old.plan!=null)doc.plan=old.plan;
+        if(old&&(old.n||0)>0){bkAdd(B,'collections/'+P.plant+'-'+P.ym,old);if(B.items.length>=20)await bkFlush(B)}
         var txt=JSON.stringify(P.rows);
         if(txt.length<=170000)doc.rows=P.rows;
         else{var top=P.rows.slice().sort(function(a,b){return b[3]-a[3]}).slice(0,1500);doc.rows=top;doc.z=await gz(txt);doc.rows_note='top 1500 by amount; all rows in z (gz-json)'}
         await dset('collections/'+P.plant+'-'+P.ym,doc);done++;U.progress=Math.round(done/total*100);U.progressMsg='Writing plant-month '+done+' of '+total;var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%'}
     }));
+    await bkFlush(B);
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
   }catch(e){failed=e}
   var ms=Object.keys(r.months).sort();
-  var upl={at:nowISO(),by:by,sys:'B1',entity:'CL',file:U.name,size:U.size,mode:'historic',periodLabel:ms.length?(ymLabel(ms[0])+(ms.length>1?' to '+ymLabel(ms[ms.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:ms,
+  var upl={at:nowISO(),by:by,sys:'B1',entity:'CL',file:U.name,size:U.size,mode:'historic',periodLabel:ms.length?(ymLabel(ms[0])+(ms.length>1?' to '+ymLabel(ms[ms.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:ms,backup:bkSummary(B),
     fixes:{not_customer_rows:r.notCust.A.rows+r.notCust.S.rows+r.notCust.other.rows,acp_rows:r.acp.rows,acp_value:Math.round(r.acp.value),amount_loaded:Math.round(r.custValue),zero_rows:r.zero,before_history_start:r.preHist.rows},error:failed?dbErrText(failed):undefined};
   try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/B1_collection',{map:mp,sys:'B1',entity:'CL',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed;
@@ -160,8 +162,11 @@ function collUndoPlan(uid){var docs=S.coll.filter(function(d){return d.upload===
 async function collUndo(uid){
   var pl=collUndoPlan(uid),u=S.uploads.find(function(x){return x._id===uid}),q=pl.docs.slice();
   await Promise.all([0,1,2,3].map(async function(){while(q.length){var d=q.shift();if(d.plan!=null)await dset('collections/'+d._id,{plant:d.plant,ym:d.ym,total:0,n:0,rows:[],plan:d.plan,sys:'B1',src:'RCT',undone:uid});else await ddel('collections/'+d._id)}}));
+  var mine={};pl.docs.forEach(function(d){mine['collections/'+d._id]=1});
+  var rs=await bkRestore(uid,function(p){return !!mine[p]});await bkDelete(uid);
+  for(var pi=0;pi<pl.docs.length;pi++){var pd=pl.docs[pi];if(pd.plan!=null){var ps=await dget('collections/'+pd._id);if(ps.exists){var px=ps.data();if(px.plan!==pd.plan){px.plan=pd.plan;await dset('collections/'+pd._id,px)}}}}/* a plan entered since the upload is kept */
   await ddel('rejects/'+uid);
-  if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:pl.months,undone_plant_months:pl.docs.length}))}
+  if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:pl.months,undone_plant_months:pl.docs.length,restored:rs.n||undefined}))}
   await auditW('upload undone','',{upload:uid,file:((u&&u.file)||'').slice(0,120),months:pl.months,plant_months:pl.docs.length});
   await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,months:pl.months,plant_months:pl.docs.length});
   return pl;

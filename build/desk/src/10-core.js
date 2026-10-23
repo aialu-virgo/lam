@@ -138,6 +138,14 @@ function statusOf(ach,lowerBetter){
   if(lowerBetter){/* ach is actual/plan for lower-better KPIs */return ach<=100?'green':ach<=110?'orange':'red'}
   return ach>=CFG.status_green_pct?'green':ach>=CFG.status_orange_pct?'orange':'red';
 }
+/* D45: lower-is-better KPIs (K10, K15, K16, K19, K20, K21): achievement = plan / actual x 100, capped at 200%; actual 0 is "Within plan" */
+function achLower(actual,plan){
+  if(actual==null||isNaN(actual)||plan==null||isNaN(plan))return {ach:null,within:false};
+  if(actual<=0)return {ach:200,within:true};
+  if(!(plan>0))return {ach:null,within:false};
+  return {ach:Math.min(200,plan/actual*100),within:false};
+}
+function fmtAchLower(a){return a.within?'<b class="a-green">Within plan</b>':(a.ach==null?'<span class="note">—</span>':fmtAch(a.ach))}
 function statusPill(st,txt){var m={green:['ok','On plan'],orange:['part','Watch'],red:['miss','Behind'],none:['mute','No plan'],pending:['mute','Pending']}[st]||['mute',st];return '<span class="pill '+m[0]+'">'+esc(txt||m[1])+'</span>'}
 function fmtSqft(v){return fmtN(Math.round(v||0))+' sq ft'}
 /* sheets are the primary quantity unit; sq ft is the secondary line */
