@@ -9,6 +9,7 @@ for(let i=0;i<40;i++){st['uploads/uh'+String(i).padStart(2,'0')]={at:new Date(ba
 for(const size of [{width:1440,height:900},{width:360,height:740}]){
   const {page,errs}=await open(browser,{store:JSON.parse(JSON.stringify(st)),size});await page.waitForTimeout(3500);
   await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(900);
+  await page.check('#hf-rep');await page.waitForTimeout(300);/* D41: these 40 synthetic uploads hold no stored data, so show replaced */
   const tag=size.width+'';
   const full=await page.evaluate(()=>{const c=document.querySelector('#i-hist'),p=document.querySelector('#p-intake');return {w:c.offsetWidth,pw:p.offsetWidth,hasFile:/file/i.test(c.innerText),rows:c.querySelectorAll('tbody tr.clk').length}});
   ok(tag+': history is a full-width card with a File column, 15 rows first',full.w>=full.pw-4&&full.hasFile&&full.rows===15,JSON.stringify(full));
@@ -58,7 +59,7 @@ for(const size of [{width:1440,height:900},{width:360,height:740}]){
  await page.addInitScript({path:new URL('./mock-claude.js',import.meta.url).pathname});
  await page.goto('file://'+new URL('../dist/index.html',import.meta.url).pathname);await page.waitForTimeout(3500);
  await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(900);
- await page.click('[data-act="hist-more"]');await page.click('[data-act="hist-more"]');await page.waitForTimeout(300);
+ await page.check('#hf-rep');await page.waitForTimeout(300);await page.click('[data-act="hist-more"]');await page.click('[data-act="hist-more"]');await page.waitForTimeout(300);
  await page.evaluate(()=>document.querySelector('#i-hist .tw').scrollIntoView({block:'center'}));await page.waitForTimeout(300);
  const bb=await (await page.$('#i-hist .tw')).boundingBox();
  const cdp=await ctx.newCDPSession(page);const cx=bb.x+bb.width/2,cy=bb.y+bb.height/2+40;

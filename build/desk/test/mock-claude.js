@@ -12,7 +12,7 @@ function dfz(o){if(o&&typeof o==='object'){Object.freeze(o);Object.keys(o).forEa
     onSnapshot:function(next,err){if(MODE.err===col){setTimeout(function(){err({code:'permission_denied',message:'read refused'})},0);return function(){}}if(MODE.hang===col)return function(){};var s={col:col,fire:function(){setTimeout(function(){next(snapOf(col,q))},MODE.delay||0)}};subs.push(s);s.fire();return function(){subs=subs.filter(function(x){return x!==s})}},
     get:async function(){return snapOf(col,q)}}}
   var db={collection:function(c){return query(c)},doc:function(path){return {get:async function(){await new Promise(function(r){setTimeout(r,0)});var e=path in store;return {id:path.slice(path.lastIndexOf('/')+1),exists:e,data:function(){return dfz(clone(store[path]))}}},
-    set:async function(d){await new Promise(function(r){setTimeout(r,0)});if(JSON.stringify(d).length>262144)throw {code:'invalid_argument',message:'too large'};store[path]=clone(d);notify(parent(path))},
+    set:async function(d){await new Promise(function(r){setTimeout(r,0)});if(MODE.failSet&&new RegExp(MODE.failSet).test(path))throw {code:'unavailable',message:'write failed'};if(JSON.stringify(d).length>262144)throw {code:'invalid_argument',message:'too large'};store[path]=clone(d);notify(parent(path))},
     update:async function(d){if(!(path in store))throw {code:'invalid_argument',message:'missing'};store[path]=Object.assign({},store[path],clone(d));notify(parent(path))},
     delete:async function(){delete store[path];notify(parent(path))}}}};
   window.__mockStore=function(){return clone(store)};

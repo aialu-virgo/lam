@@ -130,10 +130,6 @@ function evalR4(){
   return {out:out,live:true};
 }
 function stockPrice(plant,g){var s=sumF({plant:plant,group:g},qMonths(prevQ(curQuarterKey())));return s.sh>0?s.n/s.sh:1000}
-function stockDays(plant,g,onhand){
-  var q=prevQ(curQuarterKey()),ms=qMonths(q),sh=sumF({plant:plant,group:g},ms).sh;
-  var days=ms.reduce(function(a,m){return a+ymDays(m)},0);if(sh<=0)return null;return onhand/(sh/days);
-}
 function evalR5(){
   var out=[],t=TODAY();
   S.uploads.forEach(function(u){

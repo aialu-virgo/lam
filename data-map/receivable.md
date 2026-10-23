@@ -1,8 +1,8 @@
 ---
 title: Data map — Receivable
-summary: Receivables: no export yet; exact B1 open-invoice and open-items query columns for ageing 0–30 / 31–60 / 61–90 / 90+.
-status: draft
-updated: 2026-10-20
+summary: Receivables snapshot intake built (D39): four layouts (B1 OINV, B1 JDT1, S/4 open items, custom B1 report), as-on date from the file name or a picker, credit items shown apart.
+status: active
+updated: 2026-10-23
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -14,7 +14,7 @@ related:
 ---
 
 # Receivable (SAP export)
-**Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Receivable · **Status:** **no receivable export uploaded.**
+**Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Receivable · **Status:** **intake built (D39); no real file loaded yet.**
 
 ## Source and export
 - **Not available.** Invoice files carry `DocTotal` but no due date, paid amount or open balance.
@@ -45,3 +45,18 @@ Open ≥ 0 except credit items; due date ≥ doc date; customer exists; `as_on_d
 | Q3 FY24 to Q2 FY27 (12 quarters) | missing |
 | Q3 FY27 (current) | missing |
 
+
+## Intake in the Desk (D39, 23 Oct 2026)
+Data Intake detects the layout from the headers; if none matches it shows the column-mapping step.
+| Layout | Recognised by | Open amount |
+|---|---|---|
+| B1 OINV open invoices | `DocNum`, `DocDueDate`, `CardCode`, `DocTotal`, `PaidToDate` | `DocTotal` − `PaidToDate` |
+| B1 JDT1 open items | `BaseRef`, `DueDate`, `ShortName`, `BalDueDeb`, `BalDueCred` | debit − credit |
+| S/4 open items | `Net Due Date`, `Customer`, `Amount in Local Currency` | the amount column |
+| B1 custom open-items report | `BRANCHNAME`, `DOCNUM`, `DUEDATE`, `CARDCODE`, `BALANCE` | `BALANCE` |
+
+- **As-on date:** read from the file name (`2026-10-20`, `20.10.2026`) or picked in the page; required, never in the future. Dates are read as written, never swapped.
+- **Snapshot:** one snapshot per as-on date; the same date replaces it. The last 6 snapshots plus the latest of each month since history start are kept. Undo upload removes a snapshot.
+- **Credit items (negative open amount):** kept, shown apart on the Receivables page, not netted against invoices and not in the ageing. ACP plants are skipped and counted.
+- **Ageing:** days past due counted to the snapshot's as-on date. Rule R2 and K10 read the latest snapshot.
+- Saved column mapping is kept per layout. Template: [receivable-b1-open-invoices.csv](templates/receivable-b1-open-invoices.csv).

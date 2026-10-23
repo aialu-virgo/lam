@@ -147,7 +147,7 @@ var SEED_SUPER=['data@virgoasia.com','spa@virgoasia.com'];
 var ROLES=['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive','Coordinator (sales / CRR)','Accounts','Plant'];
 var GROUPS=['Laminate','Door','PVC sheet','Compact board'];
 var SEGMENT_NOTE='Segments are configurable (open question Q5).';
-var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'CN',label:'Credit note'},{k:'RC',label:'Receivable'},{k:'CL',label:'Collection'},{k:'ST',label:'Stock'}];
+var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'CN',label:'Credit note',live:true},{k:'RC',label:'Receivable',live:true},{k:'CL',label:'Collection',live:true},{k:'ST',label:'Stock',live:true}];
 var ODATA=[['Customer','API_BUSINESS_PARTNER'],['Item','API_PRODUCT_SRV'],['Invoice / credit note','API_BILLING_DOCUMENT_SRV'],['Receivable / collection','I_OperationalAcctgDocItem'],['Stock','API_MATERIAL_STOCK_SRV']];
 var TEMPLATES={
  users:'email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code',
@@ -305,6 +305,10 @@ async function seedDefaults(){
 function entityCells(ent){var o={};Object.keys(S.cells).forEach(function(k){var c=S.cells[k];if(c.entity===ent)o[c.ym]=c});return o}
 function cellPlants(c){return c?Object.keys(c.plants||{}).length:0}
 function covStatus(ent,qkey){
+  if(ent==='ST')return stockCov(qkey);
+  if(ent==='RC')return recvCov(qkey);
+  if(ent==='CN')return cnCov(qkey);
+  if(ent==='CL')return collCov(qkey);
   var cs=entityCells(ent),ref=0;Object.keys(cs).forEach(function(ym){ref=Math.max(ref,cellPlants(cs[ym]))});
   var months=qMonths(qkey),present=0,ok=0,detail=[];
   months.forEach(function(ym){var n=cellPlants(cs[ym]);detail.push({ym:ym,plants:n});if(n>0)present++;if(n>0&&n>=Math.ceil(ref*0.9))ok++});
@@ -359,6 +363,10 @@ function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:
 function renderUpload(){var _e=$('#i-upload');withScroll(_e,renderUpload0)}
 function renderUpload0(){
   if(!U)U=newU();
+  if(U.kind==='stock'){stockRender();return}
+  if(U.kind==='coll'){collRender();return}
+  if(U.kind==='recv'){recvRender();return}
+  if(U.kind==='cn'){cnRender();return}
   var el=$('#i-upload');if(!el)return;
   var st=U.stage;
   var stepIdx={idle:1,parsing:1,mapping:2,validating:3,validated:3,loading:4,done:4}[st]||1;
@@ -373,7 +381,7 @@ function renderUpload0(){
      +'<div class="note" style="margin-top:6px">One file per entity per quarter, or a multi-quarter file split by document date. The file is read in this browser; nothing is sent anywhere else.</div>'
      +(st==='parsing'?'<div style="margin-top:10px"><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(U.msg||'Reading file...')+'</div></div>':'')+'</div>';
     if(U.transferDone&&st==='idle')h+=U.transferDone;
-    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+'</div>';
+    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+(U.imp?'<button class="btn sm pri" data-act="imp-rc">Import as receivables</button><button class="btn sm pri" data-act="imp-cn">Import as credit notes</button>':'')+'</div>';
   }
   if(st==='mapping'||st==='validating'||st==='validated'||st==='loading'||st==='done'){
     h+='<div class="banner info"><span><b>'+esc(U.name)+'</b> &middot; '+fmtN(U.rows.length)+' data rows &middot; '+U.headers.length+' columns &middot; detected source <b>'+(U.sys==='B1'?'SAP B1':'SAP S/4HANA')+'</b>'+(U.savedMap?' &middot; saved mapping applied':'')+'</span><button class="btn sm" data-act="u-reset" '+(locked?'disabled':'')+'>Choose another file</button></div>';
@@ -464,9 +472,9 @@ function renderCov0(){
   var det='';
   if(S.covSel){
     var p=S.covSel.split('|'),c=covStatus(p[0],p[1]);
-    det='<div class="banner info" style="display:block"><b>'+qLabel(p[1])+' &middot; Invoice</b> &middot; '+({ok:'Loaded',part:'Partial',miss:'Missing'})[c.st]+(c.closed?' &middot; closed, locked':'')
+    det='<div class="banner info" style="display:block"><b>'+qLabel(p[1])+' &middot; '+(p[0]==='ST'?'Stock':p[0]==='CL'?'Collection':p[0]==='RC'?'Receivables':p[0]==='CN'?'Credit notes':'Invoice')+'</b> &middot; '+({ok:'Loaded',part:'Partial',miss:'Missing'})[c.st]+(c.closed?' &middot; closed, locked':'')
      +'<div class="note" style="color:inherit">'+c.detail.map(function(d){return d.ym+': '+d.plants+' plant'+(d.plants===1?'':'s')}).join(' &nbsp;|&nbsp; ')+(c.ref?' &nbsp;(a month counts as complete at 90% of the '+c.ref+' plants seen in the busiest month)':'')+'</div>'
-     +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>':'')
+     +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?(p[0]==='ST'?'<span class="note">Stock is a snapshot: the latest snapshot of each month counts as that month.</span>':(p[0]==='RC'||p[0]==='CN')?'<span class="note">'+(p[0]==='RC'?'Receivables are a snapshot: the latest snapshot of each month counts as that month.':'Credit notes load from the B1 or S/4 credit-note export; a month is covered when a file spans it.')+'</span>':p[0]==='CL'?'<span class="note">Collections load from the Incoming Payment Report; a month is covered when its plants have receipts.</span>':'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>'):'')
      +(effRole()!=='Super admin'||readOnly()?'<span class="note">Closing, reopening and reloading a quarter is for a Super admin.</span>':(c.closed?'<button class="btn sm" data-act="reopen" data-q="'+p[1]+'">Reopen quarter (reason required, logged)</button>':(c.st!=='miss'?'<button class="btn sm" data-act="close-q" data-q="'+p[1]+'">Close quarter</button>':'')))+'</div></div>';
   }
   el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; quarters since '+qLabel(histStart())+' (history start, D28)</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
@@ -479,15 +487,16 @@ function withScroll(container,fn){
   fn();
   if(container){Array.prototype.forEach.call(container.querySelectorAll('.tw,.hscroll'),function(e,i){if(pos[i]){e.scrollTop=pos[i][0];e.scrollLeft=pos[i][1]}})}
 }
-S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:''};
-var ENT_NAME={INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
+S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:'',showReplaced:false};
+var ENT_NAME={CU:'Customers',RC:'Receivables',CL:'Collections',ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
 function histRows(){
   var f=S.hist,q=(f.q||'').toLowerCase();
   return S.uploads.slice().sort(function(a,b){return a.at<b.at?1:-1}).filter(function(u){
+    if(!f.showReplaced&&histReplacedBy(u))return false;
     return (!f.src||u.sys===f.src)&&(!f.ent||(u.entity||'INV')===f.ent)&&(!f.status||u.status===f.status)&&(!q||((u.file||'')+' '+(u.by||'')+' '+(u.periodLabel||'')+' '+(u.status||'')+' '+(u.demo?'demo':'')).toLowerCase().indexOf(q)>=0);
   });
 }
-function histSig(){return JSON.stringify([S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file]}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
+function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u),u.backup_removed||'']}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
 function histBodyHtml(){
   var all=histRows(),rows=all.slice(0,S.hist.shown);
   if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
@@ -496,7 +505,7 @@ function histBodyHtml(){
   return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(u){
      var fn=u.file||'',isOpen=!!open[u._id];
-     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&(u.entity||'INV')==='INV'&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST'||u.entity==='CL'||u.entity==='RC'||u.entity==='CN')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
      if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
      return tr}).join('')
    +'</tbody></table></div>'
@@ -510,10 +519,11 @@ function renderHist(){
     var sel=function(id,label,cur,opts,nm){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="hist-f" data-k="'+nm+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(cur===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'};
     el.innerHTML='<div class="hd"><h2>Upload history</h2><span class="note" id="hist-count"></span></div>'
      +'<div class="row" id="hist-ctl" style="align-items:flex-end">'+sel('hf-src','Source',f.src,srcs.map(function(x){return [x,x==='B1'?'SAP B1':x==='S4'?'SAP S/4':x]}),'src')+sel('hf-ent','Entity',f.ent,ents.map(function(x){return [x,ENT_NAME[x]||x]}),'ent')+sel('hf-st','Status',f.status,sts.map(function(x){return [x,x]}),'status')
-     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div></div><div id="hist-body"></div>';
+     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div><div class="fld"><label>&nbsp;</label><label class="chip"><input type="checkbox" id="hf-rep" data-chg="hist-rep" '+(f.showReplaced?'checked':'')+'> Show replaced (<span id="hist-rep-n">0</span>)</label></div></div><div id="hist-body"></div>';
     S.hist.sig='';
   }
   if(S.hist.sig===sig)return;S.hist.sig=sig;
+  var rn=$('#hist-rep-n');if(rn)rn.textContent=String(S.uploads.filter(function(u){return !!histReplacedBy(u)}).length);
   var c=$('#hist-count');if(c)c.textContent=fmtN(S.uploads.length)+' upload'+(S.uploads.length===1?'':'s');
   var body=$('#hist-body');withScroll(body,function(){body.innerHTML=histBodyHtml()});
 }
@@ -576,7 +586,7 @@ async function onFile(file){
       var names=XLSX.read(buf,{type:'array',bookSheets:true}).SheetNames||[];
       var heads={};try{var wh=XLSX.read(buf,{type:'array',sheetRows:2,dense:true});names.forEach(function(n){var rr=XLSX.utils.sheet_to_json(wh.Sheets[n]||{},{header:1,raw:true,defval:'',blankrows:false});heads[n]=(rr[0]||[]).map(function(x){return x==null?'':String(x)})})}catch(e){}
       var kindOf=function(n){return heads[n]&&heads[n].length?detect(heads[n]):{type:'empty'}};
-      var pick=names.find(function(n){return /^(data|sapui5 export)$/i.test(n)&&kindOf(n).type==='invoice'})||names.find(function(n){return kindOf(n).type==='invoice'})||names.find(function(n){return /^(data|sapui5 export)$/i.test(n)})||names.find(function(n){return heads[n]&&heads[n].length&&!/^filter$/i.test(n)})||names.find(function(n){return !/^filter$/i.test(n)})||names[0];
+      var pick=names.find(function(n){return /^(data|sapui5 export)$/i.test(n)&&kindOf(n).type==='invoice'})||names.find(function(n){return heads[n]&&heads[n].length&&stockDetect(heads[n])})||names.find(function(n){return kindOf(n).type==='invoice'})||names.find(function(n){return /^(data|sapui5 export)$/i.test(n)})||names.find(function(n){return heads[n]&&heads[n].length&&!/^filter$/i.test(n)})||names.find(function(n){return !/^filter$/i.test(n)})||names[0];
       U.sheetPicked=pick;U.sheetsSeen=names.map(function(n){var k=kindOf(n);return n+' ('+(k.type==='invoice'?'invoice export':k.type==='master'?k.what+' list':k.type==='empty'?'empty':(heads[n]||[]).slice(0,4).join(', ')+(heads[n]&&heads[n].length>4?'...':''))+')'});
       sheetsSeen0=U.sheetsSeen;U.msg='Parsing sheet "'+pick+'"...';renderUpload();await tick();
       var wb=XLSX.read(buf,{type:'array',sheets:pick,dense:true,cellDates:false,cellNF:false,cellStyles:false,cellFormula:false,cellHTML:false});
@@ -588,9 +598,14 @@ async function onFile(file){
     var headers=rows[0].map(function(x){return x==null?'':String(x)});
     var d=detect(headers);
     var sheetsSeen=U.sheetsSeen,sheetPicked=U.sheetPicked;
+    var cud=d.type==='unknown'?custDetect(headers):null;if(cud){U=newU();U.mode=mode;U.period=period;U.msg='This is a customer master ('+cud.layout+'), not a transaction export. Load it from Admin > Customers.';renderUpload();return}
+    var rdt=recvDetect(headers);if(rdt){recvStart(file,rows,headers,rdt,sheetPicked);return}
+    var cnd=cnDetectB1(headers)||(d.type==='invoice'&&d.sys==='S4'&&cnS4Share(headers,rows)>0.5?{kind:'cn',sys:'S4',layout:'S/4 billing credit memos'}:null);if(cnd){cnStart(file,rows,headers,cnd,sheetPicked);return}
+    if(d.type==='unknown'){var cdt=collDetect(headers);if(cdt){collStart(file,rows,headers,sheetPicked);return}var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
     if(d.type==='master'&&d.what==='transfers'){U=newU();U.mode=mode;U.period=period;U.offer={file:file,rows:rows,what:'transfers'};U.msg='This file is the internal-transfer list (CardCode, CardName, Tranfser), not the sales export'+(sheetsSeen&&sheetsSeen.length>1?'. Sheets in the workbook: '+sheetsSeen.join('; ')+'. Save the DATA sheet as the CSV, or load the whole XLSX':'')+'. You can load it as the Internal-transfer list instead.';renderUpload();return}
     if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}
-    if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;U.msg='The headers match no known file'+(rows.length<2?' (the sheet has no data rows)':'')+'. Found: '+(headers.filter(Boolean).slice(0,8).join(', ')||'no header row')+(sheetsSeen&&sheetsSeen.length?'. Sheets in the workbook: '+sheetsSeen.join('; '):'')+'. Expected the B1 Combine Sale export (sheet DATA: docnum, CardCode, BPLName ...) or the S/4 Sales Register (sheet SAPUI5 Export: Invoice Document Number, Plant, Invoice Date ...). For a master, use Admin.';renderUpload();return}
+    if(d.type==='unknown'&&rows.length>=2&&(ent==='RC'||ent==='CN')){var ug={sys:'B1',layout:'unrecognised layout, map the columns'};U=newU();U.mode=mode;U.period=period;if(ent==='RC')recvStart(file,rows,headers,ug,sheetPicked);else cnStart(file,rows,headers,ug,sheetPicked);return}
+    if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;if(rows.length>=2)U.imp={file:file,rows:rows,headers:headers,sheetPicked:sheetPicked};U.msg='The headers match no known file'+(rows.length<2?' (the sheet has no data rows)':'')+'. Found: '+(headers.filter(Boolean).slice(0,8).join(', ')||'no header row')+(sheetsSeen&&sheetsSeen.length?'. Sheets in the workbook: '+sheetsSeen.join('; '):'')+'. Expected the B1 Combine Sale export (sheet DATA: docnum, CardCode, BPLName ...) or the S/4 Sales Register (sheet SAPUI5 Export: Invoice Document Number, Plant, Invoice Date ...). For a master, use Admin.';renderUpload();return}
     U.headers=headers;U.sheetPicked=sheetPicked;U.rows=rows.slice(1);U.sys=d.sys;U.map=defaultMap(headers,d.sys);
     var sv=S.mappings[d.sys+'_invoice'];
     if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
@@ -804,9 +819,14 @@ async function runLoad(opts){
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   var pms=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1});
   var byYm={};pms.forEach(function(p){(byYm[p.ym]=byYm[p.ym]||[]).push(p)});
-  var yms=Object.keys(byYm).sort(),total=pms.length,done=0,bytes=0,docsW=0,failed=null,loadedLines=0,stopped=false;
+  var yms=Object.keys(byYm).sort(),total=pms.length,done=0,bytes=0,docsW=0,failed=null,loadedLines=0,stopped=false,B=bkNew(uid,'INV',demo);
   var reloadAudit=null,closedTouched=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
   try{
+    /* D46: save a backup of everything this load replaces BEFORE the first replacing write */
+    if(!demo){for(var by0=0;by0<yms.length;by0++){var ym0=yms[by0],cl0=S.cells['INV_'+ym0];if(!cl0||!cl0.plants)continue;
+      for(var bp=0;bp<byYm[ym0].length;bp++){var P0=byYm[ym0][bp],o0=cl0.plants[P0.plant];if(!o0||o0.demo)continue;
+        for(var bi=0;bi<(o0.chunks||0);bi++)await bkAddDb(B,'inv/'+o0.sys+'-'+P0.plant+'-'+ym0+'-'+bi);var rd0=S.rollDocs&&S.rollDocs[P0.plant+'-'+ym0];if(rd0)bkAdd(B,'roll/'+P0.plant+'-'+ym0,rd0);bkAdd(B,'cellpart:'+ym0+':'+P0.plant,o0);await bkMaybe(B)}}}
+    await bkCommit(B);
     if(closedTouched.length){await dset('log/'+uid,{at:nowISO(),by:by,event:'closed quarter reloaded',quarters:closedTouched,reason:U.reason||'',upload:uid,file:U.name});reloadAudit=await auditW('closed quarter reloaded',closedTouched.join(','),{quarters:closedTouched,from:nowISO(),reason:U.reason||'',upload:uid,demo:demo||undefined})}
     outer:for(var yi=0;yi<yms.length;yi++){
       var ym=yms[yi],cellId='INV_'+ym;
@@ -851,7 +871,7 @@ async function runLoad(opts){
   if(failed)status='Failed';
   var upl={at:nowISO(),by:by,sys:sys,entity:'INV',file:U.name,size:U.size,mode:U.mode,periodLabel:U.period==='auto'?(Object.keys(r.quarters).length>1?'Auto: '+Object.keys(r.quarters).length+' quarters':Object.keys(r.quarters).map(qLabel).join(', ')):qLabel(U.period),
     skipped:r.rejected,stopped:stopped||undefined,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,warned:r.warned,fanout:r.fanout,injection:r.injection,status:status,demo:demo||undefined,
-    quarters:Object.keys(r.quarters),plantMonths:done,docsWritten:docsW,bytes:bytes,
+    quarters:Object.keys(r.quarters),backup:bkSummary(B),plantMonths:done,docsWritten:docsW,bytes:bytes,
     before_history_start:r.preHist?r.preHist.rows:0,fixes:{line_numbers_created:r.af.lineSynth,repeated_lines_removed:r.af.dupNoLine,category_rows_normalised:r.af.catAlias,zone_rows_normalised:r.af.zoneNorm,junk:r.af.junk,s4_sales_exec_filled:r.af.spFilled,s4_sales_exec_blank:r.af.blankSp,date_kinds:r.af.dateKinds},groups:r.groups,out_of_scope:r.other,internal_transfers:r.xfer,dateRepair:r.dateInfo.mixed?{swapped:r.dateInfo.swapped,min:r.minDate,max:r.maxDate}:null,
     mapping:Object.keys(U.map).reduce(function(o,k){o[k]=U.map[k]>=0?U.headers[U.map[k]]:null;return o},{}),closedQuarters:closedNow,reloadReason:closedTouched.length?U.reason:undefined,error:failed?dbErrText(failed):undefined};
   try{
@@ -1197,6 +1217,7 @@ document.addEventListener('change',function(ev){
   else if(c==='closeafter'){U.closeAfter=t.checked}
   else if(c==='keepdocs'){U.keepDocs=t.checked}
   else if(c==='rejf'){U.rejFilter=t.value;renderUpload()}
+  else if(c==='hist-rep'){S.hist.showReplaced=t.checked;S.hist.shown=15;renderHist()}
   else if(c==='hist-f'){S.hist[t.getAttribute('data-k')]=t.value;S.hist.shown=15;renderHist()}
   else if(c==='potf'){var k=t.getAttribute('data-k');S.potFilter[{'pf-q':'q','pf-plant':'plant','pf-group':'group','pf-seg':'seg'}[k]]=t.value;refreshAdmin()}
 });
@@ -1250,16 +1271,19 @@ async function boot(){
     subscribe('settings',db.collection('settings'),function(d){var m=d.find(function(x){return x._id==='main'});S.settings=m||null;applySettings(m);ingestAliases(d);DS.cache={}});
     subscribe('phasing',db.collection('phasing'),function(d){S.phasing=d;DS.cache={}});
     subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
-    subscribe('receivables',db.collection('receivables'),function(d){S.recv=d});
+    subscribe('receivables',db.collection('receivables'),function(d){S.recvRaw=d;ingestRecv()});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});
-    subscribe('stock',db.collection('stock'),function(d){S.stock=d});
+    subscribe('backups',db.collection('backups'),function(d){S.backups=d;bkSchedule()});
+    subscribe('customers',db.collection('customers'),function(d){S.custRaw=d;ingestCust()});
+    subscribe('creditnotes',db.collection('creditnotes'),function(d){S.cnRaw=d;ingestCN()});
+    subscribe('stock',db.collection('stock'),function(d){S.stockRaw=d;ingestStock()});
     subscribe('itemmeta',db.collection('itemmeta'),function(d){S.itemMeta=d.find(function(x){return x._id==='main'})||null});
     subscribe('salesmaster',db.collection('salesmaster'),function(d){onSalesMaster(d.find(function(x){return x._id==='main'})||null)});
     setTimeout(function(){if(!S.smReady){S.smReady=true;ingestRoll()}},5000);
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
 boot();
 })();
 </script>

@@ -61,3 +61,31 @@ Data Intake › Upload history › Undo removes everything one upload still hold
 
 ## Skipped rows (D33, 21 Oct 2026)
 Rows with a problem are skipped; the good rows load at once and the skipped rows stay in the upload's list (Upload history: click the Skipped count). Status reads "Loaded · N rows skipped". A rule R5 action is raised only when skipped rows exceed `skip_alert_pct` of the rows read (Admin › Rules, default 2%). The date check, the multi-month stop and the replace-a-bigger-month confirm still stop a file; they are safety checks, not skipped rows.
+
+## Stock upload (D34, 21 Oct 2026)
+Data Intake accepts stock as a snapshot: B1 batch stock (best: it gives ageing), B1 OITW, S/4 MB52 or S/4 Stock Overview Totals. The as-on date is read from the file name or picked. Several warehouses of one plant are added together (map unknown warehouses in the Fixes applied panel or Admin › Aliases). Re-uploading the same date replaces that snapshot; Undo upload removes it. Export recipe: [Stock data map](../data-map/stock.md).
+
+## Collections upload (D38, 23 Oct 2026)
+Data Intake accepts the B1 Incoming Payment Report (many months in one file). Only customer receipts (DOCTYPE C) count; account and supplier rows and ACP plants are skipped and counted. Dates are read as dd/mm/yyyy and never swapped. Each plant-month it covers is replaced; Undo removes them. Layout: [Collection data map](../data-map/collection.md).
+
+## Receivables upload (D39, 23 Oct 2026)
+Data Intake accepts open items as a snapshot: B1 open invoices (OINV), B1 open journal items (JDT1), S/4 open items or the custom B1 open-items report. The as-on date comes from the file name or is picked; the same date replaces that snapshot; Undo upload removes it. Negative open amounts are credit items, shown apart. Layouts: [Receivable data map](../data-map/receivable.md).
+
+## Credit notes upload (D39 and D40, 23 Oct 2026)
+Data Intake accepts B1 credit-note lines (ORIN/RIN1) and S/4 billing credit memos, many months in one file (period in the file name). The Sales view then shows Invoiced, Credit notes and Net side by side; once every month of a quarter is covered, achievement and growth for that quarter use Net, earlier quarters stay on invoiced. Where a month has no file the page says "Credit notes not loaded", never zero. Export all branches. Layouts: [Credit note data map](../data-map/credit-note.md).
+
+## Customer master (D39, 23 Oct 2026)
+Admin › Customers: upload B1 OCRD or the S/4 business partner list; each load replaces the master. It names customers, suggests the salesperson and shows the credit limit and "over limit by" on Receivables. See [Customer data map](../data-map/customer.md).
+
+## Upload history: replaced uploads (D41)
+An upload whose data nothing points to any more (a later upload covered the same months or date) is marked "Replaced by <file, date>" and hidden by default; tick "Show replaced" to list it.
+
+## Credit notes: per-plant coverage, and Undo that restores (D45)
+At load the credit-notes page asks "This file covers all branches": tick it only when the export holds every branch; untick for a partial export (only plants with rows are covered). Net is used per plant, and for a company, zone or group only when every plant in scope is covered; otherwise the page shows Invoiced and the tooltip names the plants still missing.
+
+When an upload replaces stored sales plant-months, collections, credit notes, a receivables snapshot or a stock snapshot, the Desk first copies what it replaces into a backup (collection `backups`, kept 30 days, deleted earlier if that upload is itself replaced or undone). **Undo restores the previous data** (only where no later upload has changed it again). Backups are written first: if one cannot be saved the load stops and nothing is replaced. Each backup document is at most 240,000 bytes as stored (the database limit is 256 KiB); all backups together are capped at 20 MB: expired, then oldest backups are purged first, and if the new one still does not fit the page asks you to confirm that Undo cannot restore that upload. A first load keeps no backup.
+
+An unrecognised receivables or credit-note file always reaches the column-mapping step (choose the entity, or use "Import as receivables / credit notes"); it is rejected only if the required fields are still unmapped after mapping.
+
+## Backups: whole uploads, integrity, wording (D47)
+Backups are removed one whole upload at a time, oldest first, and the upload shows "Undo no longer restores (backup removed <date>)" in history. A load that needs room lists the uploads that would lose their backup and removes nothing until you press "Remove those backups and load"; Cancel changes nothing. If it cannot fit even after removing every older backup, nothing is removed and you are asked whether to load without a backup. Each upload's backup records its part count and checksums; if a part is missing or damaged, Undo says "Backup incomplete: Undo will remove these months; upload them again" and restores nothing. After a restoring Undo the dialog says "Restored the previous data for N plant-months".

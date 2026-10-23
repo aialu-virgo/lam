@@ -2,7 +2,7 @@
 title: Comparison basis
 summary: QoQ only: quarter, month, QTD, YTD and custom comparisons, the Q1 to prior-FY Q4 crossover, new-entity and partial-history handling, and what the D9 storage grain forces.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-21
+updated: 2026-10-23
 related:
   - design/_index.md
   - data-map/target-phasing.md
@@ -93,7 +93,7 @@ Changes in a customer's segment re-bucket all history to the **current** segment
 4. **No item-level or line-level QoQ.** "New item" cannot be derived. A "New" label applies to customers, persons, plants and product groups only.
 5. **Drill-down:** figure → quarter → month → document. It stops at the document ([Decisions](../decisions.md) D9). If the uploader drops the index, it stops at the aggregate row (plant × month × customer).
 6. **Salesperson:** B1 rows carry a name, S/4 rows carry none. Person-level QoQ for S/4-loaded periods uses the customer master's salesperson (**Assumed (new)**); see [Role matrix](role-matrix.md).
-7. **Credit notes** have no feed yet; actuals are invoice-only until they do, and the page says so on every net-sales figure.
+7. **Credit notes (D40, 23 Oct 2026; Vijay interim yes, SP Sir to confirm):** actuals are invoiced until credit notes are loaded. Once every month of a quarter (up to today) is covered by a credit-note file, achievement and growth for that quarter and later use Net = invoiced − credit notes; earlier quarters stay on invoiced. Each figure is labelled Invoiced or Net. QoQ compares Net with Net only when both quarters are covered, otherwise invoiced with invoiced, and the tooltip says which. A month with no credit-note file shows "Credit notes not loaded", never zero. **Coverage is per plant-month (D45):** a plant-month is covered when the plant has credit-note rows in a loaded file for that month, or when the uploader ticked "This file covers all branches" at load (pre-ticked when the file has rows for more than half the active laminate plants; stored on the upload). A plant-quarter uses Net only when all its months are covered; a company, zone or group total uses Net only when every plant in scope is covered for every month, otherwise Invoiced, and the tooltip names the uncovered plants (max 5, then "+n"). Not available per salesperson. Targets stay set on invoiced sales. Build: [Credit note data map](../data-map/credit-note.md).
 
 ## Hand test for QA check 9
 Use the demo series in [Target model](target-model.md). Expected: Q3 FY27 QoQ is against Q2 FY27 (540.00); Q1 FY27 against Q4 FY26 (500.00); no view shows Q3 FY26 (470.00) beside Q3 FY27; grep finds no 12-month shift.

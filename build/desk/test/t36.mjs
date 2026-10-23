@@ -51,6 +51,6 @@ const ids=await page.evaluate(()=>Object.entries(window.__mockStore()).filter(([
 await page.click('[data-act="hist-undo"][data-id="'+ids[0][0]+'"]');await page.waitForTimeout(500);
 await page.click('[data-act="undo-go"]');await page.waitForTimeout(4000);
 const w=await page.evaluate(()=>{const m=window.__mockStore();return {cells:Object.keys(m).filter(k=>/^cells\/INV_/.test(k)).length,inv:Object.keys(m).filter(k=>/^inv\//.test(k)).length,roll:Object.keys(m).filter(k=>/^roll\//.test(k)).length,undone:Object.values(m).filter(v=>v&&v.status==='Undone').length,r5:Object.values(m).filter(v=>v&&v.rule==='R5').length}});
-ok('Undo upload works on an auto-loaded upload (cells, chunks, roll-ups, rejects and its R5 action removed)',w.cells===0&&w.inv===0&&w.roll===0&&w.undone===1&&w.r5===0,JSON.stringify(w));
+ok('Undo upload works on an auto-loaded upload: its R5 action is removed and the August data it replaced (earlier upload) is restored from the backup (D45)',w.cells===1&&w.inv===2&&w.roll===2&&w.undone===1&&w.r5===0,JSON.stringify(w));
 console.log(errs.filter(e=>!/ERR_FAILED/.test(e)).slice(0,3));
 console.log(res.join('\n'));await browser.close();

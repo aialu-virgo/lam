@@ -22,15 +22,16 @@ function pageSales(){
   if(!coord){
     var tot=figs({},ctx),spl=salesKpis(ctx,tot,tot.series);
     var cards=[];
-    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · Net sales · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded.',status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
+    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. '+cnNote(tot),status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
     cards.push(qtyCard(ctx,tot));
     var A=haveCust?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.cur):null,P=haveCust&&res.prior?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.prior):null;
     var nA=A?Array.from(A.values()).filter(function(c){return c.n>0}).length:null,nP=P?Array.from(P.values()).filter(function(c){return c.n>0}).length:null;
     cards.push(kpiCard({color:'orange',chip:'☺',title:'Customers billed · '+res.label,value:nA==null?'…':fmtN(nA),sub:'Unique customers invoiced.',status:'none',pillTxt:'No plan',ach:null,rows:[['Addressable','pending rules'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',nA!=null&&nP!=null?qoqCell(qoqOf(nA,nP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
     var rl=tot.sh>0?tot.A/tot.sh:null,rlP=tot.Psh>0?tot.P/tot.Psh:null;
-    cards.push(kpiCard({color:'green',chip:'%',title:'Realisation · ₹ per sheet',value:rl!=null?'₹ '+fmtN(Math.round(rl)):'—',sub:'Net sales ÷ sheets'+(tot.sq>0?' (₹ '+(tot.A/tot.sq).toFixed(1)+' per sq ft).':'.'),status:'none',pillTxt:'No plan',rows:[['Potential','n/a'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',rl!=null&&rlP!=null?qoqCell(qoqOf(rl,rlP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
+    cards.push(kpiCard({color:'green',chip:'%',title:'Realisation · ₹ per sheet',value:rl!=null?'₹ '+fmtN(Math.round(rl)):'—',sub:'Sales ÷ sheets'+(tot.sq>0?' (₹ '+(tot.A/tot.sq).toFixed(1)+' per sq ft).':'.'),status:'none',pillTxt:'No plan',rows:[['Potential','n/a'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',rl!=null&&rlP!=null?qoqCell(qoqOf(rl,rlP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
     h+='<div class="kpirow">'+cards.join('')+'</div>';
-    h+=trendCard('Quarters since '+qLabel(histStart())+' · Net sales'+(sc.sp?' (own)':''),{},ctx,undefined,'sl');
+    h+=trendCard('Quarters since '+qLabel(histStart())+' · Sales'+(sc.sp?' (own)':''),{},ctx,undefined,'sl');
+    h+=cnPanel(ctx);
     h+=drillPanel(ctx);
     h+=classTiles(ctx,haveCust,tot);
     h+=leaderboard(ctx);
@@ -172,7 +173,7 @@ function kpiCompute(id,u,ctx){
    case 'K9':{var co=collectionFigs(ctx,f&&f.plants);Object.assign(K,{name:'Collection achievement %',kind:'pct',actual:co.ach,plan:co.plan>0?100:null,detail:co.detail,none:co.plan<=0,pending:!co.have});break}
    case 'K10':{var rv=recvStats(f&&f.plants);Object.assign(K,{name:'Overdue share %',kind:'pct',actual:rv.have?rv.overShare:null,plan:15,lower:true,detail:rv.have?'':'Needs the receivable export',pending:!rv.have});break}
    case 'K11':{var rv2=recvStats(f&&f.plants);Object.assign(K,{name:'Ageing profile (0–30 / 31–60 / 61–90 / 90+)',kind:'text',text:rv2.have?rv2.buckets.map(function(b){return fmtMoney(b)}).join(' / '):'—',none:true,pending:!rv2.have});break}
-   case 'K15':case 'K16':{var st=stockStats(f&&f.plants);var m2=id==='K15'?['Stock days','days',st.have?st.days:null,CFG.stock_days_target,true]:['Aged stock %','pct',st.have?st.agedPct:null,10,true];Object.assign(K,{name:m2[0],kind:m2[1],actual:m2[2],plan:m2[3],lower:m2[4],pending:!st.have,detail:st.have?'':'Needs the stock export'});break}
+   case 'K15':case 'K16':{var st=stockStats(f&&f.plants);var m2=id==='K15'?['Stock days','days',st.have?st.days:null,CFG.stock_days_target,true]:['Aged stock %','pct',st.have&&st.hasAge?st.agedPct:null,10,true];Object.assign(K,{name:m2[0],kind:m2[1],actual:m2[2],plan:m2[3],lower:m2[4],pending:!st.have||(id==='K16'&&!st.hasAge),detail:st.have?(id==='K16'&&!st.hasAge?'Needs the batch stock export (ageing)':''):'Needs the stock export'});break}
    case 'K17':Object.assign(K,{name:'On-time closure %',kind:'pct',actual:pct(cur.onTime,cur.done),plan:90,last:pct(prv.onTime,prv.done),detail:cur.onTime+' of '+cur.done+' on time'});break;
    case 'K18':Object.assign(K,{name:'Response within 1 day %',kind:'pct',actual:pct(cur.quick,cur.assigned),plan:90,last:pct(prv.quick,prv.assigned),detail:cur.quick+' of '+cur.assigned+' assigned'});break;
    case 'K19':Object.assign(K,{name:'Overdue open actions',kind:'n',actual:cur.overdue,plan:0,lower:true,last:null,detail:'now'});break;
@@ -186,7 +187,7 @@ function kpiCompute(id,u,ctx){
   if(K.pending&&K.kind!=='text'){K.actual=null}
   /* achievement and status */
   if(K.plan!=null&&K.actual!=null&&K.kind!=='text'){
-    if(K.lower){K.ach=K.plan>0?K.actual/K.plan*100:(K.actual<=0?100:200);K.status=K.plan>0?statusOf(K.ach,true):(K.actual<=K.plan?'green':K.actual<=1?'orange':'red')}
+    if(K.lower){var al=achLower(K.actual,K.plan);K.ach=al.ach;K.within=al.within;K.over=!!al.over;K.status=K.plan>0?(al.within?'green':statusOf(K.ach)):(K.actual<=K.plan?'green':K.actual<=1?'orange':'red')}
     else{K.ach=K.plan>0?K.actual/K.plan*100:null;K.status=statusOf(K.ach)}
   }else K.status=K.none||K.kind==='text'?'none':'none';
   if(id==='K1'&&K.actual!=null){K.status=statusOf(K.actual)}
@@ -208,7 +209,7 @@ function kpiTable(u,ctx){
      var qoq='—';
      if(K.id==='K1'||K.id==='K2'||K.id==='K3')qoq=qoqCell(K.qoq);
      else if(K.last!=null&&K.actual!=null){var d=K.actual-K.last;qoq=K.kind==='pct'?'<span class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'−')+Math.abs(d).toFixed(1)+' pts</span>':(K.last>0?qoqCell(qoqOf(K.actual,K.last,{})):(d===0?'0':(d>0?'+':'−')+Math.abs(d)))}
-     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.ach!=null?fmtAch(K.ach,K.lower):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
+     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.over?'<b class="a-red">Over plan</b>':K.within?'<b class="a-green">Within plan</b>':K.ach!=null?fmtAch(K.ach):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
   return {html:h,on:on,scored:scored,total:rows.length};
 }
 function teamPeople(u){
@@ -245,9 +246,9 @@ function personTrend(p,f,ctx){
     if(!collAvailable(pl))return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Collections · '+esc(p.name)+'</h2></div>'+needPanel(['coll'],'No collection history is loaded, so the Accounts scorecard has no trend yet.')+'</section>';
     return trendCard('Quarters since '+qLabel(histStart())+' · Collections · '+p.name,{plants:pl},ctx,undefined,'tm',{series:collSeries(pl),kind:'coll'})+drillPanel(ctx);
   }
-  if(noData())return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
-  if(f==null)return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
-  return trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch KPIs were dropped (D31).</p>':'')+drillPanel(ctx);
+  if(noData())return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
+  if(f==null)return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
+  return trendCard('Quarters since '+qLabel(histStart())+' · Sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch KPIs were dropped (D31).</p>':'')+drillPanel(ctx);
 }
 
 /* salespeople from the sales-employee master that match the B1 names: scorecards for people who are not Desk users */
@@ -262,7 +263,7 @@ function teamSalespeople(ctx,u){
    +rows.map(function(r){return '<tr class="clk'+(S.team.sp===r.x.k?' sel':'')+'" data-act="team-sp" data-k="'+esc(r.x.k)+'"><td><b>'+esc(r.x.k)+'</b> <span class="note mono">'+esc(r.x.m.code)+'</span></td><td>'+esc(r.x.m.zone||'—')+'</td><td>'+esc(r.x.m.plant?plantShort(r.x.m.plant):(r.x.m.plantRaw||'—'))+'</td><td>'+esc(r.x.m.designation||'—')+'</td><td class="num">'+fmtMoney(r.o.A)+'</td><td class="num">'+fmtAch(r.o.ach)+'</td><td class="num">'+qoqCell(r.o.qoq)+'</td></tr>'}).join('')+'</tbody></table></div><p class="note">Names match the master exactly or after removing the " - &lt;branch&gt;" suffix. Facts only; no ranking label.</p>';
   if(S.team.sp&&list.some(function(x){return x.k===S.team.sp})){
     var m=spMeta(S.team.sp),p={name:S.team.sp,email:'',role:'Sales executive',department:'Sales',sales_employee_code:m.code,plant_codes:m.plant||''},kt=kpiTable(p,ctx);
-    h+='<div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(m.zone||'')+' · '+esc(m.plant?plantName(m.plant):(m.plantRaw||''))+'</h2><span class="note">'+kt.on+' of '+kt.scored+' scored KPIs on plan</span></div>'+kt.html+trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,{},ctx,S.team.sp,'tp')+drillPanel(ctx);
+    h+='<div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(m.zone||'')+' · '+esc(m.plant?plantName(m.plant):(m.plantRaw||''))+'</h2><span class="note">'+kt.on+' of '+kt.scored+' scored KPIs on plan</span></div>'+kt.html+trendCard('Quarters since '+qLabel(histStart())+' · Sales · '+p.name,{},ctx,S.team.sp,'tp')+drillPanel(ctx);
   }
   return h+'</section>';
 }

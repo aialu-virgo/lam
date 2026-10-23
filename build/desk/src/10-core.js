@@ -113,10 +113,10 @@ function fmtPct(v,sign,d){if(v==null||isNaN(v))return '—';d=d==null?1:d;var s=
 function fmtVarMoney(v){return (v>0?'+':v<0?'−':'')+fmtMoney(Math.abs(v))}
 
 /* ---- trend, moving average, Stretch (target-model.md) ---- */
-function trendStats(series){
+function trendStats(series,opt){
   /* series: numbers (or null for a quarter not loaded), oldest first. QoQ uses consecutive loaded pairs. */
   var n=series.length,qoqs=[],qoqAt=new Array(n).fill(null),ma=new Array(n).fill(null);
-  for(var i=1;i<n;i++){var a=series[i],p=series[i-1];if(a!=null&&p!=null&&p>0){var q=(a-p)/p*100;qoqs.push(q);qoqAt[i]=q}}
+  for(var i=1;i<n;i++){var a=series[i],p=series[i-1];if(opt&&opt.pairs){var pp=opt.pairs(i);if(pp){a=pp[0];p=pp[1]}}if(a!=null&&p!=null&&p>0){var q=(a-p)/p*100;qoqs.push(q);qoqAt[i]=q}}
   for(i=3;i<n;i++){var ok=true,s=0;for(var j=i-3;j<=i;j++){if(series[j]==null){ok=false;break}s+=series[j]}if(ok)ma[i]=s/4}
   var avg=qoqs.length?qoqs.reduce(function(a,b){return a+b},0)/qoqs.length:null;
   var sx=0,sy=0,sxx=0,sxy=0,k=0;for(i=0;i<n;i++){if(series[i]!=null){var x=i+1,y=series[i];sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;k++}}
@@ -138,6 +138,14 @@ function statusOf(ach,lowerBetter){
   if(lowerBetter){/* ach is actual/plan for lower-better KPIs */return ach<=100?'green':ach<=110?'orange':'red'}
   return ach>=CFG.status_green_pct?'green':ach>=CFG.status_orange_pct?'orange':'red';
 }
+/* D45: lower-is-better KPIs (K10, K15, K16, K19, K20, K21): achievement = plan / actual x 100, capped at 200%; actual 0 is "Within plan" */
+function achLower(actual,plan){
+  if(actual==null||isNaN(actual)||plan==null||isNaN(plan))return {ach:null,within:false};
+  if(actual<=0)return {ach:200,within:true};
+  if(!(plan>0))return {ach:null,within:false,over:true};
+  return {ach:Math.min(200,plan/actual*100),within:false};
+}
+function fmtAchLower(a){return a.over?'<b class="a-red">Over plan</b>':a.within?'<b class="a-green">Within plan</b>':(a.ach==null?'<span class="note">—</span>':fmtAch(a.ach))}
 function statusPill(st,txt){var m={green:['ok','On plan'],orange:['part','Watch'],red:['miss','Behind'],none:['mute','No plan'],pending:['mute','Pending']}[st]||['mute',st];return '<span class="pill '+m[0]+'">'+esc(txt||m[1])+'</span>'}
 function fmtSqft(v){return fmtN(Math.round(v||0))+' sq ft'}
 /* sheets are the primary quantity unit; sq ft is the secondary line */

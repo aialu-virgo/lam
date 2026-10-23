@@ -1,0 +1,77 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';import zlib from 'zlib';import { createRequire } from 'module';
+const require=createRequire(import.meta.url);const G=require('../../demo-data/generator.js');
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';const AF=SP+'af/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+const browser=await chromium.launch();const res=[];const ok=(n,c,d)=>res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
+const csvOf=(h,rows)=>[h.join(',')].concat(rows.map(r=>r.map(v=>{v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(','))).join('\n');
+const items=JSON.parse(zlib.gunzipSync(Buffer.from(store['items/c0'].z,'base64')).toString()).map(a=>a[0]);
+const plants=Object.keys(store).filter(k=>/^plants\//.test(k)&&store[k].plant_name&&/^DEMO/.test(store[k].plant_name)).slice(0,2).map(k=>({code:k.slice(7),name:store[k].plant_name}));
+const st0=JSON.parse(JSON.stringify(store));Object.keys(st0).forEach(k=>{if(/^(collections|receivables|stock|creditnotes|backups|uploads|rejects|actions|followups|cells|inv|roll)\//.test(k))delete st0[k]});
+let {page,errs}=await open(browser,{store:st0,autoload:true});await page.waitForTimeout(3500);
+await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(700);
+const ms=p=>page.evaluate(p=>Object.fromEntries(Object.entries(window.__mockStore()).filter(([k])=>new RegExp(p).test(k))),p);
+const up=async(f,kind)=>{await page.click('[data-act="u-reset"]').catch(()=>{});const inp=await page.$('input[type=file]');await inp.setInputFiles(f);await page.waitForFunction(n=>window.__desk.U&&window.__desk.U.name===n&&['mapping','validated','done'].includes(window.__desk.U.stage),f.split('/').pop(),{timeout:60000});await page.waitForTimeout(300)};
+const undo=async fileRe=>{await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(500);await page.click('[data-act="u-reset"]').catch(()=>{});
+  const id=await page.evaluate(re=>Object.entries(window.__mockStore()).filter(([k,v])=>k.startsWith('uploads/')&&v.file&&new RegExp(re).test(v.file)&&v.status!=='Undone').sort((a,b)=>a[1].at<b[1].at?1:-1).map(([k])=>k.slice(8))[0],fileRe);
+  await page.click('[data-act="hist-undo"][data-id="'+id+'"]');await page.waitForTimeout(600);const dt=await page.innerText('#dlg');await page.click('[data-act="undo-go"]');await page.waitForTimeout(5000);const after=await page.innerText('#dlg').catch(()=>'');if(/Undo stopped/.test(after))console.log('UNDOERR',after.slice(after.indexOf('Undo stopped'),after.indexOf('Undo stopped')+300));await page.click('[data-act="dlg-close"]').catch(()=>{});await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(500);return {id,dt}};
+/* ---------- collections ---------- */
+const CH=['#','BRANCHNAME','DOCNUM','DOCDATE','DOCTYPE','PAYMENTMEANS','ACCOUNT','ACCOUNTNAME','CARDCODE','CARDNAME','CITY','CHECK_DATE','CHECKNO','CHECKSUM','TARNSFERREF','TRANSFER_DATE','TRANSFERSUM','CASHSUM','REMARKS','JOURNALREMARK'];
+const crow=(n,doc,amt)=>[n,'DEMO plant 1012',doc,'10/08/2026','C','Bank','','','DEMOCU1','DEMO C1','','','',0,'','',amt,0,'',''];
+fs.writeFileSync(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31.csv',csvOf(CH,[crow(1,1,1000),crow(2,2,2000)]));
+await up(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31.csv');await page.click('[data-act="coll-validate"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000});
+let b=await ms('^backups/');ok('a first load keeps no backup',Object.keys(b).length===0,'');
+fs.writeFileSync(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31 b.csv',csvOf(CH,[crow(1,1,1000),crow(2,2,2500),crow(3,3,500)]));
+await up(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31 b.csv');await page.click('[data-act="coll-validate"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000});await page.waitForTimeout(800);
+let c=await ms('^collections/');b=await ms('^backups/');
+ok('collections: replacing a month keeps the previous document in a backup (1 doc)',c['collections/1012-2026-08'].total===4000&&Object.keys(b).length===1,JSON.stringify([c['collections/1012-2026-08'].total,Object.keys(b)]));
+let u=await undo('31 b');
+c=await ms('^collections/');b=await ms('^backups/');
+ok('collections: Undo restores the previous data, and the dialog says so; backup removed',c['collections/1012-2026-08']&&c['collections/1012-2026-08'].total===3000&&/Undo restores the previous data/.test(u.dt)&&Object.keys(b).length===0,JSON.stringify([c['collections/1012-2026-08']&&c['collections/1012-2026-08'].total,/restores the previous/.test(u.dt),Object.keys(b).length]));
+/* ---------- receivables ---------- */
+const RH=['DocNum','DocDate','DocDueDate','CardCode','CardName','BPLName','DocTotal','PaidToDate'];
+fs.writeFileSync(AF+'bk_open_2026-10-20.csv',csvOf(RH,[[1,'05/08/2026','05/09/2026','DEMOCU1','C1','DEMO plant 1012',1000,0]]));
+const rv=async f=>{await up(f);await page.evaluate(()=>document.querySelector('[data-act="rc-validate"]').click());await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000});await page.waitForTimeout(600)};
+await rv(AF+'bk_open_2026-10-20.csv');
+fs.writeFileSync(AF+'bk_open_2026-10-20 v2.csv',csvOf(RH,[[1,'05/08/2026','05/09/2026','DEMOCU1','C1','DEMO plant 1012',5000,0]]));
+await rv(AF+'bk_open_2026-10-20 v2.csv');
+let r=await ms('^receivables/rsnap');b=await ms('^backups/');
+ok('receivables: the same as-on date replaced; the old snapshot is in a backup',r['receivables/rsnap_20261020'].open===5000&&Object.keys(b).length===1,JSON.stringify([r['receivables/rsnap_20261020'].open,Object.keys(b)]));
+u=await undo('v2');r=await ms('^receivables/rsnap');b=await ms('^backups/');
+ok('receivables: Undo restores the earlier snapshot of that date',r['receivables/rsnap_20261020']&&r['receivables/rsnap_20261020'].open===1000&&/Undo restores the previous data/.test(u.dt)&&Object.keys(b).length===0,JSON.stringify([r['receivables/rsnap_20261020']&&r['receivables/rsnap_20261020'].open,Object.keys(b).length]));
+/* ---------- credit notes ---------- */
+const NH=['DocNum','LineNum','DocDate','CardCode','CardName','BPLName','ItemCode','Quantity','LineTotal','BaseRef'];
+const nrow=(d,v)=>[d,0,'05/08/2026','DEMOCU1','C1','DEMO plant 1012','DEMOFG00001',2,v,9];
+const cn=async f=>{await up(f);await page.evaluate(()=>{const b=document.querySelector('[data-act="cn-validate"]');if(b)b.click()});await page.waitForFunction(()=>window.__desk.U.stage==='validated'||window.__desk.U.stage==='done',null,{timeout:20000});await page.waitForTimeout(500);if(await page.evaluate(()=>window.__desk.U.stage)==='validated'){await page.click('[data-act="cn-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000})}await page.waitForTimeout(600)};
+fs.writeFileSync(AF+'bk_cn_-2026-08-01_to_2026-08-31.csv',csvOf(NH,[nrow(1,100)]));await cn(AF+'bk_cn_-2026-08-01_to_2026-08-31.csv');
+fs.writeFileSync(AF+'bk_cn_-2026-08-01_to_2026-08-31 v2.csv',csvOf(NH,[nrow(1,100),nrow(2,900)]));await cn(AF+'bk_cn_-2026-08-01_to_2026-08-31 v2.csv');
+let n=await ms('^creditnotes/1012');ok('credit notes: replaced plant-month holds the new value',n['creditnotes/1012-2026-08'].groups.Laminate.value===1000,'');
+u=await undo('v2');n=await ms('^creditnotes/1012');b=await ms('^backups/');
+ok('credit notes: Undo restores the previous plant-month',n['creditnotes/1012-2026-08']&&n['creditnotes/1012-2026-08'].groups.Laminate.value===100&&Object.keys(b).length===0,JSON.stringify(n['creditnotes/1012-2026-08']&&n['creditnotes/1012-2026-08'].groups));
+/* ---------- stock ---------- */
+const s4a=G.stockFile({kind:'s4',asOf:'2026-10-20',plants,items,seed:6}),s4b=G.stockFile({kind:'s4',asOf:'2026-10-20',plants,items,seed:11});
+fs.writeFileSync(AF+'MB52 bk 2026-10-20.csv',csvOf(s4a.headers,s4a.rows));fs.writeFileSync(AF+'MB52 bk 2026-10-20 v2.csv',csvOf(s4b.headers,s4b.rows));
+const stk=async f=>{await up(f);await page.click('[data-act="stk-validate"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:60000});await page.waitForTimeout(600)};
+await stk(AF+'MB52 bk 2026-10-20.csv');const s1=(await ms('^stock/snap_'))['stock/snap_20261020'];
+await stk(AF+'MB52 bk 2026-10-20 v2.csv');let s2=(await ms('^stock/snap_'))['stock/snap_20261020'];b=await ms('^backups/');
+ok('stock: same as-on date replaced; previous snapshot and item chunks backed up',s2.upload!==s1.upload&&Object.keys(b).length>=1,JSON.stringify([s1.upload,s2.upload,Object.keys(b).length]));
+u=await undo('v2');let s3=(await ms('^stock/snap_'))['stock/snap_20261020'];b=await ms('^backups/');const its=await ms('^stock/it_20261020');
+ok('stock: Undo restores the earlier snapshot and its item rows',s3&&s3.upload===s1.upload&&Object.keys(its).length>=1&&Object.keys(b).length===0,JSON.stringify([s3&&s3.upload===s1.upload,Object.keys(its).length]));
+/* ---------- sales ---------- */
+const clean=G.invoices({shape:'B1',plants,months:['2026-04'],docsPerPlantMonth:20,seed:5,dateStyle:'iso'});fs.writeFileSync(AF+'Combine Sale bk 2026-04 clean.csv',csvOf(clean.headers,clean.rows));
+const thin=G.invoices({shape:'B1',plants:[plants[0]],months:['2026-04'],docsPerPlantMonth:2,seed:5,dateStyle:'iso'});fs.writeFileSync(AF+'Combine Sale bk 2026-04 thin.csv',csvOf(thin.headers,thin.rows));
+await page.evaluate(()=>{window.__NOAUTOLOAD=false});
+const inv=async f=>{await up(f);await page.evaluate(()=>{const b=document.querySelector('[data-act="u-validate"]');if(b)b.click()});await page.waitForFunction(()=>window.__desk.U.stage==='done'||window.__desk.U.stage==='validated',null,{timeout:90000});
+  if(await page.evaluate(()=>window.__desk.U.stage)==='validated'){if(await page.$('[data-chg="confrep"]'))await page.check('[data-chg="confrep"]');if(await page.$('#u-reason'))await page.fill('#u-reason','reload');await page.waitForTimeout(300);await page.click('[data-act="u-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:90000})}await page.waitForTimeout(800)};
+await inv(AF+'Combine Sale bk 2026-04 clean.csv');
+const cell0=(await ms('^cells/INV_2026-04'))['cells/INV_2026-04'].plants[plants[0].code];
+await inv(AF+'Combine Sale bk 2026-04 thin.csv');
+const cell1=(await ms('^cells/INV_2026-04'))['cells/INV_2026-04'].plants[plants[0].code];b=await ms('^backups/');
+ok('sales: the thin file replaced plant 1 for April; the previous chunks, roll-up and cell entry are in a backup',cell1.upload!==cell0.upload&&Object.keys(b).length>=1,JSON.stringify([cell0.lines,cell1.lines,Object.keys(b).length]));
+console.log('BK',JSON.stringify(Object.entries(await ms('^backups/')).map(([k,v])=>[k,v.upload,v.entity,v.n])),JSON.stringify(Object.entries(await ms('^uploads/')).filter(([k,v])=>/thin/.test(v.file||'')).map(([k,v])=>[k,v.status,v.backup])));u=await undo('thin');const cell2=(await ms('^cells/INV_2026-04'))['cells/INV_2026-04'];b=await ms('^backups/');const roll=(await ms('^roll/'+plants[0].code+'-2026-04'));
+ok('sales: Undo restores the earlier plant-month (cell entry, chunks, roll-up)',cell2&&cell2.plants[plants[0].code]&&cell2.plants[plants[0].code].upload===cell0.upload&&cell2.plants[plants[0].code].lines===cell0.lines&&Object.keys(roll).length===1&&Object.keys(b).length===0&&/Undo restores the previous data/.test(u.dt),JSON.stringify([cell2&&cell2.plants[plants[0].code]&&cell2.plants[plants[0].code].lines,cell0.lines,Object.keys(roll).length,Object.keys(b).length]));
+/* ---------- retention ---------- */
+await page.evaluate(()=>window.__mockStore());
+const bytes=await page.evaluate(()=>0);
+console.log(errs.filter(e=>!/ERR_FAILED/.test(e)).slice(0,3));
+console.log(res.join('\n'));await browser.close();
