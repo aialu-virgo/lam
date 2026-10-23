@@ -137,7 +137,7 @@ async function stockParse(){
 async function stockWrite(res,meta){
   var d8=compactYmd(res.asOf),id='snap_'+d8,old=S.stockRaw.find(function(x){return x._id===id}),plants={},uid=meta.uid,ci=0;
   var pk=Object.keys(res.plants).sort(),B=bkNew(uid,'ST',meta.demo);
-  if(old){bkAdd(B,'stock/'+id,old);S.stockRaw.forEach(function(d){if(d._id.indexOf('it_'+d8+'_')===0)bkAdd(B,'stock/'+d._id,d)});await bkFlush(B);meta.backup=bkSummary(B)}
+  if(old){bkAdd(B,'stock/'+id,old);S.stockRaw.forEach(function(d){if(d._id.indexOf('it_'+d8+'_')===0)bkAdd(B,'stock/'+d._id,d)});await bkCommit(B)}
   for(var pi=0;pi<pk.length;pi++){
     var p=pk[pi],P=res.plants[p],rows=P.rows,per=1500,n=Math.max(1,Math.ceil(rows.length/per)),groups={};
     Object.keys(P.groups).forEach(function(g){var G=P.groups[g];groups[g]={sheets:Math.round(G.sheets),sqft:Math.round(G.sqft),value:G.hasValue?Math.round(G.value):null,items:G.items.size,age:G.ageKnown>0?G.age.map(Math.round):null,over:G.ageKnown>0?Math.round(G.over):null,ageKnown:Math.round(G.ageKnown)}});

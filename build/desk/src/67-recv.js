@@ -136,7 +136,7 @@ async function recvLoad(){
   U.stage='loading';U.progressMsg='Writing the snapshot...';recvRender();await tick();
   var pk=Object.keys(r.plants).sort(),plants={},done=0,B=bkNew(uid,'RC',demo);
   try{
-    if(old){bkAdd(B,'receivables/'+id,old);S.recvRaw.forEach(function(d){if(d._id.indexOf('ri_'+d8+'_')===0)bkAdd(B,'receivables/'+d._id,d)});await bkFlush(B)}
+    if(old){bkAdd(B,'receivables/'+id,old);S.recvRaw.forEach(function(d){if(d._id.indexOf('ri_'+d8+'_')===0)bkAdd(B,'receivables/'+d._id,d)});await bkCommit(B)}
     for(var pi=0;pi<pk.length;pi++){
       var p=pk[pi],P=r.plants[p],rows=P.rows,per=1200,n=Math.max(1,Math.ceil(rows.length/per));
       for(var c=0;c<n;c++)await dset('receivables/ri_'+d8+'_'+p+'_'+c,{z:await gz(JSON.stringify(rows.slice(c*per,(c+1)*per))),as_of:r.asOf,plant:p,i:c,n:rows.length,upload:uid,demo:demo||undefined,fmt:'gz-json v1: [doc,customer,name,due,open,total,docDate]'});

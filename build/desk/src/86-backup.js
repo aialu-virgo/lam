@@ -6,28 +6,76 @@
  * Cost: one backup document per ~450 KB of replaced JSON; bytes are about the size of the data replaced (sales chunks are already compressed, so they are stored near 1:1).
  * Nothing is backed up for a first load. */
 S.backups=[];
-var BK_DAYS=30;
-function bkNew(uid,entity,demo){return {uid:uid,entity:entity,demo:!!demo,items:[],seen:{},i:0,docs:0,bytes:0,count:0}}
-function bkAdd(B,path,data){if(B.demo||!data||B.seen[path])return;B.seen[path]=1;var o=Object.assign({},data);delete o._id;B.items.push({p:path,d:o})}
+var BK_DAYS=30,BK_MAX=240000,BK_CAP=20*1024*1024;
+/* D46: the database caps a document at 256 KiB, so every backup document is sized by what is finally stored (after gzip and encoding): at most 240,000 bytes of z.
+ * All backup documents are written BEFORE any replacing starts; if that fails nothing has been replaced. All backups together stay under 20 MB:
+ * expired and then oldest backups are purged first; if the new one still does not fit, the uploader must confirm that Undo cannot restore it. */
+function bkNew(uid,entity,demo){return {uid:uid,entity:entity,demo:!!demo,items:[],seen:{},raw:0,pend:[],pendBytes:0,i:0,docs:0,bytes:0,count:0,skipped:false}}
+function bkAdd(B,path,data){if(B.demo||!data||B.seen[path])return;B.seen[path]=1;var o=Object.assign({},data);delete o._id;var it={p:path,d:o};B.raw+=JSON.stringify(it).length;B.items.push(it)}
 async function bkAddDb(B,path){if(B.demo||B.seen[path])return;var s=await dget(path);if(s.exists)bkAdd(B,path,s.data())}
-async function bkFlush(B){
-  var items=B.items;if(!items.length)return B;B.items=[];
-  var groups=[],cur=[],len=0;
-  items.forEach(function(it){var l=JSON.stringify(it).length;if(cur.length&&len+l>450000){groups.push(cur);cur=[];len=0}cur.push(it);len+=l});if(cur.length)groups.push(cur);
-  var exp=new Date(Date.now()+BK_DAYS*864e5).toISOString();
-  for(var g=0;g<groups.length;g++){var idx=B.i++,z=await gz(JSON.stringify(groups[g]));B.bytes+=z.length;
-    await dset('backups/'+B.uid+'_'+idx,{upload:B.uid,entity:B.entity,i:idx,n:groups[g].length,z:z,at:nowISO(),expires:exp});B.docs++}
-  B.count+=items.length;
+/* compress the collected items into documents of at most BK_MAX stored bytes (split until they fit; one oversized item is cut into parts) */
+async function bkPack(items){
+  var out=[];
+  async function go(list){
+    var z=await gz(JSON.stringify(list));
+    if(z.length<=BK_MAX){out.push({z:z,n:list.length});return}
+    if(list.length>1){var h=list.length>>1;await go(list.slice(0,h));await go(list.slice(h));return}
+    var js=JSON.stringify(list[0]),n=Math.ceil(js.length/120000);
+    for(var k=0;k<n;k++)await go([{p:'part:'+list[0].p,k:k,n:n,s:js.slice(k*120000,(k+1)*120000)}]);
+  }
+  var cur=[],len=0;
+  for(var a=0;a<items.length;a++){var l=JSON.stringify(items[a]).length;if(cur.length&&len+l>400000){await go(cur);cur=[];len=0}cur.push(items[a]);len+=l}
+  if(cur.length)await go(cur);
+  return out;
+}
+async function bkPrep(B){
+  if(!B.items.length)return B;var items=B.items;B.items=[];B.raw=0;B.seen={};
+  var docs=await bkPack(items);docs.forEach(function(d){B.pend.push(d);B.pendBytes+=d.z.length});B.count+=items.length;
   return B;
 }
-function bkSummary(B){return B&&B.docs?{docs:B.docs,bytes:B.bytes,items:B.count}:undefined}
+async function bkMaybe(B){if(B.raw>600000)await bkPrep(B)}
+function bkStored(){return S.backups.reduce(function(a,d){return a+(d.z||'').length},0)}
+function bkAsk(){return new Promise(function(res){S.bkResolve=res;openDlg('<h3>No room for a backup</h3><p>The backups held already use the 20 MB limit and the data this upload replaces does not fit.</p><div class="banner warn" style="display:block"><b>Undo will not be able to restore the replaced months for this upload.</b></div><div class="row"><button class="btn pri" data-act="bk-go">Load anyway</button><button class="btn" data-act="bk-cancel">Cancel the load</button></div>')})}
+Object.assign(handlers,{
+ 'bk-go':function(){closeDlg();var r=S.bkResolve;S.bkResolve=null;if(r)r(true)},
+ 'bk-cancel':function(){closeDlg();var r=S.bkResolve;S.bkResolve=null;if(r)r(false)}
+});
+/* write every backup document now; call once, before the first replacing write */
+async function bkCommit(B){
+  await bkPrep(B);
+  if(!B.pend.length)return B;
+  var need=B.pendBytes,total=bkStored(),now=nowISO();
+  if(total+need>BK_CAP){
+    var ex=S.backups.filter(function(d){return d.upload!==B.uid}).sort(function(a,b){var ea=(a.expires&&a.expires<now)?0:1,eb=(b.expires&&b.expires<now)?0:1;return ea!==eb?ea-eb:((a.at||'')<(b.at||'')?-1:1)});
+    for(var k=0;k<ex.length&&total+need>BK_CAP;k++){total-=(ex[k].z||'').length;await ddel('backups/'+ex[k]._id)}
+  }
+  if(need>BK_CAP||total+need>BK_CAP){
+    var go=await bkAsk();
+    if(!go)throw new Error('the load was cancelled because the backup does not fit; nothing was changed.');
+    B.pend=[];B.pendBytes=0;B.skipped=true;return B;
+  }
+  var exp=new Date(Date.now()+BK_DAYS*864e5).toISOString(),written=[];
+  try{
+    for(var g=0;g<B.pend.length;g++){var idx=B.i++;
+      await dset('backups/'+B.uid+'_'+idx,{upload:B.uid,entity:B.entity,i:idx,n:B.pend[g].n,z:B.pend[g].z,at:nowISO(),expires:exp});written.push('backups/'+B.uid+'_'+idx)}
+  }catch(e){
+    for(var w=0;w<written.length;w++){try{await ddel(written[w])}catch(e2){}}
+    throw new Error('the backup of the data being replaced could not be saved; nothing was changed.');
+  }
+  B.docs=B.pend.length;B.bytes=B.pendBytes;B.pend=[];B.pendBytes=0;
+  return B;
+}
+function bkSummary(B){return B&&(B.docs||B.skipped)?{docs:B.docs,bytes:B.bytes,items:B.count,skipped:B.skipped||undefined}:undefined}
 function bkFor(uid){return S.backups.filter(function(d){return d.upload===uid}).sort(function(a,b){return a.i-b.i})}
 function bkHas(uid){return S.backups.some(function(d){return d.upload===uid})}
 /* restore the saved documents for which allow(path) is true; cell entries of sales plant-months are returned for the caller to merge */
 async function bkRestore(uid,allow){
   var docs=bkFor(uid),n=0,cells=[];
+  var parts={};
   for(var i=0;i<docs.length;i++){var items=JSON.parse(await ungz(docs[i].z));
-    for(var j=0;j<items.length;j++){var it=items[j];if(allow&&!allow(it.p))continue;
+    for(var j=0;j<items.length;j++){var it=items[j];
+      if(it.p.indexOf('part:')===0){var pp=it.p.slice(5);(parts[pp]=parts[pp]||[])[it.k]=it.s;if(parts[pp].filter(function(x){return x!=null}).length===it.n){it=JSON.parse(parts[pp].join(''));delete parts[pp]}else continue}
+      if(allow&&!allow(it.p))continue;
       if(it.p.indexOf('cellpart:')===0){cells.push(it);continue}
       await dset(it.p,it.d);n++}}
   return {n:n,cells:cells};

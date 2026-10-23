@@ -126,17 +126,17 @@ async function collLoad(){
   U.stage='loading';U.progressMsg='Writing...';collRender();await tick();
   var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice(),atNow=nowISO(),B=bkNew(uid,'CL',demo);
   try{
+    for(var bi=0;bi<list.length;bi++){var bo=S.coll.find(function(d){return d._id===list[bi].plant+'-'+list[bi].ym});if(bo&&(bo.n||0)>0){bkAdd(B,'collections/'+list[bi].plant+'-'+list[bi].ym,bo);await bkMaybe(B)}}
+    await bkCommit(B);/* backups first: nothing is replaced until they are saved */
     await Promise.all([0,1,2,3].map(async function(){
       while(q.length){var P=q.shift(),old=S.coll.find(function(d){return d._id===P.plant+'-'+P.ym});
         var doc={plant:P.plant,ym:P.ym,total:Math.round(P.total*100)/100,n:P.rows.length,sys:'B1',src:'RCT',upload:uid,at:atNow,demo:demo||undefined};
         if(old&&old.plan!=null)doc.plan=old.plan;
-        if(old&&(old.n||0)>0){bkAdd(B,'collections/'+P.plant+'-'+P.ym,old);if(B.items.length>=20)await bkFlush(B)}
         var txt=JSON.stringify(P.rows);
         if(txt.length<=170000)doc.rows=P.rows;
         else{var top=P.rows.slice().sort(function(a,b){return b[3]-a[3]}).slice(0,1500);doc.rows=top;doc.z=await gz(txt);doc.rows_note='top 1500 by amount; all rows in z (gz-json)'}
         await dset('collections/'+P.plant+'-'+P.ym,doc);done++;U.progress=Math.round(done/total*100);U.progressMsg='Writing plant-month '+done+' of '+total;var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%'}
     }));
-    await bkFlush(B);
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
   }catch(e){failed=e}
   var ms=Object.keys(r.months).sort();

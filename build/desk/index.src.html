@@ -822,6 +822,11 @@ async function runLoad(opts){
   var yms=Object.keys(byYm).sort(),total=pms.length,done=0,bytes=0,docsW=0,failed=null,loadedLines=0,stopped=false,B=bkNew(uid,'INV',demo);
   var reloadAudit=null,closedTouched=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
   try{
+    /* D46: save a backup of everything this load replaces BEFORE the first replacing write */
+    if(!demo){for(var by0=0;by0<yms.length;by0++){var ym0=yms[by0],cl0=S.cells['INV_'+ym0];if(!cl0||!cl0.plants)continue;
+      for(var bp=0;bp<byYm[ym0].length;bp++){var P0=byYm[ym0][bp],o0=cl0.plants[P0.plant];if(!o0||o0.demo)continue;
+        for(var bi=0;bi<(o0.chunks||0);bi++)await bkAddDb(B,'inv/'+o0.sys+'-'+P0.plant+'-'+ym0+'-'+bi);var rd0=S.rollDocs&&S.rollDocs[P0.plant+'-'+ym0];if(rd0)bkAdd(B,'roll/'+P0.plant+'-'+ym0,rd0);bkAdd(B,'cellpart:'+ym0+':'+P0.plant,o0);await bkMaybe(B)}}}
+    await bkCommit(B);
     if(closedTouched.length){await dset('log/'+uid,{at:nowISO(),by:by,event:'closed quarter reloaded',quarters:closedTouched,reason:U.reason||'',upload:uid,file:U.name});reloadAudit=await auditW('closed quarter reloaded',closedTouched.join(','),{quarters:closedTouched,from:nowISO(),reason:U.reason||'',upload:uid,demo:demo||undefined})}
     outer:for(var yi=0;yi<yms.length;yi++){
       var ym=yms[yi],cellId='INV_'+ym;
@@ -833,7 +838,6 @@ async function runLoad(opts){
         var P=ps[pi];
         U.progressMsg='Writing '+ym+' plant '+P.plant+' ('+(done+1)+' of '+total+')';U.progress=Math.round(done/total*100);paintProgress();
         var old0=cell.plants[P.plant];
-        if(old0&&!old0.demo&&!demo){for(var bi=0;bi<(old0.chunks||0);bi++)await bkAddDb(B,'inv/'+old0.sys+'-'+P.plant+'-'+ym+'-'+bi);var rd0=S.rollDocs&&S.rollDocs[P.plant+'-'+ym];if(rd0)bkAdd(B,'roll/'+P.plant+'-'+ym,rd0);bkAdd(B,'cellpart:'+ym+':'+P.plant,old0);if(B.items.length>=6)await bkFlush(B)}
         if(demo&&old0&&!old0.demo)throw new Error('Demo write refused: '+P.plant+' '+ym+' holds real SAP data');
         var chunks=await packChunks(sys,P);
         var old=cell.plants[P.plant],lines=0,docsN=P.docs.size,net=0,sheets=0,cb=0;
@@ -847,7 +851,6 @@ async function runLoad(opts){
         await writeRoll(P.plant,ym,sys,rollRowsOf(P.agg),atNow,demo);
         bytes+=cb;loadedLines+=lines;done++;
       }
-      await bkFlush(B);
       await dset('cells/'+cellId,cell);S.cells[cellId]=cell;
       for(var si=0;si<stale.length;si++)await ddel(stale[si]);
     }
@@ -1280,7 +1283,7 @@ async function boot(){
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},bkStored:bkStored,gz:gz};
 boot();
 })();
 </script>

@@ -137,20 +137,20 @@ async function cnLoad(){
   U.stage='loading';U.progressMsg='Writing...';cnRender();await tick();
   var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice(),B=bkNew(uid,'CN',demo);
   var cnOld=function(plant,ym){return S.cnRaw.filter(function(d){return d.plant===plant&&d.ym===ym&&!d.cov})};
+  var cnDel=[];
   try{
+    var lamAll=cnLamPlants();
+    for(var li0=0;li0<list.length;li0++){cnOld(list[li0].plant,list[li0].ym).forEach(function(d){bkAdd(B,'creditnotes/'+d._id,d)});await bkMaybe(B)}
+    if(U.allBranches){for(var ci0=0;ci0<r.covMonths.length;ci0++)for(var li=0;li<lamAll.length;li++){var lp=lamAll[li];if(r.pm.has(lp+'|'+r.covMonths[ci0]))continue;var od=cnOld(lp,r.covMonths[ci0]);if(!od.length)continue;od.forEach(function(d){bkAdd(B,'creditnotes/'+d._id,d)});cnDel.push(od);await bkMaybe(B)}}
+    await bkCommit(B);/* backups first: nothing is replaced until they are saved */
     await Promise.all([0,1,2,3].map(async function(){
-      while(q.length){var P=q.shift(),olds=cnOld(P.plant,P.ym);olds.forEach(function(d){bkAdd(B,'creditnotes/'+d._id,d)});if(B.items.length>=20)await bkFlush(B);var per=2500,n=Math.max(1,Math.ceil(P.lines.length/per)),id=P.plant+'-'+P.ym,groups={};
+      while(q.length){var P=q.shift(),per=2500,n=Math.max(1,Math.ceil(P.lines.length/per)),id=P.plant+'-'+P.ym,groups={};
         Object.keys(P.groups).forEach(function(g){var G=P.groups[g];groups[g]={sheets:Math.round(G.sheets),sqft:Math.round(G.sqft),value:Math.round(G.value*100)/100,lines:G.lines}});
         for(var c=1;c<n;c++)await dset('creditnotes/'+id+'~'+c,{plant:P.plant,ym:P.ym,chunk:c,z:await gz(JSON.stringify(P.lines.slice(c*per,(c+1)*per))),upload:uid,demo:demo||undefined});
         await dset('creditnotes/'+id,{plant:P.plant,ym:P.ym,groups:groups,n:P.lines.length,chunks:n,z:await gz(JSON.stringify(P.lines.slice(0,per))),fmt:'gz-json v1: [doc,line,day,customer,item,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sheets,value,baseDoc]',sys:U.sys,src:U.sys==='S4'?'billing credit memo':'ORIN/RIN1',upload:uid,at:atNow,demo:demo||undefined});
         done++;U.progress=Math.round(done/total*100);U.progressMsg='Writing plant-month '+done+' of '+total;var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%'}
     }));
-    var lamAll=cnLamPlants();
-    if(U.allBranches){/* a covered plant-month with no row in this file now holds none: the old documents are removed (kept in the backup) */
-      for(var ci0=0;ci0<r.covMonths.length;ci0++)for(var li=0;li<lamAll.length;li++){var lp=lamAll[li];if(r.pm.has(lp+'|'+r.covMonths[ci0]))continue;var od=cnOld(lp,r.covMonths[ci0]);if(!od.length)continue;
-        od.forEach(function(d){bkAdd(B,'creditnotes/'+d._id,d)});await bkFlush(B);for(var oi=0;oi<od.length;oi++)await ddel('creditnotes/'+od[oi]._id)}
-    }
-    await bkFlush(B);
+    for(var di=0;di<cnDel.length;di++)for(var oi=0;oi<cnDel[di].length;oi++)await ddel('creditnotes/'+cnDel[di][oi]._id);/* covered plant-months with no row now hold none (the old documents are in the backup) */
     for(var ci=0;ci<r.covMonths.length;ci++){var cm=r.covMonths[ci],pls={};r.pm.forEach(function(P){if(P.ym===cm)pls[P.plant]=1});if(U.allBranches)lamAll.forEach(function(p){pls[p]=1});
       await dset('creditnotes/cov_'+cm+'_'+uid,{ym:cm,cov:true,plants:Object.keys(pls).sort(),all_branches:!!U.allBranches,backup:bkSummary(B),upload:uid,at:atNow,demo:demo||undefined})}
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
