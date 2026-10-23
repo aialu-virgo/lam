@@ -2,7 +2,7 @@
 S.adminTab='users';S.rbBusy=false;
 function adminTabs(){
   var r=effRole();
-  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['aliases','Aliases'],['settings','Rules & settings'],['tools','Tools']];
+  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['customers','Customers'],['aliases','Aliases'],['settings','Rules & settings'],['tools','Tools']];
   return [['potential','Market potential']];
 }
 function buildAdmin(){
@@ -15,7 +15,7 @@ function refreshAdmin0(){
   var el=$('#a-body');if(!el)return;
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
   var focusId=document.activeElement&&document.activeElement.id,t=S.adminTab;
-  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():t==='aliases'?aliasesHtml():potentialHtml();
+  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():t==='customers'?custHtml():t==='aliases'?aliasesHtml():potentialHtml();
   if(el.getAttribute('data-h')!==String(html.length)+t||(t!=='settings'&&t!=='aliases')){el.innerHTML=html;el.setAttribute('data-h',String(html.length)+t)}
   if(focusId){var f=document.getElementById(focusId);if(f&&f.focus){f.focus();try{var v=f.value;if(f.setSelectionRange&&f.type!=='number'&&f.type!=='email'&&f.type!=='date')f.setSelectionRange(v.length,v.length)}catch(e){}}}
 }

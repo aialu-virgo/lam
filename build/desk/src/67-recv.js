@@ -30,11 +30,12 @@ function recvDetect(headers){
   else if(set['branchname']&&set['balance'])layout='B1 custom open-items report';
   return {kind:'recv',sys:(layout.indexOf('S/4')===0?'S4':'B1'),layout:layout};
 }
+function rcMapKey(sys,layout){return sys+'_receivable_'+String(layout||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function recvDefaultMap(headers){var ix=headerIndex(headers),m={};RC_FIELDS.forEach(function(f){m[f.k]=-1;for(var i=0;i<f.c.length;i++){var k=norm(f.c[i]);if(k in ix){m[f.k]=ix[k];break}}});return m}
 function recvStart(file,rows,headers,det,sheetPicked){
   var mode=U.mode;U=newU();U.mode=mode;U.kind='recv';U.entity='RC';U.name=file.name;U.size=file.size;U.headers=headers;U.rows=rows.slice(1);U.sys=det.sys;U.layout=det.layout;U.sheetPicked=sheetPicked;
   U.map=recvDefaultMap(headers);
-  var sv=S.mappings[det.sys+'_receivable'];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
+  var sv=S.mappings[rcMapKey(det.sys,det.layout)];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
   U.asOf=asOfFromName(file.name);U.asOfSrc=U.asOf?'file name':'';
   U.stage='mapping';renderUpload();
 }
@@ -147,7 +148,7 @@ async function recvLoad(){
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
   }catch(e){failed=e}
   var upl={at:nowISO(),by:by,sys:U.sys,entity:'RC',file:U.name,size:U.size,mode:'snapshot',periodLabel:'Receivables as on '+fmtDate(r.asOf),as_of:r.asOf,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plants:pk.length,fixes:{credit_items:r.credit.rows,acp_rows:r.acp.rows,zero_rows:r.zero,repeated_rows:r.dup,no_due_date:r.noDue},error:failed?dbErrText(failed):undefined};
-  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+U.sys+'_receivable',{map:mp,sys:U.sys,entity:'RC',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
+  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+rcMapKey(U.sys,U.layout),{map:mp,sys:U.sys,entity:'RC',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed;
   U.doneMsg=failed?('Load stopped: '+dbErrText(failed)):('Loaded open items as on '+fmtDate(r.asOf)+': '+fmtN(r.good)+' items, '+fmtMoney(r.open)+' open, in '+pk.length+' plants.'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':''));
   recvRender();
@@ -194,4 +195,12 @@ function recvCov(qkey){
   months.forEach(function(ym){var have=S.recvSnaps.filter(function(s){return s.as_of.slice(0,7)===ym}).sort(function(a,b){return a.as_of<b.as_of?1:-1});detail.push({ym:ym,plants:have.length?Object.keys(have[0].plants||{}).length:0});if(have.length)present++});
   var elig=months.filter(function(m){return m<=cur}).length;
   return {st:present===0?'miss':(present>=elig&&elig>0?'ok':'part'),detail:detail,ref:0,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
+}
+/* ---- Receivables page helpers: credit items shown apart; a customer's open total across the plants in scope ---- */
+function custOpenTotal(code){var t=0;S.recv.forEach(function(d){if(!plantInScope(SC(),d.plant))return;(d.rows||[]).forEach(function(r){if(r[1]===code)t+=r[4]})});return t}
+function recvCreditHtml(plants){
+  var sc=SC(),rows=[];(S.recvCredit||[]).forEach(function(d){if(!plantInScope(sc,d.plant)||(plants&&!plants.has(d.plant)))return;d.rows.forEach(function(r){rows.push({plant:d.plant,doc:r[0],cust:r[1],name:r[2],due:r[3],amt:-r[4]})})});
+  if(!rows.length)return '';
+  rows.sort(function(a,b){return b.amt-a.amt});var tot=rows.reduce(function(a,x){return a+x.amt},0);
+  return '<section class="card"><div class="hd"><h2>Credit items (unapplied)</h2><span class="note">'+fmtN(rows.length)+' items, '+fmtMoney(tot)+'. Negative open amounts, kept apart: not netted against invoices and not in the ageing.</span></div><div class="tw" style="max-height:260px;overflow:auto"><table class="std"><thead><tr><th>Customer</th><th>Plant</th><th>Document</th><th class="num">Credit ₹</th></tr></thead><tbody>'+rows.slice(0,60).map(function(x){return '<tr><td class="break"><b>'+esc(x.cust)+'</b> '+esc(custName(x.cust,x.name))+'</td><td>'+esc(plantShort(x.plant))+'</td><td class="mono">'+esc(x.doc)+'</td><td class="num">'+fmtMoney(x.amt)+'</td></tr>'}).join('')+'</tbody></table></div></section>';
 }

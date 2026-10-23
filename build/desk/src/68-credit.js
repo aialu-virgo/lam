@@ -16,6 +16,7 @@ var CN_FIELDS=[
  {k:'value',label:'Line value (excl. GST)',canon:'net_value_inr',req:1,c:['LineTotal','LINETOTAL','Total Amount (Item)']},
  {k:'base',label:'Base document (invoice)',canon:'base_ref',c:['BaseRef','BASEREF','Reference Document']},
  {k:'type',label:'Billing type (S/4)',canon:'billing_type',c:['Billing Type']}];
+function cnMapKey(sys,layout){return sys+'_creditnote_'+String(layout||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function cnDetectB1(headers){
   var set={};headers.forEach(function(h){set[norm(h)]=1});
   return set['docnum']&&set['docdate']&&set['cardcode']&&set['itemcode']&&set['linetotal']&&set['baseref']&&!set['invoice type']&&!set['catagory']?{kind:'cn',sys:'B1',layout:'B1 credit notes (ORIN / RIN1)'}:null;
@@ -29,7 +30,7 @@ function cnDefaultMap(headers){var ix=headerIndex(headers),m={};CN_FIELDS.forEac
 function cnStart(file,rows,headers,det,sheetPicked){
   var mode=U.mode;U=newU();U.mode=mode;U.kind='cn';U.entity='CN';U.name=file.name;U.size=file.size;U.headers=headers;U.rows=rows.slice(1);U.sys=det.sys;U.layout=det.layout;U.sheetPicked=sheetPicked;
   U.map=cnDefaultMap(headers);
-  var sv=S.mappings[det.sys+'_creditnote'];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
+  var sv=S.mappings[cnMapKey(det.sys,det.layout)];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
   U.period=periodFromName(file.name);
   U.stage='mapping';renderUpload();
 }
@@ -148,7 +149,7 @@ async function cnLoad(){
   var ms=Object.keys(r.months).sort();
   var upl={at:nowISO(),by:by,sys:U.sys,entity:'CN',file:U.name,size:U.size,mode:'historic',periodLabel:r.covMonths.length?(ymLabel(r.covMonths[0])+(r.covMonths.length>1?' to '+ymLabel(r.covMonths[r.covMonths.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:r.covMonths,
     fixes:{other_rows:r.other.rows,acp_rows:r.acp.rows,repeated_lines:r.dup,amount_loaded:Math.round(r.value),sheets_loaded:Math.round(r.sheets)},error:failed?dbErrText(failed):undefined};
-  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+U.sys+'_creditnote',{map:mp,sys:U.sys,entity:'CN',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
+  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+cnMapKey(U.sys,U.layout),{map:mp,sys:U.sys,entity:'CN',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed;
   U.doneMsg=failed?('Load stopped: '+dbErrText(failed)+' '+done+' of '+total+' plant-months were stored.'):('Loaded '+fmtN(r.good)+' credit-note lines ('+fmtMoney(r.value)+') into '+done+' plant-months; '+r.covMonths.length+' months are now covered.'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':''));
   cnRender();

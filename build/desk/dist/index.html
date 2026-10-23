@@ -685,7 +685,7 @@ function withScroll(container,fn){
   if(container){Array.prototype.forEach.call(container.querySelectorAll('.tw,.hscroll'),function(e,i){if(pos[i]){e.scrollTop=pos[i][0];e.scrollLeft=pos[i][1]}})}
 }
 S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:'',showReplaced:false};
-var ENT_NAME={RC:'Receivables',CL:'Collections',ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
+var ENT_NAME={CU:'Customers',RC:'Receivables',CL:'Collections',ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
 function histRows(){
   var f=S.hist,q=(f.q||'').toLowerCase();
   return S.uploads.slice().sort(function(a,b){return a.at<b.at?1:-1}).filter(function(u){
@@ -795,6 +795,7 @@ async function onFile(file){
     var headers=rows[0].map(function(x){return x==null?'':String(x)});
     var d=detect(headers);
     var sheetsSeen=U.sheetsSeen,sheetPicked=U.sheetPicked;
+    var cud=d.type==='unknown'?custDetect(headers):null;if(cud){U=newU();U.mode=mode;U.period=period;U.msg='This is a customer master ('+cud.layout+'), not a transaction export. Load it from Admin > Customers.';renderUpload();return}
     var rdt=recvDetect(headers);if(rdt){recvStart(file,rows,headers,rdt,sheetPicked);return}
     var cnd=cnDetectB1(headers)||(d.type==='invoice'&&d.sys==='S4'&&cnS4Share(headers,rows)>0.5?{kind:'cn',sys:'S4',layout:'S/4 billing credit memos'}:null);if(cnd){cnStart(file,rows,headers,cnd,sheetPicked);return}
     if(d.type==='unknown'){var cdt=collDetect(headers);if(cdt){collStart(file,rows,headers,sheetPicked);return}var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
@@ -1533,10 +1534,10 @@ function fmtPct(v,sign,d){if(v==null||isNaN(v))return '—';d=d==null?1:d;var s=
 function fmtVarMoney(v){return (v>0?'+':v<0?'−':'')+fmtMoney(Math.abs(v))}
 
 /* ---- trend, moving average, Stretch (target-model.md) ---- */
-function trendStats(series){
+function trendStats(series,opt){
   /* series: numbers (or null for a quarter not loaded), oldest first. QoQ uses consecutive loaded pairs. */
   var n=series.length,qoqs=[],qoqAt=new Array(n).fill(null),ma=new Array(n).fill(null);
-  for(var i=1;i<n;i++){var a=series[i],p=series[i-1];if(a!=null&&p!=null&&p>0){var q=(a-p)/p*100;qoqs.push(q);qoqAt[i]=q}}
+  for(var i=1;i<n;i++){var a=series[i],p=series[i-1];if(opt&&opt.pairs){var pp=opt.pairs(i);if(pp){a=pp[0];p=pp[1]}}if(a!=null&&p!=null&&p>0){var q=(a-p)/p*100;qoqs.push(q);qoqAt[i]=q}}
   for(i=3;i<n;i++){var ok=true,s=0;for(var j=i-3;j<=i;j++){if(series[j]==null){ok=false;break}s+=series[j]}if(ok)ma[i]=s/4}
   var avg=qoqs.length?qoqs.reduce(function(a,b){return a+b},0)/qoqs.length:null;
   var sx=0,sy=0,sxx=0,sxy=0,k=0;for(i=0;i<n;i++){if(series[i]!=null){var x=i+1,y=series[i];sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;k++}}
@@ -1852,6 +1853,11 @@ function personPlan(sp,w,onlyPlant,onlyGroup){
   });
   return out;
 }
+/* D40: trend steps compare Net with Net only when both quarters have credit notes loaded, otherwise invoiced with invoiced; averages and the line stay on invoiced */
+function trendOfSeries(ser){
+  var inv=ser.map(function(x){return x.isCur?null:x.A});
+  return trendStats(inv,{pairs:function(i){var a=ser[i],p=ser[i-1];return a&&p&&a.net&&p.net&&!a.isCur&&!p.isCur?[a.Anet,p.Anet]:null}});
+}
 /* series of closed quarters since history start (up to 12) + current: actual, target, ach for a filter */
 function quarterSeries(f,personSp){
   var cur=curQuarterKey(),qs=closedQuarters().concat([cur]),out=[];
@@ -1860,11 +1866,12 @@ function quarterSeries(f,personSp){
     var loaded=isCur?anyMonthData(ms,f.plants||(f.plant?new Set([f.plant]):null)):monthsLoaded(ms,f.plant?new Set([f.plant]):f.plants);
     var ff=Object.assign({},f);if(personSp!=null)ff.sp=personSp;
     var N=isCur?wdBetween(ms[0]+'-01',TODAY()):Infinity;var w=isCur?walk(ms,N):wins(ms);
-    var A=loaded?sumF(ff,w).n:null;
+    var A=loaded?sumF(ff,w).n:null,Anet=null,net=false,H=A;
+    if(A!=null&&ff.sp==null){var cn=cnFor(ff,w);if(cn.covered){net=true;Anet=A-cn.value;H=Anet}}
     var P=personSp!=null?personPlan(personSp,qMonths(q),f.plant,f.group):planW(f,qMonths(q));
     var tgt=(personSp!=null?P.any:P.any)?(personSp!=null?P.tgt:P.tgt):null;
     var tgtTo=isCur?(personSp!=null?personPlan(personSp,w,f.plant,f.group).tgt:planW(f,w).tgt):tgt;
-    out.push({q:q,label:qLabel(q),A:A,loaded:loaded,tgt:tgt,tgtTo:tgtTo,kind:P.kind,isCur:isCur,ach:(A!=null&&tgtTo>0)?A/tgtTo*100:null,N:N});
+    out.push({q:q,label:qLabel(q),A:A,H:H,Anet:Anet,net:net,loaded:loaded,tgt:tgt,tgtTo:tgtTo,kind:P.kind,isCur:isCur,ach:(H!=null&&tgtTo>0)?H/tgtTo*100:null,N:N});
   });
   return out;
 }
@@ -2446,7 +2453,10 @@ function figs(ent,ctx,opts){
   opts=opts||{};
   var f=Object.assign({plants:ctx.plants},ctx.base,ent);if(f.sp===undefined&&ctx.sc.sp)f.sp=undefined;
   var res=ctx.res,cur=res.cur,pr=res.prior,spMode=f.sp!=null&&f.sp!==undefined&&ent.sp!==undefined||(ctx.sc.sp==null&&f.sp!=null);
-  var A=sumF(f,cur),P=pr?sumF(f,pr):null;
+  var A0=sumF(f,cur),P0=pr?sumF(f,pr):null,A=A0,P=P0,basis='Invoiced',pBasis='Invoiced',cnA=f.sp==null?cnFor(f,cur):null,cnP=(f.sp==null&&pr)?cnFor(f,pr):null,bothNet=!!(cnA&&cnA.covered&&cnP&&cnP.covered);
+  var netAcc=function(x,c){return Object.assign({},x,{n:x.n-c.value,sh:x.sh-c.sheets,sq:x.sq-c.sqft})};
+  if(cnA&&cnA.covered){A=netAcc(A0,cnA);basis='Net'}
+  if(bothNet){P=netAcc(P0,cnP);pBasis='Net'}
   var pl=null;
   if(opts.noPlan){pl={any:false,tgt:0,pot:0,kind:'none',orig:0}}
   else if(f.sp!=null&&ent.sp!==undefined){pl=personPlan(f.sp,cur,f.plant,f.group);pl.orig=pl.tgt}
@@ -2455,17 +2465,18 @@ function figs(ent,ctx,opts){
   var pset=f.plant?new Set([f.plant]):f.plants;
   var incomplete=!monthsLoaded(res.curMonths,pset)||(res.prior?!monthsLoaded(res.priorMonths,pset):false);
   if(!res.curMonths.length)incomplete=true;
-  var q=res.prior?qoqOf(A.n,P.n,{incomplete:incomplete,noPrior:preHist(res.priorMonths||[])}):{v:null,state:'none',txt:''};
+  var q=res.prior?qoqOf(bothNet?A.n:A0.n,bothNet?P.n:P0.n,{incomplete:incomplete,noPrior:preHist(res.priorMonths||[])}):{v:null,state:'none',txt:''};
+  q.tip=bothNet?'Net sales against net sales (credit notes loaded for both quarters).':(basis==='Net'?'Invoiced against invoiced: credit notes are not loaded for the prior quarter, so growth is not netted.':'Invoiced against invoiced.');
   var hasT=pl.any&&pl.tgt>0;
-  var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete};
+  var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete,basis:basis,pBasis:pBasis,cn:cnA&&cnA.covered?cnA.value:null};
   o.var=hasT?A.n-pl.tgt:null;o.varPct=hasT?(A.n-pl.tgt)/pl.tgt*100:null;o.ach=hasT?A.n/pl.tgt*100:null;o.share=(pl.any&&pl.pot>0)?A.n/pl.pot*100:null;
-  if(!opts.noTrend){var ser=quarterSeries(f,(f.sp!=null)?f.sp:undefined);var ts=trendStats(ser.map(function(x){return x.isCur?null:x.A}));o.trend=ts;o.series=ser}
+  if(!opts.noTrend){var ser=quarterSeries(f,(f.sp!=null)?f.sp:undefined);var ts=trendOfSeries(ser);o.trend=ts;o.series=ser}
   return o;
 }
 function fmtAch(v,lower){if(v==null)return '<span class="note">—</span>';var st=statusOf(v,lower);return '<b class="a-'+st+'">'+v.toFixed(1)+'%</b>'}
 function qoqCell(q){
   if(!q||q.state==='none')return '<span class="note">—</span>';
-  if(q.state==='ok')return '<span class="'+(q.v>=0?'up':'dn')+'">'+fmtPct(q.v,true)+'</span>';
+  if(q.state==='ok')return '<span class="'+(q.v>=0?'up':'dn')+'"'+(q.tip?' title="'+esc(q.tip)+'"':'')+'>'+fmtPct(q.v,true)+'</span>';
   if(q.state==='nohist')return '<span class="note" title="History starts at '+esc(qLabel(histStart()))+'">No prior quarter loaded</span>';
   if(q.state==='incomplete')return '<span class="note" title="Prior or current quarter is not fully loaded">incomplete history</span>';
   if(q.state==='new')return '<span class="note">New, no prior quarter</span>';
@@ -2480,7 +2491,8 @@ function tgtCell(o){
 function stdTable(first,rows,tot,opt){
   opt=opt||{};
   rows=rows.slice().sort(function(a,b){var av=a.o.var,bv=b.o.var;if(av==null&&bv==null)return b.o.A-a.o.A;if(av==null)return 1;if(bv==null)return -1;return av-bv});
-  var head='<tr><th>'+esc(first)+'</th>'+(opt.noPlan?'':'<th class="num">Potential</th><th class="num">Target</th>')+'<th class="num">Actual</th>'+(opt.noPlan?'':'<th class="num">Var</th><th class="num">Ach %</th><th class="num">Share %</th>')+'<th class="num">Last Qtr</th><th class="num">QoQ %</th><th>Trend</th></tr>';
+  var bs=(tot&&tot.basis)||(rows[0]&&rows[0].o.basis)||'Invoiced';
+  var head='<tr><th>'+esc(first)+'</th>'+(opt.noPlan?'':'<th class="num">Potential</th><th class="num">Target</th>')+'<th class="num" title="'+(bs==='Net'?'Net sales = invoiced minus credit notes (D40)':'Invoiced sales; credit notes are not loaded for this period')+'">Actual · '+bs+'</th>'+(opt.noPlan?'':'<th class="num">Var</th><th class="num">Ach %</th><th class="num">Share %</th>')+'<th class="num">Last Qtr</th><th class="num">QoQ %</th><th>Trend</th></tr>';
   var line=function(label,o,total,attrs){
     return '<tr'+(total?' class="tot"':(attrs?' class="clk"':''))+(attrs||'')+'><td>'+label+'</td>'+(opt.noPlan?'':'<td class="num">'+(o.pot!=null?fmtMoney(o.pot):'—')+'</td><td class="num">'+tgtCell(o)+'</td>')
      +'<td class="num">'+fmtMoney(o.A)+'</td>'
@@ -2527,25 +2539,25 @@ function trendWord(o){return o.trend?(o.trend.short?'history too short':arrow(o.
 function trendCard(title,ent,ctx,personSp,id,opts){
   opts=opts||{};
   var f=Object.assign({plants:ctx.plants},ctx.base,ent||{});var sp=personSp!=null?personSp:(f.sp!=null?f.sp:undefined);
-  var ser=opts.series||quarterSeries(f,sp),closed=ser.filter(function(s){return !s.isCur}),ts=trendStats(closed.map(function(s){return s.A})),cur=ser[ser.length-1];
-  var all=ser.map(function(s){return s.A});
+  var ser=opts.series||quarterSeries(f,sp),closed=ser.filter(function(s){return !s.isCur}),ts=trendOfSeries(ser),cur=ser[ser.length-1];
+  var all=ser.map(function(s){return s.H});
   if(!all.some(function(v){return v!=null&&v>0}))return '<section class="card"><div class="hd"><h2>'+esc(title)+'</h2></div><div class="empty">No quarters loaded in your scope yet. The trend needs history from Data Intake.</div></section>';
   var W=760,H=250,L=44,R=10,T=14,B=62,n=ser.length,bw=(W-L-R)/n,mx=Math.max.apply(null,all.map(function(v){return v||0}).concat(ser.map(function(s){return s.tgt||0})).concat([1]))*1.12;
   var y=function(v){return T+(H-T-B)*(1-v/mx)},x=function(i){return L+i*bw};
-  var svg='<svg class="trend" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'. '+ser.map(function(s){return s.label+' '+(s.A==null?'not loaded':fmtMoney(s.A))}).join('; ')+'" preserveAspectRatio="xMidYMid meet"><defs><pattern id="hat'+id+'" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--brand)" opacity=".35"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--brand)" stroke-width="3"/></pattern></defs>';
+  var svg='<svg class="trend" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'. '+ser.map(function(s){return s.label+' '+(s.H==null?'not loaded':fmtMoney(s.H))}).join('; ')+'" preserveAspectRatio="xMidYMid meet"><defs><pattern id="hat'+id+'" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--brand)" opacity=".35"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--brand)" stroke-width="3"/></pattern></defs>';
   for(var g=0;g<=4;g++){var gv2=mx/1.12*g/4,gy=y(gv2);svg+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+gy+'" y2="'+gy+'" stroke="var(--line)" stroke-width="1"/><text x="'+(L-4)+'" y="'+(gy+3)+'" text-anchor="end" class="ax">'+esc(fmtMoney(gv2).replace('₹',''))+'</text>'}
   ser.forEach(function(s,i){
     var bx=x(i)+bw*.18,w=bw*.64;
-    if(s.A==null){svg+='<rect x="'+bx+'" y="'+(T+4)+'" width="'+w+'" height="'+(H-T-B-4)+'" rx="4" fill="none" stroke="var(--ink3)" stroke-dasharray="4 3" opacity=".6"><title>'+s.label+': not loaded (gap, not zero)</title></rect>'}
-    else svg+='<rect class="bar-q" data-act="trend-q" data-q="'+s.q+'" data-sp="'+esc(sp!=null?sp:'')+'" data-kind="'+(opts.kind||'sales')+'" data-pl="'+esc(f.plants?Array.from(f.plants).join(','):'')+'" x="'+bx+'" y="'+y(s.A)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(s.A))+'" rx="4" fill="'+(s.isCur?'url(#hat'+id+')':'var(--brand)')+'" stroke="var(--brand)" tabindex="0"><title>'+s.label+' actual '+fmtMoney(s.A)+(s.tgt!=null?' · target '+fmtMoney(s.tgt):' · no plan')+'</title></rect>';
+    if(s.H==null){svg+='<rect x="'+bx+'" y="'+(T+4)+'" width="'+w+'" height="'+(H-T-B-4)+'" rx="4" fill="none" stroke="var(--ink3)" stroke-dasharray="4 3" opacity=".6"><title>'+s.label+': not loaded (gap, not zero)</title></rect>'}
+    else svg+='<rect class="bar-q" data-act="trend-q" data-q="'+s.q+'" data-sp="'+esc(sp!=null?sp:'')+'" data-kind="'+(opts.kind||'sales')+'" data-pl="'+esc(f.plants?Array.from(f.plants).join(','):'')+'" x="'+bx+'" y="'+y(s.H)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(s.H))+'" rx="4" fill="'+(s.isCur?'url(#hat'+id+')':'var(--brand)')+'" stroke="var(--brand)" tabindex="0"><title>'+s.label+' '+(s.net?'net sales':'invoiced')+' '+fmtMoney(s.H)+(s.tgt!=null?' · target '+fmtMoney(s.tgt):' · no plan')+'</title></rect>';
     if(s.tgt!=null)svg+='<line x1="'+(bx-3)+'" x2="'+(bx+w+3)+'" y1="'+y(s.tgt)+'" y2="'+y(s.tgt)+'" stroke="var(--orange)" stroke-width="2.5"><title>'+s.label+' target '+fmtMoney(s.tgt)+'</title></line>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="ax">'+esc(s.label.replace(' FY',' '))+(s.isCur?'*':'')+'</text>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+26)+'" text-anchor="middle" class="ax a-'+statusOf(s.ach)+'">'+(s.ach!=null?s.ach.toFixed(0)+'%':'—')+'</text>';
-    var qv=i>0?ts.qoqAt[i]:null;var noPriorQ=(i===0&&s.q===histStart());if(s.isCur){var pv=ser[i-1].A;qv=(s.A!=null&&pv!=null&&pv>0&&cur.N!==Infinity)?null:qv}
+    var qv=i>0?ts.qoqAt[i]:null;var noPriorQ=(i===0&&s.q===histStart());if(s.isCur){var pv=ser[i-1].H;qv=(s.H!=null&&pv!=null&&pv>0&&cur.N!==Infinity)?null:qv}
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+40)+'" text-anchor="middle" class="ax '+(qv==null?'':qv>=0?'up':'dn')+'">'+(s.isCur?'QTD':(noPriorQ?'no prior':qv==null?'—':(qv>0?'+':'')+qv.toFixed(1).replace('-','−')))+'</text>';
   });
   /* previous-quarter marker on the current bar */
-  var pv2=ser.length>1?ser[ser.length-2].A:null;if(pv2!=null)svg+='<line x1="'+(x(n-1)+bw*.1)+'" x2="'+(x(n-1)+bw*.9)+'" y1="'+y(pv2)+'" y2="'+y(pv2)+'" stroke="var(--ink)" stroke-dasharray="3 2" stroke-width="1.5"><title>Previous quarter '+fmtMoney(pv2)+'</title></line>';
+  var pv2=ser.length>1?ser[ser.length-2].H:null;if(pv2!=null)svg+='<line x1="'+(x(n-1)+bw*.1)+'" x2="'+(x(n-1)+bw*.9)+'" y1="'+y(pv2)+'" y2="'+y(pv2)+'" stroke="var(--ink)" stroke-dasharray="3 2" stroke-width="1.5"><title>Previous quarter '+fmtMoney(pv2)+'</title></line>';
   /* 4-quarter moving average (closed quarters) */
   var pts=ts.ma.map(function(v,i){return v==null?null:[x(i)+bw/2,y(v)]}).filter(Boolean);
   if(pts.length>1)svg+='<polyline points="'+pts.map(function(p){return p[0]+','+p[1]}).join(' ')+'" fill="none" stroke="var(--slate)" stroke-width="2.2"><title>4-quarter moving average</title></polyline>';
@@ -2612,7 +2624,7 @@ function pageOverview(){
   var ctx=viewCtx();if(noData())return emptyData();
   var res=ctx.res,tot=figs({},ctx),spl=salesKpis(ctx,tot,tot.series);
   var cardsQ=[];
-  cardsQ.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · Net sales · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. Credit notes: no feed yet.',status:statusOf(tot.ach),
+  cardsQ.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. Credit notes: no feed yet.',status:statusOf(tot.ach),
     ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],
      ['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['Quarter trend',trendWord(tot)]]}));
   cardsQ.push(qtyCard(ctx,tot));
@@ -2621,7 +2633,7 @@ function pageOverview(){
   cardsQ.push(kpiCard({color:'orange',chip:'+',title:'K7 · New customers',value:'—',sub:'Needs the customer first-seen index (four earlier quarters).',pending:true,pendingTxt:'Pending',pendingMsg:'Needs four earlier quarters of history to find first-time customers; shown as pending, not zero.',
     rows:[['Addressable','pending rules'],['Target','No plan (P6)'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %','—'],['Quarter trend','—']]}));
   var h='<div class="kpirow">'+cardsQ.join('')+'</div>';
-  h+=trendCard('Quarters since '+qLabel(histStart())+' · Net sales',{},ctx,undefined,'ov');
+  h+=trendCard('Quarters since '+qLabel(histStart())+' · Sales',{},ctx,undefined,'ov');
   h+=drillPanel(ctx);
   /* branch chart + alerts */
   h+='<div class="grid2">'+branchChart(ctx)+alertsCard()+'</div>';
@@ -2710,15 +2722,16 @@ function pageSales(){
   if(!coord){
     var tot=figs({},ctx),spl=salesKpis(ctx,tot,tot.series);
     var cards=[];
-    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · Net sales · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded.',status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
+    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded.',status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
     cards.push(qtyCard(ctx,tot));
     var A=haveCust?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.cur):null,P=haveCust&&res.prior?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.prior):null;
     var nA=A?Array.from(A.values()).filter(function(c){return c.n>0}).length:null,nP=P?Array.from(P.values()).filter(function(c){return c.n>0}).length:null;
     cards.push(kpiCard({color:'orange',chip:'☺',title:'Customers billed · '+res.label,value:nA==null?'…':fmtN(nA),sub:'Unique customers invoiced.',status:'none',pillTxt:'No plan',ach:null,rows:[['Addressable','pending rules'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',nA!=null&&nP!=null?qoqCell(qoqOf(nA,nP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
     var rl=tot.sh>0?tot.A/tot.sh:null,rlP=tot.Psh>0?tot.P/tot.Psh:null;
-    cards.push(kpiCard({color:'green',chip:'%',title:'Realisation · ₹ per sheet',value:rl!=null?'₹ '+fmtN(Math.round(rl)):'—',sub:'Net sales ÷ sheets'+(tot.sq>0?' (₹ '+(tot.A/tot.sq).toFixed(1)+' per sq ft).':'.'),status:'none',pillTxt:'No plan',rows:[['Potential','n/a'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',rl!=null&&rlP!=null?qoqCell(qoqOf(rl,rlP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
+    cards.push(kpiCard({color:'green',chip:'%',title:'Realisation · ₹ per sheet',value:rl!=null?'₹ '+fmtN(Math.round(rl)):'—',sub:'Sales ÷ sheets'+(tot.sq>0?' (₹ '+(tot.A/tot.sq).toFixed(1)+' per sq ft).':'.'),status:'none',pillTxt:'No plan',rows:[['Potential','n/a'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',rl!=null&&rlP!=null?qoqCell(qoqOf(rl,rlP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
     h+='<div class="kpirow">'+cards.join('')+'</div>';
-    h+=trendCard('Quarters since '+qLabel(histStart())+' · Net sales'+(sc.sp?' (own)':''),{},ctx,undefined,'sl');
+    h+=trendCard('Quarters since '+qLabel(histStart())+' · Sales'+(sc.sp?' (own)':''),{},ctx,undefined,'sl');
+    h+=cnPanel(ctx);
     h+=drillPanel(ctx);
     h+=classTiles(ctx,haveCust,tot);
     h+=leaderboard(ctx);
@@ -2933,9 +2946,9 @@ function personTrend(p,f,ctx){
     if(!collAvailable(pl))return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Collections · '+esc(p.name)+'</h2></div>'+needPanel(['coll'],'No collection history is loaded, so the Accounts scorecard has no trend yet.')+'</section>';
     return trendCard('Quarters since '+qLabel(histStart())+' · Collections · '+p.name,{plants:pl},ctx,undefined,'tm',{series:collSeries(pl),kind:'coll'})+drillPanel(ctx);
   }
-  if(noData())return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
-  if(f==null)return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
-  return trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch KPIs were dropped (D31).</p>':'')+drillPanel(ctx);
+  if(noData())return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
+  if(f==null)return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
+  return trendCard('Quarters since '+qLabel(histStart())+' · Sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch KPIs were dropped (D31).</p>':'')+drillPanel(ctx);
 }
 
 /* salespeople from the sales-employee master that match the B1 names: scorecards for people who are not Desk users */
@@ -2950,7 +2963,7 @@ function teamSalespeople(ctx,u){
    +rows.map(function(r){return '<tr class="clk'+(S.team.sp===r.x.k?' sel':'')+'" data-act="team-sp" data-k="'+esc(r.x.k)+'"><td><b>'+esc(r.x.k)+'</b> <span class="note mono">'+esc(r.x.m.code)+'</span></td><td>'+esc(r.x.m.zone||'—')+'</td><td>'+esc(r.x.m.plant?plantShort(r.x.m.plant):(r.x.m.plantRaw||'—'))+'</td><td>'+esc(r.x.m.designation||'—')+'</td><td class="num">'+fmtMoney(r.o.A)+'</td><td class="num">'+fmtAch(r.o.ach)+'</td><td class="num">'+qoqCell(r.o.qoq)+'</td></tr>'}).join('')+'</tbody></table></div><p class="note">Names match the master exactly or after removing the " - &lt;branch&gt;" suffix. Facts only; no ranking label.</p>';
   if(S.team.sp&&list.some(function(x){return x.k===S.team.sp})){
     var m=spMeta(S.team.sp),p={name:S.team.sp,email:'',role:'Sales executive',department:'Sales',sales_employee_code:m.code,plant_codes:m.plant||''},kt=kpiTable(p,ctx);
-    h+='<div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(m.zone||'')+' · '+esc(m.plant?plantName(m.plant):(m.plantRaw||''))+'</h2><span class="note">'+kt.on+' of '+kt.scored+' scored KPIs on plan</span></div>'+kt.html+trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,{},ctx,S.team.sp,'tp')+drillPanel(ctx);
+    h+='<div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(m.zone||'')+' · '+esc(m.plant?plantName(m.plant):(m.plantRaw||''))+'</h2><span class="note">'+kt.on+' of '+kt.scored+' scored KPIs on plan</span></div>'+kt.html+trendCard('Quarters since '+qLabel(histStart())+' · Sales · '+p.name,{},ctx,S.team.sp,'tp')+drillPanel(ctx);
   }
   return h+'</section>';
 }
@@ -3019,9 +3032,9 @@ function pageReceivables(){
      kpiCard({color:'orange',chip:'%',title:'K10 · Overdue share (over '+CFG.overdue_share_days+' days)',value:st.overShare!=null?st.overShare.toFixed(1)+'%':'—',sub:'Open receivables more than '+CFG.overdue_share_days+' days past due ÷ total open.',status:st.overShare==null?'none':statusOf(st.overShare/15*100,true),ach:st.overShare!=null?Math.min(100,15/Math.max(st.overShare,.1)*100):null,rows:[['Plan','15% (Assumed)'],['Var',st.overShare!=null?(st.overShare-15>=0?'+':'−')+Math.abs(st.overShare-15).toFixed(1)+' pts':'—'],['Ach %',st.overShare!=null?fmtAch(15/Math.max(st.overShare,.1)*100):'—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['12-qtr trend','—']]}),col.card];
     h+='<div class="kpirow">'+cards.join('')+'</div>';
     h+='<section class="card"><div class="hd"><h2>Ageing · days past due</h2></div><div class="ctiles">'+names.map(function(n,i){return '<div class="ctile t-'+['A','B','C','C'][i]+'"><b>'+n+' days</b><span class="big">'+fmtMoney(st.buckets[i])+'</span><span>'+(st.total>0?(st.buckets[i]/st.total*100).toFixed(1):'0.0')+'% of open</span></div>'}).join('')+'</div></section>';
-    var by={};st.items.forEach(function(x){var od=diffDays(TODAY(),x.due);if(od<=0)return;var k=x.plant+'|'+x.cust,o=by[k]||(by[k]={plant:x.plant,cust:x.cust,name:x.name,b:[0,0,0,0],total:0,oldest:0});var bi=od<=30?0:od<=60?1:od<=90?2:3;o.b[bi]+=x.open;o.total+=x.open;o.oldest=Math.max(o.oldest,od)});
+    var by={};st.items.forEach(function(x){var od=diffDays(S.recvAsOf||TODAY(),x.due);if(od<=0)return;var k=x.plant+'|'+x.cust,o=by[k]||(by[k]={plant:x.plant,cust:x.cust,name:x.name,b:[0,0,0,0],total:0,oldest:0});var bi=od<=30?0:od<=60?1:od<=90?2:3;o.b[bi]+=x.open;o.total+=x.open;o.oldest=Math.max(o.oldest,od)});
     var rows=Object.keys(by).map(function(k){return by[k]}).filter(function(o){var q=(S.f.search||'').toLowerCase();return !q||(o.cust+o.name).toLowerCase().indexOf(q)>=0}).sort(function(a,b){return b.total-a.total}).slice(0,60);
-    h+='<section class="card"><div class="hd"><h2>Overdue by customer</h2><span class="note">Source: open invoice items (SAP B1 OINV / S/4 BSID). Rule R2 raises an action at '+CFG.rcv_days+' days and '+fmtMoney(CFG.rcv_min_inr)+'.</span></div><div class="tw tall"><table><thead><tr><th>Customer</th><th>Plant</th><th class="num">0–30</th><th class="num">31–60</th><th class="num">61–90</th><th class="num">90+</th><th class="num">Overdue</th><th class="num">Oldest (days)</th></tr></thead><tbody>'+rows.map(function(o){return '<tr><td class="break"><b>'+esc(o.cust)+'</b> '+esc(o.name||'')+'</td><td>'+esc(plantShort(o.plant))+'</td>'+o.b.map(function(v){return '<td class="num">'+(v?fmtMoney(v):'—')+'</td>'}).join('')+'<td class="num"><b>'+fmtMoney(o.total)+'</b></td><td class="num">'+o.oldest+'</td></tr>'}).join('')+'</tbody></table></div></section>';
+    h+='<section class="card"><div class="hd"><h2>Overdue by customer</h2><span class="note">Source: open invoice items (SAP B1 OINV / S/4 BSID). Rule R2 raises an action at '+CFG.rcv_days+' days and '+fmtMoney(CFG.rcv_min_inr)+'.</span></div><div class="tw tall"><table><thead><tr><th>Customer</th><th>Plant</th><th class="num">0–30</th><th class="num">31–60</th><th class="num">61–90</th><th class="num">90+</th><th class="num">Overdue</th><th class="num">Oldest (days)</th>'+(S.custIdx&&S.custIdx.size?'<th>Salesperson (master)</th><th class="num">Credit limit</th><th class="num">Over limit by</th>':'')+'</tr></thead><tbody>'+rows.map(function(o){var ci=custInfo(o.cust),tot=custOpenTotal(o.cust),over=ci&&ci[6]>0&&tot>ci[6]?tot-ci[6]:0;return '<tr><td class="break"><b>'+esc(o.cust)+'</b> '+esc(custName(o.cust,o.name))+'</td><td>'+esc(plantShort(o.plant))+'</td>'+o.b.map(function(v){return '<td class="num">'+(v?fmtMoney(v):'—')+'</td>'}).join('')+'<td class="num"><b>'+fmtMoney(o.total)+'</b></td><td class="num">'+o.oldest+'</td>'+(S.custIdx&&S.custIdx.size?'<td>'+(ci&&ci[5]?esc(ci[5])+' <span class="note">suggested</span>':'—')+'</td><td class="num">'+(ci&&ci[6]>0?fmtMoney(ci[6]):'—')+'</td><td class="num">'+(over?'<span class="pill miss">'+fmtMoney(over)+'</span>':'—')+'</td>':'')+'</tr>'}).join('')+'</tbody></table></div></section>'+recvCreditHtml(plants);
   }else h+=needPanel(['recv'],'No receivable items are loaded.');
   /* collection plan vs actual by month */
   if(col.have){
@@ -3643,11 +3656,12 @@ function recvDetect(headers){
   else if(set['branchname']&&set['balance'])layout='B1 custom open-items report';
   return {kind:'recv',sys:(layout.indexOf('S/4')===0?'S4':'B1'),layout:layout};
 }
+function rcMapKey(sys,layout){return sys+'_receivable_'+String(layout||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function recvDefaultMap(headers){var ix=headerIndex(headers),m={};RC_FIELDS.forEach(function(f){m[f.k]=-1;for(var i=0;i<f.c.length;i++){var k=norm(f.c[i]);if(k in ix){m[f.k]=ix[k];break}}});return m}
 function recvStart(file,rows,headers,det,sheetPicked){
   var mode=U.mode;U=newU();U.mode=mode;U.kind='recv';U.entity='RC';U.name=file.name;U.size=file.size;U.headers=headers;U.rows=rows.slice(1);U.sys=det.sys;U.layout=det.layout;U.sheetPicked=sheetPicked;
   U.map=recvDefaultMap(headers);
-  var sv=S.mappings[det.sys+'_receivable'];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
+  var sv=S.mappings[rcMapKey(det.sys,det.layout)];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
   U.asOf=asOfFromName(file.name);U.asOfSrc=U.asOf?'file name':'';
   U.stage='mapping';renderUpload();
 }
@@ -3760,7 +3774,7 @@ async function recvLoad(){
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
   }catch(e){failed=e}
   var upl={at:nowISO(),by:by,sys:U.sys,entity:'RC',file:U.name,size:U.size,mode:'snapshot',periodLabel:'Receivables as on '+fmtDate(r.asOf),as_of:r.asOf,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plants:pk.length,fixes:{credit_items:r.credit.rows,acp_rows:r.acp.rows,zero_rows:r.zero,repeated_rows:r.dup,no_due_date:r.noDue},error:failed?dbErrText(failed):undefined};
-  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+U.sys+'_receivable',{map:mp,sys:U.sys,entity:'RC',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
+  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+rcMapKey(U.sys,U.layout),{map:mp,sys:U.sys,entity:'RC',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed;
   U.doneMsg=failed?('Load stopped: '+dbErrText(failed)):('Loaded open items as on '+fmtDate(r.asOf)+': '+fmtN(r.good)+' items, '+fmtMoney(r.open)+' open, in '+pk.length+' plants.'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':''));
   recvRender();
@@ -3808,6 +3822,14 @@ function recvCov(qkey){
   var elig=months.filter(function(m){return m<=cur}).length;
   return {st:present===0?'miss':(present>=elig&&elig>0?'ok':'part'),detail:detail,ref:0,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
 }
+/* ---- Receivables page helpers: credit items shown apart; a customer's open total across the plants in scope ---- */
+function custOpenTotal(code){var t=0;S.recv.forEach(function(d){if(!plantInScope(SC(),d.plant))return;(d.rows||[]).forEach(function(r){if(r[1]===code)t+=r[4]})});return t}
+function recvCreditHtml(plants){
+  var sc=SC(),rows=[];(S.recvCredit||[]).forEach(function(d){if(!plantInScope(sc,d.plant)||(plants&&!plants.has(d.plant)))return;d.rows.forEach(function(r){rows.push({plant:d.plant,doc:r[0],cust:r[1],name:r[2],due:r[3],amt:-r[4]})})});
+  if(!rows.length)return '';
+  rows.sort(function(a,b){return b.amt-a.amt});var tot=rows.reduce(function(a,x){return a+x.amt},0);
+  return '<section class="card"><div class="hd"><h2>Credit items (unapplied)</h2><span class="note">'+fmtN(rows.length)+' items, '+fmtMoney(tot)+'. Negative open amounts, kept apart: not netted against invoices and not in the ageing.</span></div><div class="tw" style="max-height:260px;overflow:auto"><table class="std"><thead><tr><th>Customer</th><th>Plant</th><th>Document</th><th class="num">Credit ₹</th></tr></thead><tbody>'+rows.slice(0,60).map(function(x){return '<tr><td class="break"><b>'+esc(x.cust)+'</b> '+esc(custName(x.cust,x.name))+'</td><td>'+esc(plantShort(x.plant))+'</td><td class="mono">'+esc(x.doc)+'</td><td class="num">'+fmtMoney(x.amt)+'</td></tr>'}).join('')+'</tbody></table></div></section>';
+}
 
 /* ---- src/68-credit.js ---- */
 /* ================= Credit notes intake and the Net view (D39 and D40, 23 Oct 2026) =================
@@ -3828,6 +3850,7 @@ var CN_FIELDS=[
  {k:'value',label:'Line value (excl. GST)',canon:'net_value_inr',req:1,c:['LineTotal','LINETOTAL','Total Amount (Item)']},
  {k:'base',label:'Base document (invoice)',canon:'base_ref',c:['BaseRef','BASEREF','Reference Document']},
  {k:'type',label:'Billing type (S/4)',canon:'billing_type',c:['Billing Type']}];
+function cnMapKey(sys,layout){return sys+'_creditnote_'+String(layout||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function cnDetectB1(headers){
   var set={};headers.forEach(function(h){set[norm(h)]=1});
   return set['docnum']&&set['docdate']&&set['cardcode']&&set['itemcode']&&set['linetotal']&&set['baseref']&&!set['invoice type']&&!set['catagory']?{kind:'cn',sys:'B1',layout:'B1 credit notes (ORIN / RIN1)'}:null;
@@ -3841,7 +3864,7 @@ function cnDefaultMap(headers){var ix=headerIndex(headers),m={};CN_FIELDS.forEac
 function cnStart(file,rows,headers,det,sheetPicked){
   var mode=U.mode;U=newU();U.mode=mode;U.kind='cn';U.entity='CN';U.name=file.name;U.size=file.size;U.headers=headers;U.rows=rows.slice(1);U.sys=det.sys;U.layout=det.layout;U.sheetPicked=sheetPicked;
   U.map=cnDefaultMap(headers);
-  var sv=S.mappings[det.sys+'_creditnote'];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
+  var sv=S.mappings[cnMapKey(det.sys,det.layout)];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
   U.period=periodFromName(file.name);
   U.stage='mapping';renderUpload();
 }
@@ -3960,7 +3983,7 @@ async function cnLoad(){
   var ms=Object.keys(r.months).sort();
   var upl={at:nowISO(),by:by,sys:U.sys,entity:'CN',file:U.name,size:U.size,mode:'historic',periodLabel:r.covMonths.length?(ymLabel(r.covMonths[0])+(r.covMonths.length>1?' to '+ymLabel(r.covMonths[r.covMonths.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:r.covMonths,
     fixes:{other_rows:r.other.rows,acp_rows:r.acp.rows,repeated_lines:r.dup,amount_loaded:Math.round(r.value),sheets_loaded:Math.round(r.sheets)},error:failed?dbErrText(failed):undefined};
-  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+U.sys+'_creditnote',{map:mp,sys:U.sys,entity:'CN',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
+  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+cnMapKey(U.sys,U.layout),{map:mp,sys:U.sys,entity:'CN',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed;
   U.doneMsg=failed?('Load stopped: '+dbErrText(failed)+' '+done+' of '+total+' plant-months were stored.'):('Loaded '+fmtN(r.good)+' credit-note lines ('+fmtMoney(r.value)+') into '+done+' plant-months; '+r.covMonths.length+' months are now covered.'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':''));
   cnRender();
@@ -4019,12 +4042,139 @@ function cnPanel(ctx,f){
   return '<section class="card"><div class="hd"><h2>Invoiced · Credit notes · Net</h2><span class="note">'+(allCov?'Net is the headline for this period':'Headline stays invoiced where credit notes are not loaded')+'</span></div><div class="tw hscroll"><table class="std"><thead><tr><th>Month</th><th class="num">Invoiced ₹</th><th class="num">Invoiced sheets</th><th class="num">Credit notes ₹</th><th class="num">Credit note sheets</th><th class="num">Net ₹</th><th class="num">Net sheets</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note">Net = invoiced − credit notes. Targets are set on invoiced sales. Once every month of a quarter has credit notes loaded, achievement and growth for that quarter use Net; earlier quarters stay on invoiced. Growth compares Net with Net only when both quarters have credit notes, otherwise invoiced with invoiced.</p></section>';
 }
 
+/* ---- src/69-cust.js ---- */
+/* ================= Customer master (D39, 23 Oct 2026): Admin, replace-all like the item master =================
+ * One row per customer: [code, name, group, city, state, salesperson, credit limit, balance, payment terms]. Stored in customers/c<i> (gz, 3,000 rows each)
+ * with customers/main as the index. Layouts: B1 OCRD (CardType C only) and S/4 business partner, plus synonyms and the mapping step.
+ * Uses: a name wherever only a code shows; the salesperson as a suggestion where sales lacks one; credit limit and "over limit by" on the Receivables page.
+ * Display and a rule-based flag only: no new automatic action. */
+S.custMeta=null;S.custRaw=[];S.custIdx=new Map();S.custKey='';S.cu=null;
+var CU_FIELDS=[
+ {k:'code',label:'Customer code',canon:'customer_code',req:1,c:['CardCode','Customer','Customer Number','BP Code','Business Partner']},
+ {k:'name',label:'Customer name',canon:'customer_name',req:1,c:['CardName','Name','Customer Name','Name 1','Business Partner Name']},
+ {k:'type',label:'Type (C customer; others skipped)',canon:'bp_type',c:['CardType','Card Type','BP Type']},
+ {k:'group',label:'Customer group',canon:'customer_group',c:['GroupName','Group Name','GroupCode','Customer Group']},
+ {k:'city',label:'City',canon:'city',c:['City','Town']},
+ {k:'state',label:'State / region',canon:'state',c:['State','Region','State/Region']},
+ {k:'sp',label:'Salesperson',canon:'salesperson',c:['SlpName','Sales Employee','SlpCode','Sales Executive']},
+ {k:'limit',label:'Credit limit',canon:'credit_limit',c:['CreditLine','Credit Limit','Credit limit amount','Credit Line']},
+ {k:'bal',label:'Account balance',canon:'balance',c:['Balance','Account Balance','Current Balance']},
+ {k:'terms',label:'Payment terms',canon:'payment_terms',c:['PymntGroup','Payment Terms','Payment Group','Terms']}];
+function custDetect(headers){
+  var set={};headers.forEach(function(h){set[norm(h)]=1});var has=function(a){return a.some(function(x){return set[norm(x)]})};
+  if(has(['docnum','itemcode','linetotal','quantity','docduedate','branchname','tranfser','invoice document number','checksum','onhand','whscode']))return null;
+  var code=has(['cardcode','customer number','bp code','business partner']),nm=has(['cardname','customer name','business partner name']);
+  if(code&&nm&&has(['cardtype','groupname','creditline','credit limit','city','slpcode','slpname','pymntgroup']))return {sys:'B1',layout:'B1 customer master (OCRD)'};
+  if(has(['customer'])&&has(['name'])&&has(['credit limit','credit limit amount','region','city']))return {sys:'S4',layout:'S/4 business partner'};
+  return null;
+}
+function custDefaultMap(headers){var ix=headerIndex(headers),m={};CU_FIELDS.forEach(function(f){m[f.k]=-1;for(var i=0;i<f.c.length;i++){var k=norm(f.c[i]);if(k in ix){m[f.k]=ix[k];break}}});return m}
+async function custPick(file){
+  var st={stage:'working',name:file.name,size:file.size,msg:'Reading the file...',src:null,rows:null,headers:null,map:null,res:null};S.cu=st;S.lastHtml='';schedule();
+  try{
+    var src=await listSheets(file),pick=src.names[0],rows=await sheetRows(src,pick);
+    if(!rows.length)throw new Error('The sheet is empty.');
+    st.headers=rows[0].map(function(x){return x==null?'':String(x)});st.rows=rows.slice(1);st.sheet=pick;
+    var d=custDetect(st.headers);st.layout=d?d.layout:'unknown layout, map the columns';st.sys=d?d.sys:'B1';
+    st.map=custDefaultMap(st.headers);
+    var sv=S.mappings[st.sys+'_customer_'+String(st.layout).toLowerCase().replace(/[^a-z0-9]+/g,'')];if(sv&&sv.map){var ix=headerIndex(st.headers);Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){st.map[k]=-1}else if(n in ix)st.map[k]=ix[n]})}
+    st.stage='mapping';st.msg='';
+  }catch(e){st.stage='idle';st.msg='Could not read the file: '+((e&&e.message)||e)}
+  S.lastHtml='';schedule();
+}
+async function custParse(){
+  var st=S.cu,m=st.map,rows=st.rows,c=function(k){return m[k]==null?-1:m[k]},cC=c('code'),cN=c('name'),cT=c('type'),cG=c('group'),cCi=c('city'),cS=c('state'),cSp=c('sp'),cL=c('limit'),cB=c('bal'),cP=c('terms');
+  var res={read:rows.length,loaded:0,rejected:0,rejects:[],skippedType:0,warned:0,custs:[],withLimit:0,withSp:0};
+  var seen={},T0=Date.now(),g=function(r,i){return i>=0?String(r[i]==null?'':r[i]).trim():''};
+  st.stage='working';st.msg='Checking...';schedule();await tick();
+  for(var i=0;i<rows.length;i++){
+    if(Date.now()-T0>40){T0=Date.now();st.msg='Checking customer '+fmtN(i)+' of '+fmtN(rows.length);schedule();await tick()}
+    var r=rows[i],code=g(r,cC).toUpperCase();
+    if(!code&&!g(r,cN))continue;
+    if(cT>=0){var ty=norm(g(r,cT));if(ty&&ty!=='c'&&ty!=='ccustomer'&&ty!=='customer'&&ty!=='cust'){res.skippedType++;continue}}
+    if(!code){res.rejected++;if(res.rejects.length<20000)res.rejects.push([i+2,'','','Customer code','Customer code is empty','']);continue}
+    if(seen[code]){res.rejected++;if(res.rejects.length<20000)res.rejects.push([i+2,code,'','Customer code','Duplicate customer code in file','']);continue}
+    seen[code]=1;
+    var lim=cL>=0?toNum(r[cL]):0,bal=cB>=0?toNum(r[cB]):0;
+    if(isNaN(lim)){res.warned++;lim=0}if(isNaN(bal))bal=0;
+    var sp=g(r,cSp);if(lim>0)res.withLimit++;if(sp)res.withSp++;
+    res.custs.push([code,g(r,cN).slice(0,40),g(r,cG).slice(0,24),g(r,cCi).slice(0,24),g(r,cS).slice(0,20),sp.slice(0,30),Math.round(lim),Math.round(bal),g(r,cP).slice(0,20)]);res.loaded++;
+  }
+  st.res=res;st.stage='checked';st.msg='';S.lastHtml='';schedule();
+}
+async function custLoad(){
+  if(!superOnly('load the customer master'))return;
+  var st=S.cu,r=st&&st.res;if(!r||st.stage!=='checked')return;
+  st.stage='loading';st.msg='Writing customers...';schedule();await tick();
+  var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!st.demo;
+  try{
+    var per=3000,n=Math.max(1,Math.ceil(r.custs.length/per));
+    for(var i=0;i<n;i++){await dset('customers/c'+i,{z:await gz(JSON.stringify(r.custs.slice(i*per,(i+1)*per))),n:Math.min(per,r.custs.length-i*per),i:i,upload:uid,fmt:'gz-json v1: [code,name,group,city,state,salesperson,credit limit,balance,payment terms]',demo:demo||undefined})}
+    var old=(S.custMeta&&S.custMeta.chunks)||0;for(var j=n;j<old;j++)await ddel('customers/c'+j);
+    await dset('customers/main',{at:nowISO(),by:by,file:st.name,layout:st.layout,sys:st.sys,read:r.read,loaded:r.loaded,rejected:r.rejected,skipped_type:r.skippedType,with_limit:r.withLimit,chunks:n,upload:uid,demo:demo||undefined});
+    await dset('uploads/'+uid,{at:nowISO(),by:by,sys:st.sys,entity:'CU',file:st.name,size:st.size||0,mode:'master',periodLabel:'Customer master snapshot',read:r.read,loaded:r.loaded,rejected:r.rejected,skipped:r.rejected,warned:r.warned,status:'Loaded',demo:demo||undefined,fixes:{not_customers:r.skippedType}});
+    if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
+    var mp={};Object.keys(st.map).forEach(function(k){mp[k]=st.map[k]>=0?st.headers[st.map[k]]:null});await dset('mappings/'+st.sys+'_customer_'+String(st.layout).toLowerCase().replace(/[^a-z0-9]+/g,''),{map:mp,sys:st.sys,entity:'CU',at:nowISO(),by:by});
+    await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:by,event:'customer master loaded',rows:r.loaded});
+  }catch(e){failed=e}
+  st.stage=failed?'checked':'done';st.msg=failed?('Load stopped: '+dbErrText(failed)):('Loaded '+fmtN(r.loaded)+' customers ('+fmtN(r.withLimit)+' with a credit limit). '+fmtN(r.skippedType)+' non-customer partners were counted, not stored.');
+  S.lastHtml='';schedule();
+}
+function custHtml(){
+  var st=S.cu,m=S.custMeta,h='<section class="card"><div class="hd"><h2>Customer master &middot; '+(m?fmtN(m.loaded)+' customers':'not loaded')+'</h2><div class="row"><label class="btn pri sm" for="up-cust" style="cursor:pointer">Upload customer master (XLSX or CSV)</label><input id="up-cust" data-mfile="cust" type="file" accept=".xlsx,.xls,.csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="mst-tmpl" data-t="cust">Download template</button></div></div>';
+  h+='<p class="note" style="margin:0">B1 OCRD (customers only, CardType C) or the S/4 business partner list. Each load replaces the whole master. Used to name customers wherever only a code shows, to suggest the salesperson, and to show the credit limit and "over limit by" next to open receivables.</p>';
+  if(m)h+='<div class="kpis"><div class="kpi"><small>Customers stored</small><b>'+fmtN(m.loaded)+'</b><small>'+fmtN(m.with_limit||0)+' with a credit limit</small></div><div class="kpi"><small>Rejected rows</small><b>'+fmtN(m.rejected)+'</b></div><div class="kpi"><small>Loaded</small><b style="font-size:14px;font-family:var(--font)">'+esc(istStr(m.at))+'</b><small>'+esc((m.by||'').split('@')[0])+' · '+esc(m.file||'')+'</small></div></div>';
+  else h+='<div class="empty">No customer master yet.</div>';
+  if(st&&st.msg&&(st.stage==='idle'||st.stage==='working'||st.stage==='done'||st.stage==='checked'))h+='<div class="banner '+(st.stage==='idle'?'err':'info')+'">'+esc(st.msg)+'</div>';
+  if(st&&st.stage==='mapping'){
+    var rows=CU_FIELDS.map(function(f){var cur=st.map[f.k];if(cur==null)cur=-1;
+      var opts='<option value="-1"'+(cur<0?' selected':'')+'>unmapped</option>'+st.headers.map(function(hd,i){return '<option value="'+i+'"'+(cur===i?' selected':'')+'>'+esc(hd===''?'(blank header, col '+(i+1)+')':hd)+'</option>'}).join('');
+      var sample='';if(cur>=0){for(var r=0;r<Math.min(st.rows.length,50);r++){var v=st.rows[r][cur];if(v!==''&&v!=null){sample=String(v);break}}}
+      return '<tr><td><select class="in" data-chg="cu-map" data-k="'+f.k+'" aria-label="File column for '+esc(f.label)+'">'+opts+'</select></td><td><b>'+esc(f.label)+'</b><div class="note mono">'+f.canon+'</div></td><td>'+(f.req?'<span class="pill info">Required</span>':'<span class="pill mute">Optional</span>')+'</td><td class="mono break" style="max-width:180px">'+esc(sample.slice(0,60))+'</td></tr>'}).join('');
+    var miss=CU_FIELDS.filter(function(f){return f.req&&(st.map[f.k]==null||st.map[f.k]<0)}).map(function(f){return f.label});
+    h+='<div class="banner info"><span><b>'+esc(st.name)+'</b> &middot; '+fmtN(st.rows.length)+' rows &middot; detected <b>'+esc(st.layout)+'</b></span></div><div class="tw"><table><thead><tr><th>File column</th><th>Canonical field</th><th>Need</th><th>Sample</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+(miss.length?'<div class="banner err">Map these first: '+esc(miss.join(', '))+'</div>':'')+'<div class="row"><button class="btn pri" data-act="cu-check" '+(miss.length?'disabled':'')+'>Confirm and check</button><button class="btn" data-act="mst-reset" data-k="cu">Cancel</button></div>';
+  }
+  if(st&&st.res&&(st.stage==='checked'||st.stage==='loading'||st.stage==='done')){var r=st.res;
+    h+='<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Customers loading</small><b>'+fmtN(r.loaded)+'</b></div><div class="kpi"><small>Not customers (skipped, counted)</small><b>'+fmtN(r.skippedType)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>With a credit limit</small><b>'+fmtN(r.withLimit)+'</b></div><div class="kpi"><small>With a salesperson</small><b>'+fmtN(r.withSp)+'</b></div></div>';
+    if(r.rejected)h+='<div class="row"><button class="btn sm" data-act="cu-rejcsv">Download rejected rows (CSV)</button></div>';
+    if(st.stage==='checked')h+='<div class="row"><button class="btn pri" data-act="cu-load" '+(r.loaded>0&&!readOnly()?'':'disabled')+'>Load '+fmtN(r.loaded)+' customers (replaces the master)</button><button class="btn" data-act="mst-reset" data-k="cu">Cancel</button></div>';
+    if(st.stage==='done')h+='<div class="row"><button class="btn sm" data-act="mst-reset" data-k="cu">Upload another file</button></div>';
+  }
+  return h+'</section>';
+}
+Object.assign(handlers,{
+ 'cu-check':function(){return custParse()},
+ 'cu-load':function(){return custLoad()},
+ 'cu-rejcsv':function(){return download('rejected-customer-rows.csv',csvLine(['row','code','','field','reason','value'])+'\n'+S.cu.res.rejects.map(csvLine).join('\n'))}
+});
+document.addEventListener('change',function(ev){
+  var t=ev.target,c=t.getAttribute&&t.getAttribute('data-chg');
+  if(c==='cu-map'&&S.cu){S.cu.map[t.getAttribute('data-k')]=+t.value;S.lastHtml='';schedule()}
+});
+/* ---- ingest: customers/c<i> -> S.custIdx (code -> row) ---- */
+function ingestCust(){
+  var meta=S.custRaw.find(function(x){return x._id==='main'})||null;S.custMeta=meta;
+  var key=meta?(meta.upload||'')+'|'+(meta.at||'')+'|'+(meta.chunks||0):'';
+  if(key===S.custKey)return;S.custKey=key;
+  if(!meta){S.custIdx=new Map();S.lastHtml='';schedule();return}
+  var dm={};S.custRaw.forEach(function(x){dm[x._id]=x});
+  (async function(){
+    var idx=new Map();
+    for(var i=0;i<(meta.chunks||0);i++){var d=dm['c'+i];if(!d)continue;try{JSON.parse(await ungz(d.z)).forEach(function(a){idx.set(a[0],a)})}catch(e){}}
+    if(key!==S.custKey)return;
+    S.custIdx=idx;DS.cache={};S.engSig=null;S.lastHtml='';schedule();
+  })();
+}
+/* [code,name,group,city,state,salesperson,limit,balance,terms] or null */
+function custInfo(code){return S.custIdx&&S.custIdx.size?(S.custIdx.get(String(code||'').toUpperCase())||null):null}
+function custName(code,fallback){var c=custInfo(code);return (fallback&&String(fallback).trim())||(c?c[1]:'')}
+
 /* ---- src/70-admin.js ---- */
 /* ================= v0.9 Admin: plans workflow, settings, tools, roll-up rebuild, demo extras ================= */
 S.adminTab='users';S.rbBusy=false;
 function adminTabs(){
   var r=effRole();
-  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['aliases','Aliases'],['settings','Rules & settings'],['tools','Tools']];
+  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['customers','Customers'],['aliases','Aliases'],['settings','Rules & settings'],['tools','Tools']];
   return [['potential','Market potential']];
 }
 function buildAdmin(){
@@ -4037,7 +4187,7 @@ function refreshAdmin0(){
   var el=$('#a-body');if(!el)return;
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
   var focusId=document.activeElement&&document.activeElement.id,t=S.adminTab;
-  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():t==='aliases'?aliasesHtml():potentialHtml();
+  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():t==='customers'?custHtml():t==='aliases'?aliasesHtml():potentialHtml();
   if(el.getAttribute('data-h')!==String(html.length)+t||(t!=='settings'&&t!=='aliases')){el.innerHTML=html;el.setAttribute('data-h',String(html.length)+t)}
   if(focusId){var f=document.getElementById(focusId);if(f&&f.focus){f.focus();try{var v=f.value;if(f.setSelectionRange&&f.type!=='number'&&f.type!=='email'&&f.type!=='date')f.setSelectionRange(v.length,v.length)}catch(e){}}}
 }
@@ -4588,11 +4738,11 @@ function sempHtml(){
   return h+'<div id="up-msg"></div></section>';
 }
 Object.assign(handlers,{
- 'mst-reset':function(t){S.mst[t.getAttribute('data-k')]=null;S.lastHtml='';schedule()},
+ 'mst-reset':function(t){var rk=t.getAttribute('data-k');if(rk==='cu')S.cu=null;else S.mst[rk]=null;S.lastHtml='';schedule()},
  'mst-item-load':function(){return itemLoad()},
  'mst-semp-check':function(){return sempCheck()},
  'mst-semp-load':function(){return sempLoad()},
- 'mst-tmpl':function(t){var k=t.getAttribute('data-t');return download(k==='items'?'item-master-template.csv':'sales-employee-template.csv',(k==='items'?'Item No.,Item Description,Inventory UoM,Active,Thickness,Size,Item Category':'Employee Code,*FirstName,*LastName,FullName,Mobile No.,Email,Designation,Zone,Plant Name,*CompanyCode,B1 SlpCode,B1 Sales Employee Name,Reports To (Employee Code),EndDate')+'\n')},
+ 'mst-tmpl':function(t){var k=t.getAttribute('data-t');return download(k==='cust'?'customer-master-template.csv':k==='items'?'item-master-template.csv':'sales-employee-template.csv',(k==='cust'?'CardCode,CardName,CardType,GroupName,City,State,SlpName,CreditLine,Balance,PymntGroup':k==='items'?'Item No.,Item Description,Inventory UoM,Active,Thickness,Size,Item Category':'Employee Code,*FirstName,*LastName,FullName,Mobile No.,Email,Designation,Zone,Plant Name,*CompanyCode,B1 SlpCode,B1 Sales Employee Name,Reports To (Employee Code),EndDate')+'\n')},
  'mst-rejcsv':function(t){var st=S.mst[t.getAttribute('data-k')];return download('rejected-rows.csv',csvLine(['row','code','','field','reason','value'])+'\n'+st.res.rejects.map(csvLine).join('\n'))},
  'mst-needs-csv':function(){var st=S.mst.semp;return download('people-needing-plant-and-designation.csv',csvLine(['row','worker_id','full_name','note'])+'\n'+(st.res.needs||[]).map(function(x){return csvLine([x[0],x[1],x[2],x[3]])}).join('\n'))},
  'mst-unmatched-csv':function(){return download('unmatched-salespeople.csv',csvLine(['b1_salesperson_name','invoice_lines','reason'])+'\n'+unmatchedSp().map(function(u){return csvLine([u.name,u.lines,u.why])}).join('\n'))}
@@ -4603,6 +4753,7 @@ document.addEventListener('change',function(ev){
   if(mf){var f=t.files&&t.files[0];if(!f)return;
     if(readOnly()||effRole()!=='Super admin'){toast('Only a Super admin can upload masters');return}
     if(mf==='items'){S.mst.items={stage:'working',name:f.name,size:f.size,msg:'Reading the workbook...',src:null,res:null};S.lastHtml='';schedule();listSheets(f).then(function(src){S.mst.items.src=src;return itemParse()}).catch(function(e){S.mst.items={stage:'idle',msg:'Could not read the file: '+((e&&e.message)||e)};schedule()})}
+    else if(mf==='cust')custPick(f);
     else sempPick(f);
     t.value='';return}
   if(t.getAttribute('data-chg')==='mst-sheet'){var st=S.mst.semp;if(st&&st.sheets[+t.getAttribute('data-i')])st.sheets[+t.getAttribute('data-i')].ticked=t.checked}
@@ -5397,6 +5548,7 @@ async function boot(){
     subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
     subscribe('receivables',db.collection('receivables'),function(d){S.recvRaw=d;ingestRecv()});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});
+    subscribe('customers',db.collection('customers'),function(d){S.custRaw=d;ingestCust()});
     subscribe('creditnotes',db.collection('creditnotes'),function(d){S.cnRaw=d;ingestCN()});
     subscribe('stock',db.collection('stock'),function(d){S.stockRaw=d;ingestStock()});
     subscribe('itemmeta',db.collection('itemmeta'),function(d){S.itemMeta=d.find(function(x){return x._id==='main'})||null});
@@ -5405,7 +5557,7 @@ async function boot(){
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey};
 boot();
 })();
 </script>

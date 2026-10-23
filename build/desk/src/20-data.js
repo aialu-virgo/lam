@@ -283,6 +283,11 @@ function personPlan(sp,w,onlyPlant,onlyGroup){
   });
   return out;
 }
+/* D40: trend steps compare Net with Net only when both quarters have credit notes loaded, otherwise invoiced with invoiced; averages and the line stay on invoiced */
+function trendOfSeries(ser){
+  var inv=ser.map(function(x){return x.isCur?null:x.A});
+  return trendStats(inv,{pairs:function(i){var a=ser[i],p=ser[i-1];return a&&p&&a.net&&p.net&&!a.isCur&&!p.isCur?[a.Anet,p.Anet]:null}});
+}
 /* series of closed quarters since history start (up to 12) + current: actual, target, ach for a filter */
 function quarterSeries(f,personSp){
   var cur=curQuarterKey(),qs=closedQuarters().concat([cur]),out=[];
@@ -291,11 +296,12 @@ function quarterSeries(f,personSp){
     var loaded=isCur?anyMonthData(ms,f.plants||(f.plant?new Set([f.plant]):null)):monthsLoaded(ms,f.plant?new Set([f.plant]):f.plants);
     var ff=Object.assign({},f);if(personSp!=null)ff.sp=personSp;
     var N=isCur?wdBetween(ms[0]+'-01',TODAY()):Infinity;var w=isCur?walk(ms,N):wins(ms);
-    var A=loaded?sumF(ff,w).n:null;
+    var A=loaded?sumF(ff,w).n:null,Anet=null,net=false,H=A;
+    if(A!=null&&ff.sp==null){var cn=cnFor(ff,w);if(cn.covered){net=true;Anet=A-cn.value;H=Anet}}
     var P=personSp!=null?personPlan(personSp,qMonths(q),f.plant,f.group):planW(f,qMonths(q));
     var tgt=(personSp!=null?P.any:P.any)?(personSp!=null?P.tgt:P.tgt):null;
     var tgtTo=isCur?(personSp!=null?personPlan(personSp,w,f.plant,f.group).tgt:planW(f,w).tgt):tgt;
-    out.push({q:q,label:qLabel(q),A:A,loaded:loaded,tgt:tgt,tgtTo:tgtTo,kind:P.kind,isCur:isCur,ach:(A!=null&&tgtTo>0)?A/tgtTo*100:null,N:N});
+    out.push({q:q,label:qLabel(q),A:A,H:H,Anet:Anet,net:net,loaded:loaded,tgt:tgt,tgtTo:tgtTo,kind:P.kind,isCur:isCur,ach:(H!=null&&tgtTo>0)?H/tgtTo*100:null,N:N});
   });
   return out;
 }

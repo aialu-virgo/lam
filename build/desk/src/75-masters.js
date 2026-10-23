@@ -305,11 +305,11 @@ function sempHtml(){
   return h+'<div id="up-msg"></div></section>';
 }
 Object.assign(handlers,{
- 'mst-reset':function(t){S.mst[t.getAttribute('data-k')]=null;S.lastHtml='';schedule()},
+ 'mst-reset':function(t){var rk=t.getAttribute('data-k');if(rk==='cu')S.cu=null;else S.mst[rk]=null;S.lastHtml='';schedule()},
  'mst-item-load':function(){return itemLoad()},
  'mst-semp-check':function(){return sempCheck()},
  'mst-semp-load':function(){return sempLoad()},
- 'mst-tmpl':function(t){var k=t.getAttribute('data-t');return download(k==='items'?'item-master-template.csv':'sales-employee-template.csv',(k==='items'?'Item No.,Item Description,Inventory UoM,Active,Thickness,Size,Item Category':'Employee Code,*FirstName,*LastName,FullName,Mobile No.,Email,Designation,Zone,Plant Name,*CompanyCode,B1 SlpCode,B1 Sales Employee Name,Reports To (Employee Code),EndDate')+'\n')},
+ 'mst-tmpl':function(t){var k=t.getAttribute('data-t');return download(k==='cust'?'customer-master-template.csv':k==='items'?'item-master-template.csv':'sales-employee-template.csv',(k==='cust'?'CardCode,CardName,CardType,GroupName,City,State,SlpName,CreditLine,Balance,PymntGroup':k==='items'?'Item No.,Item Description,Inventory UoM,Active,Thickness,Size,Item Category':'Employee Code,*FirstName,*LastName,FullName,Mobile No.,Email,Designation,Zone,Plant Name,*CompanyCode,B1 SlpCode,B1 Sales Employee Name,Reports To (Employee Code),EndDate')+'\n')},
  'mst-rejcsv':function(t){var st=S.mst[t.getAttribute('data-k')];return download('rejected-rows.csv',csvLine(['row','code','','field','reason','value'])+'\n'+st.res.rejects.map(csvLine).join('\n'))},
  'mst-needs-csv':function(){var st=S.mst.semp;return download('people-needing-plant-and-designation.csv',csvLine(['row','worker_id','full_name','note'])+'\n'+(st.res.needs||[]).map(function(x){return csvLine([x[0],x[1],x[2],x[3]])}).join('\n'))},
  'mst-unmatched-csv':function(){return download('unmatched-salespeople.csv',csvLine(['b1_salesperson_name','invoice_lines','reason'])+'\n'+unmatchedSp().map(function(u){return csvLine([u.name,u.lines,u.why])}).join('\n'))}
@@ -320,6 +320,7 @@ document.addEventListener('change',function(ev){
   if(mf){var f=t.files&&t.files[0];if(!f)return;
     if(readOnly()||effRole()!=='Super admin'){toast('Only a Super admin can upload masters');return}
     if(mf==='items'){S.mst.items={stage:'working',name:f.name,size:f.size,msg:'Reading the workbook...',src:null,res:null};S.lastHtml='';schedule();listSheets(f).then(function(src){S.mst.items.src=src;return itemParse()}).catch(function(e){S.mst.items={stage:'idle',msg:'Could not read the file: '+((e&&e.message)||e)};schedule()})}
+    else if(mf==='cust')custPick(f);
     else sempPick(f);
     t.value='';return}
   if(t.getAttribute('data-chg')==='mst-sheet'){var st=S.mst.semp;if(st&&st.sheets[+t.getAttribute('data-i')])st.sheets[+t.getAttribute('data-i')].ticked=t.checked}

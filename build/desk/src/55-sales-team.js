@@ -22,15 +22,16 @@ function pageSales(){
   if(!coord){
     var tot=figs({},ctx),spl=salesKpis(ctx,tot,tot.series);
     var cards=[];
-    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · Net sales · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded.',status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
+    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded.',status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
     cards.push(qtyCard(ctx,tot));
     var A=haveCust?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.cur):null,P=haveCust&&res.prior?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.prior):null;
     var nA=A?Array.from(A.values()).filter(function(c){return c.n>0}).length:null,nP=P?Array.from(P.values()).filter(function(c){return c.n>0}).length:null;
     cards.push(kpiCard({color:'orange',chip:'☺',title:'Customers billed · '+res.label,value:nA==null?'…':fmtN(nA),sub:'Unique customers invoiced.',status:'none',pillTxt:'No plan',ach:null,rows:[['Addressable','pending rules'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',nA!=null&&nP!=null?qoqCell(qoqOf(nA,nP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
     var rl=tot.sh>0?tot.A/tot.sh:null,rlP=tot.Psh>0?tot.P/tot.Psh:null;
-    cards.push(kpiCard({color:'green',chip:'%',title:'Realisation · ₹ per sheet',value:rl!=null?'₹ '+fmtN(Math.round(rl)):'—',sub:'Net sales ÷ sheets'+(tot.sq>0?' (₹ '+(tot.A/tot.sq).toFixed(1)+' per sq ft).':'.'),status:'none',pillTxt:'No plan',rows:[['Potential','n/a'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',rl!=null&&rlP!=null?qoqCell(qoqOf(rl,rlP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
+    cards.push(kpiCard({color:'green',chip:'%',title:'Realisation · ₹ per sheet',value:rl!=null?'₹ '+fmtN(Math.round(rl)):'—',sub:'Sales ÷ sheets'+(tot.sq>0?' (₹ '+(tot.A/tot.sq).toFixed(1)+' per sq ft).':'.'),status:'none',pillTxt:'No plan',rows:[['Potential','n/a'],['Target','No plan'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %',rl!=null&&rlP!=null?qoqCell(qoqOf(rl,rlP,{incomplete:tot.incomplete})):'—'],['12-qtr trend','—']]}));
     h+='<div class="kpirow">'+cards.join('')+'</div>';
-    h+=trendCard('Quarters since '+qLabel(histStart())+' · Net sales'+(sc.sp?' (own)':''),{},ctx,undefined,'sl');
+    h+=trendCard('Quarters since '+qLabel(histStart())+' · Sales'+(sc.sp?' (own)':''),{},ctx,undefined,'sl');
+    h+=cnPanel(ctx);
     h+=drillPanel(ctx);
     h+=classTiles(ctx,haveCust,tot);
     h+=leaderboard(ctx);
@@ -245,9 +246,9 @@ function personTrend(p,f,ctx){
     if(!collAvailable(pl))return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Collections · '+esc(p.name)+'</h2></div>'+needPanel(['coll'],'No collection history is loaded, so the Accounts scorecard has no trend yet.')+'</section>';
     return trendCard('Quarters since '+qLabel(histStart())+' · Collections · '+p.name,{plants:pl},ctx,undefined,'tm',{series:collSeries(pl),kind:'coll'})+drillPanel(ctx);
   }
-  if(noData())return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
-  if(f==null)return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Net sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
-  return trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch KPIs were dropped (D31).</p>':'')+drillPanel(ctx);
+  if(noData())return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Sales · '+esc(p.name)+'</h2></div>'+emptyData('No sales history is loaded in your scope.')+'</section>';
+  if(f==null)return '<section class="card"><div class="hd"><h2>Quarters since '+qLabel(histStart())+' · Sales · '+esc(p.name)+'</h2></div><div class="empty sm">No sales rows match this person\'s sales employee code ('+esc(p.sales_employee_code||'blank')+'). It must equal the salesperson name in the SAP export.</div></section>';
+  return trendCard('Quarters since '+qLabel(histStart())+' · Sales · '+p.name,f.sp!=null?{}:f,ctx,f.sp!=null?f.sp:undefined,'tm')+(p.role==='Plant'||p.role==='Coordinator (sales / CRR)'?'<p class="note">Primary KPI shown is the plant\'s net sales: dispatch KPIs were dropped (D31).</p>':'')+drillPanel(ctx);
 }
 
 /* salespeople from the sales-employee master that match the B1 names: scorecards for people who are not Desk users */
@@ -262,7 +263,7 @@ function teamSalespeople(ctx,u){
    +rows.map(function(r){return '<tr class="clk'+(S.team.sp===r.x.k?' sel':'')+'" data-act="team-sp" data-k="'+esc(r.x.k)+'"><td><b>'+esc(r.x.k)+'</b> <span class="note mono">'+esc(r.x.m.code)+'</span></td><td>'+esc(r.x.m.zone||'—')+'</td><td>'+esc(r.x.m.plant?plantShort(r.x.m.plant):(r.x.m.plantRaw||'—'))+'</td><td>'+esc(r.x.m.designation||'—')+'</td><td class="num">'+fmtMoney(r.o.A)+'</td><td class="num">'+fmtAch(r.o.ach)+'</td><td class="num">'+qoqCell(r.o.qoq)+'</td></tr>'}).join('')+'</tbody></table></div><p class="note">Names match the master exactly or after removing the " - &lt;branch&gt;" suffix. Facts only; no ranking label.</p>';
   if(S.team.sp&&list.some(function(x){return x.k===S.team.sp})){
     var m=spMeta(S.team.sp),p={name:S.team.sp,email:'',role:'Sales executive',department:'Sales',sales_employee_code:m.code,plant_codes:m.plant||''},kt=kpiTable(p,ctx);
-    h+='<div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(m.zone||'')+' · '+esc(m.plant?plantName(m.plant):(m.plantRaw||''))+'</h2><span class="note">'+kt.on+' of '+kt.scored+' scored KPIs on plan</span></div>'+kt.html+trendCard('Quarters since '+qLabel(histStart())+' · Net sales · '+p.name,{},ctx,S.team.sp,'tp')+drillPanel(ctx);
+    h+='<div class="hd"><h2>Scorecard · '+esc(p.name)+' · '+esc(m.zone||'')+' · '+esc(m.plant?plantName(m.plant):(m.plantRaw||''))+'</h2><span class="note">'+kt.on+' of '+kt.scored+' scored KPIs on plan</span></div>'+kt.html+trendCard('Quarters since '+qLabel(histStart())+' · Sales · '+p.name,{},ctx,S.team.sp,'tp')+drillPanel(ctx);
   }
   return h+'</section>';
 }
