@@ -496,7 +496,7 @@ function histRows(){
     return (!f.src||u.sys===f.src)&&(!f.ent||(u.entity||'INV')===f.ent)&&(!f.status||u.status===f.status)&&(!q||((u.file||'')+' '+(u.by||'')+' '+(u.periodLabel||'')+' '+(u.status||'')+' '+(u.demo?'demo':'')).toLowerCase().indexOf(q)>=0);
   });
 }
-function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u)]}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
+function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u),u.backup_removed||'']}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
 function histBodyHtml(){
   var all=histRows(),rows=all.slice(0,S.hist.shown);
   if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
@@ -1283,7 +1283,7 @@ async function boot(){
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},bkStored:bkStored,gz:gz};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
 boot();
 })();
 </script>

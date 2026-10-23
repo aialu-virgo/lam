@@ -142,10 +142,10 @@ function statusOf(ach,lowerBetter){
 function achLower(actual,plan){
   if(actual==null||isNaN(actual)||plan==null||isNaN(plan))return {ach:null,within:false};
   if(actual<=0)return {ach:200,within:true};
-  if(!(plan>0))return {ach:null,within:false};
+  if(!(plan>0))return {ach:null,within:false,over:true};
   return {ach:Math.min(200,plan/actual*100),within:false};
 }
-function fmtAchLower(a){return a.within?'<b class="a-green">Within plan</b>':(a.ach==null?'<span class="note">—</span>':fmtAch(a.ach))}
+function fmtAchLower(a){return a.over?'<b class="a-red">Over plan</b>':a.within?'<b class="a-green">Within plan</b>':(a.ach==null?'<span class="note">—</span>':fmtAch(a.ach))}
 function statusPill(st,txt){var m={green:['ok','On plan'],orange:['part','Watch'],red:['miss','Behind'],none:['mute','No plan'],pending:['mute','Pending']}[st]||['mute',st];return '<span class="pill '+m[0]+'">'+esc(txt||m[1])+'</span>'}
 function fmtSqft(v){return fmtN(Math.round(v||0))+' sq ft'}
 /* sheets are the primary quantity unit; sq ft is the secondary line */

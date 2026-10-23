@@ -693,7 +693,7 @@ function histRows(){
     return (!f.src||u.sys===f.src)&&(!f.ent||(u.entity||'INV')===f.ent)&&(!f.status||u.status===f.status)&&(!q||((u.file||'')+' '+(u.by||'')+' '+(u.periodLabel||'')+' '+(u.status||'')+' '+(u.demo?'demo':'')).toLowerCase().indexOf(q)>=0);
   });
 }
-function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u)]}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
+function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u),u.backup_removed||'']}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
 function histBodyHtml(){
   var all=histRows(),rows=all.slice(0,S.hist.shown);
   if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
@@ -1569,10 +1569,10 @@ function statusOf(ach,lowerBetter){
 function achLower(actual,plan){
   if(actual==null||isNaN(actual)||plan==null||isNaN(plan))return {ach:null,within:false};
   if(actual<=0)return {ach:200,within:true};
-  if(!(plan>0))return {ach:null,within:false};
+  if(!(plan>0))return {ach:null,within:false,over:true};
   return {ach:Math.min(200,plan/actual*100),within:false};
 }
-function fmtAchLower(a){return a.within?'<b class="a-green">Within plan</b>':(a.ach==null?'<span class="note">—</span>':fmtAch(a.ach))}
+function fmtAchLower(a){return a.over?'<b class="a-red">Over plan</b>':a.within?'<b class="a-green">Within plan</b>':(a.ach==null?'<span class="note">—</span>':fmtAch(a.ach))}
 function statusPill(st,txt){var m={green:['ok','On plan'],orange:['part','Watch'],red:['miss','Behind'],none:['mute','No plan'],pending:['mute','Pending']}[st]||['mute',st];return '<span class="pill '+m[0]+'">'+esc(txt||m[1])+'</span>'}
 function fmtSqft(v){return fmtN(Math.round(v||0))+' sq ft'}
 /* sheets are the primary quantity unit; sq ft is the secondary line */
@@ -2902,7 +2902,7 @@ function kpiCompute(id,u,ctx){
   if(K.pending&&K.kind!=='text'){K.actual=null}
   /* achievement and status */
   if(K.plan!=null&&K.actual!=null&&K.kind!=='text'){
-    if(K.lower){var al=achLower(K.actual,K.plan);K.ach=al.ach;K.within=al.within;K.status=K.plan>0?(al.within?'green':statusOf(K.ach)):(K.actual<=K.plan?'green':K.actual<=1?'orange':'red')}
+    if(K.lower){var al=achLower(K.actual,K.plan);K.ach=al.ach;K.within=al.within;K.over=!!al.over;K.status=K.plan>0?(al.within?'green':statusOf(K.ach)):(K.actual<=K.plan?'green':K.actual<=1?'orange':'red')}
     else{K.ach=K.plan>0?K.actual/K.plan*100:null;K.status=statusOf(K.ach)}
   }else K.status=K.none||K.kind==='text'?'none':'none';
   if(id==='K1'&&K.actual!=null){K.status=statusOf(K.actual)}
@@ -2924,7 +2924,7 @@ function kpiTable(u,ctx){
      var qoq='—';
      if(K.id==='K1'||K.id==='K2'||K.id==='K3')qoq=qoqCell(K.qoq);
      else if(K.last!=null&&K.actual!=null){var d=K.actual-K.last;qoq=K.kind==='pct'?'<span class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'−')+Math.abs(d).toFixed(1)+' pts</span>':(K.last>0?qoqCell(qoqOf(K.actual,K.last,{})):(d===0?'0':(d>0?'+':'−')+Math.abs(d)))}
-     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.within?'<b class="a-green">Within plan</b>':K.ach!=null?fmtAch(K.ach):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
+     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.over?'<b class="a-red">Over plan</b>':K.within?'<b class="a-green">Within plan</b>':K.ach!=null?fmtAch(K.ach):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
   return {html:h,on:on,scored:scored,total:rows.length};
 }
 function teamPeople(u){
@@ -5477,9 +5477,9 @@ function undoDialog0(uid){
 async function undoUpload(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
-  if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3><p>The data this upload held was removed. Upload the file again if you still need it.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
-  if(us&&us.entity==='CL'){try{var cpl=await collUndo(uid);closeDlg();openDlg('<h3>Collection upload '+esc(uid)+' undone</h3><p>Removed '+cpl.docs.length+' plant-months. <b>Upload these months again:</b> '+(cpl.months.length?esc(cpl.months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el1=$('#d-err');if(el1)el1.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
-  if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3><p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
+  if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],us.entity==='RC'?'snap':null,'<p>The data this upload held was removed. Upload the file again if you still need it.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
+  if(us&&us.entity==='CL'){try{var cpl=await collUndo(uid);closeDlg();openDlg('<h3>Collection upload '+esc(uid)+' undone</h3>'+undoDoneP(cpl.docs.length,cpl.months,null,'<p>Removed '+cpl.docs.length+' plant-months. <b>Upload these months again:</b> '+(cpl.months.length?esc(cpl.months.map(ymLabel).join(', ')):'none')+'.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el1=$('#d-err');if(el1)el1.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
+  if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],'snap','<p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   var pl=undoPlan(uid);if(!pl)return;
   var jobs=[],months=pl.months.slice(),sets=[];
   pl.months.forEach(function(ym){
@@ -5504,7 +5504,7 @@ async function undoUpload(uid){
     await auditW('upload undone','',{upload:uid,file:(up.file||'').slice(0,120),months:months,plant_months:pl.n});
     await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,months:months,plant_months:pl.n});
     closeDlg();
-    openDlg('<h3>Upload '+esc(uid)+' undone</h3><p>Removed '+pl.n+' plant-month'+(pl.n===1?'':'s')+'. <b>Upload these months again:</b> '+(months.length?esc(months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>');
+    openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(pl.n,months,null,'<p>Removed '+pl.n+' plant-month'+(pl.n===1?'':'s')+'. <b>Upload these months again:</b> '+(months.length?esc(months.map(ymLabel).join(', ')):'none')+'.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>');
   }catch(e){var el=$('#d-err');if(el)el.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'. Nothing else was changed; run it again.</div>'}
 }
 Object.assign(handlers,{
@@ -5543,6 +5543,10 @@ function histReplacedBy(u){
   return later[0]||null;
 }
 function histStatusPill(u){
+  var rm=u.backup_removed?' <span class="note" title="'+esc(u.backup_removed_why||'')+'">Undo no longer restores (backup removed '+esc(istStr(u.backup_removed))+')</span>':'';
+  return histStatusPill0(u)+rm;
+}
+function histStatusPill0(u){
   var rb=histReplacedBy(u);if(rb)return '<span class="pill mute" title="Nothing stored points to this upload any more">Replaced by '+esc((rb.file||'').slice(0,40))+', '+esc(istStr(rb.at))+'</span>';
   var st=u.status,sk=u.rejected||0;
   if((st==='Loaded'||(st==='Partial'&&!u.stopped&&u.entity!=='INV'))&&sk>0)return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' row'+(sk===1?'':'s')+' skipped</span>';
@@ -5600,65 +5604,111 @@ async function bkPrep(B){
 }
 async function bkMaybe(B){if(B.raw>600000)await bkPrep(B)}
 function bkStored(){return S.backups.reduce(function(a,d){return a+(d.z||'').length},0)}
-function bkAsk(){return new Promise(function(res){S.bkResolve=res;openDlg('<h3>No room for a backup</h3><p>The backups held already use the 20 MB limit and the data this upload replaces does not fit.</p><div class="banner warn" style="display:block"><b>Undo will not be able to restore the replaced months for this upload.</b></div><div class="row"><button class="btn pri" data-act="bk-go">Load anyway</button><button class="btn" data-act="bk-cancel">Cancel the load</button></div>')})}
+function bkAsk(kind,list){return new Promise(function(res){S.bkResolve=res;
+  var body=kind==='purge'?'<p>The backups held use the 20 MB limit. To keep a backup of what this upload replaces, these older uploads would lose theirs (Undo would no longer restore them):</p><ul>'+list.map(function(u){return '<li>'+esc(u.file||u.id)+' &middot; '+esc(u.at?istStr(u.at):'')+'</li>'}).join('')+'</ul><div class="row"><button class="btn pri" data-act="bk-go">Remove those backups and load</button><button class="btn" data-act="bk-cancel">Cancel the load</button></div>'
+    :'<p>The data this upload replaces does not fit in the 20 MB of backups, even with every older backup removed. Nothing has been removed.</p><div class="banner warn" style="display:block"><b>Undo will not be able to restore the replaced months for this upload.</b></div><div class="row"><button class="btn pri" data-act="bk-go">Load anyway</button><button class="btn" data-act="bk-cancel">Cancel the load</button></div>';
+  openDlg('<h3>'+(kind==='purge'?'Older backups must go':'No room for a backup')+'</h3>'+body)})}
 Object.assign(handlers,{
  'bk-go':function(){closeDlg();var r=S.bkResolve;S.bkResolve=null;if(r)r(true)},
  'bk-cancel':function(){closeDlg();var r=S.bkResolve;S.bkResolve=null;if(r)r(false)}
 });
+/* backups grouped by upload: oldest upload first, expired ones before the others */
+function bkGroups(exceptUid){
+  var by={},now=nowISO();
+  S.backups.forEach(function(d){if(d.upload===exceptUid)return;var g=by[d.upload]||(by[d.upload]={id:d.upload,docs:[],bytes:0,at:d.at||'',expired:false});g.docs.push(d);g.bytes+=(d.z||'').length;if((d.at||'')<g.at)g.at=d.at;if(d.expires&&d.expires<now)g.expired=true});
+  return Object.keys(by).map(function(k){return by[k]}).sort(function(a,b){return a.expired!==b.expired?(a.expired?-1:1):(a.at<b.at?-1:1)});
+}
+/* delete whole uploads' backups together and mark each upload in history */
+async function bkRemoveUploads(groups,why){
+  for(var g=0;g<groups.length;g++){
+    for(var k=0;k<groups[g].docs.length;k++)await ddel('backups/'+groups[g].docs[k]._id);
+    var u=S.uploads.find(function(x){return x._id===groups[g].id});
+    if(u&&why){var up=Object.assign({},u);delete up._id;up.backup_removed=nowISO();up.backup_removed_why=why;await dset('uploads/'+groups[g].id,up)}
+  }
+}
 /* write every backup document now; call once, before the first replacing write */
 async function bkCommit(B){
   await bkPrep(B);
   if(!B.pend.length)return B;
-  var need=B.pendBytes,total=bkStored(),now=nowISO();
+  var need=B.pendBytes,total=bkStored(),plan=[],toRemove=[],loud=false;
   if(total+need>BK_CAP){
-    var ex=S.backups.filter(function(d){return d.upload!==B.uid}).sort(function(a,b){var ea=(a.expires&&a.expires<now)?0:1,eb=(b.expires&&b.expires<now)?0:1;return ea!==eb?ea-eb:((a.at||'')<(b.at||'')?-1:1)});
-    for(var k=0;k<ex.length&&total+need>BK_CAP;k++){total-=(ex[k].z||'').length;await ddel('backups/'+ex[k]._id)}
-  }
-  if(need>BK_CAP||total+need>BK_CAP){
-    var go=await bkAsk();
-    if(!go)throw new Error('the load was cancelled because the backup does not fit; nothing was changed.');
-    B.pend=[];B.pendBytes=0;B.skipped=true;return B;
+    /* plan first, delete nothing yet: whole uploads, expired then oldest first */
+    var gs=bkGroups(B.uid),t=total;
+    for(var k=0;k<gs.length&&t+need>BK_CAP;k++){plan.push(gs[k]);t-=gs[k].bytes}
+    if(need>BK_CAP||t+need>BK_CAP){
+      var go=await bkAsk('nofit');/* nothing is removed in this case */
+      if(!go)throw new Error('the load was cancelled because the backup does not fit; nothing was changed.');
+      B.pend=[];B.pendBytes=0;B.skipped=true;return B;
+    }
+    loud=plan.some(function(g){return !g.expired});
+    if(loud){
+      var ok=await bkAsk('purge',plan.map(function(g){var u=S.uploads.find(function(x){return x._id===g.id})||{};return {id:g.id,file:u.file,at:u.at||g.at}}));
+      if(!ok)throw new Error('the load was cancelled; nothing was changed.');
+    }
+    toRemove=plan;
   }
   var exp=new Date(Date.now()+BK_DAYS*864e5).toISOString(),written=[];
   try{
     for(var g=0;g<B.pend.length;g++){var idx=B.i++;
-      await dset('backups/'+B.uid+'_'+idx,{upload:B.uid,entity:B.entity,i:idx,n:B.pend[g].n,z:B.pend[g].z,at:nowISO(),expires:exp});written.push('backups/'+B.uid+'_'+idx)}
+      await dset('backups/'+B.uid+'_'+idx,{upload:B.uid,entity:B.entity,i:idx,of:B.pend.length,ck:bkHash(B.pend[g].z),n:B.pend[g].n,z:B.pend[g].z,at:nowISO(),expires:exp});written.push('backups/'+B.uid+'_'+idx)}
   }catch(e){
     for(var w=0;w<written.length;w++){try{await ddel(written[w])}catch(e2){}}
     throw new Error('the backup of the data being replaced could not be saved; nothing was changed.');
   }
   B.docs=B.pend.length;B.bytes=B.pendBytes;B.pend=[];B.pendBytes=0;
+  if(toRemove.length)await bkRemoveUploads(toRemove,'room for a newer backup');/* after the new backup is safely written */
   return B;
 }
+function undoDoneP(removed,months,kind,generic){
+  var L=S.bkLast||{units:0,incomplete:false};
+  if(L.incomplete)return '<p><b>Backup incomplete:</b> nothing was restored. The months this upload held were removed. <b>Upload these months again:</b> '+(months&&months.length?esc(months.map(ymLabel).join(', ')):'none')+'.</p>';
+  if(L.units>0){if(kind==='snap')return '<p>Restored the previous snapshot.</p>';var rest=removed!=null?Math.max(0,removed-L.units):0;return '<p>Restored the previous data for '+L.units+' plant-month'+(L.units===1?'':'s')+'.'+(rest>0?' '+rest+' more had no earlier data and were removed; <b>upload those again</b> if you need them.':'')+'</p>'}
+  return generic;
+}
 function bkSummary(B){return B&&(B.docs||B.skipped)?{docs:B.docs,bytes:B.bytes,items:B.count,skipped:B.skipped||undefined}:undefined}
+function bkHash(str){var h=2166136261;for(var i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)>>>0}return h.toString(16)}
+/* integrity: every part of an upload's backup must be present and match its checksum */
+function bkCheck(uid){
+  var docs=bkFor(uid);if(!docs.length)return {ok:true,none:true};
+  var of=docs[0].of;if(of==null)return {ok:true};/* written before checksums existed */
+  var have={},bad=0;docs.forEach(function(d){have[d.i]=1;if(d.ck!==bkHash(d.z||''))bad++});
+  var missing=[];for(var i=0;i<of;i++)if(!have[i])missing.push(i);
+  return {ok:!missing.length&&!bad&&docs.length===of,missing:missing,bad:bad,of:of,have:docs.length};
+}
 function bkFor(uid){return S.backups.filter(function(d){return d.upload===uid}).sort(function(a,b){return a.i-b.i})}
 function bkHas(uid){return S.backups.some(function(d){return d.upload===uid})}
 /* restore the saved documents for which allow(path) is true; cell entries of sales plant-months are returned for the caller to merge */
 async function bkRestore(uid,allow){
-  var docs=bkFor(uid),n=0,cells=[];
+  var docs=bkFor(uid),n=0,cells=[];S.bkLast={units:0,incomplete:false};
+  var chk=bkCheck(uid);if(!chk.ok){S.bkLast.incomplete=true;return {n:0,cells:[],incomplete:true}}
   var parts={};
   for(var i=0;i<docs.length;i++){var items=JSON.parse(await ungz(docs[i].z));
     for(var j=0;j<items.length;j++){var it=items[j];
       if(it.p.indexOf('part:')===0){var pp=it.p.slice(5);(parts[pp]=parts[pp]||[])[it.k]=it.s;if(parts[pp].filter(function(x){return x!=null}).length===it.n){it=JSON.parse(parts[pp].join(''));delete parts[pp]}else continue}
       if(allow&&!allow(it.p))continue;
       if(it.p.indexOf('cellpart:')===0){cells.push(it);continue}
-      await dset(it.p,it.d);n++}}
+      await dset(it.p,it.d);n++;if(/^collections\/|^creditnotes\/[^~]*$|\/rsnap_|\/snap_/.test(it.p))S.bkLast.units++}}
+  S.bkLast.units+=cells.length;
   return {n:n,cells:cells};
 }
 async function bkDelete(uid){var docs=bkFor(uid);for(var i=0;i<docs.length;i++)await ddel('backups/'+docs[i]._id)}
 var bkTimer=0;
 async function bkPurge(){
   if(readOnly()||effRole()!=='Super admin'||!S.uploads.length)return;
-  var now=nowISO(),gone={};
-  S.backups.forEach(function(d){
-    var u=S.uploads.find(function(x){return x._id===d.upload});
-    if((d.expires&&d.expires<now)||(u&&(u.status==='Undone'||histReplacedBy(u))))gone[d._id]=1});
-  var ids=Object.keys(gone);for(var i=0;i<ids.length;i++){try{await ddel('backups/'+ids[i])}catch(e){}}
+  var now=nowISO(),by={};
+  S.backups.forEach(function(d){var g=by[d.upload]||(by[d.upload]={id:d.upload,docs:[]});g.docs.push(d)});
+  var exp=[],gone=[];
+  Object.keys(by).forEach(function(id){var g=by[id],u=S.uploads.find(function(x){return x._id===id});
+    var expired=g.docs.some(function(d){return d.expires&&d.expires<now});
+    if(u&&(u.status==='Undone'||histReplacedBy(u)))gone.push(g);else if(expired)exp.push(g)});
+  try{await bkRemoveUploads(gone,null);await bkRemoveUploads(exp,'older than '+BK_DAYS+' days')}catch(e){}
 }
 function bkSchedule(){clearTimeout(bkTimer);bkTimer=setTimeout(function(){bkPurge()},4000)}
 /* the Undo dialog says so when a backup exists */
 function bkDialogNote(uid){
   if(!bkHas(uid))return;
+  var chk=bkCheck(uid);
+  if(!chk.ok){var e0=document.getElementById('d-err');if(e0)e0.insertAdjacentHTML('beforebegin','<div class="banner warn" style="display:block"><b>Backup incomplete:</b> Undo will remove these months; upload them again. Nothing will be restored.</div>');var gb=document.querySelector('[data-act="undo-go"]');if(gb)gb.textContent='Undo and remove these months';return}
   var nodes=document.querySelectorAll('.note,p');
   Array.prototype.forEach.call(nodes,function(p){if(/^Undo cannot bring back/.test(p.textContent||''))p.textContent='Undo restores the previous data: what this upload replaced is put back (only where no later upload has changed it again).'});
   var e=document.getElementById('d-err');if(e)e.insertAdjacentHTML('beforebegin','<div class="banner ok" style="display:block"><b>Undo restores the previous data.</b> A copy taken before this upload replaced it is held for '+BK_DAYS+' days.</div>');
@@ -5723,7 +5773,7 @@ async function boot(){
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},bkStored:bkStored,gz:gz};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
 boot();
 })();
 </script>

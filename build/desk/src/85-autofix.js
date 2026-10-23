@@ -416,9 +416,9 @@ function undoDialog0(uid){
 async function undoUpload(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
-  if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3><p>The data this upload held was removed. Upload the file again if you still need it.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
-  if(us&&us.entity==='CL'){try{var cpl=await collUndo(uid);closeDlg();openDlg('<h3>Collection upload '+esc(uid)+' undone</h3><p>Removed '+cpl.docs.length+' plant-months. <b>Upload these months again:</b> '+(cpl.months.length?esc(cpl.months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el1=$('#d-err');if(el1)el1.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
-  if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3><p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
+  if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],us.entity==='RC'?'snap':null,'<p>The data this upload held was removed. Upload the file again if you still need it.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
+  if(us&&us.entity==='CL'){try{var cpl=await collUndo(uid);closeDlg();openDlg('<h3>Collection upload '+esc(uid)+' undone</h3>'+undoDoneP(cpl.docs.length,cpl.months,null,'<p>Removed '+cpl.docs.length+' plant-months. <b>Upload these months again:</b> '+(cpl.months.length?esc(cpl.months.map(ymLabel).join(', ')):'none')+'.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el1=$('#d-err');if(el1)el1.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
+  if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],'snap','<p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   var pl=undoPlan(uid);if(!pl)return;
   var jobs=[],months=pl.months.slice(),sets=[];
   pl.months.forEach(function(ym){
@@ -443,7 +443,7 @@ async function undoUpload(uid){
     await auditW('upload undone','',{upload:uid,file:(up.file||'').slice(0,120),months:months,plant_months:pl.n});
     await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,months:months,plant_months:pl.n});
     closeDlg();
-    openDlg('<h3>Upload '+esc(uid)+' undone</h3><p>Removed '+pl.n+' plant-month'+(pl.n===1?'':'s')+'. <b>Upload these months again:</b> '+(months.length?esc(months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>');
+    openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(pl.n,months,null,'<p>Removed '+pl.n+' plant-month'+(pl.n===1?'':'s')+'. <b>Upload these months again:</b> '+(months.length?esc(months.map(ymLabel).join(', ')):'none')+'.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>');
   }catch(e){var el=$('#d-err');if(el)el.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'. Nothing else was changed; run it again.</div>'}
 }
 Object.assign(handlers,{
@@ -482,6 +482,10 @@ function histReplacedBy(u){
   return later[0]||null;
 }
 function histStatusPill(u){
+  var rm=u.backup_removed?' <span class="note" title="'+esc(u.backup_removed_why||'')+'">Undo no longer restores (backup removed '+esc(istStr(u.backup_removed))+')</span>':'';
+  return histStatusPill0(u)+rm;
+}
+function histStatusPill0(u){
   var rb=histReplacedBy(u);if(rb)return '<span class="pill mute" title="Nothing stored points to this upload any more">Replaced by '+esc((rb.file||'').slice(0,40))+', '+esc(istStr(rb.at))+'</span>';
   var st=u.status,sk=u.rejected||0;
   if((st==='Loaded'||(st==='Partial'&&!u.stopped&&u.entity!=='INV'))&&sk>0)return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' row'+(sk===1?'':'s')+' skipped</span>';
