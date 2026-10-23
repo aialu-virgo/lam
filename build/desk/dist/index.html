@@ -344,7 +344,7 @@ var SEED_SUPER=['data@virgoasia.com','spa@virgoasia.com'];
 var ROLES=['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive','Coordinator (sales / CRR)','Accounts','Plant'];
 var GROUPS=['Laminate','Door','PVC sheet','Compact board'];
 var SEGMENT_NOTE='Segments are configurable (open question Q5).';
-var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'CN',label:'Credit note'},{k:'RC',label:'Receivable'},{k:'CL',label:'Collection',live:true},{k:'ST',label:'Stock',live:true}];
+var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'CN',label:'Credit note',live:true},{k:'RC',label:'Receivable',live:true},{k:'CL',label:'Collection',live:true},{k:'ST',label:'Stock',live:true}];
 var ODATA=[['Customer','API_BUSINESS_PARTNER'],['Item','API_PRODUCT_SRV'],['Invoice / credit note','API_BILLING_DOCUMENT_SRV'],['Receivable / collection','I_OperationalAcctgDocItem'],['Stock','API_MATERIAL_STOCK_SRV']];
 var TEMPLATES={
  users:'email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code',
@@ -503,6 +503,8 @@ function entityCells(ent){var o={};Object.keys(S.cells).forEach(function(k){var 
 function cellPlants(c){return c?Object.keys(c.plants||{}).length:0}
 function covStatus(ent,qkey){
   if(ent==='ST')return stockCov(qkey);
+  if(ent==='RC')return recvCov(qkey);
+  if(ent==='CN')return cnCov(qkey);
   if(ent==='CL')return collCov(qkey);
   var cs=entityCells(ent),ref=0;Object.keys(cs).forEach(function(ym){ref=Math.max(ref,cellPlants(cs[ym]))});
   var months=qMonths(qkey),present=0,ok=0,detail=[];
@@ -560,6 +562,8 @@ function renderUpload0(){
   if(!U)U=newU();
   if(U.kind==='stock'){stockRender();return}
   if(U.kind==='coll'){collRender();return}
+  if(U.kind==='recv'){recvRender();return}
+  if(U.kind==='cn'){cnRender();return}
   var el=$('#i-upload');if(!el)return;
   var st=U.stage;
   var stepIdx={idle:1,parsing:1,mapping:2,validating:3,validated:3,loading:4,done:4}[st]||1;
@@ -665,9 +669,9 @@ function renderCov0(){
   var det='';
   if(S.covSel){
     var p=S.covSel.split('|'),c=covStatus(p[0],p[1]);
-    det='<div class="banner info" style="display:block"><b>'+qLabel(p[1])+' &middot; '+(p[0]==='ST'?'Stock':p[0]==='CL'?'Collection':'Invoice')+'</b> &middot; '+({ok:'Loaded',part:'Partial',miss:'Missing'})[c.st]+(c.closed?' &middot; closed, locked':'')
+    det='<div class="banner info" style="display:block"><b>'+qLabel(p[1])+' &middot; '+(p[0]==='ST'?'Stock':p[0]==='CL'?'Collection':p[0]==='RC'?'Receivables':p[0]==='CN'?'Credit notes':'Invoice')+'</b> &middot; '+({ok:'Loaded',part:'Partial',miss:'Missing'})[c.st]+(c.closed?' &middot; closed, locked':'')
      +'<div class="note" style="color:inherit">'+c.detail.map(function(d){return d.ym+': '+d.plants+' plant'+(d.plants===1?'':'s')}).join(' &nbsp;|&nbsp; ')+(c.ref?' &nbsp;(a month counts as complete at 90% of the '+c.ref+' plants seen in the busiest month)':'')+'</div>'
-     +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?(p[0]==='ST'?'<span class="note">Stock is a snapshot: the latest snapshot of each month counts as that month.</span>':p[0]==='CL'?'<span class="note">Collections load from the Incoming Payment Report; a month is covered when its plants have receipts.</span>':'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>'):'')
+     +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?(p[0]==='ST'?'<span class="note">Stock is a snapshot: the latest snapshot of each month counts as that month.</span>':(p[0]==='RC'||p[0]==='CN')?'<span class="note">'+(p[0]==='RC'?'Receivables are a snapshot: the latest snapshot of each month counts as that month.':'Credit notes load from the B1 or S/4 credit-note export; a month is covered when a file spans it.')+'</span>':p[0]==='CL'?'<span class="note">Collections load from the Incoming Payment Report; a month is covered when its plants have receipts.</span>':'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>'):'')
      +(effRole()!=='Super admin'||readOnly()?'<span class="note">Closing, reopening and reloading a quarter is for a Super admin.</span>':(c.closed?'<button class="btn sm" data-act="reopen" data-q="'+p[1]+'">Reopen quarter (reason required, logged)</button>':(c.st!=='miss'?'<button class="btn sm" data-act="close-q" data-q="'+p[1]+'">Close quarter</button>':'')))+'</div></div>';
   }
   el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; quarters since '+qLabel(histStart())+' (history start, D28)</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
@@ -680,15 +684,16 @@ function withScroll(container,fn){
   fn();
   if(container){Array.prototype.forEach.call(container.querySelectorAll('.tw,.hscroll'),function(e,i){if(pos[i]){e.scrollTop=pos[i][0];e.scrollLeft=pos[i][1]}})}
 }
-S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:''};
-var ENT_NAME={CL:'Collections',ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
+S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:'',showReplaced:false};
+var ENT_NAME={RC:'Receivables',CL:'Collections',ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
 function histRows(){
   var f=S.hist,q=(f.q||'').toLowerCase();
   return S.uploads.slice().sort(function(a,b){return a.at<b.at?1:-1}).filter(function(u){
+    if(!f.showReplaced&&histReplacedBy(u))return false;
     return (!f.src||u.sys===f.src)&&(!f.ent||(u.entity||'INV')===f.ent)&&(!f.status||u.status===f.status)&&(!q||((u.file||'')+' '+(u.by||'')+' '+(u.periodLabel||'')+' '+(u.status||'')+' '+(u.demo?'demo':'')).toLowerCase().indexOf(q)>=0);
   });
 }
-function histSig(){return JSON.stringify([S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file]}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
+function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u)]}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
 function histBodyHtml(){
   var all=histRows(),rows=all.slice(0,S.hist.shown);
   if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
@@ -697,7 +702,7 @@ function histBodyHtml(){
   return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(u){
      var fn=u.file||'',isOpen=!!open[u._id];
-     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST'||u.entity==='CL')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST'||u.entity==='CL'||u.entity==='RC'||u.entity==='CN')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
      if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
      return tr}).join('')
    +'</tbody></table></div>'
@@ -711,10 +716,11 @@ function renderHist(){
     var sel=function(id,label,cur,opts,nm){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="hist-f" data-k="'+nm+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(cur===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'};
     el.innerHTML='<div class="hd"><h2>Upload history</h2><span class="note" id="hist-count"></span></div>'
      +'<div class="row" id="hist-ctl" style="align-items:flex-end">'+sel('hf-src','Source',f.src,srcs.map(function(x){return [x,x==='B1'?'SAP B1':x==='S4'?'SAP S/4':x]}),'src')+sel('hf-ent','Entity',f.ent,ents.map(function(x){return [x,ENT_NAME[x]||x]}),'ent')+sel('hf-st','Status',f.status,sts.map(function(x){return [x,x]}),'status')
-     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div></div><div id="hist-body"></div>';
+     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div><div class="fld"><label>&nbsp;</label><label class="chip"><input type="checkbox" id="hf-rep" data-chg="hist-rep" '+(f.showReplaced?'checked':'')+'> Show replaced (<span id="hist-rep-n">0</span>)</label></div></div><div id="hist-body"></div>';
     S.hist.sig='';
   }
   if(S.hist.sig===sig)return;S.hist.sig=sig;
+  var rn=$('#hist-rep-n');if(rn)rn.textContent=String(S.uploads.filter(function(u){return !!histReplacedBy(u)}).length);
   var c=$('#hist-count');if(c)c.textContent=fmtN(S.uploads.length)+' upload'+(S.uploads.length===1?'':'s');
   var body=$('#hist-body');withScroll(body,function(){body.innerHTML=histBodyHtml()});
 }
@@ -789,6 +795,8 @@ async function onFile(file){
     var headers=rows[0].map(function(x){return x==null?'':String(x)});
     var d=detect(headers);
     var sheetsSeen=U.sheetsSeen,sheetPicked=U.sheetPicked;
+    var rdt=recvDetect(headers);if(rdt){recvStart(file,rows,headers,rdt,sheetPicked);return}
+    var cnd=cnDetectB1(headers)||(d.type==='invoice'&&d.sys==='S4'&&cnS4Share(headers,rows)>0.5?{kind:'cn',sys:'S4',layout:'S/4 billing credit memos'}:null);if(cnd){cnStart(file,rows,headers,cnd,sheetPicked);return}
     if(d.type==='unknown'){var cdt=collDetect(headers);if(cdt){collStart(file,rows,headers,sheetPicked);return}var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
     if(d.type==='master'&&d.what==='transfers'){U=newU();U.mode=mode;U.period=period;U.offer={file:file,rows:rows,what:'transfers'};U.msg='This file is the internal-transfer list (CardCode, CardName, Tranfser), not the sales export'+(sheetsSeen&&sheetsSeen.length>1?'. Sheets in the workbook: '+sheetsSeen.join('; ')+'. Save the DATA sheet as the CSV, or load the whole XLSX':'')+'. You can load it as the Internal-transfer list instead.';renderUpload();return}
     if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}
@@ -1399,6 +1407,7 @@ document.addEventListener('change',function(ev){
   else if(c==='closeafter'){U.closeAfter=t.checked}
   else if(c==='keepdocs'){U.keepDocs=t.checked}
   else if(c==='rejf'){U.rejFilter=t.value;renderUpload()}
+  else if(c==='hist-rep'){S.hist.showReplaced=t.checked;S.hist.shown=15;renderHist()}
   else if(c==='hist-f'){S.hist[t.getAttribute('data-k')]=t.value;S.hist.shown=15;renderHist()}
   else if(c==='potf'){var k=t.getAttribute('data-k');S.potFilter[{'pf-q':'q','pf-plant':'plant','pf-group':'group','pf-seg':'seg'}[k]]=t.value;refreshAdmin()}
 });
@@ -2965,7 +2974,7 @@ function plantSet(plants){return plants instanceof Set?plants:null}
 function recvItems(plants){var sc=SC(),out=[];S.recv.forEach(function(d){if(!plantInScope(sc,d.plant)||(plants&&!plants.has(d.plant)))return;d.rows.forEach(function(r){out.push({plant:d.plant,inv:r[0],cust:r[1],name:r[2],due:r[3],open:r[4],total:r[5]})})});return out}
 function recvStats(plants){
   var it=recvItems(plants);if(!it.length)return {have:false,buckets:[0,0,0,0],notDue:0,total:0,overShare:null};
-  var t=TODAY(),b=[0,0,0,0],nd=0,tot=0,over=0;
+  var t=S.recvAsOf||TODAY(),b=[0,0,0,0],nd=0,tot=0,over=0;
   it.forEach(function(x){var od=diffDays(t,x.due);tot+=x.open;if(od<=0){nd+=x.open;return}if(od<=30)b[0]+=x.open;else if(od<=60)b[1]+=x.open;else if(od<=90)b[2]+=x.open;else b[3]+=x.open;if(od>CFG.overdue_share_days)over+=x.open});
   return {have:true,buckets:b,notDue:nd,total:tot,overShare:tot>0?over/tot*100:null,items:it};
 }
@@ -3599,6 +3608,415 @@ function collCov(qkey){
   S.coll.forEach(function(d){if(d.undone)return;by[d.ym]=(by[d.ym]||0)+1;ref=Math.max(ref,by[d.ym])});
   var present=0,ok=0,detail=[];months.forEach(function(ym){var n=by[ym]||0;detail.push({ym:ym,plants:n});if(n>0)present++;if(n>0&&n>=Math.ceil(ref*0.9))ok++});
   return {st:present===0?'miss':(ok===3?'ok':'part'),detail:detail,ref:ref,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
+}
+
+/* ---- src/67-recv.js ---- */
+/* ================= Receivables intake: open items snapshot (D39, Vijay, 23 Oct 2026) =================
+ * A snapshot "as on" a date: one row per open invoice or open item. Stored as
+ *   receivables/rsnap_YYYYMMDD            index + aggregates per plant (small)
+ *   receivables/ri_YYYYMMDD_<plant>_<n>   open items of one plant, gzipped, 1,200 rows per document
+ * Kept: last 6 snapshots plus the latest of each month since history start. The latest snapshot is decoded into S.recv (the shape the
+ * Receivables page, K10/K11, rule R2 and the default collection plan already read): [{plant, asOn, rows:[[doc, cust, name, due, open, total, docDate]]}]. */
+S.recvRaw=[];S.recvCredit=[];S.recvSnaps=[];S.recvAsOf='';S.recvTok=0;S.recvKey='';
+var RC_FIELDS=[
+ {k:'branch',label:'Branch / plant',canon:'plant_code',req:1,c:['BRANCHNAME','BPLName','Branch Name','Branch','Plant','Profit Center','BPL']},
+ {k:'doc',label:'Document number',canon:'source_doc_no',req:1,c:['DOCNUM','DocNum','BaseRef','BELNR','Document','Document Number','Invoice','Reference']},
+ {k:'date',label:'Document date',canon:'doc_date',c:['DOCDATE','DocDate','RefDate','BUDAT','Posting Date','Document Date']},
+ {k:'due',label:'Due date',canon:'due_date',req:1,c:['DUEDATE','DocDueDate','DueDate','Net Due Date','FAEDT','Due Date']},
+ {k:'cust',label:'Customer code',canon:'customer_code',req:1,c:['CARDCODE','CardCode','ShortName','KUNNR','Customer','Customer Number']},
+ {k:'name',label:'Customer name',canon:'customer_name',c:['CARDNAME','CardName','Name','Customer Name','Name 1']},
+ {k:'total',label:'Document total',canon:'doc_total',c:['DOCTOTAL','DocTotal','Invoice Amount','Gross Amount']},
+ {k:'paid',label:'Paid to date',canon:'paid_to_date',c:['PAIDTODATE','PaidToDate','Paid']},
+ {k:'open',label:'Open amount (balance)',canon:'open_amount',c:['BALANCE','Balance','BalDue','Open Amount','Open Balance','Amount in Local Currency','DMBTR']},
+ {k:'deb',label:'Balance due debit',canon:'bal_due_debit',c:['BalDueDeb','BalDueDebit']},
+ {k:'cred',label:'Balance due credit',canon:'bal_due_credit',c:['BalDueCred','BalDueCredit']}];
+function recvDetect(headers){
+  var set={};headers.forEach(function(h){set[norm(h)]=1});var has=function(a){return a.some(function(x){return set[norm(x)]})};
+  if(has(['itemcode','item code','linetotal','quantity','invoice document item','checksum','transfersum','onhand','whscode','batchnum']))return null;
+  var cust=has(['cardcode','shortname','kunnr','customer','customer number']),doc=has(['docnum','baseref','belnr','document','document number','invoice']),due=has(['docduedate','duedate','net due date','faedt','due date']);
+  var amt=has(['balance','baldue','open amount','open balance','amount in local currency','dmbtr','baldueded','balduedeb'])||(has(['doctotal'])&&has(['paidtodate']));
+  if(!(cust&&doc&&due&&amt))return null;
+  var layout='generic';
+  if(set['paidtodate']&&set['docduedate'])layout='B1 OINV open invoices';
+  else if(set['shortname']&&(set['balduedeb']||set['baldueded']))layout='B1 JDT1 open items';
+  else if(set['faedt']||set['net due date']||set['kunnr'])layout='S/4 open items';
+  else if(set['branchname']&&set['balance'])layout='B1 custom open-items report';
+  return {kind:'recv',sys:(layout.indexOf('S/4')===0?'S4':'B1'),layout:layout};
+}
+function recvDefaultMap(headers){var ix=headerIndex(headers),m={};RC_FIELDS.forEach(function(f){m[f.k]=-1;for(var i=0;i<f.c.length;i++){var k=norm(f.c[i]);if(k in ix){m[f.k]=ix[k];break}}});return m}
+function recvStart(file,rows,headers,det,sheetPicked){
+  var mode=U.mode;U=newU();U.mode=mode;U.kind='recv';U.entity='RC';U.name=file.name;U.size=file.size;U.headers=headers;U.rows=rows.slice(1);U.sys=det.sys;U.layout=det.layout;U.sheetPicked=sheetPicked;
+  U.map=recvDefaultMap(headers);
+  var sv=S.mappings[det.sys+'_receivable'];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
+  U.asOf=asOfFromName(file.name);U.asOfSrc=U.asOf?'file name':'';
+  U.stage='mapping';renderUpload();
+}
+function recvAmountOk(){var m=U.map;return (m.open>=0)||(m.deb>=0||m.cred>=0)||(m.total>=0&&m.paid>=0)}
+async function recvParse(){
+  var map=U.map,rows=U.rows,col=function(k){return map[k]==null?-1:map[k]},cB=col('branch'),cD=col('doc'),cDt=col('date'),cDu=col('due'),cC=col('cust'),cN=col('name'),cT=col('total'),cP=col('paid'),cO=col('open'),cDe=col('deb'),cCr=col('cred');
+  var resolve=plantResolver(),asOf=U.asOf,res={read:rows.length,good:0,rejected:0,rejects:[],reasons:{},asOf:asOf,layout:U.layout,acp:{rows:0,value:0,plants:{}},zero:0,credit:{rows:0,value:0},unknownBranch:{},plants:{},noDue:0,open:0,notDue:0,minDue:null};
+  var rej=function(i,doc,field,reason,val){res.rejected++;res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,doc,'',field,reason,val==null?'':val])};
+  var T0=Date.now(),seen=new Set(),dupN=0;res.dup=0;
+  for(var i=0;i<rows.length;i++){
+    if(Date.now()-T0>40){T0=Date.now();U.progress=Math.round(i/rows.length*100);U.progressMsg='Checking row '+fmtN(i)+' of '+fmtN(rows.length);var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%';await tick()}
+    var r=rows[i],doc=String(r[cD]==null?'':r[cD]).trim().replace(/\.0$/,''),cust=String(r[cC]==null?'':r[cC]).trim();
+    if(!doc&&!cust)continue;
+    if(!doc){rej(i,'','Document number','Document number is empty','');continue}
+    if(!cust){rej(i,doc,'Customer','Customer code is empty','');continue}
+    var open=NaN,total=cT>=0?toNum(r[cT]):NaN;
+    if(cO>=0)open=toNum(r[cO]);
+    else if(cDe>=0||cCr>=0){var dv=cDe>=0?toNum(r[cDe]):0,cv=cCr>=0?toNum(r[cCr]):0;open=(isNaN(dv)?0:dv)-(isNaN(cv)?0:cv)}
+    else if(cT>=0&&cP>=0){var pv=toNum(r[cP]);open=total-(isNaN(pv)?0:pv)}
+    if(isNaN(open)){rej(i,doc,'Open amount','Open amount is not a number',r[cO>=0?cO:cT]);continue}
+    var bn=String(r[cB]==null?'':r[cB]).trim(),pl=resolve(U.sys,bn);
+    if(!pl){var k2=bn||'(blank)';res.unknownBranch[k2]=(res.unknownBranch[k2]||0)+1;rej(i,doc,'Branch','Unknown plant or branch',bn);continue}
+    if(pl.business==='ACP'||+pl.plant_code>=1050){res.acp.rows++;res.acp.value+=open;res.acp.plants[pl.plant_code]=1;continue}
+    if(pl.active===false){rej(i,doc,'Plant','Plant is switched off in Admin',pl.plant_code);continue}
+    if(Math.abs(open)<0.005){res.zero++;continue}
+    var dd=cDt>=0?parseColDate(r[cDt]):null,du=cDu>=0?parseColDate(r[cDu]):null,dueIso;
+    if(cDt>=0&&r[cDt]!==''&&r[cDt]!=null&&!dd){rej(i,doc,'Document date','Date not readable',r[cDt]);continue}
+    if(!du){if(cDu>=0&&r[cDu]!==''&&r[cDu]!=null){rej(i,doc,'Due date','Date not readable',r[cDu]);continue}if(dd){du=dd;res.noDue++}else{rej(i,doc,'Due date','No due date and no document date','');continue}}
+    dueIso=du.y+'-'+pad(du.m)+'-'+pad(du.d);var docIso=dd?dd.y+'-'+pad(dd.m)+'-'+pad(dd.d):'';
+    var dk=pl.plant_code+'|'+doc+'|'+cust+'|'+open;if(seen.has(dk)){res.dup++;continue}seen.add(dk);
+    var P=res.plants[pl.plant_code]||(res.plants[pl.plant_code]={rows:[],open:0,credit:0,notDue:0,b:[0,0,0,0],cust:new Set()});
+    var nm=cN>=0?String(r[cN]==null?'':r[cN]).trim().slice(0,30):'';
+    P.rows.push([doc,cust,nm,dueIso,Math.round(open*100)/100,isNaN(total)?'':Math.round(total*100)/100,docIso]);P.cust.add(cust);
+    if(open<0){P.credit+=-open;res.credit.rows++;res.credit.value+=-open}
+    else{var od=asOf?diffDays(asOf,dueIso):0;P.open+=open;res.open+=open;if(od<=0){P.notDue+=open;res.notDue+=open}else P.b[od<=30?0:od<=60?1:od<=90?2:3]+=open}
+    res.good++;
+  }
+  return res;
+}
+function recvRender(){
+  var el=$('#i-upload');if(!el)return;var st=U.stage,locked=st==='validating'||st==='loading';
+  var stepIdx={mapping:2,validating:3,validated:3,loading:4,done:4}[st]||1;
+  var steps=['Upload','Confirm mapping','Validate','Load'].map(function(s,i){return '<span class="'+(i+1<stepIdx?'ok':i+1===stepIdx?'on':'')+'">'+(i+1)+' '+s+'</span>'}).join('');
+  var h='<div class="hd"><h2>Upload a SAP export &middot; Receivables</h2><div class="steps">'+steps+'</div></div>';
+  h+='<div class="banner info"><span><b>'+esc(U.name)+'</b> &middot; '+fmtN(U.rows.length)+' data rows &middot; '+U.headers.length+' columns &middot; detected <b>'+esc(U.layout||'open items')+'</b>'+(U.savedMap?' &middot; saved mapping applied':'')+'</span><button class="btn sm" data-act="u-reset" '+(locked?'disabled':'')+'>Choose another file</button></div>';
+  var asOfOk=/^\d{4}-\d\d-\d\d$/.test(U.asOf||'')&&U.asOf<=TODAY();
+  h+='<div class="row" style="align-items:flex-end"><div class="fld"><label for="rc-asof">Open items as on (required)</label><input id="rc-asof" type="date" class="in" data-chg="rc-asof" value="'+esc(U.asOf||'')+'" max="'+TODAY()+'" '+(locked?'disabled':'')+'></div><div class="note" style="flex:1">'+(U.asOf?(asOfOk?'Read from the '+esc(U.asOfSrc||'picker')+': <b>'+esc(fmtDate(U.asOf))+'</b>. A snapshot for the same date replaces the earlier one. Ageing counts days past due to this date.':'<b class="dn">That date is in the future.</b>'):'No date in the file name. <b>Pick the date these open items are as on.</b>')+'</div></div>';
+  if(st==='mapping'){
+    var rows=RC_FIELDS.map(function(f){var cur=U.map[f.k];if(cur==null)cur=-1;
+      var opts='<option value="-1"'+(cur<0?' selected':'')+'>unmapped</option>'+U.headers.map(function(hd,i){return '<option value="'+i+'"'+(cur===i?' selected':'')+'>'+esc(hd===''?'(blank header, col '+(i+1)+')':hd)+'</option>'}).join('');
+      var sample='';if(cur>=0){for(var r=0;r<Math.min(U.rows.length,50);r++){var v=U.rows[r][cur];if(v!==''&&v!=null){sample=String(v);break}}}
+      return '<tr><td><select class="in" data-chg="rc-map" data-k="'+f.k+'" aria-label="File column for '+esc(f.label)+'">'+opts+'</select></td><td><b>'+esc(f.label)+'</b><div class="note mono">'+f.canon+'</div></td><td>'+(f.req?'<span class="pill info">Required</span>':'<span class="pill mute">Optional</span>')+'</td><td class="mono break" style="max-width:180px">'+esc(sample.slice(0,60))+'</td></tr>'}).join('');
+    var miss=RC_FIELDS.filter(function(f){return f.req&&(U.map[f.k]==null||U.map[f.k]<0)}).map(function(f){return f.label});
+    if(!recvAmountOk())miss.push('an open-amount column, or debit/credit balance, or document total with paid to date');
+    h+='<div class="hd"><h2>Confirm column mapping</h2><span class="note">Open = open amount; else debit − credit; else total − paid. Credit items (negative open) are kept and shown separately.</span></div><div class="tw"><table><thead><tr><th>File column</th><th>Canonical field</th><th>Need</th><th>Sample</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+     +(miss.length?'<div class="banner err">Map these first: '+esc(miss.join(', '))+'</div>':'')+'<div class="row"><button class="btn pri" data-act="rc-validate" '+(miss.length||!asOfOk?'disabled':'')+'>Confirm and validate</button></div>';
+  }
+  if(st==='validating')h+='<div><div class="bar"><i style="width:'+U.progress+'%"></i></div><div class="note">'+esc(U.progressMsg||'')+'</div></div>';
+  if(st==='validated'||st==='loading'||st==='done')h+=recvResultHtml(st!=='validated');
+  if(st==='loading')h+='<div><div class="bar"><i style="width:'+U.progress+'%"></i></div><div class="note">'+esc(U.progressMsg||'')+'</div></div>';
+  if(st==='done')h+='<div class="banner '+(U.doneOk?'ok':'warn')+'"><span>'+esc(U.doneMsg)+'</span><button class="btn sm" data-act="u-reset">Upload another file</button></div>';
+  if(U.msg)h+='<div class="banner err">'+esc(U.msg)+'</div>';
+  el.innerHTML=h;
+}
+function recvResultHtml(locked){
+  var r=U.res;if(!r)return '';
+  var h='<div class="hd"><h2>Validation result</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?fmtN(r.rejected)+' rows will be skipped':'All rows pass')+'</span></div>'
+   +'<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Open items loading</small><b>'+fmtN(r.good)+'</b></div><div class="kpi"><small>Open receivable</small><b>'+fmtMoney(r.open)+'</b><small>'+fmtMoney(r.notDue)+' not yet due</small></div><div class="kpi"><small>Credit items (unapplied)</small><b>'+fmtN(r.credit.rows)+'</b><small>'+fmtMoney(r.credit.value)+'</small></div><div class="kpi"><small>Rows skipped (rejected)</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>ACP plants (out of scope)</small><b>'+fmtN(r.acp.rows)+'</b></div></div>';
+  var it=[{st:'info',t:'File layout',n:null,d:esc(r.layout+'. '+(r.asOf?'As on '+fmtDate(r.asOf)+'. '+(recvSnapAt(r.asOf)?'Replaces the snapshot already held for this date.':'New snapshot.'):''))}];
+  if(r.credit.rows)it.push({st:'info',t:'Credit items kept separately (negative open amount)',n:r.credit.rows,d:esc(fmtMoney(r.credit.value)+' is shown apart from the ageing; it is not netted against invoices.')});
+  if(r.acp.rows)it.push({st:'info',t:'ACP plants skipped (not part of this Desk)',n:r.acp.rows,d:esc(Object.keys(r.acp.plants).length+' plants.')});
+  if(r.zero)it.push({st:'info',t:'Zero-balance rows skipped',n:r.zero,d:''});
+  if(r.dup)it.push({st:'fixed',t:'Repeated rows removed (same plant, document, customer and amount)',n:r.dup,d:''});
+  if(r.noDue)it.push({st:'need',t:'No due date: document date used',n:r.noDue,d:'Add the due date to the export so ageing is right.'});
+  var ub=Object.keys(r.unknownBranch);
+  if(ub.length)it.push({st:'need',t:'Branches not in the plant master (rows skipped)',n:ub.reduce(function(a,k){return a+r.unknownBranch[k]},0),d:esc(ub.slice(0,8).join(', '))+'. Add the plant or its B1 branch name in Admin › Plants, then load again.'});
+  h+=fixesPanel(it,'Fixes applied');
+  var pk=Object.keys(r.plants).sort();
+  h+='<div class="tw hscroll" style="max-height:240px;overflow:auto"><table><thead><tr><th>Plant</th><th class="num">Items</th><th class="num">Open</th><th class="num">Not due</th><th class="num">0–30</th><th class="num">31–60</th><th class="num">61–90</th><th class="num">90+</th></tr></thead><tbody>'+pk.map(function(p){var P=r.plants[p];return '<tr><td>'+esc(plantShort(p))+'</td><td class="num">'+fmtN(P.rows.length)+'</td><td class="num">'+fmtMoney(P.open)+'</td><td class="num">'+fmtMoney(P.notDue)+'</td>'+P.b.map(function(b){return '<td class="num">'+fmtMoney(b)+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>';
+  h+='<div class="row"><button class="btn pri" data-act="rc-load" '+(r.good>0&&!locked?'':'disabled')+'>Load '+fmtN(r.good)+' open items</button>'+(r.rejected?'<button class="btn" data-act="u-rejcsv-rc">Download skipped rows (CSV)</button>':'')+(locked?'':'<button class="btn" data-act="u-reset">Cancel upload</button>')+'</div>';
+  return h;
+}
+function recvSnapAt(a){return S.recvSnaps.find(function(s){return s.as_of===a})||null}
+async function recvValidate(){
+  U.stage='validating';U.progress=0;U.progressMsg='Starting...';recvRender();await tick();
+  try{U.res=await recvParse();U.stage='validated'}catch(e){U.stage='mapping';U.msg='Could not check the file: '+((e&&e.message)||e)}
+  recvRender();
+}
+function recvKeep(extra){
+  var all=S.recvSnaps.map(function(s){return s.as_of});if(extra&&all.indexOf(extra)<0)all.push(extra);all.sort().reverse();
+  var keep={},lo=histLoYm(),lm={};all.slice(0,6).forEach(function(a){keep[a]=1});
+  all.forEach(function(a){var m=a.slice(0,7);if(!lm[m]||a>lm[m])lm[m]=a});Object.keys(lm).forEach(function(m){if(m>=lo)keep[lm[m]]=1});return keep;
+}
+async function recvDeleteSnap(s){var d8=compactYmd(s.as_of),ps=s.plants||{};for(var p in ps){for(var j=0;j<(ps[p].chunks||0);j++)await ddel('receivables/ri_'+d8+'_'+p+'_'+j)}await ddel('receivables/rsnap_'+d8)}
+async function recvLoad(){
+  if(!superOnly('load receivables')||!U||!U.res||U.res.good<=0)return;
+  var r=U.res,uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!U.demoFlag,d8=compactYmd(r.asOf),id='rsnap_'+d8,old=S.recvRaw.find(function(x){return x._id===id});
+  U.stage='loading';U.progressMsg='Writing the snapshot...';recvRender();await tick();
+  var pk=Object.keys(r.plants).sort(),plants={},done=0;
+  try{
+    for(var pi=0;pi<pk.length;pi++){
+      var p=pk[pi],P=r.plants[p],rows=P.rows,per=1200,n=Math.max(1,Math.ceil(rows.length/per));
+      for(var c=0;c<n;c++)await dset('receivables/ri_'+d8+'_'+p+'_'+c,{z:await gz(JSON.stringify(rows.slice(c*per,(c+1)*per))),as_of:r.asOf,plant:p,i:c,n:rows.length,upload:uid,demo:demo||undefined,fmt:'gz-json v1: [doc,customer,name,due,open,total,docDate]'});
+      plants[p]={chunks:n,rows:rows.length,open:Math.round(P.open),credit:Math.round(P.credit),notDue:Math.round(P.notDue),b:P.b.map(Math.round),customers:P.cust.size};done++;
+      U.progress=Math.round(done/pk.length*100);U.progressMsg='Writing plant '+done+' of '+pk.length;var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%';
+    }
+    await dset('receivables/'+id,{as_of:r.asOf,layout:r.layout,sys:U.sys,file:U.name,upload:uid,at:nowISO(),by:by,plants:plants,loaded:r.good,skipped:r.rejected,open:Math.round(r.open),credit:Math.round(r.credit.value),demo:demo||undefined});
+    if(old){var ops=old.plants||{};for(var q in ops){var oc=ops[q].chunks||0,nc=plants[q]?plants[q].chunks:0;for(var j=nc;j<oc;j++)await ddel('receivables/ri_'+d8+'_'+q+'_'+j)}}
+    var keep=recvKeep(r.asOf);for(var i=0;i<S.recvSnaps.length;i++){var s=S.recvSnaps[i];if(!keep[s.as_of]&&s.as_of!==r.asOf)await recvDeleteSnap(s)}
+    if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
+  }catch(e){failed=e}
+  var upl={at:nowISO(),by:by,sys:U.sys,entity:'RC',file:U.name,size:U.size,mode:'snapshot',periodLabel:'Receivables as on '+fmtDate(r.asOf),as_of:r.asOf,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plants:pk.length,fixes:{credit_items:r.credit.rows,acp_rows:r.acp.rows,zero_rows:r.zero,repeated_rows:r.dup,no_due_date:r.noDue},error:failed?dbErrText(failed):undefined};
+  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+U.sys+'_receivable',{map:mp,sys:U.sys,entity:'RC',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
+  U.stage='done';U.doneOk=!failed;
+  U.doneMsg=failed?('Load stopped: '+dbErrText(failed)):('Loaded open items as on '+fmtDate(r.asOf)+': '+fmtN(r.good)+' items, '+fmtMoney(r.open)+' open, in '+pk.length+' plants.'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':''));
+  recvRender();
+}
+Object.assign(handlers,{
+ 'rc-validate':async function(){await recvValidate();if(U&&U.stage==='validated'&&!window.__NOAUTOLOAD&&U.res&&U.res.good>0&&effRole()==='Super admin'&&!readOnly()){toast('Loading '+fmtN(U.res.good)+' open items; '+fmtN(U.res.rejected)+' skipped');await recvLoad()}},
+ 'rc-load':function(){return recvLoad()},
+ 'u-rejcsv-rc':function(){var r=U.res;return download('skipped-receivable-rows.csv',csvLine(['row','document','line','field','reason','value'])+'\n'+r.rejects.map(csvLine).join('\n'))}
+});
+document.addEventListener('change',function(ev){
+  var t=ev.target,c=t.getAttribute&&t.getAttribute('data-chg');
+  if(c==='rc-asof'){U.asOf=t.value;U.asOfSrc='picker';if(U.stage==='validated'||U.stage==='done'){U.stage='mapping';U.res=null}recvRender()}
+  else if(c==='rc-map'){U.map[t.getAttribute('data-k')]=+t.value;U.savedMap=false;recvRender()}
+});
+/* ---- ingest: snapshots -> the per-plant open-item docs the page already reads ---- */
+function ingestRecv(){
+  var snaps=S.recvRaw.filter(function(x){return /^rsnap_\d{8}$/.test(x._id)});S.recvSnaps=snaps;
+  var sorted=snaps.slice().sort(function(a,b){return a.as_of<b.as_of?1:-1}),today=TODAY(),latest=sorted.find(function(s){return s.as_of<=today})||sorted[0]||null;
+  S.recvAsOf=latest?latest.as_of:'';
+  if(!latest){S.recvCredit=[];S.recv=S.recvRaw.filter(function(x){return x.rows&&x.plant});S.recvKey='';DS.cache={};S.engSig=null;S.lastHtml='';schedule();return}
+  var key=latest._id+'|'+latest.upload+'|'+latest.at;
+  if(key===S.recvKey)return;S.recvKey=key;var tok=++S.recvTok;
+  (async function(){
+    var d8=compactYmd(latest.as_of),out=[],cr=[],ps=Object.keys(latest.plants||{}),dm={};
+    S.recvRaw.forEach(function(x){dm[x._id]=x});
+    for(var i=0;i<ps.length;i++){var p=ps[i],rows=[];
+      for(var c=0;c<(latest.plants[p].chunks||0);c++){var d=dm['ri_'+d8+'_'+p+'_'+c];if(!d)continue;try{JSON.parse(await ungz(d.z)).forEach(function(r){rows.push(r)})}catch(e){}}
+      out.push({_id:'rsnap-'+p,plant:p,asOn:latest.as_of,rows:rows.filter(function(r){return r[4]>0})});
+      cr.push({_id:'rcred-'+p,plant:p,asOn:latest.as_of,rows:rows.filter(function(r){return r[4]<0})})}
+    if(tok!==S.recvTok)return;
+    S.recvCredit=cr;S.recv=out;DS.cache={};S.engSig=null;S.lastHtml='';schedule();
+  })();
+}
+async function recvUndo(uid){
+  var s=S.recvSnaps.find(function(x){return x.upload===uid}),u=S.uploads.find(function(x){return x._id===uid});
+  if(s)await recvDeleteSnap(s);await ddel('rejects/'+uid);
+  if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:s?[s.as_of]:[],undone_plant_months:s?Object.keys(s.plants||{}).length:0}))}
+  await auditW('upload undone','',{upload:uid,file:((u&&u.file)||'').slice(0,120),as_of:s?s.as_of:''});
+  await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,as_of:s?s.as_of:''});
+  return s;
+}
+function recvCov(qkey){
+  var months=qMonths(qkey),present=0,detail=[],cur=TODAY().slice(0,7);
+  months.forEach(function(ym){var have=S.recvSnaps.filter(function(s){return s.as_of.slice(0,7)===ym}).sort(function(a,b){return a.as_of<b.as_of?1:-1});detail.push({ym:ym,plants:have.length?Object.keys(have[0].plants||{}).length:0});if(have.length)present++});
+  var elig=months.filter(function(m){return m<=cur}).length;
+  return {st:present===0?'miss':(present>=elig&&elig>0?'ok':'part'),detail:detail,ref:0,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
+}
+
+/* ---- src/68-credit.js ---- */
+/* ================= Credit notes intake and the Net view (D39 and D40, 23 Oct 2026) =================
+ * A period entity like invoices: a file may span months. Stored per plant-month by product group (sheets, value) with the SAP reference per line:
+ *   creditnotes/<plant>-<ym>        {plant, ym, groups:{G:{sheets,sqft,value,lines}}, n, z (gzip of the lines), upload}
+ *   creditnotes/<plant>-<ym>~<i>    further gzipped line chunks of a big plant-month
+ *   creditnotes/cov_<ym>            {ym, upload}: the month is covered by a credit-note file (a plant with none then has none)
+ * D40: once every month of a quarter (up to today) is covered, achievement and growth for that quarter use Net = invoiced - credit notes. */
+S.cnRaw=[];S.cn=[];S.cnCov={};S.cnSig='';
+var CN_FIELDS=[
+ {k:'branch',label:'Branch / plant',canon:'plant_code',req:1,c:['BPLName','BRANCHNAME','Branch Name','Branch','Plant']},
+ {k:'doc',label:'Credit note number',canon:'source_doc_no',req:1,c:['DocNum','DOCNUM','Invoice Document Number','Credit Memo']},
+ {k:'line',label:'Line',canon:'source_line',c:['LineNum','Line Num','Invoice Document item','VisOrder']},
+ {k:'date',label:'Document date',canon:'doc_date',req:1,c:['DocDate','DOCDATE','Invoice Date','Posting Date']},
+ {k:'cust',label:'Customer code',canon:'customer_code',c:['CardCode','CARDCODE','Sold-to-Party Number']},
+ {k:'item',label:'Item code',canon:'item_code',req:1,c:['ItemCode','ITEMCODE','Product Code']},
+ {k:'qty',label:'Quantity (sheets)',canon:'qty_sheets',c:['Quantity','QUANTITY','Invoice Qty']},
+ {k:'value',label:'Line value (excl. GST)',canon:'net_value_inr',req:1,c:['LineTotal','LINETOTAL','Total Amount (Item)']},
+ {k:'base',label:'Base document (invoice)',canon:'base_ref',c:['BaseRef','BASEREF','Reference Document']},
+ {k:'type',label:'Billing type (S/4)',canon:'billing_type',c:['Billing Type']}];
+function cnDetectB1(headers){
+  var set={};headers.forEach(function(h){set[norm(h)]=1});
+  return set['docnum']&&set['docdate']&&set['cardcode']&&set['itemcode']&&set['linetotal']&&set['baseref']&&!set['invoice type']&&!set['catagory']?{kind:'cn',sys:'B1',layout:'B1 credit notes (ORIN / RIN1)'}:null;
+}
+function cnS4Share(headers,rows){
+  var ix=headerIndex(headers),bi=ix['billing type'];if(bi==null)return 0;var n=0,non=0;
+  for(var i=1;i<rows.length&&i<=3000;i++){var t=norm(rows[i][bi]);if(!t)continue;n++;if(t!=='f2')non++}
+  return n?non/n:0;
+}
+function cnDefaultMap(headers){var ix=headerIndex(headers),m={};CN_FIELDS.forEach(function(f){m[f.k]=-1;for(var i=0;i<f.c.length;i++){var k=norm(f.c[i]);if(k in ix){m[f.k]=ix[k];break}}});return m}
+function cnStart(file,rows,headers,det,sheetPicked){
+  var mode=U.mode;U=newU();U.mode=mode;U.kind='cn';U.entity='CN';U.name=file.name;U.size=file.size;U.headers=headers;U.rows=rows.slice(1);U.sys=det.sys;U.layout=det.layout;U.sheetPicked=sheetPicked;
+  U.map=cnDefaultMap(headers);
+  var sv=S.mappings[det.sys+'_creditnote'];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
+  U.period=periodFromName(file.name);
+  U.stage='mapping';renderUpload();
+}
+async function cnParse(){
+  var map=U.map,rows=U.rows,col=function(k){return map[k]==null?-1:map[k]},cB=col('branch'),cD=col('doc'),cL=col('line'),cT=col('date'),cC=col('cust'),cI=col('item'),cQ=col('qty'),cV=col('value'),cBa=col('base'),cTy=col('type');
+  var idx=await loadItemIdx(),resolve=plantResolver(),per=U.period,today=TODAY(),lo=histLoYm();
+  var res={read:rows.length,good:0,rejected:0,rejects:[],reasons:{},period:per,layout:U.layout,acp:{rows:0,value:0},other:{rows:0,value:0},preHist:{rows:0,value:0},unknownBranch:{},nonCredit:0,months:{},pm:new Map(),minDate:null,maxDate:null,value:0,sheets:0,itemMaster:idx.size>0,covMonths:[]};
+  var rej=function(i,doc,field,reason,val){res.rejected++;res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,doc,'',field,reason,val==null?'':val])};
+  var T0=Date.now(),seen=new Set();res.dup=0;
+  for(var i=0;i<rows.length;i++){
+    if(Date.now()-T0>40){T0=Date.now();U.progress=Math.round(i/rows.length*100);U.progressMsg='Checking row '+fmtN(i)+' of '+fmtN(rows.length);var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%';await tick()}
+    var r=rows[i],doc=String(r[cD]==null?'':r[cD]).trim().replace(/\.0$/,'');
+    if(!doc&&!String(r[cI]==null?'':r[cI]).trim())continue;
+    if(cTy>=0){var ty=norm(r[cTy]);if(ty==='f2'){res.nonCredit++;continue}}
+    if(!doc){rej(i,'','Credit note number','Credit note number is empty','');continue}
+    var val=toNum(r[cV]);if(isNaN(val)){rej(i,doc,'Line value','Line value is not a number',r[cV]);continue}
+    var qty=cQ>=0?toNum(r[cQ]):0;if(isNaN(qty))qty=0;
+    val=Math.abs(val);qty=Math.abs(qty);
+    var dt=parseColDate(r[cT]);if(!dt){rej(i,doc,'Document date','Date not readable',r[cT]);continue}
+    var ym=dt.y+'-'+pad(dt.m),iso=ym+'-'+pad(dt.d);
+    if(!res.minDate||iso<res.minDate)res.minDate=iso;if(!res.maxDate||iso>res.maxDate)res.maxDate=iso;
+    if(iso>today){rej(i,doc,'Document date','Date in the future',iso);continue}
+    if(per&&(iso<per.from||iso>per.to)){rej(i,doc,'Document date','Date outside the period in the file name ('+per.from+' to '+per.to+')',iso);continue}
+    var bn=String(r[cB]==null?'':r[cB]).trim(),pl=resolve(U.sys,bn);
+    if(!pl){var k2=bn||'(blank)';res.unknownBranch[k2]=(res.unknownBranch[k2]||0)+1;rej(i,doc,'Branch','Unknown plant or branch',bn);continue}
+    if(pl.business==='ACP'||+pl.plant_code>=1050){res.acp.rows++;res.acp.value+=val;continue}
+    if(pl.active===false){rej(i,doc,'Plant','Plant is switched off in Admin',pl.plant_code);continue}
+    if(ym<lo){res.preHist.rows++;res.preHist.value+=val;continue}
+    var item=String(r[cI]==null?'':r[cI]).trim().toUpperCase(),it=idx.get(item);
+    if(!it){res.other.rows++;res.other.value+=val;continue}
+    var line=cL>=0?String(r[cL]==null?'':r[cL]).trim().replace(/\.0$/,''):'',dk=pl.plant_code+'|'+doc+'|'+line+'|'+item+'|'+qty+'|'+val;
+    if(seen.has(dk)){res.dup++;continue}seen.add(dk);
+    var key=pl.plant_code+'|'+ym,P=res.pm.get(key);if(!P){P={plant:pl.plant_code,ym:ym,groups:{},lines:[]};res.pm.set(key,P)}
+    var g=it[0],G=P.groups[g]||(P.groups[g]={sheets:0,sqft:0,value:0,lines:0});G.sheets+=qty;G.sqft+=qty*it[1];G.value+=val;G.lines++;
+    P.lines.push([doc,line,dt.d,cC>=0?String(r[cC]==null?'':r[cC]).trim():'',item,ITEM_GROUPS.indexOf(g),qty,Math.round(val*100)/100,cBa>=0?String(r[cBa]==null?'':r[cBa]).trim().replace(/\.0$/,''):'']);
+    var M=res.months[ym]||(res.months[ym]={lines:0,value:0,sheets:0});M.lines++;M.value+=val;M.sheets+=qty;res.value+=val;res.sheets+=qty;res.good++;
+  }
+  /* months this file covers: the period in the file name, else the months between the first and last date */
+  var from=per?per.from.slice(0,7):(res.minDate||'').slice(0,7),to=per?per.to.slice(0,7):(res.maxDate||'').slice(0,7),cm=[];
+  if(from&&to){var x=from<lo?lo:from;while(x<=to&&cm.length<60&&x<=today.slice(0,7)){cm.push(x);x=shiftYm(x,1)}}
+  res.covMonths=cm;
+  return res;
+}
+function cnReplaceRisk(res){
+  var out={},list=[];
+  res.pm.forEach(function(P){var old=S.cn.find(function(d){return d._id===P.plant+'-'+P.ym});if(!old||old.demo)return;
+    if((old.n||0)>P.lines.length){var o=out[P.ym]||(out[P.ym]={ym:P.ym,plants:0,oldLines:0,newLines:0});o.plants++;o.oldLines+=old.n||0;o.newLines+=P.lines.length}});
+  Object.keys(out).sort().forEach(function(k){list.push(out[k])});return list;
+}
+function cnCanLoad(){var r=U&&U.res;if(!r)return false;if(!(r.good>0)&&!r.covMonths.length)return false;if(cnReplaceRisk(r).length&&!U.confirmReplace)return false;return true}
+function cnRender(){
+  var el=$('#i-upload');if(!el)return;var st=U.stage,locked=st==='validating'||st==='loading';
+  var stepIdx={mapping:2,validating:3,validated:3,loading:4,done:4}[st]||1;
+  var steps=['Upload','Confirm mapping','Validate','Load'].map(function(s,i){return '<span class="'+(i+1<stepIdx?'ok':i+1===stepIdx?'on':'')+'">'+(i+1)+' '+s+'</span>'}).join('');
+  var h='<div class="hd"><h2>Upload a SAP export &middot; Credit notes</h2><div class="steps">'+steps+'</div></div>';
+  h+='<div class="banner info"><span><b>'+esc(U.name)+'</b> &middot; '+fmtN(U.rows.length)+' data rows &middot; '+U.headers.length+' columns &middot; detected <b>'+esc(U.layout||'credit notes')+'</b>'+(U.savedMap?' &middot; saved mapping applied':'')+'</span><button class="btn sm" data-act="u-reset" '+(locked?'disabled':'')+'>Choose another file</button></div>';
+  if(st==='mapping'){
+    var rows=CN_FIELDS.map(function(f){var cur=U.map[f.k];if(cur==null)cur=-1;
+      var opts='<option value="-1"'+(cur<0?' selected':'')+'>unmapped</option>'+U.headers.map(function(hd,i){return '<option value="'+i+'"'+(cur===i?' selected':'')+'>'+esc(hd===''?'(blank header, col '+(i+1)+')':hd)+'</option>'}).join('');
+      var sample='';if(cur>=0){for(var r=0;r<Math.min(U.rows.length,50);r++){var v=U.rows[r][cur];if(v!==''&&v!=null){sample=String(v);break}}}
+      return '<tr><td><select class="in" data-chg="cn-map" data-k="'+f.k+'" aria-label="File column for '+esc(f.label)+'">'+opts+'</select></td><td><b>'+esc(f.label)+'</b><div class="note mono">'+f.canon+'</div></td><td>'+(f.req?'<span class="pill info">Required</span>':'<span class="pill mute">Optional</span>')+'</td><td class="mono break" style="max-width:180px">'+esc(sample.slice(0,60))+'</td></tr>'}).join('');
+    var miss=CN_FIELDS.filter(function(f){return f.req&&(U.map[f.k]==null||U.map[f.k]<0)}).map(function(f){return f.label});
+    h+='<div class="hd"><h2>Confirm column mapping</h2><span class="note">One row per credit-note line. Values are taken as positive amounts to subtract from invoiced sales.</span></div><div class="tw"><table><thead><tr><th>File column</th><th>Canonical field</th><th>Need</th><th>Sample</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+     +(miss.length?'<div class="banner err">Map these first: '+esc(miss.join(', '))+'</div>':'')+'<div class="row"><button class="btn pri" data-act="cn-validate" '+(miss.length?'disabled':'')+'>Confirm and validate</button></div>';
+  }
+  if(st==='validating')h+='<div><div class="bar"><i style="width:'+U.progress+'%"></i></div><div class="note">'+esc(U.progressMsg||'')+'</div></div>';
+  if(st==='validated'||st==='loading'||st==='done')h+=cnResultHtml(st!=='validated');
+  if(st==='loading')h+='<div><div class="bar"><i style="width:'+U.progress+'%"></i></div><div class="note">'+esc(U.progressMsg||'')+'</div></div>';
+  if(st==='done')h+='<div class="banner '+(U.doneOk?'ok':'warn')+'"><span>'+esc(U.doneMsg)+'</span><button class="btn sm" data-act="u-reset">Upload another file</button></div>';
+  if(U.msg)h+='<div class="banner err">'+esc(U.msg)+'</div>';
+  el.innerHTML=h;
+}
+function cnResultHtml(locked){
+  var r=U.res;if(!r)return '';
+  var h='<div class="hd"><h2>Validation result</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?fmtN(r.rejected)+' rows will be skipped':'All rows pass')+'</span></div>'
+   +'<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Credit-note lines loading</small><b>'+fmtN(r.good)+'</b><small>'+fmtMoney(r.value)+' · '+fmtN(Math.round(r.sheets))+' sheets</small></div><div class="kpi"><small>Rows skipped (rejected)</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Not laminates (counted)</small><b>'+fmtN(r.other.rows)+'</b></div><div class="kpi"><small>ACP plants (out of scope)</small><b>'+fmtN(r.acp.rows)+'</b></div><div class="kpi"><small>Plant-months to write</small><b>'+fmtN(r.pm.size)+'</b></div></div>';
+  var it=[{st:'info',t:'File layout',n:null,d:esc(r.layout+'. Dates '+(r.minDate||'-')+' to '+(r.maxDate||'-')+', read as written, never swapped.')}];
+  it.push({st:'info',t:'Months this file covers',n:r.covMonths.length,d:esc(r.covMonths.map(ymLabel).join(', ')||'none')+'. A plant with no credit note in a covered month shows no credit notes there. Export all branches.'});
+  if(!r.itemMaster)it.push({st:'need',t:'No item master loaded',n:null,d:'The product group and sheets need the item master (Admin › Item master).'});
+  if(r.other.rows)it.push({st:'info',t:'Items not in the item master (counted, not stored)',n:r.other.rows,d:esc(fmtMoney(r.other.value)+'. The item master holds laminate-scope items only.')});
+  if(r.acp.rows)it.push({st:'info',t:'ACP plants skipped',n:r.acp.rows,d:esc(fmtMoney(r.acp.value))});
+  if(r.preHist.rows)it.push({st:'info',t:'Before history start ('+qLabel(histStart())+')',n:r.preHist.rows,d:'Not loaded; no action needed (D28).'});
+  if(r.nonCredit)it.push({st:'info',t:'Invoice rows (billing type F2) skipped',n:r.nonCredit,d:'This file is for credit notes only.'});
+  if(r.dup)it.push({st:'fixed',t:'Repeated lines removed',n:r.dup,d:''});
+  var ub=Object.keys(r.unknownBranch);if(ub.length)it.push({st:'need',t:'Branches not in the plant master (rows skipped)',n:ub.reduce(function(a,k){return a+r.unknownBranch[k]},0),d:esc(ub.slice(0,8).join(', '))+'. Add the plant or its B1 branch name in Admin › Plants.'});
+  it.push({st:'info',t:'What changes in the Desk',n:null,d:'Where every month of a quarter is covered, the Sales view shows Invoiced, Credit notes and Net side by side, and achievement and growth for that quarter use Net (D40). Earlier quarters stay on invoiced.'});
+  h+=fixesPanel(it,'Fixes applied');
+  var ms=Object.keys(r.months).sort();
+  h+='<div class="tw hscroll" style="max-height:220px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Lines</th><th class="num">Sheets</th><th class="num">Credit notes</th></tr></thead><tbody>'+ms.map(function(m){var M=r.months[m];return '<tr><td>'+esc(ymLabel(m))+'</td><td class="num">'+fmtN(M.lines)+'</td><td class="num">'+fmtN(Math.round(M.sheets))+'</td><td class="num">'+fmtMoney(M.value)+'</td></tr>'}).join('')+'</tbody></table></div>';
+  var rep=cnReplaceRisk(r);
+  if(rep.length)h+='<div class="banner warn" style="display:block"><b>Safety check stopped this file: it would replace '+rep.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more credit-note lines than the new data.</b><div class="tw hscroll" style="max-height:160px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Plant-months</th><th class="num">Lines held now</th><th class="num">In this file</th></tr></thead><tbody>'+rep.map(function(x){return '<tr><td>'+esc(ymLabel(x.ym))+'</td><td class="num">'+x.plants+'</td><td class="num">'+fmtN(x.oldLines)+'</td><td class="num">'+fmtN(x.newLines)+'</td></tr>'}).join('')+'</tbody></table></div><label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="cn-confrep" '+(U.confirmReplace?'checked':'')+' '+(locked?'disabled':'')+'> I confirm: replace these months ('+rep.map(function(x){return ymLabel(x.ym)}).join(', ')+')</label></div>';
+  h+='<div class="row"><button class="btn pri" data-act="cn-load" '+(cnCanLoad()&&!locked?'':'disabled')+'>Load '+fmtN(r.good)+' credit-note lines</button>'+(r.rejected?'<button class="btn" data-act="u-rejcsv-cn">Download skipped rows (CSV)</button>':'')+(locked?'':'<button class="btn" data-act="u-reset">Cancel upload</button>')+'</div>';
+  return h;
+}
+async function cnValidate(){
+  U.stage='validating';U.progress=0;U.progressMsg='Starting...';U.confirmReplace=false;cnRender();await tick();
+  try{U.res=await cnParse();U.stage='validated'}catch(e){U.stage='mapping';U.msg='Could not check the file: '+((e&&e.message)||e)}
+  cnRender();
+}
+async function cnLoad(){
+  if(!superOnly('load credit notes')||!U||!U.res||!cnCanLoad())return;
+  var r=U.res,uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!U.demoFlag,done=0,total=r.pm.size,atNow=nowISO();
+  U.stage='loading';U.progressMsg='Writing...';cnRender();await tick();
+  var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice();
+  try{
+    await Promise.all([0,1,2,3].map(async function(){
+      while(q.length){var P=q.shift(),per=2500,n=Math.max(1,Math.ceil(P.lines.length/per)),id=P.plant+'-'+P.ym,groups={};
+        Object.keys(P.groups).forEach(function(g){var G=P.groups[g];groups[g]={sheets:Math.round(G.sheets),sqft:Math.round(G.sqft),value:Math.round(G.value*100)/100,lines:G.lines}});
+        for(var c=1;c<n;c++)await dset('creditnotes/'+id+'~'+c,{plant:P.plant,ym:P.ym,chunk:c,z:await gz(JSON.stringify(P.lines.slice(c*per,(c+1)*per))),upload:uid,demo:demo||undefined});
+        await dset('creditnotes/'+id,{plant:P.plant,ym:P.ym,groups:groups,n:P.lines.length,chunks:n,z:await gz(JSON.stringify(P.lines.slice(0,per))),fmt:'gz-json v1: [doc,line,day,customer,item,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sheets,value,baseDoc]',sys:U.sys,src:U.sys==='S4'?'billing credit memo':'ORIN/RIN1',upload:uid,at:atNow,demo:demo||undefined});
+        done++;U.progress=Math.round(done/total*100);U.progressMsg='Writing plant-month '+done+' of '+total;var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%'}
+    }));
+    for(var ci=0;ci<r.covMonths.length;ci++)await dset('creditnotes/cov_'+r.covMonths[ci],{ym:r.covMonths[ci],cov:true,upload:uid,at:atNow,demo:demo||undefined});
+    if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
+  }catch(e){failed=e}
+  var ms=Object.keys(r.months).sort();
+  var upl={at:nowISO(),by:by,sys:U.sys,entity:'CN',file:U.name,size:U.size,mode:'historic',periodLabel:r.covMonths.length?(ymLabel(r.covMonths[0])+(r.covMonths.length>1?' to '+ymLabel(r.covMonths[r.covMonths.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:r.covMonths,
+    fixes:{other_rows:r.other.rows,acp_rows:r.acp.rows,repeated_lines:r.dup,amount_loaded:Math.round(r.value),sheets_loaded:Math.round(r.sheets)},error:failed?dbErrText(failed):undefined};
+  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+U.sys+'_creditnote',{map:mp,sys:U.sys,entity:'CN',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
+  U.stage='done';U.doneOk=!failed;
+  U.doneMsg=failed?('Load stopped: '+dbErrText(failed)+' '+done+' of '+total+' plant-months were stored.'):('Loaded '+fmtN(r.good)+' credit-note lines ('+fmtMoney(r.value)+') into '+done+' plant-months; '+r.covMonths.length+' months are now covered.'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':''));
+  cnRender();
+}
+Object.assign(handlers,{
+ 'cn-validate':async function(){await cnValidate();if(U&&U.stage==='validated'&&!window.__NOAUTOLOAD&&cnCanLoad()&&effRole()==='Super admin'&&!readOnly()){toast('Loading '+fmtN(U.res.good)+' credit-note lines; '+fmtN(U.res.rejected)+' skipped');await cnLoad()}},
+ 'cn-load':function(){return cnLoad()},
+ 'u-rejcsv-cn':function(){var r=U.res;return download('skipped-credit-note-rows.csv',csvLine(['row','document','line','field','reason','value'])+'\n'+r.rejects.map(csvLine).join('\n'))}
+});
+document.addEventListener('change',function(ev){
+  var t=ev.target,c=t.getAttribute&&t.getAttribute('data-chg');
+  if(c==='cn-map'){U.map[t.getAttribute('data-k')]=+t.value;U.savedMap=false;cnRender()}
+  else if(c==='cn-confrep'){U.confirmReplace=t.checked;cnRender()}
+});
+function ingestCN(){
+  S.cn=S.cnRaw.filter(function(d){return d.plant&&d.ym&&d.groups&&!d.chunk});
+  var cov={};S.cnRaw.forEach(function(d){if(d.cov&&d.ym)cov[d.ym]=d.upload||1});S.cnCov=cov;
+  DS.cache={};S.lastHtml='';S.engSig=null;schedule();
+}
+function cnUndoPlan(uid){var docs=S.cnRaw.filter(function(d){return d.upload===uid&&!d.cov});var ms={};docs.forEach(function(d){ms[d.ym]=1});return {docs:docs,cov:S.cnRaw.filter(function(d){return d.upload===uid&&d.cov}),months:Object.keys(ms).sort()}}
+async function cnUndo(uid){
+  var pl=cnUndoPlan(uid),u=S.uploads.find(function(x){return x._id===uid}),all=pl.docs.concat(pl.cov),q=all.slice();
+  await Promise.all([0,1,2,3].map(async function(){while(q.length){var d=q.shift();await ddel('creditnotes/'+d._id)}}));
+  await ddel('rejects/'+uid);
+  if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:pl.months,undone_plant_months:pl.docs.filter(function(d){return !d.chunk}).length}))}
+  await auditW('upload undone','',{upload:uid,file:((u&&u.file)||'').slice(0,120),months:pl.months,plant_months:pl.docs.length});
+  await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,months:pl.months});
+  return pl;
+}
+/* ---- coverage grid row ---- */
+function cnCov(qkey){
+  var months=qMonths(qkey),cur=TODAY().slice(0,7),elig=months.filter(function(m){return m<=cur}),present=elig.filter(function(m){return S.cnCov[m]}).length,detail=months.map(function(ym){return {ym:ym,plants:S.cn.filter(function(d){return d.ym===ym}).length}});
+  return {st:present===0?'miss':(present>=elig.length&&elig.length>0?'ok':'part'),detail:detail,ref:0,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
+}
+
+/* ================= the Net view (D40) ================= */
+function cnMonthsCovered(ms){var cur=TODAY().slice(0,7),el=ms.filter(function(m){return m<=cur});return el.length>0&&el.every(function(m){return !!S.cnCov[m]})}
+/* credit notes for a filter and window: {value,sheets,sqft,covered}. w: [{ym,frac}] or [ym]. Not available per salesperson. */
+function cnFor(f,w){
+  w=wins(w);var ms=w.map(function(x){return x.ym}),out={value:0,sheets:0,sqft:0,covered:false};
+  if(f.sp!=null)return out;
+  out.covered=cnMonthsCovered(ms);if(!out.covered)return out;
+  w.forEach(function(x){S.cn.forEach(function(d){if(d.ym!==x.ym)return;if(f.plants&&!f.plants.has(d.plant))return;if(f.plant&&d.plant!==f.plant)return;
+    Object.keys(d.groups).forEach(function(g){if(f.group&&g!==f.group)return;var G=d.groups[g];out.value+=G.value*x.frac;out.sheets+=G.sheets*x.frac;out.sqft+=(G.sqft||0)*x.frac})})});
+  return out;
+}
+function cnPanel(ctx,f){
+  var res=ctx.res,ms=res.curMonths&&res.curMonths.length?res.curMonths:(res.cur||[]).map(function(x){return x.ym||x}),cur=TODAY().slice(0,7);
+  var base=Object.assign({plants:ctx.plants},ctx.base);if(f)Object.assign(base,f);
+  if(base.sp!=null)return '';
+  var rows=ms.filter(function(m){return m<=cur}).map(function(m){
+    var A=sumF(base,[m]),cv=!!S.cnCov[m],C=cv?cnFor(base,[m]):null;
+    return '<tr><td>'+esc(ymLabel(m))+'</td><td class="num">'+fmtMoney(A.n)+'</td><td class="num">'+fmtN(Math.round(A.sh))+'</td>'+(cv?'<td class="num">'+fmtMoney(C.value)+'</td><td class="num">'+fmtN(Math.round(C.sheets))+'</td><td class="num"><b>'+fmtMoney(A.n-C.value)+'</b></td><td class="num"><b>'+fmtN(Math.round(A.sh-C.sheets))+'</b></td>':'<td class="note" colspan="4">Credit notes not loaded</td>')+'</tr>'}).join('');
+  if(!rows)return '';
+  var allCov=cnMonthsCovered(ms);
+  return '<section class="card"><div class="hd"><h2>Invoiced · Credit notes · Net</h2><span class="note">'+(allCov?'Net is the headline for this period':'Headline stays invoiced where credit notes are not loaded')+'</span></div><div class="tw hscroll"><table class="std"><thead><tr><th>Month</th><th class="num">Invoiced ₹</th><th class="num">Invoiced sheets</th><th class="num">Credit notes ₹</th><th class="num">Credit note sheets</th><th class="num">Net ₹</th><th class="num">Net sheets</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note">Net = invoiced − credit notes. Targets are set on invoiced sales. Once every month of a quarter has credit notes loaded, achievement and growth for that quarter use Net; earlier quarters stay on invoiced. Growth compares Net with Net only when both quarters have credit notes, otherwise invoiced with invoiced.</p></section>';
 }
 
 /* ---- src/70-admin.js ---- */
@@ -4832,6 +5250,8 @@ function undoPlan(uid){
 }
 function undoDialog(uid){
   var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&(us.entity==='RC'||us.entity==='CN')){var rc=us.entity==='RC',ps=rc?S.recvSnaps.find(function(x){return x.upload===uid}):cnUndoPlan(uid);
+    openDlg('<h3>Undo '+(rc?'receivables':'credit-note')+' upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>'+(rc?(ps?'Removes the open-items snapshot as on '+esc(ps.as_of)+' ('+Object.keys(ps.plants||{}).length+' plants)':'This upload no longer holds a snapshot (a later upload for the same date replaced it)'):'Removes '+ps.docs.filter(function(d){return !d.chunk}).length+' plant-months of credit notes in '+ps.months.length+' month'+(ps.months.length===1?'':'s')+' and their coverage marks')+'</b> that still point to this upload. The upload stays in history marked Undone, and the undo is logged.</div><p class="note">Undo cannot bring back data this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   if(us&&us.entity==='CL'){var cp=collUndoPlan(uid);
     openDlg('<h3>Undo collection upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>Removes '+cp.docs.length+' plant-month'+(cp.docs.length===1?'':'s')+' of receipts in '+cp.months.length+' month'+(cp.months.length===1?'':'s')+'</b> that still point to this upload. A collection plan already set on a month is kept. The upload stays in history marked Undone, and the undo is logged.</div><p><b>Months to upload again afterwards:</b> '+(cp.months.length?esc(cp.months.map(ymLabel).join(', ')):'none')+'.</p><p class="note">Undo cannot bring back receipts this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);
@@ -4847,6 +5267,7 @@ function undoDialog(uid){
 async function undoUpload(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3><p>The data this upload held was removed. Upload the file again if you still need it.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   if(us&&us.entity==='CL'){try{var cpl=await collUndo(uid);closeDlg();openDlg('<h3>Collection upload '+esc(uid)+' undone</h3><p>Removed '+cpl.docs.length+' plant-months. <b>Upload these months again:</b> '+(cpl.months.length?esc(cpl.months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el1=$('#d-err');if(el1)el1.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3><p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   var pl=undoPlan(uid);if(!pl)return;
@@ -4880,7 +5301,35 @@ Object.assign(handlers,{
 });
 
 /* ================= D33 (21 Oct 2026, Vijay): skipped rows never block; good rows load at once ================= */
+/* D41: an upload whose data nothing points to any more, because a later upload replaced the same plant-months or snapshot date, is "replaced" */
+function histHolds(u){
+  var id=u._id,e=u.entity||'INV',k;
+  if(e==='INV'){for(k in S.cells){var c=S.cells[k];if(c.entity!=='INV')continue;for(var p in (c.plants||{}))if(c.plants[p].upload===id)return true}return false}
+  if(e==='CL')return S.coll.some(function(d){return d.upload===id});
+  if(e==='ST')return S.stockSnaps.some(function(d){return d.upload===id});
+  if(e==='RC')return (S.recvSnaps||[]).some(function(d){return d.upload===id});
+  if(e==='CN')return (S.cn||[]).some(function(d){return d.upload===id});
+  if(e==='IT')return !!(S.itemMeta&&S.itemMeta.upload===id);
+  if(e==='CU')return !!(S.custMeta&&S.custMeta.upload===id);
+  return true;
+}
+function histReplacedBy(u){
+  if(!u||u.status!=='Loaded'&&u.status!=='Partial')return null;
+  var e=u.entity||'INV';if(['INV','CL','ST','RC','CN','IT','CU'].indexOf(e)<0)return null;
+  if(histHolds(u))return null;
+  var later=S.uploads.filter(function(v){return v._id!==u._id&&(v.entity||'INV')===e&&v.at>u.at&&(v.status==='Loaded'||v.status==='Partial')});
+  if(!later.length)return null;
+  var ov=function(a,b){if(!a||!b)return true;return a.some(function(x){return b.indexOf(x)>=0})};
+  later=later.filter(function(v){
+    if(e==='INV')return ov(u.quarters,v.quarters);
+    if(e==='CL'||e==='CN')return ov(u.months,v.months);
+    if(e==='ST'||e==='RC')return !u.as_of||u.as_of===v.as_of;
+    return true});
+  later.sort(function(a,b){return a.at<b.at?-1:1});
+  return later[0]||null;
+}
 function histStatusPill(u){
+  var rb=histReplacedBy(u);if(rb)return '<span class="pill mute" title="Nothing stored points to this upload any more">Replaced by '+esc((rb.file||'').slice(0,40))+', '+esc(istStr(rb.at))+'</span>';
   var st=u.status,sk=u.rejected||0;
   if((st==='Loaded'||(st==='Partial'&&!u.stopped&&u.entity!=='INV'))&&sk>0)return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' row'+(sk===1?'':'s')+' skipped</span>';
   if(st==='Partial'&&!u.stopped&&sk>0&&(u.entity||'INV')!=='INV')return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' rows skipped</span>';
@@ -4946,8 +5395,9 @@ async function boot(){
     subscribe('settings',db.collection('settings'),function(d){var m=d.find(function(x){return x._id==='main'});S.settings=m||null;applySettings(m);ingestAliases(d);DS.cache={}});
     subscribe('phasing',db.collection('phasing'),function(d){S.phasing=d;DS.cache={}});
     subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
-    subscribe('receivables',db.collection('receivables'),function(d){S.recv=d});
+    subscribe('receivables',db.collection('receivables'),function(d){S.recvRaw=d;ingestRecv()});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});
+    subscribe('creditnotes',db.collection('creditnotes'),function(d){S.cnRaw=d;ingestCN()});
     subscribe('stock',db.collection('stock'),function(d){S.stockRaw=d;ingestStock()});
     subscribe('itemmeta',db.collection('itemmeta'),function(d){S.itemMeta=d.find(function(x){return x._id==='main'})||null});
     subscribe('salesmaster',db.collection('salesmaster'),function(d){onSalesMaster(d.find(function(x){return x._id==='main'})||null)});

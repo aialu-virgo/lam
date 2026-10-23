@@ -15,7 +15,7 @@ function plantSet(plants){return plants instanceof Set?plants:null}
 function recvItems(plants){var sc=SC(),out=[];S.recv.forEach(function(d){if(!plantInScope(sc,d.plant)||(plants&&!plants.has(d.plant)))return;d.rows.forEach(function(r){out.push({plant:d.plant,inv:r[0],cust:r[1],name:r[2],due:r[3],open:r[4],total:r[5]})})});return out}
 function recvStats(plants){
   var it=recvItems(plants);if(!it.length)return {have:false,buckets:[0,0,0,0],notDue:0,total:0,overShare:null};
-  var t=TODAY(),b=[0,0,0,0],nd=0,tot=0,over=0;
+  var t=S.recvAsOf||TODAY(),b=[0,0,0,0],nd=0,tot=0,over=0;
   it.forEach(function(x){var od=diffDays(t,x.due);tot+=x.open;if(od<=0){nd+=x.open;return}if(od<=30)b[0]+=x.open;else if(od<=60)b[1]+=x.open;else if(od<=90)b[2]+=x.open;else b[3]+=x.open;if(od>CFG.overdue_share_days)over+=x.open});
   return {have:true,buckets:b,notDue:nd,total:tot,overShare:tot>0?over/tot*100:null,items:it};
 }

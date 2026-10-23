@@ -384,7 +384,7 @@ var SEED_SUPER=['demo.super@demo'];
 var ROLES=['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive','Coordinator (sales / CRR)','Accounts','Plant'];
 var GROUPS=['Laminate','Door','PVC sheet','Compact board'];
 var SEGMENT_NOTE='Segments are configurable (open question Q5).';
-var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'CN',label:'Credit note'},{k:'RC',label:'Receivable'},{k:'CL',label:'Collection'},{k:'ST',label:'Stock',live:true}];
+var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'CN',label:'Credit note'},{k:'RC',label:'Receivable'},{k:'CL',label:'Collection',live:true},{k:'ST',label:'Stock',live:true}];
 var ODATA=[['Customer','API_BUSINESS_PARTNER'],['Item','API_PRODUCT_SRV'],['Invoice / credit note','API_BILLING_DOCUMENT_SRV'],['Receivable / collection','I_OperationalAcctgDocItem'],['Stock','API_MATERIAL_STOCK_SRV']];
 var TEMPLATES={
  users:'email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code',
@@ -543,6 +543,7 @@ function entityCells(ent){var o={};Object.keys(S.cells).forEach(function(k){var 
 function cellPlants(c){return c?Object.keys(c.plants||{}).length:0}
 function covStatus(ent,qkey){
   if(ent==='ST')return stockCov(qkey);
+  if(ent==='CL')return collCov(qkey);
   var cs=entityCells(ent),ref=0;Object.keys(cs).forEach(function(ym){ref=Math.max(ref,cellPlants(cs[ym]))});
   var months=qMonths(qkey),present=0,ok=0,detail=[];
   months.forEach(function(ym){var n=cellPlants(cs[ym]);detail.push({ym:ym,plants:n});if(n>0)present++;if(n>0&&n>=Math.ceil(ref*0.9))ok++});
@@ -598,6 +599,7 @@ function renderUpload(){var _e=$('#i-upload');withScroll(_e,renderUpload0)}
 function renderUpload0(){
   if(!U)U=newU();
   if(U.kind==='stock'){stockRender();return}
+  if(U.kind==='coll'){collRender();return}
   var el=$('#i-upload');if(!el)return;
   var st=U.stage;
   var stepIdx={idle:1,parsing:1,mapping:2,validating:3,validated:3,loading:4,done:4}[st]||1;
@@ -703,9 +705,9 @@ function renderCov0(){
   var det='';
   if(S.covSel){
     var p=S.covSel.split('|'),c=covStatus(p[0],p[1]);
-    det='<div class="banner info" style="display:block"><b>'+qLabel(p[1])+' &middot; '+(p[0]==='ST'?'Stock':'Invoice')+'</b> &middot; '+({ok:'Loaded',part:'Partial',miss:'Missing'})[c.st]+(c.closed?' &middot; closed, locked':'')
+    det='<div class="banner info" style="display:block"><b>'+qLabel(p[1])+' &middot; '+(p[0]==='ST'?'Stock':p[0]==='CL'?'Collection':'Invoice')+'</b> &middot; '+({ok:'Loaded',part:'Partial',miss:'Missing'})[c.st]+(c.closed?' &middot; closed, locked':'')
      +'<div class="note" style="color:inherit">'+c.detail.map(function(d){return d.ym+': '+d.plants+' plant'+(d.plants===1?'':'s')}).join(' &nbsp;|&nbsp; ')+(c.ref?' &nbsp;(a month counts as complete at 90% of the '+c.ref+' plants seen in the busiest month)':'')+'</div>'
-     +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?(p[0]==='ST'?'<span class="note">Stock is a snapshot: the latest snapshot of each month counts as that month.</span>':'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>'):'')
+     +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?(p[0]==='ST'?'<span class="note">Stock is a snapshot: the latest snapshot of each month counts as that month.</span>':p[0]==='CL'?'<span class="note">Collections load from the Incoming Payment Report; a month is covered when its plants have receipts.</span>':'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>'):'')
      +(effRole()!=='Super admin'||readOnly()?'<span class="note">Closing, reopening and reloading a quarter is for a Super admin.</span>':(c.closed?'<button class="btn sm" data-act="reopen" data-q="'+p[1]+'">Reopen quarter (reason required, logged)</button>':(c.st!=='miss'?'<button class="btn sm" data-act="close-q" data-q="'+p[1]+'">Close quarter</button>':'')))+'</div></div>';
   }
   el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; quarters since '+qLabel(histStart())+' (history start, D28)</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
@@ -718,15 +720,16 @@ function withScroll(container,fn){
   fn();
   if(container){Array.prototype.forEach.call(container.querySelectorAll('.tw,.hscroll'),function(e,i){if(pos[i]){e.scrollTop=pos[i][0];e.scrollLeft=pos[i][1]}})}
 }
-S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:''};
-var ENT_NAME={ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
+S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:'',showReplaced:false};
+var ENT_NAME={CL:'Collections',ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
 function histRows(){
   var f=S.hist,q=(f.q||'').toLowerCase();
   return S.uploads.slice().sort(function(a,b){return a.at<b.at?1:-1}).filter(function(u){
+    if(!f.showReplaced&&histReplacedBy(u))return false;
     return (!f.src||u.sys===f.src)&&(!f.ent||(u.entity||'INV')===f.ent)&&(!f.status||u.status===f.status)&&(!q||((u.file||'')+' '+(u.by||'')+' '+(u.periodLabel||'')+' '+(u.status||'')+' '+(u.demo?'demo':'')).toLowerCase().indexOf(q)>=0);
   });
 }
-function histSig(){return JSON.stringify([S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file]}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
+function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u)]}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
 function histBodyHtml(){
   var all=histRows(),rows=all.slice(0,S.hist.shown);
   if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
@@ -735,7 +738,7 @@ function histBodyHtml(){
   return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(u){
      var fn=u.file||'',isOpen=!!open[u._id];
-     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST'||u.entity==='CL')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
      if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
      return tr}).join('')
    +'</tbody></table></div>'
@@ -749,10 +752,11 @@ function renderHist(){
     var sel=function(id,label,cur,opts,nm){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="hist-f" data-k="'+nm+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(cur===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'};
     el.innerHTML='<div class="hd"><h2>Upload history</h2><span class="note" id="hist-count"></span></div>'
      +'<div class="row" id="hist-ctl" style="align-items:flex-end">'+sel('hf-src','Source',f.src,srcs.map(function(x){return [x,x==='B1'?'SAP B1':x==='S4'?'SAP S/4':x]}),'src')+sel('hf-ent','Entity',f.ent,ents.map(function(x){return [x,ENT_NAME[x]||x]}),'ent')+sel('hf-st','Status',f.status,sts.map(function(x){return [x,x]}),'status')
-     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div></div><div id="hist-body"></div>';
+     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div><div class="fld"><label>&nbsp;</label><label class="chip"><input type="checkbox" id="hf-rep" data-chg="hist-rep" '+(f.showReplaced?'checked':'')+'> Show replaced (<span id="hist-rep-n">0</span>)</label></div></div><div id="hist-body"></div>';
     S.hist.sig='';
   }
   if(S.hist.sig===sig)return;S.hist.sig=sig;
+  var rn=$('#hist-rep-n');if(rn)rn.textContent=String(S.uploads.filter(function(u){return !!histReplacedBy(u)}).length);
   var c=$('#hist-count');if(c)c.textContent=fmtN(S.uploads.length)+' upload'+(S.uploads.length===1?'':'s');
   var body=$('#hist-body');withScroll(body,function(){body.innerHTML=histBodyHtml()});
 }
@@ -827,7 +831,7 @@ async function onFile(file){
     var headers=rows[0].map(function(x){return x==null?'':String(x)});
     var d=detect(headers);
     var sheetsSeen=U.sheetsSeen,sheetPicked=U.sheetPicked;
-    if(d.type==='unknown'){var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
+    if(d.type==='unknown'){var cdt=collDetect(headers);if(cdt){collStart(file,rows,headers,sheetPicked);return}var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
     if(d.type==='master'&&d.what==='transfers'){U=newU();U.mode=mode;U.period=period;U.offer={file:file,rows:rows,what:'transfers'};U.msg='This file is the internal-transfer list (CardCode, CardName, Tranfser), not the sales export'+(sheetsSeen&&sheetsSeen.length>1?'. Sheets in the workbook: '+sheetsSeen.join('; ')+'. Save the DATA sheet as the CSV, or load the whole XLSX':'')+'. You can load it as the Internal-transfer list instead.';renderUpload();return}
     if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}
     if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;U.msg='The headers match no known file'+(rows.length<2?' (the sheet has no data rows)':'')+'. Found: '+(headers.filter(Boolean).slice(0,8).join(', ')||'no header row')+(sheetsSeen&&sheetsSeen.length?'. Sheets in the workbook: '+sheetsSeen.join('; '):'')+'. Expected the B1 Combine Sale export (sheet DATA: docnum, CardCode, BPLName ...) or the S/4 Sales Register (sheet SAPUI5 Export: Invoice Document Number, Plant, Invoice Date ...). For a master, use Admin.';renderUpload();return}
@@ -1437,6 +1441,7 @@ document.addEventListener('change',function(ev){
   else if(c==='closeafter'){U.closeAfter=t.checked}
   else if(c==='keepdocs'){U.keepDocs=t.checked}
   else if(c==='rejf'){U.rejFilter=t.value;renderUpload()}
+  else if(c==='hist-rep'){S.hist.showReplaced=t.checked;S.hist.shown=15;renderHist()}
   else if(c==='hist-f'){S.hist[t.getAttribute('data-k')]=t.value;S.hist.shown=15;renderHist()}
   else if(c==='potf'){var k=t.getAttribute('data-k');S.potFilter[{'pf-q':'q','pf-plant':'plant','pf-group':'group','pf-seg':'seg'}[k]]=t.value;refreshAdmin()}
 });
@@ -3462,6 +3467,183 @@ function stockCov(qkey){
   return {st:present===0?'miss':(present>=elig&&elig>0?'ok':'part'),detail:detail,ref:0,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed'),stock:true};
 }
 
+/* ---- src/66-coll.js ---- */
+/* ================= Collections intake: B1 "Incoming Payment Report" (D38, Vijay, 23 Oct 2026) =================
+ * One file spans many months. A collection is a DOCTYPE C row (customer receipt); A (account) and S (supplier) rows are skipped and counted.
+ * amount = CHECKSUM + TRANSFERSUM + CASHSUM. DOCDATE is dd/mm/yyyy text and is never swapped.
+ * Stored in collections/{plant}-{ym}: {plant, ym, total, n, rows:[[doc, day, cust, amount, name]], z (gzip of all rows when too many), plan, upload}. */
+var COLL_FIELDS=[
+ {k:'branch',label:'Branch',canon:'plant_code',req:1,c:['BRANCHNAME','Branch Name','Branch']},
+ {k:'doc',label:'Receipt number',canon:'source_doc_no',req:1,c:['DOCNUM','Doc Num','DocNum']},
+ {k:'date',label:'Receipt date',canon:'doc_date',req:1,c:['DOCDATE','Doc Date','DocDate']},
+ {k:'type',label:'Document type (C customer, A account, S supplier)',canon:'doc_type',req:1,c:['DOCTYPE','Doc Type']},
+ {k:'cust',label:'Customer code',canon:'customer_code',req:1,c:['CARDCODE','Card Code','CardCode']},
+ {k:'name',label:'Customer name',canon:'customer_name',c:['CARDNAME','Card Name','CardName']},
+ {k:'chk',label:'Cheque amount',canon:'check_sum',c:['CHECKSUM','Check Sum','CheckSum']},
+ {k:'trf',label:'Bank transfer amount',canon:'transfer_sum',c:['TRANSFERSUM','Transfer Sum','TrsfrSum']},
+ {k:'cash',label:'Cash amount',canon:'cash_sum',c:['CASHSUM','Cash Sum','CashSum']},
+ {k:'means',label:'Payment means',canon:'payment_means',c:['PAYMENTMEANS','Payment Means']}];
+function collDetect(headers){
+  var set={};headers.forEach(function(h){set[norm(h)]=1});
+  return set['branchname']&&set['docnum']&&set['docdate']&&set['doctype']&&set['cardcode']&&(set['checksum']||set['transfersum']||set['cashsum'])?{kind:'coll',sys:'B1'}:null;
+}
+function collDefaultMap(headers){var ix=headerIndex(headers),m={};COLL_FIELDS.forEach(function(f){m[f.k]=-1;for(var i=0;i<f.c.length;i++){var k=norm(f.c[i]);if(k in ix){m[f.k]=ix[k];break}}});return m}
+function periodFromName(name){var m=/(20\d{2}-\d{2}-\d{2})[_ \-]*to[_ \-]*(20\d{2}-\d{2}-\d{2})/i.exec(String(name||''));return m?{from:m[1],to:m[2]}:null}
+function collStart(file,rows,headers,sheetPicked){
+  var mode=U.mode;U=newU();U.mode=mode;U.kind='coll';U.entity='CL';U.name=file.name;U.size=file.size;U.headers=headers;U.rows=rows.slice(1);U.sys='B1';U.sheetPicked=sheetPicked;
+  U.map=collDefaultMap(headers);
+  var sv=S.mappings['B1_collection'];if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
+  U.period=periodFromName(file.name);
+  U.stage='mapping';renderUpload();
+}
+function parseColDate(v){
+  /* as written: text dd/mm/yyyy (day first), ISO text, an Excel serial or a Date. Never swapped. */
+  if(v==null||v==='')return null;
+  var d=parseDateCell(v);return d&&validYMD(d)?d:null;
+}
+async function collParse(){
+  var map=U.map,rows=U.rows,col=function(k){return map[k]==null?-1:map[k]},cB=col('branch'),cD=col('doc'),cT=col('date'),cTy=col('type'),cC=col('cust'),cN=col('name'),cK=col('chk'),cF=col('trf'),cH=col('cash');
+  var resolve=plantResolver(),per=U.period,today=TODAY(),lo=histLoYm();
+  var res={read:rows.length,good:0,rejected:0,rejects:[],reasons:{},period:per,notCust:{A:{rows:0,value:0},S:{rows:0,value:0},other:{rows:0,value:0}},acp:{rows:0,value:0,plants:{}},preHist:{rows:0,value:0},zero:0,unknownBranch:{},months:{},pm:new Map(),minDate:null,maxDate:null,total:0,custRows:0,custValue:0};
+  var rej=function(i,doc,field,reason,val){res.rejected++;res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,doc,'',field,reason,val==null?'':val])};
+  var T0=Date.now();
+  for(var i=0;i<rows.length;i++){
+    if(Date.now()-T0>40){T0=Date.now();U.progress=Math.round(i/rows.length*100);U.progressMsg='Checking row '+fmtN(i)+' of '+fmtN(rows.length);var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%';await tick()}
+    var r=rows[i],ty=String(r[cTy]==null?'':r[cTy]).trim().toUpperCase();
+    var amt=0,ok=false;[cK,cF,cH].forEach(function(c){if(c>=0){var v=toNum(r[c]);if(!isNaN(v)){amt+=v;ok=true}}});
+    if(ty!=='C'){var k=ty==='A'||ty==='S'?ty:'other';res.notCust[k].rows++;res.notCust[k].value+=ok?amt:0;continue}
+    var doc=String(r[cD]==null?'':r[cD]).trim().replace(/\.0$/,'');
+    if(!doc){rej(i,'','Receipt number','Receipt number is empty','');continue}
+    if(!ok){rej(i,doc,'Amount','No amount in cheque, transfer or cash columns','');continue}
+    if(amt<0){rej(i,doc,'Amount','Negative receipt amount',amt);continue}
+    var dt=parseColDate(r[cT]);if(!dt){rej(i,doc,'Receipt date','Date not readable',r[cT]);continue}
+    var ym=dt.y+'-'+pad(dt.m),iso=ym+'-'+pad(dt.d);
+    if(!res.minDate||iso<res.minDate)res.minDate=iso;if(!res.maxDate||iso>res.maxDate)res.maxDate=iso;
+    if(iso>today){rej(i,doc,'Receipt date','Date in the future',iso);continue}
+    if(per&&(iso<per.from||iso>per.to)){rej(i,doc,'Receipt date','Date outside the period in the file name ('+per.from+' to '+per.to+')',iso);continue}
+    var bn=String(r[cB]==null?'':r[cB]).trim(),pl=resolve('B1',bn);
+    if(!pl){var k2=bn||'(blank)';res.unknownBranch[k2]=(res.unknownBranch[k2]||0)+1;rej(i,doc,'Branch','Unknown plant or branch',bn);continue}
+    if(pl.business==='ACP'||+pl.plant_code>=1050){res.acp.rows++;res.acp.value+=amt;res.acp.plants[pl.plant_code]=1;continue}
+    if(pl.active===false){rej(i,doc,'Plant','Plant is switched off in Admin',pl.plant_code);continue}
+    if(ym<lo){res.preHist.rows++;res.preHist.value+=amt;continue}
+    if(amt===0){res.zero++;continue}
+    var key=pl.plant_code+'|'+ym,P=res.pm.get(key);if(!P){P={plant:pl.plant_code,ym:ym,rows:[],total:0};res.pm.set(key,P)}
+    var cust=String(r[cC]==null?'':r[cC]).trim(),nm=cN>=0?String(r[cN]==null?'':r[cN]).trim().slice(0,30):'';
+    P.rows.push([doc,dt.d,cust,Math.round(amt*100)/100,nm]);P.total+=amt;res.good++;res.custRows++;res.custValue+=amt;
+    var M=res.months[ym]||(res.months[ym]={rows:0,value:0,plants:new Set()});M.rows++;M.value+=amt;M.plants.add(pl.plant_code);
+  }
+  return res;
+}
+function collReplaceRisk(res){
+  var out={},list=[];
+  res.pm.forEach(function(P){var old=S.coll.find(function(d){return d._id===P.plant+'-'+P.ym});if(!old||old.demo)return;var on=old.n||(old.rows||[]).length;
+    if(on>P.rows.length){var o=out[P.ym]||(out[P.ym]={ym:P.ym,plants:0,oldRows:0,newRows:0});o.plants++;o.oldRows+=on;o.newRows+=P.rows.length}});
+  Object.keys(out).sort().forEach(function(k){list.push(out[k])});return list;
+}
+function collCanLoad(){var r=U&&U.res;if(!r||!(r.good>0))return false;if(collReplaceRisk(r).length&&!U.confirmReplace)return false;return true}
+function collRender(){
+  var el=$('#i-upload');if(!el)return;var st=U.stage,locked=st==='validating'||st==='loading';
+  var stepIdx={mapping:2,validating:3,validated:3,loading:4,done:4}[st]||1;
+  var steps=['Upload','Confirm mapping','Validate','Load'].map(function(s,i){return '<span class="'+(i+1<stepIdx?'ok':i+1===stepIdx?'on':'')+'">'+(i+1)+' '+s+'</span>'}).join('');
+  var h='<div class="hd"><h2>Upload a SAP export &middot; Collections</h2><div class="steps">'+steps+'</div></div>';
+  h+='<div class="banner info"><span><b>'+esc(U.name)+'</b> &middot; '+fmtN(U.rows.length)+' data rows &middot; '+U.headers.length+' columns &middot; detected <b>B1 Incoming Payment Report</b>'+(U.savedMap?' &middot; saved mapping applied':'')+'</span><button class="btn sm" data-act="u-reset" '+(locked?'disabled':'')+'>Choose another file</button></div>';
+  h+='<div class="note">'+(U.period?'Period in the file name: <b>'+esc(U.period.from)+' to '+esc(U.period.to)+'</b>. ':'No period in the file name. ')+'Receipt dates are read as dd/mm/yyyy and never swapped.</div>';
+  if(st==='mapping'){
+    var rows=COLL_FIELDS.map(function(f){var cur=U.map[f.k];if(cur==null)cur=-1;
+      var opts='<option value="-1"'+(cur<0?' selected':'')+'>unmapped</option>'+U.headers.map(function(hd,i){return '<option value="'+i+'"'+(cur===i?' selected':'')+'>'+esc(hd===''?'(blank header, col '+(i+1)+')':hd)+'</option>'}).join('');
+      var sample='';if(cur>=0){for(var r=0;r<Math.min(U.rows.length,50);r++){var v=U.rows[r][cur];if(v!==''&&v!=null){sample=String(v);break}}}
+      return '<tr><td><select class="in" data-chg="coll-map" data-k="'+f.k+'" aria-label="File column for '+esc(f.label)+'">'+opts+'</select></td><td><b>'+esc(f.label)+'</b><div class="note mono">'+f.canon+'</div></td><td>'+(f.req?'<span class="pill info">Required</span>':'<span class="pill mute">Optional</span>')+'</td><td class="mono break" style="max-width:180px">'+esc(sample.slice(0,60))+'</td></tr>'}).join('');
+    var miss=COLL_FIELDS.filter(function(f){return f.req&&(U.map[f.k]==null||U.map[f.k]<0)}).map(function(f){return f.label});
+    if(U.map.chk<0&&U.map.trf<0&&U.map.cash<0)miss.push('at least one amount column');
+    h+='<div class="hd"><h2>Confirm column mapping</h2><span class="note">A collection is a customer-receipt row (type C); amount = cheque + transfer + cash.</span></div><div class="tw"><table><thead><tr><th>File column</th><th>Canonical field</th><th>Need</th><th>Sample</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+     +(miss.length?'<div class="banner err">Map these first: '+esc(miss.join(', '))+'</div>':'')+'<div class="row"><button class="btn pri" data-act="coll-validate" '+(miss.length?'disabled':'')+'>Confirm and validate</button></div>';
+  }
+  if(st==='validating')h+='<div><div class="bar"><i style="width:'+U.progress+'%"></i></div><div class="note">'+esc(U.progressMsg||'')+'</div></div>';
+  if(st==='validated'||st==='loading'||st==='done')h+=collResultHtml(st!=='validated');
+  if(st==='loading')h+='<div><div class="bar"><i style="width:'+U.progress+'%"></i></div><div class="note">'+esc(U.progressMsg||'')+'</div></div>';
+  if(st==='done')h+='<div class="banner '+(U.doneOk?'ok':'warn')+'"><span>'+esc(U.doneMsg)+'</span><button class="btn sm" data-act="u-reset">Upload another file</button></div>';
+  if(U.msg)h+='<div class="banner err">'+esc(U.msg)+'</div>';
+  el.innerHTML=h;
+}
+function collResultHtml(locked){
+  var r=U.res;if(!r)return '';
+  var h='<div class="hd"><h2>Validation result</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?fmtN(r.rejected)+' rows will be skipped':'All rows pass')+'</span></div>'
+   +'<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>Customer receipts loading</small><b>'+fmtN(r.good)+'</b><small>'+fmtMoney(r.custValue)+'</small></div><div class="kpi"><small>Rows skipped (rejected)</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Not customer receipts (A, S)</small><b>'+fmtN(r.notCust.A.rows+r.notCust.S.rows+r.notCust.other.rows)+'</b></div><div class="kpi"><small>ACP plants (out of scope)</small><b>'+fmtN(r.acp.rows)+'</b><small>'+fmtMoney(r.acp.value)+'</small></div><div class="kpi"><small>Plant-months to write</small><b>'+fmtN(r.pm.size)+'</b></div></div>';
+  var it=[];
+  it.push({st:'info',t:'File layout',n:null,d:esc('B1 Incoming Payment Report, '+fmtN(r.read)+' rows. Dates run '+(r.minDate||'-')+' to '+(r.maxDate||'-')+', read as dd/mm/yyyy, never swapped.')});
+  it.push({st:'info',t:'Not customer receipts, skipped and counted',n:r.notCust.A.rows+r.notCust.S.rows+r.notCust.other.rows,d:esc('Account (A) '+fmtN(r.notCust.A.rows)+' rows '+fmtMoney(r.notCust.A.value)+'; supplier (S) '+fmtN(r.notCust.S.rows)+' rows '+fmtMoney(r.notCust.S.value)+(r.notCust.other.rows?'; other type '+fmtN(r.notCust.other.rows):'')+'. Only DOCTYPE C counts as a collection.')});
+  if(r.acp.rows)it.push({st:'info',t:'ACP plants skipped (not part of this Desk)',n:r.acp.rows,d:esc(Object.keys(r.acp.plants).length+' plants, '+fmtMoney(r.acp.value)+'.')});
+  if(r.preHist.rows)it.push({st:'info',t:'Before history start ('+qLabel(histStart())+')',n:r.preHist.rows,d:'Not loaded and not rejected; no action needed (D28).'});
+  if(r.zero)it.push({st:'info',t:'Zero-amount receipts skipped',n:r.zero,d:''});
+  var ub=Object.keys(r.unknownBranch);
+  if(ub.length)it.push({st:'need',t:'Branches not in the plant master (rows skipped)',n:ub.reduce(function(a,k){return a+r.unknownBranch[k]},0),d:esc(ub.slice(0,8).join(', ')+(ub.length>8?' and '+(ub.length-8)+' more':''))+'. Add the plant, or its B1 branch name, in Admin › Plants, then load again.'});
+  var rep=collReplaceRisk(r);
+  var ms=Object.keys(r.months).sort();
+  h+=fixesPanel(it,'Fixes applied');
+  h+='<div class="tw hscroll" style="max-height:260px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Receipts</th><th class="num">Plants</th><th class="num">Amount</th></tr></thead><tbody>'+ms.map(function(m){var M=r.months[m];return '<tr><td>'+esc(ymLabel(m))+'</td><td class="num">'+fmtN(M.rows)+'</td><td class="num">'+M.plants.size+'</td><td class="num">'+fmtMoney(M.value)+'</td></tr>'}).join('')+'</tbody></table></div>';
+  if(rep.length)h+='<div class="banner warn" style="display:block"><b>Safety check stopped this file: it would replace '+rep.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more receipts than the new data.</b> Replaced data cannot be restored by the Desk.<div class="tw hscroll" style="max-height:180px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Plant-months</th><th class="num">Receipts held now</th><th class="num">In this file</th></tr></thead><tbody>'+rep.map(function(x){return '<tr><td>'+esc(ymLabel(x.ym))+'</td><td class="num">'+x.plants+'</td><td class="num">'+fmtN(x.oldRows)+'</td><td class="num">'+fmtN(x.newRows)+'</td></tr>'}).join('')+'</tbody></table></div><label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="coll-confrep" '+(U.confirmReplace?'checked':'')+' '+(locked?'disabled':'')+'> I confirm: replace these months ('+rep.map(function(x){return ymLabel(x.ym)}).join(', ')+')</label></div>';
+  h+='<div class="row"><button class="btn pri" data-act="coll-load" '+(collCanLoad()&&!locked?'':'disabled')+'>Load '+fmtN(r.good)+' receipts</button>'+(r.rejected?'<button class="btn" data-act="u-rejcsv-coll">Download skipped rows (CSV)</button>':'')+(locked?'':'<button class="btn" data-act="u-reset">Cancel upload</button>')+'</div>';
+  return h;
+}
+async function collValidate(){
+  U.stage='validating';U.progress=0;U.progressMsg='Starting...';U.confirmReplace=false;collRender();await tick();
+  try{U.res=await collParse();U.stage='validated'}catch(e){U.stage='mapping';U.msg='Could not check the file: '+((e&&e.message)||e)}
+  collRender();
+}
+async function collLoad(){
+  if(!superOnly('load collections')||!U||!U.res||!collCanLoad())return;
+  var r=U.res,uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!U.demoFlag,done=0,total=r.pm.size;
+  U.stage='loading';U.progressMsg='Writing...';collRender();await tick();
+  var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice(),atNow=nowISO();
+  try{
+    await Promise.all([0,1,2,3].map(async function(){
+      while(q.length){var P=q.shift(),old=S.coll.find(function(d){return d._id===P.plant+'-'+P.ym});
+        var doc={plant:P.plant,ym:P.ym,total:Math.round(P.total*100)/100,n:P.rows.length,sys:'B1',src:'RCT',upload:uid,at:atNow,demo:demo||undefined};
+        if(old&&old.plan!=null)doc.plan=old.plan;
+        var txt=JSON.stringify(P.rows);
+        if(txt.length<=170000)doc.rows=P.rows;
+        else{var top=P.rows.slice().sort(function(a,b){return b[3]-a[3]}).slice(0,1500);doc.rows=top;doc.z=await gz(txt);doc.rows_note='top 1500 by amount; all rows in z (gz-json)'}
+        await dset('collections/'+P.plant+'-'+P.ym,doc);done++;U.progress=Math.round(done/total*100);U.progressMsg='Writing plant-month '+done+' of '+total;var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%'}
+    }));
+    if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
+  }catch(e){failed=e}
+  var ms=Object.keys(r.months).sort();
+  var upl={at:nowISO(),by:by,sys:'B1',entity:'CL',file:U.name,size:U.size,mode:'historic',periodLabel:ms.length?(ymLabel(ms[0])+(ms.length>1?' to '+ymLabel(ms[ms.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:ms,
+    fixes:{not_customer_rows:r.notCust.A.rows+r.notCust.S.rows+r.notCust.other.rows,acp_rows:r.acp.rows,acp_value:Math.round(r.acp.value),amount_loaded:Math.round(r.custValue),zero_rows:r.zero,before_history_start:r.preHist.rows},error:failed?dbErrText(failed):undefined};
+  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/B1_collection',{map:mp,sys:'B1',entity:'CL',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
+  U.stage='done';U.doneOk=!failed;
+  U.doneMsg=failed?('Load stopped: '+dbErrText(failed)+' '+done+' of '+total+' plant-months were stored.'):('Loaded '+fmtN(r.good)+' customer receipts ('+fmtMoney(r.custValue)+') into '+done+' plant-months.'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':''));
+  collRender();
+}
+Object.assign(handlers,{
+ 'coll-validate':async function(){await collValidate();if(U&&U.stage==='validated'&&!window.__NOAUTOLOAD&&collCanLoad()&&effRole()==='Super admin'&&!readOnly()){toast('Loading '+fmtN(U.res.good)+' receipts; '+fmtN(U.res.rejected)+' skipped');await collLoad()}},
+ 'coll-load':function(){return collLoad()},
+ 'u-rejcsv-coll':function(){var r=U.res;return download('skipped-collection-rows.csv',csvLine(['row','receipt','line','field','reason','value'])+'\n'+r.rejects.map(csvLine).join('\n'))}
+});
+document.addEventListener('change',function(ev){
+  var t=ev.target,c=t.getAttribute&&t.getAttribute('data-chg');
+  if(c==='coll-map'){U.map[t.getAttribute('data-k')]=+t.value;U.savedMap=false;collRender()}
+  else if(c==='coll-confrep'){U.confirmReplace=t.checked;collRender()}
+});
+/* ---- Undo ---- */
+function collUndoPlan(uid){var docs=S.coll.filter(function(d){return d.upload===uid});var ms={};docs.forEach(function(d){ms[d.ym]=1});return {docs:docs,months:Object.keys(ms).sort()}}
+async function collUndo(uid){
+  var pl=collUndoPlan(uid),u=S.uploads.find(function(x){return x._id===uid}),q=pl.docs.slice();
+  await Promise.all([0,1,2,3].map(async function(){while(q.length){var d=q.shift();if(d.plan!=null)await dset('collections/'+d._id,{plant:d.plant,ym:d.ym,total:0,n:0,rows:[],plan:d.plan,sys:'B1',src:'RCT',undone:uid});else await ddel('collections/'+d._id)}}));
+  await ddel('rejects/'+uid);
+  if(u){var up=Object.assign({},u);delete up._id;await dset('uploads/'+uid,Object.assign(up,{status:'Undone',undone_at:nowISO(),undone_by:whoAmI(),undone_months:pl.months,undone_plant_months:pl.docs.length}))}
+  await auditW('upload undone','',{upload:uid,file:((u&&u.file)||'').slice(0,120),months:pl.months,plant_months:pl.docs.length});
+  await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,months:pl.months,plant_months:pl.docs.length});
+  return pl;
+}
+/* ---- coverage: a month is covered when its plants have collection documents ---- */
+function collCov(qkey){
+  var months=qMonths(qkey),by={},ref=0;
+  S.coll.forEach(function(d){if(d.undone)return;by[d.ym]=(by[d.ym]||0)+1;ref=Math.max(ref,by[d.ym])});
+  var present=0,ok=0,detail=[];months.forEach(function(ym){var n=by[ym]||0;detail.push({ym:ym,plants:n});if(n>0)present++;if(n>0&&n>=Math.ceil(ref*0.9))ok++});
+  return {st:present===0?'miss':(ok===3?'ok':'part'),detail:detail,ref:ref,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
+}
+
 /* ---- src/70-admin.js ---- */
 /* ================= v0.9 Admin: plans workflow, settings, tools, roll-up rebuild, demo extras ================= */
 S.adminTab='users';S.rbBusy=false;
@@ -4693,6 +4875,8 @@ function undoPlan(uid){
 }
 function undoDialog(uid){
   var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&us.entity==='CL'){var cp=collUndoPlan(uid);
+    openDlg('<h3>Undo collection upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>Removes '+cp.docs.length+' plant-month'+(cp.docs.length===1?'':'s')+' of receipts in '+cp.months.length+' month'+(cp.months.length===1?'':'s')+'</b> that still point to this upload. A collection plan already set on a month is kept. The upload stays in history marked Undone, and the undo is logged.</div><p><b>Months to upload again afterwards:</b> '+(cp.months.length?esc(cp.months.map(ymLabel).join(', ')):'none')+'.</p><p class="note">Undo cannot bring back receipts this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);
     openDlg('<h3>Undo stock upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>'+(sp?'Removes the stock snapshot as on '+esc(sp.as_of)+' ('+sp.plants+' plants)':'This upload no longer holds a snapshot (a later upload for the same date replaced it)')+'</b> with its item rows. The upload stays in history marked Undone, and the undo is logged.</div><p><b>Upload again afterwards:</b> '+(sp?'the stock file as on '+esc(sp.as_of):'nothing')+'.</p><p class="note">Undo cannot bring back an earlier snapshot for the same date that this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   var pl=undoPlan(uid);if(!pl)return;
@@ -4706,6 +4890,7 @@ function undoDialog(uid){
 async function undoUpload(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&us.entity==='CL'){try{var cpl=await collUndo(uid);closeDlg();openDlg('<h3>Collection upload '+esc(uid)+' undone</h3><p>Removed '+cpl.docs.length+' plant-months. <b>Upload these months again:</b> '+(cpl.months.length?esc(cpl.months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el1=$('#d-err');if(el1)el1.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3><p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   var pl=undoPlan(uid);if(!pl)return;
   var jobs=[],months=pl.months.slice(),sets=[];
@@ -4738,7 +4923,35 @@ Object.assign(handlers,{
 });
 
 /* ================= D33 (21 Oct 2026, Vijay): skipped rows never block; good rows load at once ================= */
+/* D41: an upload whose data nothing points to any more, because a later upload replaced the same plant-months or snapshot date, is "replaced" */
+function histHolds(u){
+  var id=u._id,e=u.entity||'INV',k;
+  if(e==='INV'){for(k in S.cells){var c=S.cells[k];if(c.entity!=='INV')continue;for(var p in (c.plants||{}))if(c.plants[p].upload===id)return true}return false}
+  if(e==='CL')return S.coll.some(function(d){return d.upload===id});
+  if(e==='ST')return S.stockSnaps.some(function(d){return d.upload===id});
+  if(e==='RC')return (S.recvSnaps||[]).some(function(d){return d.upload===id});
+  if(e==='CN')return (S.cn||[]).some(function(d){return d.upload===id});
+  if(e==='IT')return !!(S.itemMeta&&S.itemMeta.upload===id);
+  if(e==='CU')return !!(S.custMeta&&S.custMeta.upload===id);
+  return true;
+}
+function histReplacedBy(u){
+  if(!u||u.status!=='Loaded'&&u.status!=='Partial')return null;
+  var e=u.entity||'INV';if(['INV','CL','ST','RC','CN','IT','CU'].indexOf(e)<0)return null;
+  if(histHolds(u))return null;
+  var later=S.uploads.filter(function(v){return v._id!==u._id&&(v.entity||'INV')===e&&v.at>u.at&&(v.status==='Loaded'||v.status==='Partial')});
+  if(!later.length)return null;
+  var ov=function(a,b){if(!a||!b)return true;return a.some(function(x){return b.indexOf(x)>=0})};
+  later=later.filter(function(v){
+    if(e==='INV')return ov(u.quarters,v.quarters);
+    if(e==='CL'||e==='CN')return ov(u.months,v.months);
+    if(e==='ST'||e==='RC')return !u.as_of||u.as_of===v.as_of;
+    return true});
+  later.sort(function(a,b){return a.at<b.at?-1:1});
+  return later[0]||null;
+}
 function histStatusPill(u){
+  var rb=histReplacedBy(u);if(rb)return '<span class="pill mute" title="Nothing stored points to this upload any more">Replaced by '+esc((rb.file||'').slice(0,40))+', '+esc(istStr(rb.at))+'</span>';
   var st=u.status,sk=u.rejected||0;
   if((st==='Loaded'||(st==='Partial'&&!u.stopped&&u.entity!=='INV'))&&sk>0)return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' row'+(sk===1?'':'s')+' skipped</span>';
   if(st==='Partial'&&!u.stopped&&sk>0&&(u.entity||'INV')!=='INV')return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' rows skipped</span>';

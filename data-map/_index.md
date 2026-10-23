@@ -26,7 +26,7 @@ related:
 
 # data-map/
 
-- [Data map — Collection](collection.md) — draft — no export; B1 query listed
+- [Data map — Collection](collection.md) — active — B1 Incoming Payment Report intake built (D38)
 - [Data map — Credit note](credit-note.md) — draft — no export; B1 query listed
 - [Data map — Customer](customer.md) — draft — no export; B1 query listed
 - [Data map — Delivery](delivery.md) — not used (D31)

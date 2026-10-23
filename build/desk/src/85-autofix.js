@@ -398,6 +398,8 @@ function undoPlan(uid){
 }
 function undoDialog(uid){
   var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&(us.entity==='RC'||us.entity==='CN')){var rc=us.entity==='RC',ps=rc?S.recvSnaps.find(function(x){return x.upload===uid}):cnUndoPlan(uid);
+    openDlg('<h3>Undo '+(rc?'receivables':'credit-note')+' upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>'+(rc?(ps?'Removes the open-items snapshot as on '+esc(ps.as_of)+' ('+Object.keys(ps.plants||{}).length+' plants)':'This upload no longer holds a snapshot (a later upload for the same date replaced it)'):'Removes '+ps.docs.filter(function(d){return !d.chunk}).length+' plant-months of credit notes in '+ps.months.length+' month'+(ps.months.length===1?'':'s')+' and their coverage marks')+'</b> that still point to this upload. The upload stays in history marked Undone, and the undo is logged.</div><p class="note">Undo cannot bring back data this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   if(us&&us.entity==='CL'){var cp=collUndoPlan(uid);
     openDlg('<h3>Undo collection upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>Removes '+cp.docs.length+' plant-month'+(cp.docs.length===1?'':'s')+' of receipts in '+cp.months.length+' month'+(cp.months.length===1?'':'s')+'</b> that still point to this upload. A collection plan already set on a month is kept. The upload stays in history marked Undone, and the undo is logged.</div><p><b>Months to upload again afterwards:</b> '+(cp.months.length?esc(cp.months.map(ymLabel).join(', ')):'none')+'.</p><p class="note">Undo cannot bring back receipts this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);
@@ -413,6 +415,7 @@ function undoDialog(uid){
 async function undoUpload(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3><p>The data this upload held was removed. Upload the file again if you still need it.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   if(us&&us.entity==='CL'){try{var cpl=await collUndo(uid);closeDlg();openDlg('<h3>Collection upload '+esc(uid)+' undone</h3><p>Removed '+cpl.docs.length+' plant-months. <b>Upload these months again:</b> '+(cpl.months.length?esc(cpl.months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el1=$('#d-err');if(el1)el1.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3><p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   var pl=undoPlan(uid);if(!pl)return;
@@ -446,7 +449,35 @@ Object.assign(handlers,{
 });
 
 /* ================= D33 (21 Oct 2026, Vijay): skipped rows never block; good rows load at once ================= */
+/* D41: an upload whose data nothing points to any more, because a later upload replaced the same plant-months or snapshot date, is "replaced" */
+function histHolds(u){
+  var id=u._id,e=u.entity||'INV',k;
+  if(e==='INV'){for(k in S.cells){var c=S.cells[k];if(c.entity!=='INV')continue;for(var p in (c.plants||{}))if(c.plants[p].upload===id)return true}return false}
+  if(e==='CL')return S.coll.some(function(d){return d.upload===id});
+  if(e==='ST')return S.stockSnaps.some(function(d){return d.upload===id});
+  if(e==='RC')return (S.recvSnaps||[]).some(function(d){return d.upload===id});
+  if(e==='CN')return (S.cn||[]).some(function(d){return d.upload===id});
+  if(e==='IT')return !!(S.itemMeta&&S.itemMeta.upload===id);
+  if(e==='CU')return !!(S.custMeta&&S.custMeta.upload===id);
+  return true;
+}
+function histReplacedBy(u){
+  if(!u||u.status!=='Loaded'&&u.status!=='Partial')return null;
+  var e=u.entity||'INV';if(['INV','CL','ST','RC','CN','IT','CU'].indexOf(e)<0)return null;
+  if(histHolds(u))return null;
+  var later=S.uploads.filter(function(v){return v._id!==u._id&&(v.entity||'INV')===e&&v.at>u.at&&(v.status==='Loaded'||v.status==='Partial')});
+  if(!later.length)return null;
+  var ov=function(a,b){if(!a||!b)return true;return a.some(function(x){return b.indexOf(x)>=0})};
+  later=later.filter(function(v){
+    if(e==='INV')return ov(u.quarters,v.quarters);
+    if(e==='CL'||e==='CN')return ov(u.months,v.months);
+    if(e==='ST'||e==='RC')return !u.as_of||u.as_of===v.as_of;
+    return true});
+  later.sort(function(a,b){return a.at<b.at?-1:1});
+  return later[0]||null;
+}
 function histStatusPill(u){
+  var rb=histReplacedBy(u);if(rb)return '<span class="pill mute" title="Nothing stored points to this upload any more">Replaced by '+esc((rb.file||'').slice(0,40))+', '+esc(istStr(rb.at))+'</span>';
   var st=u.status,sk=u.rejected||0;
   if((st==='Loaded'||(st==='Partial'&&!u.stopped&&u.entity!=='INV'))&&sk>0)return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' row'+(sk===1?'':'s')+' skipped</span>';
   if(st==='Partial'&&!u.stopped&&sk>0&&(u.entity||'INV')!=='INV')return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' rows skipped</span>';

@@ -64,3 +64,6 @@ Rows with a problem are skipped; the good rows load at once and the skipped rows
 
 ## Stock upload (D34, 21 Oct 2026)
 Data Intake accepts stock as a snapshot: B1 batch stock (best: it gives ageing), B1 OITW, S/4 MB52 or S/4 Stock Overview Totals. The as-on date is read from the file name or picked. Several warehouses of one plant are added together (map unknown warehouses in the Fixes applied panel or Admin › Aliases). Re-uploading the same date replaces that snapshot; Undo upload removes it. Export recipe: [Stock data map](../data-map/stock.md).
+
+## Collections upload (D38, 23 Oct 2026)
+Data Intake accepts the B1 Incoming Payment Report (many months in one file). Only customer receipts (DOCTYPE C) count; account and supplier rows and ACP plants are skipped and counted. Dates are read as dd/mm/yyyy and never swapped. Each plant-month it covers is replaced; Undo removes them. Layout: [Collection data map](../data-map/collection.md).
