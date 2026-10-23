@@ -398,6 +398,8 @@ function undoPlan(uid){
 }
 function undoDialog(uid){
   var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&us.entity==='CL'){var cp=collUndoPlan(uid);
+    openDlg('<h3>Undo collection upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>Removes '+cp.docs.length+' plant-month'+(cp.docs.length===1?'':'s')+' of receipts in '+cp.months.length+' month'+(cp.months.length===1?'':'s')+'</b> that still point to this upload. A collection plan already set on a month is kept. The upload stays in history marked Undone, and the undo is logged.</div><p><b>Months to upload again afterwards:</b> '+(cp.months.length?esc(cp.months.map(ymLabel).join(', ')):'none')+'.</p><p class="note">Undo cannot bring back receipts this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);
     openDlg('<h3>Undo stock upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>'+(sp?'Removes the stock snapshot as on '+esc(sp.as_of)+' ('+sp.plants+' plants)':'This upload no longer holds a snapshot (a later upload for the same date replaced it)')+'</b> with its item rows. The upload stays in history marked Undone, and the undo is logged.</div><p><b>Upload again afterwards:</b> '+(sp?'the stock file as on '+esc(sp.as_of):'nothing')+'.</p><p class="note">Undo cannot bring back an earlier snapshot for the same date that this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   var pl=undoPlan(uid);if(!pl)return;
@@ -411,6 +413,7 @@ function undoDialog(uid){
 async function undoUpload(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&us.entity==='CL'){try{var cpl=await collUndo(uid);closeDlg();openDlg('<h3>Collection upload '+esc(uid)+' undone</h3><p>Removed '+cpl.docs.length+' plant-months. <b>Upload these months again:</b> '+(cpl.months.length?esc(cpl.months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el1=$('#d-err');if(el1)el1.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3><p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   var pl=undoPlan(uid);if(!pl)return;
   var jobs=[],months=pl.months.slice(),sets=[];
