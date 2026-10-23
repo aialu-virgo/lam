@@ -67,3 +67,15 @@ Data Intake accepts stock as a snapshot: B1 batch stock (best: it gives ageing),
 
 ## Collections upload (D38, 23 Oct 2026)
 Data Intake accepts the B1 Incoming Payment Report (many months in one file). Only customer receipts (DOCTYPE C) count; account and supplier rows and ACP plants are skipped and counted. Dates are read as dd/mm/yyyy and never swapped. Each plant-month it covers is replaced; Undo removes them. Layout: [Collection data map](../data-map/collection.md).
+
+## Receivables upload (D39, 23 Oct 2026)
+Data Intake accepts open items as a snapshot: B1 open invoices (OINV), B1 open journal items (JDT1), S/4 open items or the custom B1 open-items report. The as-on date comes from the file name or is picked; the same date replaces that snapshot; Undo upload removes it. Negative open amounts are credit items, shown apart. Layouts: [Receivable data map](../data-map/receivable.md).
+
+## Credit notes upload (D39 and D40, 23 Oct 2026)
+Data Intake accepts B1 credit-note lines (ORIN/RIN1) and S/4 billing credit memos, many months in one file (period in the file name). The Sales view then shows Invoiced, Credit notes and Net side by side; once every month of a quarter is covered, achievement and growth for that quarter use Net, earlier quarters stay on invoiced. Where a month has no file the page says "Credit notes not loaded", never zero. Export all branches. Layouts: [Credit note data map](../data-map/credit-note.md).
+
+## Customer master (D39, 23 Oct 2026)
+Admin › Customers: upload B1 OCRD or the S/4 business partner list; each load replaces the master. It names customers, suggests the salesperson and shows the credit limit and "over limit by" on Receivables. See [Customer data map](../data-map/customer.md).
+
+## Upload history: replaced uploads (D41)
+An upload whose data nothing points to any more (a later upload covered the same months or date) is marked "Replaced by <file, date>" and hidden by default; tick "Show replaced" to list it.

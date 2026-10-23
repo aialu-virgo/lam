@@ -22,9 +22,9 @@ related:
 | Wed 10:00 | QA + blind second check passed, fixes done | Engineering QA | passed Tue ~20:00 on v0.9 version 11 (demo data, stubbed runtime); open: live sign-in, real-data volume, visual match to reference |
 | Wed 11:30 | Acceptance walk-through | SP Sir | open |
 | Wed 12:00 | desk-v1.0 published, tagged, link sent | Delivery Lead | done Tue night (D22) |
-| Fri 14:00 | Collection intake published (D38) | Full-Stack Engineer | done 13:50 (v31) |
+| Fri 14:00 | Collection intake published (D38) | Full-Stack Engineer | done 13:45 (v31) |
 | Fri 15:00 | Incoming Payment Report Apr 2025–Sep 2026 loaded live and checked | Delivery Lead | done (D43) |
-| Fri 17:30 | Receivables, credit notes, customer master intakes; net-sales basis (D40); auto-replaced history (D41) published | Full-Stack Engineer | open |
+| Fri 17:30 | Receivables, credit notes, customer master intakes; net-sales basis (D40); auto-replaced history (D41) published | Full-Stack Engineer | done 14:50 (v32); QA blind check running |
 | File + 45 min | Each receivables / credit-note / customer file loaded live after Vijay sends it | Delivery Lead | waiting on files |
 
 ## Milestones

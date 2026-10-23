@@ -101,7 +101,7 @@ function trendWord(o){return o.trend?(o.trend.short?'history too short':arrow(o.
 function trendCard(title,ent,ctx,personSp,id,opts){
   opts=opts||{};
   var f=Object.assign({plants:ctx.plants},ctx.base,ent||{});var sp=personSp!=null?personSp:(f.sp!=null?f.sp:undefined);
-  var ser=opts.series||quarterSeries(f,sp),closed=ser.filter(function(s){return !s.isCur}),ts=trendOfSeries(ser),cur=ser[ser.length-1];
+  var ser=(opts.series||quarterSeries(f,sp)).map(function(s){return s.H===undefined?Object.assign({},s,{H:s.A}):s}),closed=ser.filter(function(s){return !s.isCur}),ts=trendOfSeries(ser),cur=ser[ser.length-1];
   var all=ser.map(function(s){return s.H});
   if(!all.some(function(v){return v!=null&&v>0}))return '<section class="card"><div class="hd"><h2>'+esc(title)+'</h2></div><div class="empty">No quarters loaded in your scope yet. The trend needs history from Data Intake.</div></section>';
   var W=760,H=250,L=44,R=10,T=14,B=62,n=ser.length,bw=(W-L-R)/n,mx=Math.max.apply(null,all.map(function(v){return v||0}).concat(ser.map(function(s){return s.tgt||0})).concat([1]))*1.12;

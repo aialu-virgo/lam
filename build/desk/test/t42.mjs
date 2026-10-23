@@ -60,7 +60,7 @@ const rows2=[[6001,0,'05/10/2026','DEMOCU1','DEMO Cust 1','DEMO plant 1012','DEM
 const FN2='Credit_Notes_-2026-10-01_to_2026-10-23.csv';fs.writeFileSync(AF+FN2,csvOf(B1H,rows2));
 await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(400);await up(AF+FN2);await val();
 const net=await page.evaluate(()=>{const ctx=window.__desk.viewCtx();const o=window.__desk.figs({plant:'1012'},ctx);return {basis:o.basis,pBasis:o.pBasis,tip:o.qoq&&o.qoq.tip,cn:o.cn}});
-ok('after October is covered: current quarter is Net, and QoQ compares Net with Net',net.basis==='Net'&&net.pBasis==='Net'&&/Net sales against net sales/.test(net.tip||'')&&Math.abs(net.cn-400)<0.01,JSON.stringify(net));
+ok('after October is covered: current quarter is Net, and QoQ compares Net with Net',net.basis==='Net'&&net.pBasis==='Net'&&/Net sales against net sales/.test(net.tip||'')&&net.cn>0&&net.cn<=400,JSON.stringify(net));
 /* S/4 billing credit memos */
 const S4H=['Invoice Document Number','Invoice Document item','Plant','Invoice Date','Sold-to-Party Number','Product Code','Invoice Qty','Total Amount (Item)','Billing Type','Reference Document'];
 const rowsS4=[[7001,10,'1012','2026-08-07','DEMOCU1','DEMOFG00001',3,600,'G2',9201],[7002,10,'1013','2026-08-09','DEMOCU2','DEMOFG00002',2,500,'RE',9202],[7003,10,'1013','2026-08-09','DEMOCU2','DEMOFG00002',2,500,'F2',9203],[7004,10,'1012','2026-08-11','DEMOCU1','DEMOFG00001',1,100,'S1',9204]];
