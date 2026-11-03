@@ -26,8 +26,8 @@ related:
 | Fri 15:00 | Incoming Payment Report Apr 2025–Sep 2026 loaded live and checked | Delivery Lead | done (D43) |
 | Fri 17:30 | Receivables, credit notes, customer master intakes; net-sales basis (D40); auto-replaced history (D41) published | Full-Stack Engineer | done 14:50 (v32); QA FAIL 5 defects (D45), v33 16:55; backup size blocker (D46); v34 17:30; QA FAIL on backup cap (D47), v35 18:40, QA passed (D48); sales uploads released |
 | File + 45 min | Each receivables / credit-note / customer file loaded live after Vijay sends it | Delivery Lead | waiting on files |
-| Wed 4 Nov 12:00 | Infographic Overview mock-up for approval (D50) | Product Designer | v2 (sheets first, colour bands) published 21:13 Tue 3 Nov; awaiting approval |
-| Approval + 1 day | Infographic Overview built, QA-checked, published | Full-Stack Engineer | after approval |
+| Wed 4 Nov 12:00 | Infographic Overview mock-up for approval (D50) | Product Designer | v2 approved by Vijay (D52) |
+| Wed 4 Nov 13:00 | Infographic Overview built on real data, QA-checked, published (v36) | Full-Stack Engineer | in build |
 
 ## Milestones
 **M0 Discovery**
