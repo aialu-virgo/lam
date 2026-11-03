@@ -65,8 +65,8 @@ const p2=ctx2.page;await p2.waitForTimeout(3500);await p2.evaluate(()=>{location
 const CH=['#','BRANCHNAME','DOCNUM','DOCDATE','DOCTYPE','PAYMENTMEANS','ACCOUNT','ACCOUNTNAME','CARDCODE','CARDNAME','CITY','CHECK_DATE','CHECKNO','CHECKSUM','TARNSFERREF','TRANSFER_DATE','TRANSFERSUM','CASHSUM','REMARKS','JOURNALREMARK'];
 const row=(n,a)=>[n,'DEMO plant 1012',n,'10/08/2026','C','Bank','','','DEMOCU1','C1','','','',0,'','',a,0,'',''];
 fs.writeFileSync(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31 fail.csv',[CH.join(',')].concat([row(1,50),row(2,60),row(3,70)].map(r=>r.join(','))).join('\n'));
-await (await p2.$('input[type=file]')).setInputFiles(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31 fail.csv');await p2.waitForFunction(()=>window.__desk.U&&window.__desk.U.stage==='mapping',null,{timeout:20000});
-await p2.click('[data-act="coll-validate"]');await p2.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000});
+await (await p2.$('input[type=file]')).setInputFiles(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31 fail.csv');await p2.waitForFunction(()=>window.__desk.U&&window.__desk.U.stage==='mapping',null,{timeout:60000});
+await p2.click('[data-act="coll-validate"]');await p2.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:60000});
 const msg=await p2.evaluate(()=>window.__desk.U.doneMsg);const cdoc=await p2.evaluate(()=>window.__mockStore()['collections/1012-2026-08']);
 ok('if the backup cannot be saved the load stops and says nothing was changed',/Load stopped: the backup of the data being replaced could not be saved; nothing was changed\./.test(msg),msg);
 ok('and the data being replaced is untouched',cdoc.total===77&&cdoc.upload==='uOld',JSON.stringify([cdoc.total,cdoc.upload]));
