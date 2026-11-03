@@ -31,7 +31,7 @@ function figs(ent,ctx,opts){
   var uncAll=Array.from(new Set((cnA?cnA.uncovered:[]).concat(cnP?cnP.uncovered:[]))).sort();
   q.tip=bothNet?'Net sales against net sales (credit notes loaded for every plant in scope, both quarters).':'Invoiced against invoiced: credit notes are not loaded for '+(uncAll.length?cnUncText(uncAll):'the plants in scope')+'.';
   var hasT=pl.any&&pl.tgt>0;
-  var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete,basis:basis,pBasis:pBasis,cn:cnA&&cnA.covered?cnA.value:null,cnUnc:cnA?cnA.uncovered:[],cnAny:!!(cnA&&cnA.anyLoaded)};
+  var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete,basis:basis,pBasis:pBasis,cn:cnA&&cnA.covered?cnA.value:null,cnUnc:cnA?cnA.uncovered:[],cnAny:!!(cnA&&cnA.anyLoaded),sh0:A0.sh,Psh0:P0?P0.sh:null,bothNet:bothNet};
   o.var=hasT?A.n-pl.tgt:null;o.varPct=hasT?(A.n-pl.tgt)/pl.tgt*100:null;o.ach=hasT?A.n/pl.tgt*100:null;o.share=(pl.any&&pl.pot>0)?A.n/pl.pot*100:null;
   if(!opts.noTrend){var ser=quarterSeries(f,(f.sp!=null)?f.sp:undefined);var ts=trendOfSeries(ser);o.trend=ts;o.series=ser}
   return o;
@@ -182,45 +182,28 @@ async function loadDocs(ctx,ym,cust,plant,key,spF){
   S.docs={key:key,rows:rows.slice(0,3000),cut:cut,noIndex:noIndex,legacy:legacy};S.docsLoading=null;S.lastHtml='';schedule();
 }
 
-/* ---- Overview ---- */
-function pageOverview(){
-  var ctx=viewCtx();if(noData())return emptyData();
-  var res=ctx.res,tot=figs({},ctx),spl=salesKpis(ctx,tot,tot.series);
-  var cardsQ=[];
-  cardsQ.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. '+cnNote(tot),status:statusOf(tot.ach),
-    ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],
-     ['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['Quarter trend',trendWord(tot)]]}));
-  cardsQ.push(qtyCard(ctx,tot));
-  var col=collectionFigs(ctx);
-  cardsQ.push(col.card);
-  cardsQ.push(kpiCard({color:'orange',chip:'+',title:'K7 · New customers',value:'—',sub:'Needs the customer first-seen index (four earlier quarters).',pending:true,pendingTxt:'Pending',pendingMsg:'Needs four earlier quarters of history to find first-time customers; shown as pending, not zero.',
-    rows:[['Addressable','pending rules'],['Target','No plan (P6)'],['Var','—'],['Ach %','—'],['Share of potential','—'],['Run-rate need vs now','—'],['QoQ %','—'],['Quarter trend','—']]}));
-  var h='<div class="kpirow">'+cardsQ.join('')+'</div>';
-  h+=trendCard('Quarters since '+qLabel(histStart())+' · Sales',{},ctx,undefined,'ov');
-  h+=drillPanel(ctx);
-  /* branch chart + alerts */
-  h+='<div class="grid2">'+branchChart(ctx)+alertsCard()+'</div>';
-  /* product group table and branch table */
-  var gr=distinct('group').map(function(g){return {label:'<b>'+esc(g)+'</b> ›',o:figs({group:g},ctx),attrs:' data-act="ov-group" data-v="'+esc(g)+'"'}});
-  h+='<section class="card"><div class="hd"><h2>Product group · '+esc(res.label)+' vs '+esc(res.priorLabel||'')+'</h2></div>'+stdTable('Product group',gr.filter(matchSearch),tot)+tableNote(ctx)+'</section>';
-  var br=distinct('plant').filter(function(p){return plantInScope(ctx.sc,p)&&(!ctx.f.plant||p===ctx.f.plant)}).map(function(p){return {label:'<b>'+esc(plantShort(p))+'</b> <span class="note mono">'+p+'</span> ›',o:figs({plant:p,plants:undefined},ctx),attrs:' data-act="ov-branch" data-v="'+esc(p)+'"'}});
-  h+='<section class="card"><div class="hd"><h2>Branch · '+esc(res.label)+'</h2><span class="note">Tap a row in Sales to drill: branch → salesperson → customer → SAP document.</span></div>'+stdTable('Branch',br.filter(matchSearch),tot)+tableNote(ctx,'Drill-down stops at the SAP document (decision D9).')+'</section>';
-  h+=ytdStrip(ctx);
-  h+=targetRevisionCard(ctx,tot);
-  return h;
-}
+/* ---- Overview: see src/52-overview.js ---- */
 function matchSearch(r){var q=(S.f.search||'').toLowerCase();return !q||(r.label||'').replace(/<[^>]+>/g,' ').toLowerCase().indexOf(q)>=0}
 /* quantity card: sheets are primary, sq ft the secondary line; same Ach % and QoQ rules as value */
 function qtyCard(ctx,tot){
   var res=ctx.res,q=planQty(ctx),sh=tot.sh,ach=q.tgt>0?sh/q.tgt*100:null;
   return kpiCard({color:'violet',chip:'▦',title:'Quantity · '+res.label,value:fmtSheets(sh),sub:'= '+fmtSqft(tot.sq)+' (item size).',status:statusOf(ach),ach:ach,
-   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(sh/q.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(qoqOf(sh,tot.Psh,{incomplete:tot.incomplete})):'—'],['Quarter trend',trendWord(tot)]]});
+   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(sh/q.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(shQoq(tot,res)):'—'],['Quarter trend',trendWord(tot)]]});
 }
 function planQty(ctx){
   if(ctx.sc.sp)return {pot:0,tgt:0};/* plant-level quantity plans are not an executive's target */
-  var f=Object.assign({plants:ctx.plants},ctx.base),w=ctx.res.cur,out={pot:0,tgt:0};
-  wins(w).forEach(function(x){var q=qKeyOfYm(x.ym),P=planQ(f,q),qm=qMonths(q),idx=qm.indexOf(x.ym),wdq=qm.reduce(function(a,m){return a+WD(m)},0);if(!P.nLeaf)return;out.pot+=P.potSh*(WD(x.ym)*x.frac)/wdq;out.tgt+=(P.tgt>0?P.tgtSh*(P.months[idx]/P.tgt):0)*x.frac});
+  return planQtyF(Object.assign({plants:ctx.plants},ctx.base),ctx.res.cur);
+}
+/* sheets potential and target over a window (pro-rated by working days / phased), for any filter */
+function planQtyF(f,w){
+  var out={pot:0,tgt:0,any:false,kind:'none'};
+  wins(w).forEach(function(x){var q=qKeyOfYm(x.ym),P=planQ(f,q),qm=qMonths(q),idx=qm.indexOf(x.ym),wdq=qm.reduce(function(a,m){return a+WD(m)},0);if(!P.nLeaf)return;out.any=true;out.kind=P.kind;out.pot+=P.potSh*(WD(x.ym)*x.frac)/wdq;out.tgt+=(P.tgt>0?P.tgtSh*(P.months[idx]/P.tgt):0)*x.frac});
   return out;
+}
+/* sheets QoQ on the same basis as the rupee QoQ: Net against Net only when both quarters are covered by credit notes, else invoiced against invoiced (D40, D45) */
+function shQoq(o,res){
+  if(!res.prior)return {v:null,state:'none',txt:'YTD is shown quarter by quarter'};
+  return qoqOf(o.bothNet?o.sh:o.sh0,o.bothNet?o.Psh:o.Psh0,{incomplete:o.incomplete,noPrior:preHist(res.priorMonths||[])});
 }
 function branchChart(ctx){
   var res=ctx.res,ps=distinct('plant').filter(function(p){return plantInScope(ctx.sc,p)});

@@ -313,13 +313,20 @@ function invLines(ctx,sn){
     var d=dailySheets(p,g,sn.as_of),days=d&&d.perDay>0?G.sheets/d.perDay:null;out.push({plant:p,group:g,sheets:G.sheets,sqft:G.sqft,value:G.value,items:G.items,age:G.age,over:G.over,days:days,perDay:d?d.perDay:null})})});
   return out;
 }
+/* one place for the stock figures: the Inventory page and the Overview tile both read it */
+function invSummary(ctx){
+  var sc=stockScopeSnap();if(!sc||!Object.keys(sc.plants).length)return null;
+  var sn=sc.snap,L=invLines(ctx,{as_of:sn.as_of,plants:sc.plants}),tot={sheets:0,sqft:0,value:0,hasV:false,over:0,ageK:0,days:0};
+  L.forEach(function(x){tot.sheets+=x.sheets;tot.sqft+=x.sqft;if(x.value!=null){tot.value+=x.value;tot.hasV=true}if(x.age&&x.over!=null){tot.over+=x.over;tot.ageK+=x.age.reduce(function(a,b){return a+b},0)}});
+  var dn=0,dd=0,byG={};L.forEach(function(x){if(x.days!=null){dn+=x.days*x.sheets;dd+=x.sheets;var g=byG[x.group]||(byG[x.group]={dn:0,dd:0});g.dn+=x.days*x.sheets;g.dd+=x.sheets}});
+  var days=dd>0?dn/dd:null,tgt=CFG.stock_days_target,agedPct=tot.ageK>0?tot.over/tot.ageK*100:null;
+  Object.keys(byG).forEach(function(g){byG[g]=byG[g].dd>0?byG[g].dn/byG[g].dd:null});
+  return {sn:sn,L:L,tot:tot,days:days,tgt:tgt,agedPct:agedPct,byGroup:byG};
+}
 function pageInventory(){
   var ctx=viewCtx(),sc=stockScopeSnap();
   if(!sc||!Object.keys(sc.plants).length)return needPanel(['stock'],S.stockSnaps.length?'No stock snapshot covers your plants.':'No stock is loaded.')+'<p class="note">Upload the stock export in Data Intake (Super admin). B1: inventory status (OITW) or batch stock (OIBT); S/4: MB52 or Stock Overview Totals.</p>';
-  var sn=sc.snap,L=invLines(ctx,{as_of:sn.as_of,plants:sc.plants}),tot={sheets:0,sqft:0,value:0,hasV:false,over:0,ageK:0,days:0};
-  L.forEach(function(x){tot.sheets+=x.sheets;tot.sqft+=x.sqft;if(x.value!=null){tot.value+=x.value;tot.hasV=true}if(x.age&&x.over!=null){tot.over+=x.over;tot.ageK+=x.age.reduce(function(a,b){return a+b},0)}});
-  var dn=0,dd=0;L.forEach(function(x){if(x.days!=null){dn+=x.days*x.sheets;dd+=x.sheets}});var days=dd>0?dn/dd:null,tgt=CFG.stock_days_target;
-  var agedPct=tot.ageK>0?tot.over/tot.ageK*100:null;
+  var sm=invSummary(ctx),sn=sm.sn,L=sm.L,tot=sm.tot,days=sm.days,tgt=sm.tgt,agedPct=sm.agedPct;
   var cards=[kpiCard({color:'indigo',chip:'▦',title:'Stock on hand · as on '+fmtDate(sn.as_of).replace(/^\w+ /,''),value:fmtSheets(tot.sheets),sub:'= '+fmtSqft(tot.sqft)+(tot.hasV?' · '+fmtMoney(tot.value):'')+'.',status:'none',pillTxt:'No plan',rows:[['Plan','—'],['Var','—'],['Ach %','—'],['Snapshots held',String(S.stockSnaps.length)],['QoQ %','—'],['Quarter trend','—']]}),
    kpiCard({color:'violet',chip:'⏳',title:'K15 · Stock days',value:days!=null?days.toFixed(1)+' d':'—',sub:'On hand ÷ average daily sheets sold in the last 90 days to the as-of date.',status:days==null?'none':statusOf(achLower(days,tgt).ach),ach:days!=null?Math.min(100,achLower(days,tgt).ach):null,rows:[['Plan',tgt+' d'],['Var',days!=null?(days-tgt>=0?'+':'−')+Math.abs(days-tgt).toFixed(1)+' d':'—'],['Ach %',days!=null?fmtAchLower(achLower(days,tgt)):'—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['Quarter trend','—']]}),
    agedPct!=null?kpiCard({color:'orange',chip:'%',title:'K16 · Aged stock % (over '+CFG.stock_age_days+' days)',value:agedPct.toFixed(1)+'%',sub:fmtN(Math.round(tot.over))+' aged sheets.',status:statusOf(achLower(agedPct,10).ach),ach:Math.min(100,achLower(agedPct,10).ach),rows:[['Plan','10% (Assumed)'],['Var',(agedPct-10>=0?'+':'−')+Math.abs(agedPct-10).toFixed(1)+' pt'],['Ach %',fmtAchLower(achLower(agedPct,10))],['Last Qtr','no prior snapshot'],['QoQ %','—'],['Quarter trend','—']]}):
