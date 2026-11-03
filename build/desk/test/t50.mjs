@@ -37,7 +37,7 @@ ok('Overview stock days equals the Inventory page K15 (rounded)',!!k15[1]&&parse
 /* detail tables behind Table links */
 await go(page,'#/overview',2500);
 ok('detail tables are closed by default (no table on the page)',(await page.$$('#pg table')).length===0,'');
-await page.click('#pg .ox-hero-c .ox-drill');await page.waitForTimeout(800);
+await page.click('#pg .ox-sm .ox-drill[data-k="group"]');await page.waitForTimeout(800);
 const t1=await tx(page);ok('"Table ›" opens the product-group table with its existing columns',/PRODUCT GROUP/i.test(t1)&&/Potential/.test(t1)&&/Share %/.test(t1)&&/QoQ %/.test(t1)&&(await page.$$('#pg table')).length>=1,'');
 ok('K7 is off the Overview and the alert card is gone (alerts are in Today)',!/K7 · New customers/i.test(t1)&&!/Alerts · tap to open/i.test(t1),'');
 /* 360 px, both themes */
@@ -61,5 +61,35 @@ const np=await open(browser,{store:s3});await np.page.waitForTimeout(4000);await
 ok('collections tile shows collected ÷ invoiced only as a labelled ratio when there is no collection plan',/Bar = collected ÷ invoiced/.test(npt)&&/a ratio, not an achievement/.test(npt)&&/Collection plan: not loaded/.test(npt),'');
 ok('with a collection plan the tile shows Ach % against the plan in a band colour',/of plan/.test(ov)&&/K9 · Collections/i.test(ov),'');
 await np.ctx.close();
+
+/* ===== D53 ===== */
+/* D3: a chip never shows a number that belongs to the next band */
+const chipsTxt=await page.evaluate(()=>[74.96,89.96,99.96,75,90,100,89.99].map(v=>window.__desk.oxBandChip(v).replace(/<[^>]+>/g,'')));
+ok('chips truncate: 74.96 Far behind 74.9, 89.96 Behind 89.9, 99.96 Watch 99.9 (never the next band\'s number)',/Far behind 74\.9%/.test(chipsTxt[0])&&/Behind 89\.9%/.test(chipsTxt[1])&&/Watch 99\.9%/.test(chipsTxt[2])&&/Behind 75\.0%/.test(chipsTxt[3])&&/Watch 90\.0%/.test(chipsTxt[4])&&/On target 100\.0%/.test(chipsTxt[5])&&/Behind 89\.9%/.test(chipsTxt[6]),JSON.stringify(chipsTxt));
+/* D1: one plant in scope: listed once */
+const bm=await open(browser,{store,viewer:{email:'bm.a@demo'}});await bm.page.waitForTimeout(3500);await go(bm.page,'#/overview',3000);
+const rkNames=await bm.page.evaluate(()=>({n:window.__desk.viewCtx().plants.size,names:Array.from(document.querySelectorAll('#pg .ox-rk .nm')).map(e=>e.textContent)}));
+ok('one plant in scope (bm.a@demo): "Furthest behind and ahead" lists it at most once',rkNames.n===1&&rkNames.names.length<=1&&new Set(rkNames.names).size===rkNames.names.length,JSON.stringify(rkNames));
+await bm.ctx.close();
+const all=await page.evaluate(()=>{const n=Array.from(document.querySelectorAll('#pg .ox-rk .nm')).map(e=>e.textContent);return {n:n,u:new Set(n).size}});
+ok('with all plants: no plant appears twice in the ranking',all.n.length===all.u,JSON.stringify(all));
+/* D2: every Table > opens the table that matches its own visual and unit */
+const links=await page.evaluate(()=>Array.from(document.querySelectorAll('#pg .ox-drill[data-act="ox-open"]')).map(b=>[b.closest('.ox-card').querySelector('h2').textContent.replace(/Table ›|Trend ›/g,'').trim().slice(0,40),b.getAttribute('data-k')]));
+const expect=[[/^K1 ·/i,'groupsh',/Lakh sheets/i,/Potential/i],[/^₹ value/i,'group',/₹/i,/Product group/i],[/^₹ value/i,'trendrs',/Quarters since/i,/Sales/i],[/^Quarterly trend/i,'trendsh',/Lakh sheets/i,/Target[^]*Actual[^]*Var[^]*Ach %[^]*QoQ %/i],[/^Product group mix/i,'groupsh',/Lakh sheets/i,/Share %/i],[/^Zones and plants/i,'branchsh',/Lakh sheets/i,/Zone \/ plant/i]];
+const seen=[];
+for(const [title,k] of links){
+  const ex=expect.find(e=>e[0].test(title)&&e[1]===k);
+  if(!ex){seen.push([title.slice(0,12),k,'link']);continue}
+  await go(page,'#/overview',1800);
+  await page.evaluate(([t,k])=>{const b=Array.from(document.querySelectorAll('#pg .ox-drill[data-act="ox-open"]')).find(b=>b.closest('.ox-card').querySelector('h2').textContent.trim().indexOf(t)===0&&b.getAttribute('data-k')===k);b.click()},[title,k]);await page.waitForTimeout(900);
+  const sec=await page.evaluate(k=>{const e=document.getElementById('ox-'+k);return e?e.innerText:''},ex[1]);
+  seen.push([title.slice(0,12),k,ex[2].test(sec)&&ex[3].test(sec)]);
+}
+ok('every "Table >" on a sheets visual opens a lakh-sheets table (K1, trend, group mix, zones/plants); the ₹ tile opens the ₹ table',seen.filter(x=>x[2]===true||x[2]===false).length>=6&&seen.filter(x=>x[2]===true||x[2]===false).every(x=>x[2]===true),JSON.stringify(seen));
+for(const [t,hash] of [['Collections','#/receivables'],['Stock','#/inventory'],['Overdue','#/receivables']]){
+  await go(page,'#/overview',1800);
+  const has=await page.evaluate(t=>{const b=Array.from(document.querySelectorAll('#pg .ox-drill[data-act="ox-open"]')).find(b=>b.closest('.ox-card').querySelector('h2').textContent.indexOf(t)>=0);if(!b)return false;b.click();return true},t);await page.waitForTimeout(900);
+  ok('Table > on the '+t+' tile opens '+hash,has&&(await page.evaluate(()=>location.hash))===hash,'');
+}
 console.log(errs.filter(e=>!/ERR_FAILED/.test(e)).slice(0,3));
 console.log(res.join('\n'));await browser.close();
