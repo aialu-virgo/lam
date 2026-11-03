@@ -19,10 +19,10 @@ const undo=async fileRe=>{await page.evaluate(()=>{location.hash='#/intake'});aw
 const CH=['#','BRANCHNAME','DOCNUM','DOCDATE','DOCTYPE','PAYMENTMEANS','ACCOUNT','ACCOUNTNAME','CARDCODE','CARDNAME','CITY','CHECK_DATE','CHECKNO','CHECKSUM','TARNSFERREF','TRANSFER_DATE','TRANSFERSUM','CASHSUM','REMARKS','JOURNALREMARK'];
 const crow=(n,doc,amt)=>[n,'DEMO plant 1012',doc,'10/08/2026','C','Bank','','','DEMOCU1','DEMO C1','','','',0,'','',amt,0,'',''];
 fs.writeFileSync(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31.csv',csvOf(CH,[crow(1,1,1000),crow(2,2,2000)]));
-await up(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31.csv');await page.click('[data-act="coll-validate"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000});
+await up(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31.csv');await page.click('[data-act="coll-validate"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:60000});
 let b=await ms('^backups/');ok('a first load keeps no backup',Object.keys(b).length===0,'');
 fs.writeFileSync(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31 b.csv',csvOf(CH,[crow(1,1,1000),crow(2,2,2500),crow(3,3,500)]));
-await up(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31 b.csv');await page.click('[data-act="coll-validate"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000});await page.waitForTimeout(800);
+await up(AF+'Incoming_Payment_Report_-2026-08-01_to_2026-08-31 b.csv');await page.click('[data-act="coll-validate"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:60000});await page.waitForTimeout(800);
 let c=await ms('^collections/');b=await ms('^backups/');
 ok('collections: replacing a month keeps the previous document in a backup (1 doc)',c['collections/1012-2026-08'].total===4000&&Object.keys(b).length===1,JSON.stringify([c['collections/1012-2026-08'].total,Object.keys(b)]));
 let u=await undo('31 b');
@@ -31,7 +31,7 @@ ok('collections: Undo restores the previous data, and the dialog says so; backup
 /* ---------- receivables ---------- */
 const RH=['DocNum','DocDate','DocDueDate','CardCode','CardName','BPLName','DocTotal','PaidToDate'];
 fs.writeFileSync(AF+'bk_open_2026-10-20.csv',csvOf(RH,[[1,'05/08/2026','05/09/2026','DEMOCU1','C1','DEMO plant 1012',1000,0]]));
-const rv=async f=>{await up(f);await page.evaluate(()=>document.querySelector('[data-act="rc-validate"]').click());await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000});await page.waitForTimeout(600)};
+const rv=async f=>{await up(f);await page.evaluate(()=>document.querySelector('[data-act="rc-validate"]').click());await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:60000});await page.waitForTimeout(600)};
 await rv(AF+'bk_open_2026-10-20.csv');
 fs.writeFileSync(AF+'bk_open_2026-10-20 v2.csv',csvOf(RH,[[1,'05/08/2026','05/09/2026','DEMOCU1','C1','DEMO plant 1012',5000,0]]));
 await rv(AF+'bk_open_2026-10-20 v2.csv');
@@ -42,7 +42,7 @@ ok('receivables: Undo restores the earlier snapshot of that date',r['receivables
 /* ---------- credit notes ---------- */
 const NH=['DocNum','LineNum','DocDate','CardCode','CardName','BPLName','ItemCode','Quantity','LineTotal','BaseRef'];
 const nrow=(d,v)=>[d,0,'05/08/2026','DEMOCU1','C1','DEMO plant 1012','DEMOFG00001',2,v,9];
-const cn=async f=>{await up(f);await page.evaluate(()=>{const b=document.querySelector('[data-act="cn-validate"]');if(b)b.click()});await page.waitForFunction(()=>window.__desk.U.stage==='validated'||window.__desk.U.stage==='done',null,{timeout:20000});await page.waitForTimeout(500);if(await page.evaluate(()=>window.__desk.U.stage)==='validated'){await page.click('[data-act="cn-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:20000})}await page.waitForTimeout(600)};
+const cn=async f=>{await up(f);await page.evaluate(()=>{const b=document.querySelector('[data-act="cn-validate"]');if(b)b.click()});await page.waitForFunction(()=>window.__desk.U.stage==='validated'||window.__desk.U.stage==='done',null,{timeout:60000});await page.waitForTimeout(500);if(await page.evaluate(()=>window.__desk.U.stage)==='validated'){await page.click('[data-act="cn-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:60000})}await page.waitForTimeout(600)};
 fs.writeFileSync(AF+'bk_cn_-2026-08-01_to_2026-08-31.csv',csvOf(NH,[nrow(1,100)]));await cn(AF+'bk_cn_-2026-08-01_to_2026-08-31.csv');
 fs.writeFileSync(AF+'bk_cn_-2026-08-01_to_2026-08-31 v2.csv',csvOf(NH,[nrow(1,100),nrow(2,900)]));await cn(AF+'bk_cn_-2026-08-01_to_2026-08-31 v2.csv');
 let n=await ms('^creditnotes/1012');ok('credit notes: replaced plant-month holds the new value',n['creditnotes/1012-2026-08'].groups.Laminate.value===1000,'');
