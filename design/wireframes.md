@@ -28,6 +28,7 @@ Static greyscale HTML, shared kit [wf.css](wireframes/wf.css); start at [index.h
 |---|---|---|---|
 | Index of all mock-ups | [index.html](wireframes/index.html) | all | ready for approval |
 | Overview: KPI cards, 12-quarter trend, branch chart, alerts, product-group and branch tables, YTD strip, target revision and Stretch | [overview.html](wireframes/overview.html) | desk-v0.9 | ready for approval |
+| Overview, infographic redesign (draft, asked by Vijay 3 Nov 2026): answer strip, bullet bars, 7-quarter trend, group mix, zones and plant ranking, stock-days and collections tiles, not-loaded states | [overview-infographic.html](wireframes/overview-infographic.html) | not built; awaiting approval | draft |
 | Sales: A/B/C tiles, leaderboard, drill-down branch → salesperson → customer → SAP document | [sales.html](wireframes/sales.html) | desk-v0.9 | ready for approval |
 | Orders & Dispatch: open orders, O2D days vs plan TAT | [orders-dispatch.html](wireframes/orders-dispatch.html) | desk-v0.9 | ready for approval |
 | Receivables: ageing buckets, collection plan vs actual | [receivables.html](wireframes/receivables.html) | desk-v0.9 | ready for approval |
