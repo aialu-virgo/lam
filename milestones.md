@@ -27,7 +27,7 @@ related:
 | Fri 17:30 | Receivables, credit notes, customer master intakes; net-sales basis (D40); auto-replaced history (D41) published | Full-Stack Engineer | done 14:50 (v32); QA FAIL 5 defects (D45), v33 16:55; backup size blocker (D46); v34 17:30; QA FAIL on backup cap (D47), v35 18:40, QA passed (D48); sales uploads released |
 | File + 45 min | Each receivables / credit-note / customer file loaded live after Vijay sends it | Delivery Lead | waiting on files |
 | Wed 4 Nov 12:00 | Infographic Overview mock-up for approval (D50) | Product Designer | v2 approved by Vijay (D52) |
-| Tue 3 Nov 23:30 | Infographic Overview built on real data, published (v36); QA check right after | Full-Stack Engineer | published 21:50 (v36); QA check running |
+| Tue 3 Nov 23:30 | Infographic Overview built on real data, published (v36); QA check right after | Full-Stack Engineer | published 21:50 (v36); QA 3 defects (D53), v37 due 22:45 |
 
 ## Milestones
 **M0 Discovery**
