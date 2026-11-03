@@ -8,6 +8,7 @@
   --act:#3f4654;--track:#ece8e4;--plan:#15161a;
   --green:#0a7a55;--green-soft:#e2f6ee;--orange:#8f5300;--orange-soft:#fdf1dc;--red:#9a0c20;--red-soft:#fbe4e8;
   --g1:#2a78d6;--g2:#1baf7a;--g3:#6250d6;--g4:#e87ba4;
+  --b1:#f4a9b0;--b1d:#9a0c20;--b2:#f7bd7a;--b2d:#8f5300;--b3:#f1ea8a;--b3d:#6b5a00;--b4:#a6e3c4;--b4d:#0a7a55;
   --shadow:0 1px 2px rgba(40,28,20,.05),0 4px 14px rgba(40,28,20,.06);
   --font:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
 }
@@ -15,12 +16,12 @@
   --bg:#141211;--card:#1d1b1a;--line:#2e2b29;--ink:#f3efec;--ink2:#bdb7b2;--ink3:#9a948f;
   --brand-ink:#ff6b6b;--brand-soft:#3a1214;--act:#b9bfcc;--track:#2c2926;--plan:#f3efec;
   --green:#34d399;--green-soft:#12342a;--orange:#f5b544;--orange-soft:#3a2d12;--red:#ff8fa3;--red-soft:#3b1b22;
-  --g1:#3987e5;--g2:#199e70;--g3:#9085e9;--g4:#d55181;--shadow:0 1px 2px rgba(0,0,0,.35);color-scheme:dark}}
+  --g1:#3987e5;--g2:#199e70;--g3:#9085e9;--g4:#d55181;--b1:#7a2a35;--b1d:#ff8fa3;--b2:#7b4f10;--b2d:#f5b544;--b3:#66651a;--b3d:#e6d65a;--b4:#1d6b4c;--b4d:#34d399;--shadow:0 1px 2px rgba(0,0,0,.35);color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#141211;--card:#1d1b1a;--line:#2e2b29;--ink:#f3efec;--ink2:#bdb7b2;--ink3:#9a948f;
   --brand-ink:#ff6b6b;--brand-soft:#3a1214;--act:#b9bfcc;--track:#2c2926;--plan:#f3efec;
   --green:#34d399;--green-soft:#12342a;--orange:#f5b544;--orange-soft:#3a2d12;--red:#ff8fa3;--red-soft:#3b1b22;
-  --g1:#3987e5;--g2:#199e70;--g3:#9085e9;--g4:#d55181;--shadow:0 1px 2px rgba(0,0,0,.35);color-scheme:dark}
+  --g1:#3987e5;--g2:#199e70;--g3:#9085e9;--g4:#d55181;--b1:#7a2a35;--b1d:#ff8fa3;--b2:#7b4f10;--b2d:#f5b544;--b3:#66651a;--b3d:#e6d65a;--b4:#1d6b4c;--b4d:#34d399;--shadow:0 1px 2px rgba(0,0,0,.35);color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45;margin:0;padding-block:0}
 .mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -73,6 +74,10 @@ h2{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--in
 .bul .f{position:absolute;left:0;top:3px;bottom:3px;background:var(--act);border-radius:5px}
 .bul .tg{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--plan);border-radius:2px}
 .bul .lq{position:absolute;top:-2px;bottom:-2px;width:0;border-left:2px dashed var(--ink3)}
+.bul .f.b1{background:var(--b1);border:2px solid var(--b1d)}.bul .f.b2{background:var(--b2);border:2px solid var(--b2d)}.bul .f.b3{background:var(--b3);border:2px solid var(--b3d)}.bul .f.b4{background:var(--b4);border:2px solid var(--b4d)}
+.bul .f{top:2px;bottom:2px}
+.chip.b2{background:var(--b2);color:var(--ink);border:1px solid var(--b2d)}.chip.b3{background:var(--b3);color:var(--ink);border:1px solid var(--b3d)}.chip.b1{background:var(--b1);color:var(--ink);border:1px solid var(--b1d)}.chip.b4{background:var(--b4);color:var(--ink);border:1px solid var(--b4d)}
+.bands{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px}.bands span{display:inline-flex;align-items:center;gap:5px}.bands i{width:18px;height:10px;border-radius:3px}
 .bul.nl{background:none;border:1.5px dashed var(--ink3)}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--ink2)}
 .legend i{display:inline-block;vertical-align:-2px;margin-right:5px}
@@ -126,38 +131,39 @@ tr.tot td{font-weight:800;background:var(--brand-soft)}
 
 <div class="banner"><b>Review control</b>
 <span class="seg" role="group" aria-label="Data state"><button id="s-loaded" aria-pressed="true">If targets and potential were loaded</button><button id="s-today" aria-pressed="false">As loaded today</button></span>
-<span class="note">Basis: <b id="basis">Net sales (credit notes loaded for 42 of 42 plants)</b></span></div>
+<span class="bands" aria-label="Bar colour bands by achievement"><b>Bar colour = Ach %:</b><span><i style="background:var(--b1);border:2px solid var(--b1d)"></i>&lt;75 Far behind</span><span><i style="background:var(--b2);border:2px solid var(--b2d)"></i>75–&lt;90 Behind</span><span><i style="background:var(--b3);border:2px solid var(--b3d)"></i>90–&lt;100 Watch</span><span><i style="background:var(--b4);border:2px solid var(--b4d)"></i>100+ On target</span></span><span class="note">Basis: <b id="basis">Net sales (credit notes loaded for 42 of 42 plants)</b></span></div>
 
 <section class="answers" aria-label="Five-second answers">
-<div class="ans"><q>1 · Where are we?</q><b class="full">91.3% of target</b><b class="today">₹ 138.2 cr invoiced</b><span class="full">₹ 13.2 cr behind the pro-rated target. 57.1% of market potential.</span><span class="today">Target and potential not loaded, so no Ach % yet.</span></div>
-<div class="ans"><q>2 · Growing QoQ?</q><b>▲ +6.4%</b><span>vs Q2 FY27 at the same working day. Trend rising, avg +5.3%.</span></div>
-<div class="ans"><q>3 · Who is behind?</q><b class="full">Door, Compact, South</b><b class="today">Door −7.4% QoQ</b><span class="full">Below 90% of target. 5 plants furthest behind listed below.</span><span class="today">Only QoQ can flag decline until targets load.</span></div>
+<div class="ans"><q>1 · Where are we?</q><b class="full">91.2% of target</b><b class="today">12.4 lakh sheets</b><span class="full">In sheets: 1.20 lakh behind the pro-rated target. 57.7% of market potential. Worth ₹ 138.2 cr.</span><span class="today">Target and potential not loaded, so no Ach % yet.</span></div>
+<div class="ans"><q>2 · Growing QoQ?</q><b>▲ +5.1% sheets</b><span>vs Q2 FY27 at the same working day (₹ +6.4%). Trend rising, avg +4.9%.</span></div>
+<div class="ans"><q>3 · Who is behind?</q><b class="full">Compact, Door, South</b><b class="today">Door −7.8% QoQ</b><span class="full">Below 90% of target (sheets). 5 plants furthest behind listed below.</span><span class="today">Only QoQ can flag decline until targets load.</span></div>
 <div class="ans"><q>4 · What now?</q><b>5 actions today</b><span>Top: Door QoQ below −5%, due today, owner Sales HOD.</span></div>
 </section>
 
 <div class="tiles">
 <!-- HERO -->
-<section class="card t-hero" id="hero"><h2>K1 · Sales, sheets and ₹ <a class="drill" href="#tbl-group">Table ›</a></h2>
+<section class="card t-hero" id="hero"><h2>K1 · Sales in sheets <a class="drill" href="#tbl-group">Table ›</a></h2>
 <div class="hero">
-<div data-tip="Actual ₹138.2 cr · Last Qtr (same working day) ₹129.9 cr · QoQ +6.4%" tabindex="0"><div class="big">₹ 138.2<span class="unit"> cr invoiced</span></div>
-<div class="row" style="margin-top:6px"><span class="chip ok">▲ +6.4% QoQ</span><span class="chip full warn">▼ Ach 91.3% · behind</span><span class="chip today nl">Ach % · not loaded</span></div>
-<p class="note" style="margin:6px 0 0">Internal transfers excluded. 28 of 74 working days elapsed.</p></div>
+<div data-tip="Actual 12.40 lakh sheets (₹138.2 cr) · Last Qtr (same working day) 11.80 lakh · QoQ +5.1%" tabindex="0"><div class="big">12.4<span class="unit"> lakh sheets</span></div>
+<div class="row" style="margin-top:6px"><span class="chip ok">▲ +5.1% QoQ</span><span class="chip full b3">▼ Ach 91.2% · Watch</span><span class="chip today nl">Ach % · not loaded</span></div>
+<p style="margin:8px 0 0;font-size:14px;font-weight:700" class="mono">₹ 138.2 cr <span class="unit">invoiced value, ₹ +6.4% QoQ</span></p>
+<p class="note" style="margin:4px 0 0">Laminate, Door, PVC sheet, Compact board. Internal transfers excluded. 28 of 74 working days elapsed.</p></div>
 <div>
-<div class="full" data-tip="Actual ₹138.2 cr · Target (pro-rated) ₹151.4 cr · Potential (pro-rated) ₹242.2 cr · Last Qtr ₹129.9 cr · Ach 91.3% · Share of potential 57.1%" tabindex="0"><div class="bul" role="img" aria-label="Actual 138.2 crore, target 151.4, potential 242.2"><div class="f" style="width:57.1%"></div><div class="lq" style="left:53.6%"></div><div class="tg" style="left:62.5%"></div></div></div>
-<div class="today" data-tip="Actual ₹138.2 cr · Last Qtr ₹129.9 cr. Target and potential are not loaded." tabindex="0"><div class="bul nl" role="img" aria-label="Target and potential not loaded"><div class="f" style="width:40%;opacity:.55"></div></div><p class="nl-t" style="margin:6px 0 0;font-size:12.5px">Target and potential not loaded: no scale to draw against. Load in Admin › Market potential.</p></div>
-<div class="legend" style="margin-top:8px"><span><i class="k-act"></i>Actual</span><span class="full"><i class="k-tg"></i>Target</span><span><i class="k-lq"></i>Last Qtr</span><span class="full"><i class="k-pot"></i>Track = Potential</span></div>
+<div class="full" data-tip="Actual 12.40 · Target (pro-rated) 13.60 · Potential (pro-rated) 21.50 lakh sheets · Last Qtr 11.80 · Ach 91.2% · Share of potential 57.7%" tabindex="0"><div class="bul" role="img" aria-label="Actual 12.4 lakh sheets, target 13.6, potential 21.5"><div class="f b3" style="width:57.7%"></div><div class="lq" style="left:54.9%"></div><div class="tg" style="left:63.3%"></div></div></div>
+<div class="today" data-tip="Actual 12.40 lakh sheets · Last Qtr 11.80. Target and potential are not loaded." tabindex="0"><div class="bul nl" role="img" aria-label="Target and potential not loaded"><div class="f" style="width:40%;opacity:.55;background:var(--act)"></div></div><p class="nl-t" style="margin:6px 0 0;font-size:12.5px">Target and potential not loaded: no scale to draw against. Load in Admin › Market potential.</p></div>
+<div class="legend" style="margin-top:8px"><span><i class="k-act"></i>Actual (colour = Ach band)</span><span class="full"><i class="k-tg"></i>Target</span><span><i class="k-lq"></i>Last Qtr</span><span class="full"><i class="k-pot"></i>Grey track = Potential</span></div>
 <div class="nine" style="margin-top:12px">
-<div><small>Potential</small><b class="full">242.2</b><b class="today nl-t">not loaded</b></div><div><small>Target</small><b class="full">151.4</b><b class="today nl-t">not loaded</b></div><div><small>Actual</small><b>138.2</b></div>
-<div><small>Var</small><b class="full">−13.2 (−8.7%)</b><b class="today nl-t">not loaded</b></div><div><small>Ach %</small><b class="full">91.3%</b><b class="today nl-t">not loaded</b></div><div><small>Share %</small><b class="full">57.1%</b><b class="today nl-t">not loaded</b></div>
-<div><small>Last Qtr</small><b>129.9</b></div><div><small>QoQ %</small><b>+6.4%</b></div><div><small>Trend</small><b>▲ Rising</b></div></div></div>
+<div><small>Potential</small><b class="full">21.50</b><b class="today nl-t">not loaded</b></div><div><small>Target</small><b class="full">13.60</b><b class="today nl-t">not loaded</b></div><div><small>Actual</small><b>12.40</b></div>
+<div><small>Var</small><b class="full">−1.20 (−8.8%)</b><b class="today nl-t">not loaded</b></div><div><small>Ach %</small><b class="full">91.2%</b><b class="today nl-t">not loaded</b></div><div><small>Share %</small><b class="full">57.7%</b><b class="today nl-t">not loaded</b></div>
+<div><small>Last Qtr</small><b>11.80</b></div><div><small>QoQ %</small><b>+5.1%</b></div><div><small>Trend</small><b>▲ Rising</b></div></div><p class="note" style="margin:6px 0 0">All figures in lakh sheets.</p></div>
 </div></section>
 
 <!-- small tiles -->
-<section class="card t-sm" data-tip="Sheets QTD 12.4 lakh · Target 13.6 lakh · Ach 91.2% · Last Qtr 11.8 lakh · QoQ +5.1%" tabindex="0"><h2>Sheets <a class="drill" href="#tbl-group">Table ›</a></h2>
-<div class="tile-big">12.4 <span class="unit">lakh sheets</span></div>
-<div class="full"><div class="bul"><div class="f" style="width:84%"></div><div class="tg" style="left:92%"></div></div><p class="note" style="margin:6px 0 0">▼ 91.2% of 13.6 lakh target</p></div>
+<section class="card t-sm" data-tip="Value QTD ₹138.2 cr · Target ₹151.4 cr · Ach 91.3% · Last Qtr ₹129.9 cr · QoQ +6.4%" tabindex="0"><h2>₹ value <a class="drill" href="#tbl-group">Table ›</a></h2>
+<div class="tile-big">₹ 138.2 <span class="unit">cr invoiced</span></div>
+<div class="full"><div class="bul"><div class="f b3" style="width:91.3%"></div><div class="tg" style="left:100%;margin-left:-3px"></div></div><p class="note" style="margin:6px 0 0">▼ Watch · 91.3% of ₹ 151.4 cr target</p></div>
 <div class="today empty" style="padding:8px"><span class="nl-t">Target: not loaded</span></div>
-<div class="row"><span class="chip ok">▲ +5.1% QoQ</span><svg viewBox="0 0 90 26" width="90" aria-hidden="true"><polyline points="2,22 17,19 32,15 47,12 62,13 88,5" fill="none" stroke="var(--act)" stroke-width="2"/><circle cx="88" cy="5" r="3" fill="var(--act)"/></svg></div></section>
+<div class="row"><span class="chip ok">▲ +6.4% QoQ</span><svg viewBox="0 0 90 26" width="90" aria-hidden="true"><polyline points="2,22 17,19 32,15 47,12 62,13 88,5" fill="none" stroke="var(--act)" stroke-width="2"/><circle cx="88" cy="5" r="3" fill="var(--act)"/></svg></div></section>
 
 <section class="card t-sm" data-tip="Collected Q2 FY27 ₹331.5 cr · Last Qtr ₹319.0 cr · QoQ +3.9% · Collection plan not loaded · Data to 30 Sep 2026" tabindex="0"><h2>K9 · Collections <a class="drill" href="#">Table ›</a></h2>
 <div class="tile-big">₹ 331.5 <span class="unit">cr, Q2 FY27</span></div>
@@ -168,47 +174,47 @@ tr.tot td{font-weight:800;background:var(--brand-soft)}
 <section class="card t-sm" data-tip="Stock days 47 as on 21 Oct 2026 · plan 45 · plan ÷ actual = 95.7% · lower is better · no earlier snapshot" tabindex="0"><h2>K15 · Stock days <a class="drill" href="#">Table ›</a></h2>
 <div class="tile-big">47 <span class="unit">days · 21 Oct</span></div>
 <svg viewBox="0 0 240 92" role="img" aria-label="Stock days by group: Laminate 41, Door 62, PVC sheet 38, Compact board 55; plan 45"><g>
-<rect x="64" y="6" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="8" width="102" height="8" rx="3" fill="var(--g1)"/><text x="0" y="16" class="st">Laminate</text><text x="220" y="16">41</text>
-<rect x="64" y="28" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="30" width="155" height="8" rx="3" fill="var(--g2)"/><text x="0" y="38" class="st">Door</text><text x="224" y="38" style="fill:var(--red);font-weight:700">▲62</text>
-<rect x="64" y="50" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="52" width="95" height="8" rx="3" fill="var(--g3)"/><text x="0" y="60" class="st">PVC sheet</text><text x="220" y="60">38</text>
-<rect x="64" y="72" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="74" width="138" height="8" rx="3" fill="var(--g4)"/><text x="0" y="82" class="st">Compact</text><text x="220" y="82">55</text>
+<rect x="64" y="6" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="8" width="102" height="8" rx="3" fill="var(--b4)" stroke="var(--b4d)" stroke-width="1.5"/><text x="0" y="16" class="st">Laminate</text><text x="220" y="16">▼41</text>
+<rect x="64" y="28" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="30" width="155" height="8" rx="3" fill="var(--b1)" stroke="var(--b1d)" stroke-width="1.5"/><text x="0" y="38" class="st">Door</text><text x="214" y="38" style="fill:var(--red);font-weight:700">▲62 far</text>
+<rect x="64" y="50" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="52" width="95" height="8" rx="3" fill="var(--b4)" stroke="var(--b4d)" stroke-width="1.5"/><text x="0" y="60" class="st">PVC sheet</text><text x="220" y="60">▼38</text>
+<rect x="64" y="72" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="74" width="138" height="8" rx="3" fill="var(--b2)" stroke="var(--b2d)" stroke-width="1.5"/><text x="0" y="82" class="st">Compact</text><text x="214" y="82" style="font-weight:700">▲55</text>
 <line x1="176" y1="2" x2="176" y2="90" stroke="var(--plan)" stroke-width="2"/></g></svg>
-<div class="row full"><span class="chip warn">▼ 95.7% of plan · over by 2 days</span></div><div class="row today"><span class="chip nl">Plan: not loaded</span></div>
-<p class="note" style="margin:0">Line = plan 45 days. Lower is better. One snapshot, so no QoQ yet.</p></section>
+<div class="row full"><span class="chip b3">▲ Watch · 95.7% of plan · 2 days over</span></div><div class="row today"><span class="chip nl">Plan: not loaded</span></div>
+<p class="note" style="margin:0">Line = plan 45 days. Lower is better; bar colour = plan ÷ actual (Laminate 110%, Door 73%, PVC 118%, Compact 82%). One snapshot, so no QoQ yet.</p></section>
 
 <section class="card t-sm"><h2>K10 · Overdue receivables <span class="chip nl">Not loaded</span></h2>
 <div class="empty"><b>No receivables file yet</b><span>Overdue share and the 0–30 / 31–60 / 61–90 / 90+ ageing bar appear after the Receivables intake. Shown as not loaded, never as zero.</span><div class="bul nl" style="height:12px"></div><a class="drill" href="#">Open Data Intake › Receivables</a></div></section>
 
 <!-- trend -->
-<section class="card t-6"><h2>Quarterly trend, actual vs target <a class="drill" href="#">Table ›</a></h2>
+<section class="card t-6"><h2>Quarterly trend in lakh sheets, actual vs target <a class="drill" href="#">Table ›</a></h2>
 <div id="trend"></div>
-<div class="legend"><span><i class="k-act"></i>Actual (closed)</span><span><i class="k-tg"></i><span class="full">Target</span><span class="today">Target (not loaded)</span></span><span><i style="width:14px;height:8px;border:1.5px dashed var(--ink3);border-radius:3px"></i>Run-rate projection</span><span><i style="width:14px;height:8px;background:repeating-linear-gradient(45deg,var(--ink3) 0 2px,transparent 2px 5px);border-radius:3px"></i>Incomplete history</span></div>
-<div class="callout full note"><b class="warn chip">Stretch</b> Q3 target needs +16.5% QoQ; average QoQ is +5.3% (2× = 10.6%). For discussion.</div>
-<p class="note" style="margin:0">History starts Q1 FY26 (D28): 7 quarters, not 12. Q1 FY27 has a partial month, so its QoQ and Q2's are greyed.</p></section>
+<div class="legend"><span><i class="k-act"></i>Actual sheets (lakh)</span><span><i class="k-tg"></i><span class="full">Target</span><span class="today">Target (not loaded)</span></span><span><i style="width:14px;height:8px;border:1.5px dashed var(--ink3);border-radius:3px"></i>Run-rate projection</span><span><i style="width:14px;height:8px;background:repeating-linear-gradient(45deg,var(--ink3) 0 2px,transparent 2px 5px);border-radius:3px"></i>Incomplete history</span></div>
+<div class="callout full note"><b class="warn chip">Stretch</b> Q3 target needs +15.4% QoQ in sheets; average QoQ is +4.9% (2× = 9.8%). For discussion.</div>
+<p class="note" style="margin:0">History starts Q1 FY26 (D28): 7 quarters, not 12. Q1 FY27 has a partial month, so its QoQ and Q2's are not shown ("partial", "vs partial").</p></section>
 
 <!-- groups -->
-<section class="card t-5"><h2>Product group mix and achievement <a class="drill" href="#tbl-group">Table ›</a></h2>
-<div class="mixbar" role="img" aria-label="Mix: Laminate 60.9%, Door 22.7%, PVC sheet 11.5%, Compact board 4.9%"><i style="width:60.9%;background:var(--g1)" data-tip="Laminate 60.9% of sales"></i><i style="width:22.7%;background:var(--g2)" data-tip="Door 22.7% of sales"></i><i style="width:11.5%;background:var(--g3)" data-tip="PVC sheet 11.5% of sales"></i><i style="width:4.9%;background:var(--g4)" data-tip="Compact board 4.9% of sales"></i></div>
+<section class="card t-5"><h2>Product group mix (sheets) and achievement <a class="drill" href="#tbl-group">Table ›</a></h2>
+<div class="mixbar" role="img" aria-label="Sheet mix: Laminate 61.3%, Door 10.5%, PVC sheet 21.8%, Compact board 6.4%"><i style="width:61.3%;background:var(--g1)" data-tip="Laminate 61.3% of sheets"></i><i style="width:10.5%;background:var(--g2)" data-tip="Door 10.5% of sheets"></i><i style="width:21.8%;background:var(--g3)" data-tip="PVC sheet 21.8% of sheets"></i><i style="width:6.4%;background:var(--g4)" data-tip="Compact board 6.4% of sheets"></i></div>
 <div id="groups"></div>
-<p class="note" style="margin:0">Bar length = ₹ cr against group potential (track); tick = target; dashed = Last Qtr.</p></section>
+<p class="note" style="margin:0">Sheets. Bar length = lakh sheets against group potential (grey track); colour = Ach band; tick = target; dashed = Last Qtr.</p></section>
 
 <!-- zones + ranking -->
 <section class="card t-6"><h2>Zones and plants <a class="drill" href="#">Table ›</a></h2>
 <div class="zones" id="zones"></div>
-<h2 style="margin-top:4px">Furthest behind and ahead (variance, ₹ cr)</h2>
+<h2 style="margin-top:4px">Furthest behind and ahead (variance, thousand sheets)</h2>
 <div class="full" id="rank"></div>
 <div class="today empty"><b>Ranking needs targets</b><span>Without a target there is no variance to rank. Until then, Sales › Branch lists plants by ₹ actual and QoQ %.</span></div>
-<p class="note" style="margin:0">Showing 8 of 42 plants. Plant names are DEMO.</p></section>
+<p class="note" style="margin:0">Showing 8 of 42 plants. Bar colour = Ach band. Plant names are DEMO.</p></section>
 
 <!-- today -->
 <section class="card t-5"><h2>Today · top 3 of cap 5 <a class="drill" href="#">All in Today ›</a></h2>
-<div class="act"><div><span class="pri bad">▲ High</span><b>Door sales down 7.4% QoQ</b></div><span>Next step: call top 3 Door customers, log reasons</span><span class="m">Owner Sales HOD · due today 3 Nov · why ranked: due today, ₹ 2.5 cr below Last Qtr</span></div>
-<div class="act full"><div><span class="pri bad">▲ High</span><b>Lucknow 1024 at 74% of target</b></div><span>Next step: agree catch-up plan with branch manager</span><span class="m">Owner Branch mgr 1024 · due Thu 5 Nov · ₹ 1.6 cr short</span></div>
+<div class="act"><div><span class="pri bad">▲ High</span><b>Door sheets down 7.8% QoQ</b></div><span>Next step: call top 3 Door customers, log reasons</span><span class="m">Owner Sales HOD · due today 3 Nov · why ranked: due today, 0.11 lakh sheets below Last Qtr</span></div>
+<div class="act full"><div><span class="pri bad">▲ High</span><b>Lucknow 1024 at 74.5% of target</b></div><span>Next step: agree catch-up plan with branch manager</span><span class="m">Owner Branch mgr 1024 · due Thu 5 Nov · 14 thousand sheets short</span></div>
 <div class="act"><div><span class="pri warn">● Medium</span><b>Upload Receivables and credit notes</b></div><span>Next step: send Vijay the export in Data Intake</span><span class="m">Owner Data admin · due Fri 6 Nov · Overdue share and Net sales blocked</span></div>
 <p class="note" style="margin:0">Each action: one owner, one due date, one next step. Responses happen in the page.</p></section>
 </div>
 
-<details id="tbl-group"><summary>Detail table: product group (unchanged, opens from every Table › link) <span class="draft">DRAFT, 1 of 3 tables shown</span></summary>
+<details id="tbl-group"><summary>Detail table: product group, lakh sheets (columns unchanged, opens from every Table › link) <span class="draft">DRAFT, 1 of 3 tables shown</span></summary>
 <div class="tw"><table><thead><tr><th>Group</th><th>Potential</th><th>Target</th><th>Actual</th><th>Var</th><th>Ach %</th><th>Share %</th><th>Last Qtr</th><th>QoQ %</th><th>Trend</th></tr></thead><tbody id="tb"></tbody></table></div>
 <p class="note">Branch table, YTD strip and target-revision card keep their current design below this one.</p></details>
 
@@ -221,40 +227,41 @@ tr.tot td{font-weight:800;background:var(--brand-soft)}
 </main></div>
 <script>
 (function(){
-var D={q:['Q1 FY26','Q2 FY26','Q3 FY26','Q4 FY26','Q1 FY27','Q2 FY27','Q3 FY27'],a:[288,301,322,336,318,343.3,138.2],t:[null,null,null,null,330,350,400],q2:[null,4.5,7.0,4.3,null,null,6.4]};
+var D={q:['Q1 FY26','Q2 FY26','Q3 FY26','Q4 FY26','Q1 FY27','Q2 FY27','Q3 FY27'],a:[27.0,28.4,30.0,31.2,29.6,31.2,12.4],t:[null,null,null,null,30.8,32.5,36.0],q2:[null,5.2,5.6,4.0,null,null,5.1]};
 function el(h){var d=document.createElement('div');d.innerHTML=h;return d}
 /* trend */
-var W=620,H=240,L=34,B=34,T=14,mx=420,x0=L,bw=(W-L-10)/7;
+var W=620,H=240,L=34,B=34,T=14,mx=40,x0=L,bw=(W-L-10)/7;
 function y(v){return T+(H-T-B)*(1-v/mx)}
 var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Quarterly actual versus target, Q1 FY26 to Q3 FY27">';
-[0,100,200,300,400].forEach(function(v){s+='<line x1="'+L+'" x2="'+W+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)"/><text x="0" y="'+(y(v)+3)+'">'+v+'</text>'});
+[0,10,20,30,40].forEach(function(v){s+='<line x1="'+L+'" x2="'+W+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)"/><text x="0" y="'+(y(v)+3)+'">'+v+'</text>'});
 s+='<defs><pattern id="h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--track)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink3)" stroke-width="2"/></pattern></defs>';
 D.q.forEach(function(q,i){var bx=L+i*bw+bw*.18,w=bw*.64,v=D.a[i],cur=i==6,part=i==4;
- var tip=q+' · actual ₹'+v+' cr'+(cur?' to date (28 of 74 days)':'')+(D.t[i]?' · target ₹'+D.t[i]+' cr · Ach '+(cur?'91.3% of pro-rated':(v/D.t[i]*100).toFixed(1)+'%'):'')+(D.q2[i]!=null?' · QoQ +'+D.q2[i]+'%':part?' · incomplete history':'');
+ var tip=q+' · actual '+v+' lakh sheets'+(cur?' to date (28 of 74 days)':'')+(D.t[i]?' · target '+D.t[i]+' lakh · Ach '+(cur?'91.2% of pro-rated (13.6)':(v/D.t[i]*100).toFixed(1)+'%'):'')+(D.q2[i]!=null?' · QoQ +'+D.q2[i]+'%':part?' · incomplete history (partial month)':i==5?' · QoQ not shown, previous quarter is partial':'');
  s+='<g data-tip="'+tip+'" tabindex="0">';
- if(cur){s+='<rect x="'+bx+'" y="'+y(365.6)+'" width="'+w+'" height="'+(y(0)-y(365.6))+'" rx="4" fill="none" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="4 3"/>'}
+ if(cur){s+='<rect x="'+bx+'" y="'+y(32.8)+'" width="'+w+'" height="'+(y(0)-y(32.8))+'" rx="4" fill="none" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="4 3"/>'}
  s+='<rect x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+(y(0)-y(v))+'" rx="4" fill="'+(part?'url(#h)':'var(--act)')+'"/>';
  if(D.t[i]){s+='<g class="full"><line x1="'+(bx-4)+'" x2="'+(bx+w+4)+'" y1="'+y(D.t[i])+'" y2="'+y(D.t[i])+'" stroke="var(--plan)" stroke-width="3"/></g>'}
  s+='<text x="'+(bx+w/2)+'" y="'+(H-20)+'" text-anchor="middle" class="st">'+q.replace(' FY',' ·')+'</text>';
- var qq=D.q2[i];s+='<text x="'+(bx+w/2)+'" y="'+(H-6)+'" text-anchor="middle" style="fill:'+(qq==null?'var(--ink3)':'var(--green)')+';font-weight:700">'+(qq==null?(i==0?'—':'grey'):'▲'+qq+'%')+'</text></g>'});
+ var qq=D.q2[i];s+='<text x="'+(bx+w/2)+'" y="'+(H-6)+'" text-anchor="middle" style="fill:'+(qq==null?'var(--ink3)':'var(--green)')+';font-weight:700">'+(qq==null?(i==0?'n/a':i==4?'partial':'vs partial'):'▲'+qq+'%')+'</text></g>'});
 s+='</svg>';document.getElementById('trend').innerHTML=s;
 /* groups */
-var G=[['Laminate','--g1',84.1,88.6,146.0,76.9],['Door','--g2',31.4,38.9,60.0,33.9],['PVC sheet','--g3',15.9,15.1,24.9,14.6],['Compact board','--g4',6.8,8.8,11.3,4.5]];
-function st(a){return a>=100?['ok','● On target']:a>=90?['warn','▼ Watch']:['bad','▲ Behind']}
-var gh='',tb='';G.forEach(function(g){var a=g[2]/g[3]*100,qq=(g[2]/g[5]-1)*100,sh=g[2]/g[4]*100,S=st(a),sc=Math.max(g[4],1);
- gh+='<div class="grp" data-tip="'+g[0]+' · Potential ₹'+g[4]+' · Target ₹'+g[3]+' · Actual ₹'+g[2]+' · Var '+(g[2]-g[3]).toFixed(1)+' · Ach '+a.toFixed(1)+'% · Share '+sh.toFixed(1)+'% · Last Qtr ₹'+g[5]+' · QoQ '+qq.toFixed(1)+'%" tabindex="0"><div class="h"><span><i class="sw" style="background:var('+g[1]+')"></i><b>'+g[0]+'</b> <span class="mono">₹'+g[2]+' cr</span></span><span class="row"><span class="chip full '+S[0]+'">'+S[1]+' '+a.toFixed(1)+'%</span><span class="chip today nl">Ach: not loaded</span><span class="chip '+(qq<-5?'bad':'ok')+'">'+(qq<0?'▼ ':'▲ +')+qq.toFixed(1)+'% QoQ</span></span></div>'
- +'<div class="bul"><div class="f" style="width:'+(g[2]/g[4]*100)+'%;background:var('+g[1]+')"></div><div class="lq" style="left:'+(g[5]/g[4]*100)+'%"></div><div class="tg full" style="left:'+(g[3]/g[4]*100)+'%"></div></div></div>';
- tb+='<tr><td><b>'+g[0]+'</b></td><td>'+g[4].toFixed(1)+'</td><td>'+g[3].toFixed(1)+'</td><td>'+g[2].toFixed(1)+'</td><td>'+(g[2]-g[3]).toFixed(1)+'</td><td>'+a.toFixed(1)+'%</td><td>'+sh.toFixed(1)+'%</td><td>'+g[5].toFixed(1)+'</td><td>'+qq.toFixed(1)+'%</td><td>'+(qq>0?'▲':'▼')+'</td></tr>'});
-tb+='<tr class="tot"><td>Total (₹ cr)</td><td>242.2</td><td>151.4</td><td>138.2</td><td>−13.2</td><td>91.3%</td><td>57.1%</td><td>129.9</td><td>+6.4%</td><td>▲</td></tr>';
+var G=[['Laminate','--g1',7.60,8.00,12.4,6.95],['Door','--g2',1.30,1.62,2.6,1.41],['PVC sheet','--g3',2.70,2.55,4.2,2.50],['Compact board','--g4',0.80,1.43,2.3,0.94]];
+function bd(a){return a>=100?4:a>=90?3:a>=75?2:1}
+function st(a){var b=bd(a);return [b,['','▼▼ Far behind','▼ Behind','▲ Watch','● On target'][b]]}
+var gh='',tb='';G.forEach(function(g){var a=g[2]/g[3]*100,qq=(g[2]/g[5]-1)*100,sh=g[2]/g[4]*100,S=st(a);
+ gh+='<div class="grp" data-tip="'+g[0]+' (lakh sheets) · Potential '+g[4]+' · Target '+g[3].toFixed(2)+' · Actual '+g[2].toFixed(2)+' · Var '+(g[2]-g[3]).toFixed(2)+' · Ach '+a.toFixed(1)+'% · Share '+sh.toFixed(1)+'% · Last Qtr '+g[5]+' · QoQ '+qq.toFixed(1)+'%" tabindex="0"><div class="h"><span><i class="sw" style="background:var('+g[1]+')"></i><b>'+g[0]+'</b> <span class="mono">'+g[2].toFixed(2)+' lakh</span></span><span class="row"><span class="chip full b'+S[0]+'">'+S[1]+' '+a.toFixed(1)+'%</span><span class="chip today nl">Ach: not loaded</span><span class="chip '+(qq<-5?'bad':'ok')+'">'+(qq<0?'▼ ':'▲ +')+qq.toFixed(1)+'% QoQ</span></span></div>'
+ +'<div class="bul"><div class="f full b'+S[0]+'" style="width:'+(g[2]/g[4]*100)+'%"></div><div class="f today" style="width:'+(g[2]/g[4]*100)+'%;background:var(--act)"></div><div class="lq" style="left:'+(g[5]/g[4]*100)+'%"></div><div class="tg full" style="left:'+(g[3]/g[4]*100)+'%"></div></div></div>';
+ tb+='<tr><td><b>'+g[0]+'</b></td><td>'+g[4].toFixed(2)+'</td><td>'+g[3].toFixed(2)+'</td><td>'+g[2].toFixed(2)+'</td><td>'+(g[2]-g[3]).toFixed(2)+'</td><td>'+a.toFixed(1)+'%</td><td>'+sh.toFixed(1)+'%</td><td>'+g[5].toFixed(2)+'</td><td>'+qq.toFixed(1)+'%</td><td>'+(qq>0?'▲':'▼')+'</td></tr>'});
+tb+='<tr class="tot"><td>Total (lakh sheets)</td><td>21.50</td><td>13.60</td><td>12.40</td><td>−1.20</td><td>91.2%</td><td>57.7%</td><td>11.80</td><td>+5.1%</td><td>▲</td></tr>';
 document.getElementById('groups').innerHTML=gh;document.getElementById('tb').innerHTML=tb;
 /* zones */
-var Z=[['North',42.0,38.4,36.0],['West',47.5,45.9,42.8],['South',38.1,33.6,32.5],['East',23.8,20.3,18.6]],zh='';
-Z.forEach(function(z){var a=z[2]/z[1]*100,qq=(z[2]/z[3]-1)*100,S=st(a);zh+='<div class="zone" data-tip="'+z[0]+' · Target ₹'+z[1]+' · Actual ₹'+z[2]+' · Ach '+a.toFixed(1)+'% · Last Qtr ₹'+z[3]+' · QoQ +'+qq.toFixed(1)+'%" tabindex="0"><small>'+z[0]+'</small><b class="full">'+a.toFixed(0)+'%</b><b class="today nl-t" style="font-size:13px">Ach: not loaded</b><div class="bul full"><div class="f" style="width:'+Math.min(a,100)+'%"></div></div><span class="chip full '+S[0]+'">'+S[1]+'</span><span class="chip ok">▲ +'+qq.toFixed(1)+'% QoQ</span></div>'});
+var Z=[['North',3.75,3.45,3.30],['West',4.25,4.20,3.95],['South',3.40,2.85,2.80],['East',2.20,1.90,1.75]],zh='';
+Z.forEach(function(z){var a=z[2]/z[1]*100,qq=(z[2]/z[3]-1)*100,S=st(a);zh+='<div class="zone" data-tip="'+z[0]+' (lakh sheets) · Target '+z[1].toFixed(2)+' · Actual '+z[2].toFixed(2)+' · Ach '+a.toFixed(1)+'% · Last Qtr '+z[3].toFixed(2)+' · QoQ +'+qq.toFixed(1)+'%" tabindex="0"><small>'+z[0]+'</small><b class="full">'+a.toFixed(0)+'%</b><b class="today nl-t" style="font-size:13px">Ach: not loaded</b><div class="bul"><div class="f full b'+S[0]+'" style="width:'+Math.min(a,100)+'%"></div><div class="f today" style="width:'+Math.min(a,100)+'%;background:var(--act)"></div></div><span class="chip full b'+S[0]+'">'+S[1]+'</span><span class="chip ok">▲ +'+qq.toFixed(1)+'% QoQ</span></div>'});
 document.getElementById('zones').innerHTML=zh;
 /* ranking */
-var R=[['1024 Lucknow',6.2,4.6],['1036 Coimbatore',5.1,3.9],['1019 Kolkata',7.4,6.3],['1042 Jaipur',4.8,3.9],['1015 Hyderabad',6.0,5.2],['1021 Indore',4.2,4.6],['1033 Pune',6.8,7.5],['1028 Surat',5.5,6.4]],rh='';
-R.forEach(function(r){var v=r[2]-r[1],a=r[2]/r[1]*100,w=Math.abs(v)/2.1*50,neg=v<0;
- rh+='<div class="rk" data-tip="'+r[0]+' · Target ₹'+r[1]+' · Actual ₹'+r[2]+' · Var '+v.toFixed(1)+' · Ach '+a.toFixed(1)+'%" tabindex="0"><span class="nm">'+r[0]+'</span><div class="div"><i style="'+(neg?'right:50%':'left:50%')+';width:'+w+'%;background:'+(neg?'var(--red)':'var(--green)')+'"></i></div><span class="v" style="color:'+(neg?'var(--red)':'var(--green)')+'">'+(neg?'▼ ':'▲ +')+v.toFixed(1)+' · '+a.toFixed(0)+'%</span></div>'});
+var R=[['1024 Lucknow',55,41],['1036 Coimbatore',46,35],['1019 Kolkata',64,55],['1042 Jaipur',43,35],['1015 Hyderabad',53,46],['1021 Indore',37,41],['1033 Pune',60,66],['1028 Surat',49,57]],rh='';
+R.forEach(function(r){var v=r[2]-r[1],a=r[2]/r[1]*100,w=Math.abs(v)/16*50,neg=v<0,b=bd(a);
+ rh+='<div class="rk" data-tip="'+r[0]+' (thousand sheets) · Target '+r[1]+' · Actual '+r[2]+' · Var '+v+' · Ach '+a.toFixed(1)+'%" tabindex="0"><span class="nm">'+r[0]+'</span><div class="div"><i style="'+(neg?'right:50%':'left:50%')+';width:'+w+'%;background:var(--b'+b+');border:2px solid var(--b'+b+'d)"></i></div><span class="v">'+(neg?'▼ ':'▲ +')+v+' · '+a.toFixed(0)+'%</span></div>'});
 document.getElementById('rank').innerHTML=rh;
 /* tooltip */
 var tip=document.getElementById('tip');
