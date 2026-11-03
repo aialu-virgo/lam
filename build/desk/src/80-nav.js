@@ -6,7 +6,7 @@ var PAGES=[
  ['overview','Overview','Overview'],['sales','Sales','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
  ['today','Today','Team'],['actions','Action Center','Team'],['team','Team & Scorecard','Team'],['intake','Data Intake','Data'],['admin','Admin','Data']];
 var TITLES={
- overview:['Overview','Net sales and growth against market potential. Comparison is always the previous quarter.'],
+ overview:['Overview','Sheets sold, collections and stock against market potential. Growth is always against the previous quarter.'],
  sales:['Sales','Branch → salesperson → customer → SAP document · A/B/C customer tiles'],
  receivables:['Receivables','Ageing buckets and collection plan against actual'],
  inventory:['Inventory','Stock against plan, stock days and ageing'],

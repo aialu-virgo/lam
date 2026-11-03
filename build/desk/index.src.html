@@ -919,6 +919,7 @@ async function demoLoad(){
 async function demoClear(){
   if(effRole()!=='Super admin'||readOnly()){toast('Only a Super admin can clear demo data');return}
   toast('Clearing demo data...');
+  var engWas=S.engBlock;S.engBlock=true;/* the rules engine must not write actions from half-cleared demo data (t31 race) */
   try{
     var cellIds=Object.keys(S.cells);
     for(var i=0;i<cellIds.length;i++){
@@ -932,9 +933,14 @@ async function demoClear(){
     for(var po of S.potential.filter(function(x){return x.demo}))await ddel('potential/'+po._id);
     if(S.itemMeta&&S.itemMeta.demo){for(var ic=0;ic<(S.itemMeta.chunks||0);ic++)await ddel('items/c'+ic);await ddel('itemmeta/main')}
     if(S.salesMaster&&S.salesMaster.demo)await ddel('salesmaster/main');
+    for(var w8=0;w8<80&&S.engBusy;w8++)await new Promise(function(r){setTimeout(r,100)});/* let a rules run that was already going finish, then sweep its actions too */
     await demoClearExtras();
     toast('Demo data cleared');
   }catch(e){toast('Clear failed: '+dbErrText(e))}
+  finally{
+    var left=function(){return [S.stock,S.recv,S.coll,S.actions,S.followups].some(function(l){return (l||[]).some(function(x){return x.demo})})||Object.keys(S.rollDocs||{}).some(function(k){return S.rollDocs[k].demo})};
+    for(var w9=0;w9<60&&left();w9++)await new Promise(function(r){setTimeout(r,100)});/* wait until the cleared documents have left memory before the rules engine runs again */
+    S.engBlock=engWas;S.engSig=null;schedule()}
 }
 
 /* ================= ADMIN ================= */
@@ -1283,7 +1289,7 @@ async function boot(){
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},oxBand:oxBand,oxBandChip:oxBandChip,dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
 boot();
 })();
 </script>
