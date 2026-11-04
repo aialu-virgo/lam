@@ -22,7 +22,7 @@ function pageSales(){
   if(!coord){
     var tot=figs({},ctx),spl=salesKpis(ctx,tot,tot.series);
     var cards=[];
-    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. '+cnNote(tot),status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
+    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. '+cnNote(tot),status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',shareTxt(tot)+(tot.share!=null?spl.shareChg:'')],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
     cards.push(qtyCard(ctx,tot));
     var A=haveCust?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.cur):null,P=haveCust&&res.prior?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.prior):null;
     var nA=A?Array.from(A.values()).filter(function(c){return c.n>0}).length:null,nP=P?Array.from(P.values()).filter(function(c){return c.n>0}).length:null;
@@ -163,7 +163,7 @@ function kpiCompute(id,u,ctx){
   var sales=function(){if(f==null)return null;return figs(f,ctx)};
   switch(id){
    case 'K1':{var o=sales();Object.assign(K,{name:'Sales achievement %',kind:'pct',actual:o&&o.ach,plan:o&&o.tgt!=null?100:null,last:null,qoq:o&&o.qoq,detail:o&&('Actual '+fmtMoney(o.A)+(o.tgt!=null?' vs target '+fmtMoney(o.tgt):'')),none:!o||o.tgt==null,hint:o?undefined:'No sales rows matched this person'});break}
-   case 'K2':{var o2=sales();Object.assign(K,{name:'Share of potential %',kind:'pct',actual:o2&&o2.share,plan:null,qoq:o2&&o2.qoq,detail:o2&&o2.pot!=null?'Potential '+fmtMoney(o2.pot):'No potential entered',none:true});break}
+   case 'K2':{var o2=sales();Object.assign(K,{name:'Share of potential %',kind:'pct',actual:o2&&o2.share,plan:null,qoq:o2&&o2.qoq,detail:o2&&o2.shareCheck?'Check potential: share is above '+ACH_MAX+'%':(o2&&o2.pot!=null?'Potential '+fmtMoney(o2.pot):'Potential not set'),none:true});break}
    case 'K3':{var o3=sales();Object.assign(K,{name:'QoQ growth %',kind:'pct',actual:o3&&o3.qoq&&o3.qoq.state==='ok'?o3.qoq.v:null,plan:null,qoq:o3&&o3.qoq,detail:o3&&o3.P!=null?'vs '+fmtMoney(o3.P):'',none:true,txtOnly:o3&&o3.qoq&&o3.qoq.state!=='ok'?o3.qoq.txt:null});break}
    case 'K4':{var o4=sales();var rr=o4?runRate(ctx,o4,f):null;Object.assign(K,{name:'Run-rate, required vs current',kind:'text',text:rr?fmtMoney(rr.need)+' needed vs '+fmtMoney(rr.now)+' /day':'—',none:true});break}
    case 'K5':{var o5=sales();Object.assign(K,{name:'Trend direction',kind:'text',text:o5&&o5.trend?(o5.trend.short?'history too short':arrow(o5.trend.dir)):'—',none:true});break}

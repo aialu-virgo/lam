@@ -34,6 +34,7 @@ function figs(ent,ctx,opts){
   var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete,basis:basis,pBasis:pBasis,cn:cnA&&cnA.covered?cnA.value:null,cnUnc:cnA?cnA.uncovered:[],cnAny:!!(cnA&&cnA.anyLoaded),sh0:A0.sh,Psh0:P0?P0.sh:null,bothNet:bothNet};
   o.var=hasT?A.n-pl.tgt:null;o.varPct=hasT?(A.n-pl.tgt)/pl.tgt*100:null;o.ach=hasT?A.n/pl.tgt*100:null;o.share=(pl.any&&pl.pot>0)?A.n/pl.pot*100:null;
   if(achCap(o.ach)){o.check=true;o.ach=null;o.varPct=null}
+  if(achCap(o.share)){o.shareCheck=true;o.share=null}
   if(!opts.noTrend){var ser=quarterSeries(f,(f.sp!=null)?f.sp:undefined);var ts=trendOfSeries(ser);o.trend=ts;o.series=ser}
   return o;
 }
@@ -58,9 +59,9 @@ function stdTable(first,rows,tot,opt){
   var bs=(tot&&tot.basis)||(rows[0]&&rows[0].o.basis)||'Invoiced';
   var head='<tr><th>'+esc(first)+'</th>'+(opt.noPlan?'':'<th class="num">Potential</th><th class="num">Target</th>')+'<th class="num" title="'+(bs==='Net'?'Net sales = invoiced minus credit notes (D40)':'Invoiced sales; '+(rows[0]?cnNote(rows[0].o):'credit notes are not loaded'))+'">Actual · '+bs+'</th>'+(opt.noPlan?'':'<th class="num">Var</th><th class="num">Ach %</th><th class="num">Share %</th>')+'<th class="num">Last Qtr</th><th class="num">QoQ %</th><th>Trend</th></tr>';
   var line=function(label,o,total,attrs){
-    return '<tr'+(total?' class="tot"':(attrs?' class="clk"':''))+(attrs||'')+'><td>'+label+'</td>'+(opt.noPlan?'':'<td class="num">'+(o.pot!=null?fmtMoney(o.pot):'—')+'</td><td class="num">'+tgtCell(o)+'</td>')
+    return '<tr'+(total?' class="tot"':(attrs?' class="clk"':''))+(attrs||'')+'><td>'+label+'</td>'+(opt.noPlan?'':'<td class="num">'+(o.pot!=null?fmtMoney(o.pot):'<span class="pill mute">Potential not set</span>')+'</td><td class="num">'+tgtCell(o)+'</td>')
      +'<td class="num">'+fmtMoney(o.A)+'</td>'
-     +(opt.noPlan?'':'<td class="num">'+(o.var!=null?'<span class="'+(o.var>=0?'up':'dn')+'">'+fmtVarMoney(o.var)+' · '+fmtPct(o.varPct,true)+'</span>':'—')+'</td><td class="num">'+(o.check?'<b class="a-orange">Check target</b>':fmtAch(o.ach))+'</td><td class="num">'+(o.share!=null?o.share.toFixed(1)+'%':'—')+'</td>')
+     +(opt.noPlan?'':'<td class="num">'+(o.var!=null?'<span class="'+(o.var>=0?'up':'dn')+'">'+fmtVarMoney(o.var)+' · '+fmtPct(o.varPct,true)+'</span>':'—')+'</td><td class="num">'+(o.check?'<b class="a-orange">Check target</b>':fmtAch(o.ach))+'</td><td class="num">'+shareTxt(o)+'</td>')
      +'<td class="num">'+(o.P!=null?fmtMoney(o.P):'—')+'</td><td class="num">'+qoqCell(o.qoq)+'</td><td>'+trendCell(o)+'</td></tr>';
   };
   return '<div class="tw tall"><table class="std"><thead>'+head+'</thead><tbody>'+rows.map(function(r){return line(r.label,r.o,false,r.attrs)}).join('')+(tot?line('<b>Total</b>',tot,true):'')+'</tbody></table></div>';
@@ -109,19 +110,20 @@ function trendCard(title,ent,ctx,personSp,id,opts){
   if(!all.some(function(v){return v!=null&&v>0}))return '<section class="card"><div class="hd"><h2>'+esc(title)+'</h2></div><div class="empty">No quarters loaded in your scope yet. The trend needs history from Data Intake.</div></section>';
   var W=760,H=262,L=44,R=10,T=14,B=74,n=ser.length,bw=(W-L-R)/n,mx=Math.max.apply(null,all.map(function(v){return v||0}).concat(ser.map(function(s){return s.tgt||0})).concat([1]))*1.12;
   var y=function(v){return T+(H-T-B)*(1-v/mx)},x=function(i){return L+i*bw};
-  var svg='<svg class="trend" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'. '+ser.map(function(s){return s.label+' '+(s.H==null?'not loaded':fmtMoney(s.H))}).join('; ')+'" preserveAspectRatio="xMidYMid meet"><defs><pattern id="hat'+id+'" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--brand)" opacity=".35"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--brand)" stroke-width="3"/></pattern></defs>';
+  var svg='<svg class="trend" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'. '+ser.map(function(s){return s.label+' '+(vOf(s)==null?'not loaded':(s.H==null?'partial, '+covLabel(s.cov)+', ':'')+fmtMoney(vOf(s)))}).join('; ')+'" preserveAspectRatio="xMidYMid meet"><defs><pattern id="hat'+id+'" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--brand)" opacity=".35"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--brand)" stroke-width="3"/></pattern></defs>';
   for(var g=0;g<=4;g++){var gv2=mx/1.12*g/4,gy=y(gv2);svg+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+gy+'" y2="'+gy+'" stroke="var(--line)" stroke-width="1"/><text x="'+(L-4)+'" y="'+(gy+3)+'" text-anchor="end" class="ax">'+esc(fmtMoney(gv2).replace('₹',''))+'</text>'}
+  var lbl='';/* value labels are drawn last, on a halo, so no line crosses them */
   ser.forEach(function(s,i){
     var bx=x(i)+bw*.18,w=bw*.64,v=vOf(s),isP=s.H==null&&s.Ap!=null;
     if(v==null){svg+='<rect x="'+bx+'" y="'+(T+4)+'" width="'+w+'" height="'+(H-T-B-4)+'" rx="4" fill="none" stroke="var(--ink3)" stroke-dasharray="4 3" opacity=".6"><title>'+s.label+': not loaded (gap, not zero)</title></rect>'}
-    else svg+='<rect class="bar-q" data-act="trend-q" data-q="'+s.q+'" data-sp="'+esc(sp!=null?sp:'')+'" data-kind="'+(opts.kind||'sales')+'" data-pl="'+esc(f.plants?Array.from(f.plants).join(','):'')+'" x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(v))+'" rx="4" fill="'+(s.isCur||isP?'url(#hat'+id+')':'var(--brand)')+'" stroke="var(--brand)" tabindex="0"><title>'+s.label+(isP&&s.cov?' · partial: '+s.cov.n+' of '+s.cov.N+' plants loaded':'')+' '+(s.net?'net sales':'invoiced')+' '+fmtMoney(v)+(s.tgt!=null?' · target '+fmtMoney(s.tgt):' · no plan')+'</title></rect>';
-    if(v!=null)svg+='<text x="'+(x(i)+bw/2)+'" y="'+(y(v)-4)+'" text-anchor="middle" class="ax vl">'+cr(v)+'</text>';
+    else svg+='<rect class="bar-q" data-act="trend-q" data-q="'+s.q+'" data-sp="'+esc(sp!=null?sp:'')+'" data-kind="'+(opts.kind||'sales')+'" data-pl="'+esc(f.plants?Array.from(f.plants).join(','):'')+'" x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(v))+'" rx="4" fill="'+(s.isCur||isP?'url(#hat'+id+')':'var(--brand)')+'" stroke="var(--brand)" tabindex="0"><title>'+s.label+(isP&&s.cov?' · partial: '+covLabel(s.cov)+' loaded':'')+' '+(s.net?'net sales':'invoiced')+' '+fmtMoney(v)+(s.tgt!=null?' · target '+fmtMoney(s.tgt):' · no plan')+'</title></rect>';
+    if(v!=null)lbl+='<text x="'+(x(i)+bw/2)+'" y="'+(Math.min(y(v),s.tgt!=null?y(s.tgt):1e9)-5)+'" text-anchor="middle" class="ax vl">'+cr(v)+'</text>';
     if(s.tgt!=null)svg+='<line x1="'+(bx-3)+'" x2="'+(bx+w+3)+'" y1="'+y(s.tgt)+'" y2="'+y(s.tgt)+'" stroke="var(--orange)" stroke-width="2.5"><title>'+s.label+' target '+fmtMoney(s.tgt)+'</title></line>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="ax">'+esc(s.label.replace(' FY',' '))+(s.isCur?'*':'')+'</text>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+26)+'" text-anchor="middle" class="ax a-'+statusOf(s.ach)+'">'+(s.ach!=null?s.ach.toFixed(0)+'%':'—')+'</text>';
     var qv=i>0?ts.qoqAt[i]:null;var noPriorQ=(i===0&&s.q===histStart());if(s.isCur){var pv=ser[i-1].H;qv=(s.H!=null&&pv!=null&&pv>0&&cur.N!==Infinity)?null:qv}
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+40)+'" text-anchor="middle" class="ax '+(qv==null?'':qv>=0?'up':'dn')+'">'+(s.isCur?'QTD':(noPriorQ?'no prior':qv==null?(isP?'partial':(i>0&&ser[i-1].H==null&&ser[i-1].Ap!=null?'vs partial':'—')):(qv>0?'+':'')+qv.toFixed(1).replace('-','−')))+'</text>';
-    if(isP&&s.cov)svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+52)+'" text-anchor="middle" class="ax">partial:</text><text x="'+(x(i)+bw/2)+'" y="'+(H-B+63)+'" text-anchor="middle" class="ax">'+(s.cov.n>0?s.cov.n+' of '+s.cov.N+' plants':'months missing')+'</text>';
+    if(isP&&s.cov)svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+52)+'" text-anchor="middle" class="ax">partial:</text><text x="'+(x(i)+bw/2)+'" y="'+(H-B+63)+'" text-anchor="middle" class="ax">'+esc(covLabel(s.cov))+'</text>';
   });
   /* previous-quarter marker on the current bar */
   var pv2=ser.length>1?ser[ser.length-2].H:null;if(pv2!=null)svg+='<line x1="'+(x(n-1)+bw*.1)+'" x2="'+(x(n-1)+bw*.9)+'" y1="'+y(pv2)+'" y2="'+y(pv2)+'" stroke="var(--ink)" stroke-dasharray="3 2" stroke-width="1.5"><title>Previous quarter '+fmtMoney(pv2)+'</title></line>';
@@ -129,7 +131,7 @@ function trendCard(title,ent,ctx,personSp,id,opts){
   var pts=ts.ma.map(function(v,i){return v==null?null:[x(i)+bw/2,y(v)]}).filter(Boolean);
   if(pts.length>1)svg+='<polyline points="'+pts.map(function(p){return p[0]+','+p[1]}).join(' ')+'" fill="none" stroke="var(--slate)" stroke-width="2.2"><title>4-quarter moving average</title></polyline>';
   if(ts.slope!=null){var x1=1,x2=closed.length;svg+='<line x1="'+(x(0)+bw/2)+'" x2="'+(x(closed.length-1)+bw/2)+'" y1="'+y(ts.icpt+ts.slope*x1)+'" y2="'+y(ts.icpt+ts.slope*x2)+'" stroke="var(--sky)" stroke-width="2" stroke-dasharray="6 4"><title>Trend line (least squares)</title></line>'}
-  svg+='</svg>';
+  svg+=lbl+'</svg>';
   /* Stretch / required QoQ against the current quarter's target */
   var lastClosed=closed[closed.length-1],req='';
   if(cur.tgt!=null&&lastClosed&&lastClosed.A!=null){var sr=stretchOf(cur.tgt,lastClosed.A,ts);
@@ -192,7 +194,7 @@ function matchSearch(r){var q=(S.f.search||'').toLowerCase();return !q||(r.label
 function qtyCard(ctx,tot){
   var res=ctx.res,q=planQty(ctx),sh=tot.sh,ach=q.tgt>0?sh/q.tgt*100:null;
   return kpiCard({color:'violet',chip:'▦',title:'Quantity · '+res.label,value:fmtSheets(sh),sub:'= '+fmtSqft(tot.sq)+' (item size).',status:statusOf(ach),ach:ach,
-   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(sh/q.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(shQoq(tot,res)):'—'],['Quarter trend',trendWord(tot)]]});
+   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(achCap(sh/q.pot*100)?'<b class="a-orange">Check potential</b>':(sh/q.pot*100).toFixed(1)+'%'):'Potential not set'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(shQoq(tot,res)):'—'],['Quarter trend',trendWord(tot)]]});
 }
 function planQty(ctx){
   if(ctx.sc.sp)return {pot:0,tgt:0};/* plant-level quantity plans are not an executive's target */

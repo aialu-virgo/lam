@@ -110,16 +110,19 @@ function evalR1(){
   })});
   return {out:out,live:true};
 }
-/* D55: a real target that gives more than 300% achievement is probably wrong: ask the Super admin to check it */
+/* D55/D57: a real target (or potential) that gives more than 300% is probably wrong: ask the Super admin to check it. The text never prints the absurd figure. */
 function evalR8(){
   var out=[],t=TODAY(),q=curQuarterKey(),ms=qMonths(q),N=wdBetween(ms[0]+'-01',t),w=walk(ms,N);
   if(!S.potential.length)return {out:out,live:null};
   DS.plants.forEach(function(plant){GROUPS.forEach(function(g){
-    var f={plant:plant,group:g},pw=planW(f,w);if(!(pw.any&&pw.tgt>0))return;
-    var act=sumF(f,w).n,ach=act/pw.tgt*100;
-    if(achCap(ach))out.push(mkCand('R8',plant+'_'+g,q,{title:'Check target · '+plantShort(plant)+', '+g+' · '+qLabel(q),plant:plant,group:g,value:act-pw.tgt,ctx:{plant:plant},
-      source:{label:'Rule R8 · achievement '+Math.round(ach)+'% of the target to date, above '+ACH_MAX+'%',page:'overview',plant:plant,group:g},
-      next:'Open Admin › Market potential for '+plantShort(plant)+' '+g+' '+qLabel(q)+': actual '+fmtMoney(act)+' against target to date '+fmtMoney(pw.tgt)+'. Correct the target or confirm it is real.',meta:{ach:ach,plan:pw.tgt,act:act}}));
+    var f={plant:plant,group:g},pw=planW(f,w),where=plantShort(plant)+', '+g+', '+qLabel(q);if(!pw.any)return;
+    var act=sumF(f,w).n;
+    if(pw.tgt>0&&achCap(act/pw.tgt*100))out.push(mkCand('R8',plant+'_'+g,q,{title:'Check target · '+where,plant:plant,group:g,value:act-pw.tgt,ctx:{plant:plant},
+      source:{label:'Rule R8 · achievement is over '+ACH_MAX+'% of the target',page:'overview',plant:plant,group:g},
+      next:'Achievement is over '+ACH_MAX+'% of the target: check the target ('+where+'). Open Admin › Market potential, then correct the target or confirm it is real.',meta:{kind:'target'}}));
+    if(pw.pot>0&&achCap(act/pw.pot*100))out.push(mkCand('R8',plant+'_'+g+'_pot',q,{title:'Check potential · '+where,plant:plant,group:g,value:act-pw.pot,ctx:{plant:plant},
+      source:{label:'Rule R8 · share of potential is over '+ACH_MAX+'%',page:'overview',plant:plant,group:g},
+      next:'Share of potential is over '+ACH_MAX+'%: check the potential ('+where+'). Open Admin › Market potential, then correct the potential or confirm it is real.',meta:{kind:'potential'}}));
   })});
   return {out:out,live:null};
 }

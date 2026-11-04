@@ -37,15 +37,15 @@ for(const ym of ['2026-04','2026-05','2026-06']){const k='cells/INV_'+ym;if(part
 const pt=await open(browser,{store:part});await pt.page.waitForTimeout(4000);
 const sr=await pt.page.evaluate(()=>{const g=window.__desk;return g.quarterSeries({plants:null}).map(s=>({q:s.label,A:s.A,Ap:s.Ap,partial:s.partial,cov:s.cov}))});
 const q1=sr.find(s=>/Q1 FY27/.test(s.q));
-ok('D55-2: a quarter with some plants loaded is a partial series point with its loaded value and "n of N plants"',q1&&q1.partial&&q1.A==null&&q1.Ap>0&&q1.cov&&q1.cov.n===2&&q1.cov.N>=2,JSON.stringify(q1));
+ok('D55-2: a quarter with some plants loaded is a partial series point with its loaded value and "n of N plants"',q1&&q1.partial&&q1.A==null&&q1.Ap>0&&q1.cov&&q1.cov.n===6&&q1.cov.N===12,JSON.stringify(q1));
 await go(pt.page,'#/sales',3000);
 const bars=await pt.page.evaluate(()=>({bars:document.querySelectorAll('#pg svg.trend .bar-q').length,dashed:document.querySelectorAll('#pg svg.trend rect[stroke-dasharray="4 3"]').length,vl:Array.from(document.querySelectorAll('#pg svg.trend .vl')).map(e=>e.textContent),txt:document.querySelector('#pg svg.trend').textContent}));
 ok('D55-2: the ₹ trend draws a bar for every quarter with data (partial included) and a dashed box only for no data',bars.bars>=sr.filter(s=>s.A!=null||s.Ap!=null).length&&bars.dashed===sr.filter(s=>s.A==null&&s.Ap==null).length,JSON.stringify([bars.bars,bars.dashed]));
-ok('D55-2: every bar prints its value in ₹ Cr, and the partial bar says "partial:" and "2 of N plants"',bars.vl.length>=bars.bars&&bars.vl.every(t=>/Cr$/.test(t))&&/partial:/.test(bars.txt)&&/2 of \d+ plants/.test(bars.txt),JSON.stringify(bars.vl.slice(0,3))+' '+(bars.txt.match(/\d+ of \d+ plants/)||[''])[0]);
+ok('D55-2: every bar prints its value in ₹ Cr, and the partial bar says "partial:" and "2 of N plants"',bars.vl.length>=bars.bars&&bars.vl.every(t=>/Cr$/.test(t))&&/partial:/.test(bars.txt)&&/6 of 12 plant-months/.test(bars.txt),JSON.stringify(bars.vl.slice(0,3))+' '+(bars.txt.match(/\d+ of \d+ plants/)||[''])[0]);
 ok('D55-2: the QoQ chain is marked "vs partial" after a partial quarter',/vs partial/.test(bars.txt)&&/partial/.test(bars.txt),'');
 await go(pt.page,'#/overview',3000);
 const ob=await pt.page.evaluate(()=>{const svg=Array.from(document.querySelectorAll('#pg svg')).find(s=>/Quarterly sheets/.test(s.getAttribute('aria-label')||''));return {vl:Array.from(svg.querySelectorAll('.vl')).map(e=>e.textContent),txt:svg.textContent,hatched:svg.querySelectorAll('rect[fill="url(#oxh)"]').length}});
-ok('D55-2: the Overview sheets trend prints lakh sheets on every bar, hatches the partial one and labels it',ob.vl.length>=6&&ob.hatched>=1&&/partial:/.test(ob.txt)&&/2 of \d+ plants/.test(ob.txt)&&/vs partial/.test(ob.txt),JSON.stringify(ob.vl)+' '+ob.hatched);
+ok('D55-2: the Overview sheets trend prints lakh sheets on every bar, hatches the partial one and labels it',ob.vl.length>=6&&ob.hatched>=1&&/partial:/.test(ob.txt)&&/6 of 12 plant-months/.test(ob.txt)&&/vs partial/.test(ob.txt),JSON.stringify(ob.vl)+' '+ob.hatched);
 await pt.ctx.close();
 /* ===== 3. item master: thickness and brand are kept ===== */
 const it=await open(browser,{store:{}});await it.page.waitForTimeout(2500);

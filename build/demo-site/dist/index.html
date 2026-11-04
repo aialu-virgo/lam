@@ -272,6 +272,8 @@ a.btn{text-decoration:none;display:inline-block}
 .ox-detb{display:flex;flex-direction:column;gap:12px;padding-bottom:8px;min-width:0;overflow-x:auto}
 [data-tip]{cursor:pointer}
 #ox-tip{position:fixed;z-index:60;background:var(--ink);color:var(--bg);font-size:12px;padding:7px 10px;border-radius:8px;max-width:260px;pointer-events:none;display:none;line-height:1.35}
+/* D57: value labels sit on a halo of the card colour, drawn after every line, so no line crosses the figures (both themes) */
+svg text.vl{paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round;font-weight:700;fill:var(--ink)}
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 /* Demo shell: banner, login, change-password. Uses the Desk tokens. */
@@ -1683,6 +1685,8 @@ function statusOf(ach,lowerBetter){
 /* D55: an achievement above 300% means the target is wrong (never a real result): it is shown as "Check target", not as a number */
 var ACH_MAX=300;
 function achCap(a){return a!=null&&a>ACH_MAX}
+/* D57: the same guard for Share of potential: above 300% the potential is wrong, show "Check potential" */
+function shareTxt(o){return o.shareCheck?'<b class="a-orange">Check potential</b>':(o.share!=null?o.share.toFixed(1)+'%':((o.pot==null||o.pot<=0)?'Potential not set':'—'))}
 /* D45: lower-is-better KPIs (K10, K15, K16, K19, K20, K21): achievement = plan / actual x 100, capped at 200%; actual 0 is "Within plan" */
 function achLower(actual,plan){
   if(actual==null||isNaN(actual)||plan==null||isNaN(plan))return {ach:null,within:false};
@@ -1999,9 +2003,11 @@ function trendOfSeries(ser){
 }
 /* plants of the scope that have sales loaded in every month of the quarter, out of the plants in scope */
 function quarterCoverage(ms,pset){
-  var pl=pset?Array.from(pset):DS.plants.slice(),n=pl.filter(function(p){return ms.every(function(m){var c=S.cells['INV_'+m];return c&&c.plants&&c.plants[p]})}).length;
-  return {n:n,N:pl.length};
+  /* D57: counted in plant-months; when every plant has the same number of months it reads "k of M months" */
+  var pl=pset?Array.from(pset):DS.plants.slice(),per=pl.map(function(p){return ms.filter(function(m){var c=S.cells['INV_'+m];return c&&c.plants&&c.plants[p]}).length}),n=per.reduce(function(a,b){return a+b},0),same=per.length>0&&per.every(function(k){return k===per[0]});
+  return {n:n,N:pl.length*ms.length,plants:pl.length,k:same?per[0]:null,M:ms.length};
 }
+function covLabel(c){return c?(c.k!=null?c.k+' of '+c.M+' months':c.n+' of '+c.N+' plant-months'):''}
 /* series of closed quarters since history start (up to 12) + current: actual, target, ach for a filter */
 function quarterSeries(f,personSp){
   var cur=curQuarterKey(),qs=closedQuarters().concat([cur]),out=[];
@@ -2135,16 +2141,19 @@ function evalR1(){
   })});
   return {out:out,live:true};
 }
-/* D55: a real target that gives more than 300% achievement is probably wrong: ask the Super admin to check it */
+/* D55/D57: a real target (or potential) that gives more than 300% is probably wrong: ask the Super admin to check it. The text never prints the absurd figure. */
 function evalR8(){
   var out=[],t=TODAY(),q=curQuarterKey(),ms=qMonths(q),N=wdBetween(ms[0]+'-01',t),w=walk(ms,N);
   if(!S.potential.length)return {out:out,live:null};
   DS.plants.forEach(function(plant){GROUPS.forEach(function(g){
-    var f={plant:plant,group:g},pw=planW(f,w);if(!(pw.any&&pw.tgt>0))return;
-    var act=sumF(f,w).n,ach=act/pw.tgt*100;
-    if(achCap(ach))out.push(mkCand('R8',plant+'_'+g,q,{title:'Check target · '+plantShort(plant)+', '+g+' · '+qLabel(q),plant:plant,group:g,value:act-pw.tgt,ctx:{plant:plant},
-      source:{label:'Rule R8 · achievement '+Math.round(ach)+'% of the target to date, above '+ACH_MAX+'%',page:'overview',plant:plant,group:g},
-      next:'Open Admin › Market potential for '+plantShort(plant)+' '+g+' '+qLabel(q)+': actual '+fmtMoney(act)+' against target to date '+fmtMoney(pw.tgt)+'. Correct the target or confirm it is real.',meta:{ach:ach,plan:pw.tgt,act:act}}));
+    var f={plant:plant,group:g},pw=planW(f,w),where=plantShort(plant)+', '+g+', '+qLabel(q);if(!pw.any)return;
+    var act=sumF(f,w).n;
+    if(pw.tgt>0&&achCap(act/pw.tgt*100))out.push(mkCand('R8',plant+'_'+g,q,{title:'Check target · '+where,plant:plant,group:g,value:act-pw.tgt,ctx:{plant:plant},
+      source:{label:'Rule R8 · achievement is over '+ACH_MAX+'% of the target',page:'overview',plant:plant,group:g},
+      next:'Achievement is over '+ACH_MAX+'% of the target: check the target ('+where+'). Open Admin › Market potential, then correct the target or confirm it is real.',meta:{kind:'target'}}));
+    if(pw.pot>0&&achCap(act/pw.pot*100))out.push(mkCand('R8',plant+'_'+g+'_pot',q,{title:'Check potential · '+where,plant:plant,group:g,value:act-pw.pot,ctx:{plant:plant},
+      source:{label:'Rule R8 · share of potential is over '+ACH_MAX+'%',page:'overview',plant:plant,group:g},
+      next:'Share of potential is over '+ACH_MAX+'%: check the potential ('+where+'). Open Admin › Market potential, then correct the potential or confirm it is real.',meta:{kind:'potential'}}));
   })});
   return {out:out,live:null};
 }
@@ -2632,6 +2641,7 @@ function figs(ent,ctx,opts){
   var o={A:A.n,sq:A.sq,docs:A.d,sh:A.sh,P:P?P.n:null,Psq:P?P.sq:null,Psh:P?P.sh:null,pot:pl.any?pl.pot:null,tgt:hasT?pl.tgt:null,orig:hasT?pl.orig:null,kind:pl.kind,qoq:q,incomplete:incomplete,basis:basis,pBasis:pBasis,cn:cnA&&cnA.covered?cnA.value:null,cnUnc:cnA?cnA.uncovered:[],cnAny:!!(cnA&&cnA.anyLoaded),sh0:A0.sh,Psh0:P0?P0.sh:null,bothNet:bothNet};
   o.var=hasT?A.n-pl.tgt:null;o.varPct=hasT?(A.n-pl.tgt)/pl.tgt*100:null;o.ach=hasT?A.n/pl.tgt*100:null;o.share=(pl.any&&pl.pot>0)?A.n/pl.pot*100:null;
   if(achCap(o.ach)){o.check=true;o.ach=null;o.varPct=null}
+  if(achCap(o.share)){o.shareCheck=true;o.share=null}
   if(!opts.noTrend){var ser=quarterSeries(f,(f.sp!=null)?f.sp:undefined);var ts=trendOfSeries(ser);o.trend=ts;o.series=ser}
   return o;
 }
@@ -2656,9 +2666,9 @@ function stdTable(first,rows,tot,opt){
   var bs=(tot&&tot.basis)||(rows[0]&&rows[0].o.basis)||'Invoiced';
   var head='<tr><th>'+esc(first)+'</th>'+(opt.noPlan?'':'<th class="num">Potential</th><th class="num">Target</th>')+'<th class="num" title="'+(bs==='Net'?'Net sales = invoiced minus credit notes (D40)':'Invoiced sales; '+(rows[0]?cnNote(rows[0].o):'credit notes are not loaded'))+'">Actual · '+bs+'</th>'+(opt.noPlan?'':'<th class="num">Var</th><th class="num">Ach %</th><th class="num">Share %</th>')+'<th class="num">Last Qtr</th><th class="num">QoQ %</th><th>Trend</th></tr>';
   var line=function(label,o,total,attrs){
-    return '<tr'+(total?' class="tot"':(attrs?' class="clk"':''))+(attrs||'')+'><td>'+label+'</td>'+(opt.noPlan?'':'<td class="num">'+(o.pot!=null?fmtMoney(o.pot):'—')+'</td><td class="num">'+tgtCell(o)+'</td>')
+    return '<tr'+(total?' class="tot"':(attrs?' class="clk"':''))+(attrs||'')+'><td>'+label+'</td>'+(opt.noPlan?'':'<td class="num">'+(o.pot!=null?fmtMoney(o.pot):'<span class="pill mute">Potential not set</span>')+'</td><td class="num">'+tgtCell(o)+'</td>')
      +'<td class="num">'+fmtMoney(o.A)+'</td>'
-     +(opt.noPlan?'':'<td class="num">'+(o.var!=null?'<span class="'+(o.var>=0?'up':'dn')+'">'+fmtVarMoney(o.var)+' · '+fmtPct(o.varPct,true)+'</span>':'—')+'</td><td class="num">'+(o.check?'<b class="a-orange">Check target</b>':fmtAch(o.ach))+'</td><td class="num">'+(o.share!=null?o.share.toFixed(1)+'%':'—')+'</td>')
+     +(opt.noPlan?'':'<td class="num">'+(o.var!=null?'<span class="'+(o.var>=0?'up':'dn')+'">'+fmtVarMoney(o.var)+' · '+fmtPct(o.varPct,true)+'</span>':'—')+'</td><td class="num">'+(o.check?'<b class="a-orange">Check target</b>':fmtAch(o.ach))+'</td><td class="num">'+shareTxt(o)+'</td>')
      +'<td class="num">'+(o.P!=null?fmtMoney(o.P):'—')+'</td><td class="num">'+qoqCell(o.qoq)+'</td><td>'+trendCell(o)+'</td></tr>';
   };
   return '<div class="tw tall"><table class="std"><thead>'+head+'</thead><tbody>'+rows.map(function(r){return line(r.label,r.o,false,r.attrs)}).join('')+(tot?line('<b>Total</b>',tot,true):'')+'</tbody></table></div>';
@@ -2707,19 +2717,20 @@ function trendCard(title,ent,ctx,personSp,id,opts){
   if(!all.some(function(v){return v!=null&&v>0}))return '<section class="card"><div class="hd"><h2>'+esc(title)+'</h2></div><div class="empty">No quarters loaded in your scope yet. The trend needs history from Data Intake.</div></section>';
   var W=760,H=262,L=44,R=10,T=14,B=74,n=ser.length,bw=(W-L-R)/n,mx=Math.max.apply(null,all.map(function(v){return v||0}).concat(ser.map(function(s){return s.tgt||0})).concat([1]))*1.12;
   var y=function(v){return T+(H-T-B)*(1-v/mx)},x=function(i){return L+i*bw};
-  var svg='<svg class="trend" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'. '+ser.map(function(s){return s.label+' '+(s.H==null?'not loaded':fmtMoney(s.H))}).join('; ')+'" preserveAspectRatio="xMidYMid meet"><defs><pattern id="hat'+id+'" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--brand)" opacity=".35"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--brand)" stroke-width="3"/></pattern></defs>';
+  var svg='<svg class="trend" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'. '+ser.map(function(s){return s.label+' '+(vOf(s)==null?'not loaded':(s.H==null?'partial, '+covLabel(s.cov)+', ':'')+fmtMoney(vOf(s)))}).join('; ')+'" preserveAspectRatio="xMidYMid meet"><defs><pattern id="hat'+id+'" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--brand)" opacity=".35"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--brand)" stroke-width="3"/></pattern></defs>';
   for(var g=0;g<=4;g++){var gv2=mx/1.12*g/4,gy=y(gv2);svg+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+gy+'" y2="'+gy+'" stroke="var(--line)" stroke-width="1"/><text x="'+(L-4)+'" y="'+(gy+3)+'" text-anchor="end" class="ax">'+esc(fmtMoney(gv2).replace('₹',''))+'</text>'}
+  var lbl='';/* value labels are drawn last, on a halo, so no line crosses them */
   ser.forEach(function(s,i){
     var bx=x(i)+bw*.18,w=bw*.64,v=vOf(s),isP=s.H==null&&s.Ap!=null;
     if(v==null){svg+='<rect x="'+bx+'" y="'+(T+4)+'" width="'+w+'" height="'+(H-T-B-4)+'" rx="4" fill="none" stroke="var(--ink3)" stroke-dasharray="4 3" opacity=".6"><title>'+s.label+': not loaded (gap, not zero)</title></rect>'}
-    else svg+='<rect class="bar-q" data-act="trend-q" data-q="'+s.q+'" data-sp="'+esc(sp!=null?sp:'')+'" data-kind="'+(opts.kind||'sales')+'" data-pl="'+esc(f.plants?Array.from(f.plants).join(','):'')+'" x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(v))+'" rx="4" fill="'+(s.isCur||isP?'url(#hat'+id+')':'var(--brand)')+'" stroke="var(--brand)" tabindex="0"><title>'+s.label+(isP&&s.cov?' · partial: '+s.cov.n+' of '+s.cov.N+' plants loaded':'')+' '+(s.net?'net sales':'invoiced')+' '+fmtMoney(v)+(s.tgt!=null?' · target '+fmtMoney(s.tgt):' · no plan')+'</title></rect>';
-    if(v!=null)svg+='<text x="'+(x(i)+bw/2)+'" y="'+(y(v)-4)+'" text-anchor="middle" class="ax vl">'+cr(v)+'</text>';
+    else svg+='<rect class="bar-q" data-act="trend-q" data-q="'+s.q+'" data-sp="'+esc(sp!=null?sp:'')+'" data-kind="'+(opts.kind||'sales')+'" data-pl="'+esc(f.plants?Array.from(f.plants).join(','):'')+'" x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(v))+'" rx="4" fill="'+(s.isCur||isP?'url(#hat'+id+')':'var(--brand)')+'" stroke="var(--brand)" tabindex="0"><title>'+s.label+(isP&&s.cov?' · partial: '+covLabel(s.cov)+' loaded':'')+' '+(s.net?'net sales':'invoiced')+' '+fmtMoney(v)+(s.tgt!=null?' · target '+fmtMoney(s.tgt):' · no plan')+'</title></rect>';
+    if(v!=null)lbl+='<text x="'+(x(i)+bw/2)+'" y="'+(Math.min(y(v),s.tgt!=null?y(s.tgt):1e9)-5)+'" text-anchor="middle" class="ax vl">'+cr(v)+'</text>';
     if(s.tgt!=null)svg+='<line x1="'+(bx-3)+'" x2="'+(bx+w+3)+'" y1="'+y(s.tgt)+'" y2="'+y(s.tgt)+'" stroke="var(--orange)" stroke-width="2.5"><title>'+s.label+' target '+fmtMoney(s.tgt)+'</title></line>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="ax">'+esc(s.label.replace(' FY',' '))+(s.isCur?'*':'')+'</text>';
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+26)+'" text-anchor="middle" class="ax a-'+statusOf(s.ach)+'">'+(s.ach!=null?s.ach.toFixed(0)+'%':'—')+'</text>';
     var qv=i>0?ts.qoqAt[i]:null;var noPriorQ=(i===0&&s.q===histStart());if(s.isCur){var pv=ser[i-1].H;qv=(s.H!=null&&pv!=null&&pv>0&&cur.N!==Infinity)?null:qv}
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+40)+'" text-anchor="middle" class="ax '+(qv==null?'':qv>=0?'up':'dn')+'">'+(s.isCur?'QTD':(noPriorQ?'no prior':qv==null?(isP?'partial':(i>0&&ser[i-1].H==null&&ser[i-1].Ap!=null?'vs partial':'—')):(qv>0?'+':'')+qv.toFixed(1).replace('-','−')))+'</text>';
-    if(isP&&s.cov)svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+52)+'" text-anchor="middle" class="ax">partial:</text><text x="'+(x(i)+bw/2)+'" y="'+(H-B+63)+'" text-anchor="middle" class="ax">'+(s.cov.n>0?s.cov.n+' of '+s.cov.N+' plants':'months missing')+'</text>';
+    if(isP&&s.cov)svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+52)+'" text-anchor="middle" class="ax">partial:</text><text x="'+(x(i)+bw/2)+'" y="'+(H-B+63)+'" text-anchor="middle" class="ax">'+esc(covLabel(s.cov))+'</text>';
   });
   /* previous-quarter marker on the current bar */
   var pv2=ser.length>1?ser[ser.length-2].H:null;if(pv2!=null)svg+='<line x1="'+(x(n-1)+bw*.1)+'" x2="'+(x(n-1)+bw*.9)+'" y1="'+y(pv2)+'" y2="'+y(pv2)+'" stroke="var(--ink)" stroke-dasharray="3 2" stroke-width="1.5"><title>Previous quarter '+fmtMoney(pv2)+'</title></line>';
@@ -2727,7 +2738,7 @@ function trendCard(title,ent,ctx,personSp,id,opts){
   var pts=ts.ma.map(function(v,i){return v==null?null:[x(i)+bw/2,y(v)]}).filter(Boolean);
   if(pts.length>1)svg+='<polyline points="'+pts.map(function(p){return p[0]+','+p[1]}).join(' ')+'" fill="none" stroke="var(--slate)" stroke-width="2.2"><title>4-quarter moving average</title></polyline>';
   if(ts.slope!=null){var x1=1,x2=closed.length;svg+='<line x1="'+(x(0)+bw/2)+'" x2="'+(x(closed.length-1)+bw/2)+'" y1="'+y(ts.icpt+ts.slope*x1)+'" y2="'+y(ts.icpt+ts.slope*x2)+'" stroke="var(--sky)" stroke-width="2" stroke-dasharray="6 4"><title>Trend line (least squares)</title></line>'}
-  svg+='</svg>';
+  svg+=lbl+'</svg>';
   /* Stretch / required QoQ against the current quarter's target */
   var lastClosed=closed[closed.length-1],req='';
   if(cur.tgt!=null&&lastClosed&&lastClosed.A!=null){var sr=stretchOf(cur.tgt,lastClosed.A,ts);
@@ -2790,7 +2801,7 @@ function matchSearch(r){var q=(S.f.search||'').toLowerCase();return !q||(r.label
 function qtyCard(ctx,tot){
   var res=ctx.res,q=planQty(ctx),sh=tot.sh,ach=q.tgt>0?sh/q.tgt*100:null;
   return kpiCard({color:'violet',chip:'▦',title:'Quantity · '+res.label,value:fmtSheets(sh),sub:'= '+fmtSqft(tot.sq)+' (item size).',status:statusOf(ach),ach:ach,
-   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(sh/q.pot*100).toFixed(1)+'%':'—'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(shQoq(tot,res)):'—'],['Quarter trend',trendWord(tot)]]});
+   rows:[['Potential',q.pot>0?fmtSheets(q.pot):'—'],['Target',q.tgt>0?fmtSheets(q.tgt):'No plan'],['Var',q.tgt>0?(sh-q.tgt>=0?'+':'−')+fmtSheets(Math.abs(sh-q.tgt)):'—'],['Ach %',fmtAch(ach)],['Share of potential',q.pot>0?(achCap(sh/q.pot*100)?'<b class="a-orange">Check potential</b>':(sh/q.pot*100).toFixed(1)+'%'):'Potential not set'],['Run-rate need vs now','—'],['QoQ %',res.prior&&tot.Psh!=null?qoqCell(shQoq(tot,res)):'—'],['Quarter trend',trendWord(tot)]]});
 }
 function planQty(ctx){
   if(ctx.sc.sp)return {pot:0,tgt:0};/* plant-level quantity plans are not an executive's target */
@@ -2917,9 +2928,11 @@ function oxTrendSvg(ser,hasTgt){
   var mx=Math.max.apply(null,vals.concat([1]))*1.12,step=Math.pow(10,Math.floor(Math.log10(mx/4))),m5=[1,2,5,10].map(function(k){return k*step}).filter(function(k){return mx/k<=5})[0]||step*10,top=Math.ceil(mx/m5)*m5;
   var y=function(v){return T+(H-T-B)*(1-v/top)},s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Quarterly sheets, actual against target, '+esc(ser[0].label)+' to '+esc(cur.label)+'"><defs><pattern id="oxh" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--track)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink3)" stroke-width="2"/></pattern></defs>';
   for(var g=0;g<=top+1e-9;g+=m5)s+='<line x1="'+L+'" x2="'+W+'" y1="'+y(g)+'" y2="'+y(g)+'" stroke="var(--line)"/><text x="0" y="'+(y(g)+3)+'">'+(g/100000).toFixed(g/100000%1?1:0)+'</text>';
+  var lab='';/* value labels last, on a halo (D57) */
   ser.forEach(function(q,i){
     var bx=L+i*bw+bw*.18,w=bw*.64,v=q.H,qq=oxQoqAt(ser,i),tip=q.label+' · '+(v==null?'not loaded':oxLakh(v)+' lakh sheets'+(q.isCur?' to date':'')+(q.net?' (Net)':' (Invoiced)'));
     var tg=q.isCur?q.tgtTo:q.tgt;if(tg!=null)tip+=' · target '+oxLakh(tg)+' lakh'+(v!=null&&q.ach!=null?' · Ach '+(v/tg*100).toFixed(1)+'%':'');
+    if(q.partial&&q.cov)tip+=' · partial: '+covLabel(q.cov);
     tip+=qq.v!=null?' · QoQ '+oxSgn(qq.v,Math.abs(qq.v).toFixed(1))+'%':(qq.txt?' · QoQ '+qq.txt:'');
     s+='<g data-tip="'+esc(tip)+'" tabindex="0">';
     if(v==null)s+='<rect x="'+bx+'" y="'+(T+4)+'" width="'+w+'" height="'+(H-T-B-4)+'" rx="4" fill="none" stroke="var(--ink3)" stroke-dasharray="4 3" opacity=".6"/>';
@@ -2928,11 +2941,11 @@ function oxTrendSvg(ser,hasTgt){
       s+='<rect x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(v))+'" rx="4" fill="'+(q.partial?'url(#oxh)':'var(--act)')+'"/>';
     }
     if(tg!=null)s+='<line x1="'+(bx-4)+'" x2="'+(bx+w+4)+'" y1="'+y(tg)+'" y2="'+y(tg)+'" stroke="var(--plan)" stroke-width="3"/>';
-    if(v!=null)s+='<text x="'+(bx+w/2)+'" y="'+(y(v)-4)+'" text-anchor="middle" class="st vl">'+oxLakh(v)+'</text>';
+    if(v!=null)lab+='<text x="'+(bx+w/2)+'" y="'+(Math.min(y(v),tg!=null?y(tg):1e9,q.isCur&&proj!=null?y(proj):1e9)-5)+'" text-anchor="middle" class="st vl">'+oxLakh(v)+'</text>';
     s+='<text x="'+(bx+w/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="st">'+esc(q.label.replace(' FY',' ·'))+(q.isCur?'*':'')+'</text>';
-    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+26)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text>'+(q.partial&&q.cov?'<text x="'+(bx+w/2)+'" y="'+(H-B+38)+'" text-anchor="middle" class="st">partial:</text><text x="'+(bx+w/2)+'" y="'+(H-B+49)+'" text-anchor="middle" class="st">'+(q.cov.n>0?q.cov.n+' of '+q.cov.N+' plants':'months missing')+'</text>':'')+'</g>';
+    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+26)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text>'+(q.partial&&q.cov?'<text x="'+(bx+w/2)+'" y="'+(H-B+38)+'" text-anchor="middle" class="st">partial:</text><text x="'+(bx+w/2)+'" y="'+(H-B+49)+'" text-anchor="middle" class="st">'+esc(covLabel(q.cov))+'</text>':'')+'</g>';
   });
-  return s+'</svg>';
+  return s+lab+'</svg>';
 }
 /* ---- the page ---- */
 function pageOverview(){
@@ -2940,7 +2953,7 @@ function pageOverview(){
   var res=ctx.res,tot=figs({},ctx),sc=ctx.sc,today=TODAY(),pset=ctx.plants;
   var f0=Object.assign({plants:ctx.plants},ctx.base),own=!!sc.sp;
   var q=planQty(ctx),shQ=shQoq(tot,res),ser=oxSeries(ctx),tsSh=oxTrendStats(ser),cur=ser[ser.length-1];
-  var heroCk=oxAchCk(tot.sh,q.tgt),tgtOk=q.tgt>0&&!heroCk,potOk=q.pot>0,ach=tgtOk?tot.sh/q.tgt*100:null,var_=tgtOk?tot.sh-q.tgt:null,share=potOk?tot.sh/q.pot*100:null;
+  var heroCk=oxAchCk(tot.sh,q.tgt),tgtOk=q.tgt>0&&!heroCk,potOk=q.pot>0&&!achCap(tot.sh/q.pot*100),shareCk=q.pot>0&&achCap(tot.sh/q.pot*100),ach=tgtOk?tot.sh/q.tgt*100:null,var_=tgtOk?tot.sh-q.tgt:null,share=potOk?tot.sh/q.pot*100:null;
   var lastSh=res.prior?(tot.bothNet?tot.Psh:tot.Psh0):null;
   var basisTxt=tot.basis==='Net'?'Net sales (credit notes loaded for every plant in scope)':'Invoiced sales ('+cnNote(tot).replace(/^Invoiced · /,'').replace(/\.$/,'')+')';
   /* groups */
@@ -2980,7 +2993,7 @@ function pageOverview(){
    +'<div><div'+oxTip('Actual '+oxLakh(tot.sh)+' · Target '+(tgtOk?oxLakh(q.tgt):'not loaded')+' · Potential '+(potOk?oxLakh(q.pot):'not loaded')+' lakh sheets'+(lastSh!=null?' · Last Qtr '+oxLakh(lastSh):'')+(ach!=null?' · Ach '+oxPct(ach)+'%':''))+'>'
    +oxBul({act:tot.sh,tgt:q.tgt,pot:q.pot,last:lastSh,band:ach!=null?oxBand(ach):null,aria:'Actual '+oxLakh(tot.sh)+' lakh sheets'+(tgtOk?', target '+oxLakh(q.tgt):', target not loaded')})
    +(tgtOk||potOk?'':'<p class="ox-nl" style="margin:6px 0 0;font-size:12.5px">Target and potential not loaded: no scale to draw against. Load in Admin › Market potential.</p>')+'</div>'
-   +'<div class="ox-nine">'+[['Potential',potOk?oxLakh(q.pot):null],['Target',tgtOk?oxLakh(q.tgt):null],['Actual',oxLakh(tot.sh)],['Var',tgtOk?oxSgn(var_,oxLakh(Math.abs(var_)))+' ('+fmtPct(var_/q.tgt*100,true)+')':null],['Ach %',ach!=null?oxPct(ach)+'%':null],['Share %',share!=null?share.toFixed(1)+'%':null],['Last Qtr',lastSh!=null?oxLakh(lastSh):(res.prior?null:'—')],['QoQ %',shQ.state==='ok'?fmtPct(shQ.v,true):'—'],['Trend',tsSh.short?'too short':arrowShort(tsSh.dir)+' '+tsSh.dir]].map(function(x){return '<div><small>'+x[0]+'</small>'+(x[1]==null?'<b class="ox-nl">not loaded</b>':'<b>'+esc(x[1])+'</b>')+'</div>'}).join('')+'</div><p class="note" style="margin:6px 0 0">All figures in lakh sheets. '+(cur&&cur.net?'Net of credit notes.':'Invoiced.')+'</p></div></div></section>';
+   +'<div class="ox-nine">'+[['Potential',q.pot>0?oxLakh(q.pot):null],['Target',tgtOk?oxLakh(q.tgt):null],['Actual',oxLakh(tot.sh)],['Var',tgtOk?oxSgn(var_,oxLakh(Math.abs(var_)))+' ('+fmtPct(var_/q.tgt*100,true)+')':null],['Ach %',ach!=null?oxPct(ach)+'%':null],['Share %',shareCk?'Check potential':(share!=null?share.toFixed(1)+'%':null)],['Last Qtr',lastSh!=null?oxLakh(lastSh):(res.prior?null:'—')],['QoQ %',shQ.state==='ok'?fmtPct(shQ.v,true):'—'],['Trend',tsSh.short?'too short':arrowShort(tsSh.dir)+' '+tsSh.dir]].map(function(x){return '<div><small>'+x[0]+'</small>'+(x[1]==null?'<b class="ox-nl">not loaded</b>':'<b>'+esc(x[1])+'</b>')+'</div>'}).join('')+'</div><p class="note" style="margin:6px 0 0">All figures in lakh sheets. '+(cur&&cur.net?'Net of credit notes.':'Invoiced.')+'</p></div></div></section>';
   /* rupee tile */
   h+='<section class="ox-card ox-sm"'+oxTip('Value '+fmtMoney(tot.A)+' · Target '+(tot.tgt!=null?fmtMoney(tot.tgt):'not loaded')+(tot.ach!=null?' · Ach '+oxPct(tot.ach)+'%':'')+' · Last Qtr '+(tot.P!=null?fmtMoney(tot.P):'—'))+'><h2>₹ value<span>'+oxDrill('group')+oxDrill('trendrs','Trend ›')+'</span></h2><div class="ox-tile-big">'+fmtMoney(tot.A)+' <span class="ox-unit">'+(tot.basis==='Net'?'net':'invoiced')+'</span></div>'
    +(tot.ach!=null?oxBul({act:tot.A,tgt:tot.tgt,pot:tot.tgt*1.0,last:tot.P,band:oxBand(tot.ach)})+'<p class="note" style="margin:6px 0 0">'+OX_MARK[oxBand(tot.ach)]+' '+OX_LBL[oxBand(tot.ach)]+' · '+oxPct(tot.ach)+'% of '+fmtMoney(tot.tgt)+' target</p>':'<div class="ox-empty sm"><span class="ox-nl">Target: not loaded</span></div>')
@@ -3057,7 +3070,7 @@ function pageOverview(){
   var cell=function(v,f){return v==null?'<td class="num"><span class="ox-nl">not loaded</span></td>':'<td class="num">'+f(v)+'</td>'};
   var vq=function(q){return q&&q.state==='ok'?'<td class="num"><span class="'+(q.v>=0?'up':'dn')+'">'+fmtPct(q.v,true)+'</span></td>':'<td class="num note">'+esc((q&&q.txt)||'—')+'</td>'};
   var lk=function(v){return oxLakh(v)};
-  var gRows=groups.map(function(x){var l=res.prior?(x.o.bothNet?x.o.Psh:x.o.Psh0):null,t=x.pq.tgt>0,po=x.pq.pot>0;return '<tr><td><b>'+esc(x.g)+'</b></td>'+cell(po?x.pq.pot:null,lk)+cell(t?x.pq.tgt:null,lk)+'<td class="num">'+lk(x.o.sh)+'</td>'+cell(t?x.o.sh-x.pq.tgt:null,function(v){return oxSgn(v,lk(Math.abs(v)))})+cell(x.ach,function(v){return oxPct(v)+'%'})+cell(po?x.o.sh/x.pq.pot*100:null,function(v){return oxPct(v)+'%'})+cell(l,lk)+vq(x.q)+'</tr>'}).join('');
+  var gRows=groups.map(function(x){var l=res.prior?(x.o.bothNet?x.o.Psh:x.o.Psh0):null,t=x.pq.tgt>0,po=x.pq.pot>0;return '<tr><td><b>'+esc(x.g)+'</b></td>'+cell(po?x.pq.pot:null,lk)+cell(t?x.pq.tgt:null,lk)+'<td class="num">'+lk(x.o.sh)+'</td>'+cell(t?x.o.sh-x.pq.tgt:null,function(v){return oxSgn(v,lk(Math.abs(v)))})+cell(x.ach,function(v){return oxPct(v)+'%'})+cell(po&&!achCap(x.o.sh/x.pq.pot*100)?x.o.sh/x.pq.pot*100:null,function(v){return oxPct(v)+'%'})+cell(l,lk)+vq(x.q)+'</tr>'}).join('');
   var gTot='<tr class="tot"><td>Total (lakh sheets)</td>'+cell(potOk?q.pot:null,lk)+cell(tgtOk?q.tgt:null,lk)+'<td class="num">'+lk(tot.sh)+'</td>'+cell(tgtOk?var_:null,function(v){return oxSgn(v,lk(Math.abs(v)))})+cell(ach,function(v){return oxPct(v)+'%'})+cell(share,function(v){return oxPct(v)+'%'})+cell(lastSh,lk)+vq(shQ)+'</tr>';
   var groupSh='<div class="tw"><table class="std"><thead><tr><th>Product group</th><th class="num">Potential</th><th class="num">Target</th><th class="num">Actual</th><th class="num">Var</th><th class="num">Ach %</th><th class="num">Share %</th><th class="num">Last Qtr</th><th class="num">QoQ %</th></tr></thead><tbody>'+gRows+gTot+'</tbody></table></div><p class="note">Lakh sheets. '+(cur&&cur.net?'Net of credit notes.':'Invoiced.')+'</p>';
   var pRow=function(label,o,pq,a,v){var l=res.prior?(o.bothNet?o.Psh:o.Psh0):null;return '<tr><td><b>'+esc(label)+'</b></td>'+cell(pq.tgt>0?pq.tgt:null,lk)+'<td class="num">'+lk(o.sh)+'</td>'+cell(v,function(x){return oxSgn(x,lk(Math.abs(x)))})+cell(a,function(x){return oxPct(x)+'%'})+cell(l,lk)+vq(shQoq(o,res))+'</tr>'};
@@ -3118,7 +3131,7 @@ function pageSales(){
   if(!coord){
     var tot=figs({},ctx),spl=salesKpis(ctx,tot,tot.series);
     var cards=[];
-    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. '+cnNote(tot),status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',(tot.share!=null?tot.share.toFixed(1)+'%':'—')+spl.shareChg],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
+    cards.push(kpiCard({color:'indigo',chip:'₹',title:'K1 · '+(tot.basis==='Net'?'Net sales':'Invoiced sales')+' · '+res.label,value:fmtMoney(tot.A),sub:'SAP invoices, internal transfers excluded. '+cnNote(tot),status:statusOf(tot.ach),ach:tot.ach,mini:spl.mini,rows:[['Potential',tot.pot!=null?fmtMoney(tot.pot):'—'],['Target',tgtCell(tot)],['Var',tot.var!=null?fmtVarMoney(tot.var)+' · '+fmtPct(tot.varPct,true):'—'],['Ach %',fmtAch(tot.ach)],['Share of potential',shareTxt(tot)+(tot.share!=null?spl.shareChg:'')],['Run-rate need vs now',spl.rr?fmtMoney(spl.rr.need)+' vs '+fmtMoney(spl.rr.now)+' /day':'—'],['QoQ %',qoqCell(tot.qoq)],['12-qtr trend',trendWord(tot)]]}));
     cards.push(qtyCard(ctx,tot));
     var A=haveCust?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.cur):null,P=haveCust&&res.prior?custAgg({plants:ctx.plants,sp:ctx.base.sp,group:ctx.base.group},res.prior):null;
     var nA=A?Array.from(A.values()).filter(function(c){return c.n>0}).length:null,nP=P?Array.from(P.values()).filter(function(c){return c.n>0}).length:null;
@@ -3259,7 +3272,7 @@ function kpiCompute(id,u,ctx){
   var sales=function(){if(f==null)return null;return figs(f,ctx)};
   switch(id){
    case 'K1':{var o=sales();Object.assign(K,{name:'Sales achievement %',kind:'pct',actual:o&&o.ach,plan:o&&o.tgt!=null?100:null,last:null,qoq:o&&o.qoq,detail:o&&('Actual '+fmtMoney(o.A)+(o.tgt!=null?' vs target '+fmtMoney(o.tgt):'')),none:!o||o.tgt==null,hint:o?undefined:'No sales rows matched this person'});break}
-   case 'K2':{var o2=sales();Object.assign(K,{name:'Share of potential %',kind:'pct',actual:o2&&o2.share,plan:null,qoq:o2&&o2.qoq,detail:o2&&o2.pot!=null?'Potential '+fmtMoney(o2.pot):'No potential entered',none:true});break}
+   case 'K2':{var o2=sales();Object.assign(K,{name:'Share of potential %',kind:'pct',actual:o2&&o2.share,plan:null,qoq:o2&&o2.qoq,detail:o2&&o2.shareCheck?'Check potential: share is above '+ACH_MAX+'%':(o2&&o2.pot!=null?'Potential '+fmtMoney(o2.pot):'Potential not set'),none:true});break}
    case 'K3':{var o3=sales();Object.assign(K,{name:'QoQ growth %',kind:'pct',actual:o3&&o3.qoq&&o3.qoq.state==='ok'?o3.qoq.v:null,plan:null,qoq:o3&&o3.qoq,detail:o3&&o3.P!=null?'vs '+fmtMoney(o3.P):'',none:true,txtOnly:o3&&o3.qoq&&o3.qoq.state!=='ok'?o3.qoq.txt:null});break}
    case 'K4':{var o4=sales();var rr=o4?runRate(ctx,o4,f):null;Object.assign(K,{name:'Run-rate, required vs current',kind:'text',text:rr?fmtMoney(rr.need)+' needed vs '+fmtMoney(rr.now)+' /day':'—',none:true});break}
    case 'K5':{var o5=sales();Object.assign(K,{name:'Trend direction',kind:'text',text:o5&&o5.trend?(o5.trend.short?'history too short':arrow(o5.trend.dir)):'—',none:true});break}

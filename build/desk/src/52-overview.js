@@ -69,9 +69,11 @@ function oxTrendSvg(ser,hasTgt){
   var mx=Math.max.apply(null,vals.concat([1]))*1.12,step=Math.pow(10,Math.floor(Math.log10(mx/4))),m5=[1,2,5,10].map(function(k){return k*step}).filter(function(k){return mx/k<=5})[0]||step*10,top=Math.ceil(mx/m5)*m5;
   var y=function(v){return T+(H-T-B)*(1-v/top)},s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Quarterly sheets, actual against target, '+esc(ser[0].label)+' to '+esc(cur.label)+'"><defs><pattern id="oxh" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--track)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink3)" stroke-width="2"/></pattern></defs>';
   for(var g=0;g<=top+1e-9;g+=m5)s+='<line x1="'+L+'" x2="'+W+'" y1="'+y(g)+'" y2="'+y(g)+'" stroke="var(--line)"/><text x="0" y="'+(y(g)+3)+'">'+(g/100000).toFixed(g/100000%1?1:0)+'</text>';
+  var lab='';/* value labels last, on a halo (D57) */
   ser.forEach(function(q,i){
     var bx=L+i*bw+bw*.18,w=bw*.64,v=q.H,qq=oxQoqAt(ser,i),tip=q.label+' · '+(v==null?'not loaded':oxLakh(v)+' lakh sheets'+(q.isCur?' to date':'')+(q.net?' (Net)':' (Invoiced)'));
     var tg=q.isCur?q.tgtTo:q.tgt;if(tg!=null)tip+=' · target '+oxLakh(tg)+' lakh'+(v!=null&&q.ach!=null?' · Ach '+(v/tg*100).toFixed(1)+'%':'');
+    if(q.partial&&q.cov)tip+=' · partial: '+covLabel(q.cov);
     tip+=qq.v!=null?' · QoQ '+oxSgn(qq.v,Math.abs(qq.v).toFixed(1))+'%':(qq.txt?' · QoQ '+qq.txt:'');
     s+='<g data-tip="'+esc(tip)+'" tabindex="0">';
     if(v==null)s+='<rect x="'+bx+'" y="'+(T+4)+'" width="'+w+'" height="'+(H-T-B-4)+'" rx="4" fill="none" stroke="var(--ink3)" stroke-dasharray="4 3" opacity=".6"/>';
@@ -80,11 +82,11 @@ function oxTrendSvg(ser,hasTgt){
       s+='<rect x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(v))+'" rx="4" fill="'+(q.partial?'url(#oxh)':'var(--act)')+'"/>';
     }
     if(tg!=null)s+='<line x1="'+(bx-4)+'" x2="'+(bx+w+4)+'" y1="'+y(tg)+'" y2="'+y(tg)+'" stroke="var(--plan)" stroke-width="3"/>';
-    if(v!=null)s+='<text x="'+(bx+w/2)+'" y="'+(y(v)-4)+'" text-anchor="middle" class="st vl">'+oxLakh(v)+'</text>';
+    if(v!=null)lab+='<text x="'+(bx+w/2)+'" y="'+(Math.min(y(v),tg!=null?y(tg):1e9,q.isCur&&proj!=null?y(proj):1e9)-5)+'" text-anchor="middle" class="st vl">'+oxLakh(v)+'</text>';
     s+='<text x="'+(bx+w/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="st">'+esc(q.label.replace(' FY',' ·'))+(q.isCur?'*':'')+'</text>';
-    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+26)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text>'+(q.partial&&q.cov?'<text x="'+(bx+w/2)+'" y="'+(H-B+38)+'" text-anchor="middle" class="st">partial:</text><text x="'+(bx+w/2)+'" y="'+(H-B+49)+'" text-anchor="middle" class="st">'+(q.cov.n>0?q.cov.n+' of '+q.cov.N+' plants':'months missing')+'</text>':'')+'</g>';
+    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+26)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text>'+(q.partial&&q.cov?'<text x="'+(bx+w/2)+'" y="'+(H-B+38)+'" text-anchor="middle" class="st">partial:</text><text x="'+(bx+w/2)+'" y="'+(H-B+49)+'" text-anchor="middle" class="st">'+esc(covLabel(q.cov))+'</text>':'')+'</g>';
   });
-  return s+'</svg>';
+  return s+lab+'</svg>';
 }
 /* ---- the page ---- */
 function pageOverview(){
@@ -92,7 +94,7 @@ function pageOverview(){
   var res=ctx.res,tot=figs({},ctx),sc=ctx.sc,today=TODAY(),pset=ctx.plants;
   var f0=Object.assign({plants:ctx.plants},ctx.base),own=!!sc.sp;
   var q=planQty(ctx),shQ=shQoq(tot,res),ser=oxSeries(ctx),tsSh=oxTrendStats(ser),cur=ser[ser.length-1];
-  var heroCk=oxAchCk(tot.sh,q.tgt),tgtOk=q.tgt>0&&!heroCk,potOk=q.pot>0,ach=tgtOk?tot.sh/q.tgt*100:null,var_=tgtOk?tot.sh-q.tgt:null,share=potOk?tot.sh/q.pot*100:null;
+  var heroCk=oxAchCk(tot.sh,q.tgt),tgtOk=q.tgt>0&&!heroCk,potOk=q.pot>0&&!achCap(tot.sh/q.pot*100),shareCk=q.pot>0&&achCap(tot.sh/q.pot*100),ach=tgtOk?tot.sh/q.tgt*100:null,var_=tgtOk?tot.sh-q.tgt:null,share=potOk?tot.sh/q.pot*100:null;
   var lastSh=res.prior?(tot.bothNet?tot.Psh:tot.Psh0):null;
   var basisTxt=tot.basis==='Net'?'Net sales (credit notes loaded for every plant in scope)':'Invoiced sales ('+cnNote(tot).replace(/^Invoiced · /,'').replace(/\.$/,'')+')';
   /* groups */
@@ -132,7 +134,7 @@ function pageOverview(){
    +'<div><div'+oxTip('Actual '+oxLakh(tot.sh)+' · Target '+(tgtOk?oxLakh(q.tgt):'not loaded')+' · Potential '+(potOk?oxLakh(q.pot):'not loaded')+' lakh sheets'+(lastSh!=null?' · Last Qtr '+oxLakh(lastSh):'')+(ach!=null?' · Ach '+oxPct(ach)+'%':''))+'>'
    +oxBul({act:tot.sh,tgt:q.tgt,pot:q.pot,last:lastSh,band:ach!=null?oxBand(ach):null,aria:'Actual '+oxLakh(tot.sh)+' lakh sheets'+(tgtOk?', target '+oxLakh(q.tgt):', target not loaded')})
    +(tgtOk||potOk?'':'<p class="ox-nl" style="margin:6px 0 0;font-size:12.5px">Target and potential not loaded: no scale to draw against. Load in Admin › Market potential.</p>')+'</div>'
-   +'<div class="ox-nine">'+[['Potential',potOk?oxLakh(q.pot):null],['Target',tgtOk?oxLakh(q.tgt):null],['Actual',oxLakh(tot.sh)],['Var',tgtOk?oxSgn(var_,oxLakh(Math.abs(var_)))+' ('+fmtPct(var_/q.tgt*100,true)+')':null],['Ach %',ach!=null?oxPct(ach)+'%':null],['Share %',share!=null?share.toFixed(1)+'%':null],['Last Qtr',lastSh!=null?oxLakh(lastSh):(res.prior?null:'—')],['QoQ %',shQ.state==='ok'?fmtPct(shQ.v,true):'—'],['Trend',tsSh.short?'too short':arrowShort(tsSh.dir)+' '+tsSh.dir]].map(function(x){return '<div><small>'+x[0]+'</small>'+(x[1]==null?'<b class="ox-nl">not loaded</b>':'<b>'+esc(x[1])+'</b>')+'</div>'}).join('')+'</div><p class="note" style="margin:6px 0 0">All figures in lakh sheets. '+(cur&&cur.net?'Net of credit notes.':'Invoiced.')+'</p></div></div></section>';
+   +'<div class="ox-nine">'+[['Potential',q.pot>0?oxLakh(q.pot):null],['Target',tgtOk?oxLakh(q.tgt):null],['Actual',oxLakh(tot.sh)],['Var',tgtOk?oxSgn(var_,oxLakh(Math.abs(var_)))+' ('+fmtPct(var_/q.tgt*100,true)+')':null],['Ach %',ach!=null?oxPct(ach)+'%':null],['Share %',shareCk?'Check potential':(share!=null?share.toFixed(1)+'%':null)],['Last Qtr',lastSh!=null?oxLakh(lastSh):(res.prior?null:'—')],['QoQ %',shQ.state==='ok'?fmtPct(shQ.v,true):'—'],['Trend',tsSh.short?'too short':arrowShort(tsSh.dir)+' '+tsSh.dir]].map(function(x){return '<div><small>'+x[0]+'</small>'+(x[1]==null?'<b class="ox-nl">not loaded</b>':'<b>'+esc(x[1])+'</b>')+'</div>'}).join('')+'</div><p class="note" style="margin:6px 0 0">All figures in lakh sheets. '+(cur&&cur.net?'Net of credit notes.':'Invoiced.')+'</p></div></div></section>';
   /* rupee tile */
   h+='<section class="ox-card ox-sm"'+oxTip('Value '+fmtMoney(tot.A)+' · Target '+(tot.tgt!=null?fmtMoney(tot.tgt):'not loaded')+(tot.ach!=null?' · Ach '+oxPct(tot.ach)+'%':'')+' · Last Qtr '+(tot.P!=null?fmtMoney(tot.P):'—'))+'><h2>₹ value<span>'+oxDrill('group')+oxDrill('trendrs','Trend ›')+'</span></h2><div class="ox-tile-big">'+fmtMoney(tot.A)+' <span class="ox-unit">'+(tot.basis==='Net'?'net':'invoiced')+'</span></div>'
    +(tot.ach!=null?oxBul({act:tot.A,tgt:tot.tgt,pot:tot.tgt*1.0,last:tot.P,band:oxBand(tot.ach)})+'<p class="note" style="margin:6px 0 0">'+OX_MARK[oxBand(tot.ach)]+' '+OX_LBL[oxBand(tot.ach)]+' · '+oxPct(tot.ach)+'% of '+fmtMoney(tot.tgt)+' target</p>':'<div class="ox-empty sm"><span class="ox-nl">Target: not loaded</span></div>')
@@ -209,7 +211,7 @@ function pageOverview(){
   var cell=function(v,f){return v==null?'<td class="num"><span class="ox-nl">not loaded</span></td>':'<td class="num">'+f(v)+'</td>'};
   var vq=function(q){return q&&q.state==='ok'?'<td class="num"><span class="'+(q.v>=0?'up':'dn')+'">'+fmtPct(q.v,true)+'</span></td>':'<td class="num note">'+esc((q&&q.txt)||'—')+'</td>'};
   var lk=function(v){return oxLakh(v)};
-  var gRows=groups.map(function(x){var l=res.prior?(x.o.bothNet?x.o.Psh:x.o.Psh0):null,t=x.pq.tgt>0,po=x.pq.pot>0;return '<tr><td><b>'+esc(x.g)+'</b></td>'+cell(po?x.pq.pot:null,lk)+cell(t?x.pq.tgt:null,lk)+'<td class="num">'+lk(x.o.sh)+'</td>'+cell(t?x.o.sh-x.pq.tgt:null,function(v){return oxSgn(v,lk(Math.abs(v)))})+cell(x.ach,function(v){return oxPct(v)+'%'})+cell(po?x.o.sh/x.pq.pot*100:null,function(v){return oxPct(v)+'%'})+cell(l,lk)+vq(x.q)+'</tr>'}).join('');
+  var gRows=groups.map(function(x){var l=res.prior?(x.o.bothNet?x.o.Psh:x.o.Psh0):null,t=x.pq.tgt>0,po=x.pq.pot>0;return '<tr><td><b>'+esc(x.g)+'</b></td>'+cell(po?x.pq.pot:null,lk)+cell(t?x.pq.tgt:null,lk)+'<td class="num">'+lk(x.o.sh)+'</td>'+cell(t?x.o.sh-x.pq.tgt:null,function(v){return oxSgn(v,lk(Math.abs(v)))})+cell(x.ach,function(v){return oxPct(v)+'%'})+cell(po&&!achCap(x.o.sh/x.pq.pot*100)?x.o.sh/x.pq.pot*100:null,function(v){return oxPct(v)+'%'})+cell(l,lk)+vq(x.q)+'</tr>'}).join('');
   var gTot='<tr class="tot"><td>Total (lakh sheets)</td>'+cell(potOk?q.pot:null,lk)+cell(tgtOk?q.tgt:null,lk)+'<td class="num">'+lk(tot.sh)+'</td>'+cell(tgtOk?var_:null,function(v){return oxSgn(v,lk(Math.abs(v)))})+cell(ach,function(v){return oxPct(v)+'%'})+cell(share,function(v){return oxPct(v)+'%'})+cell(lastSh,lk)+vq(shQ)+'</tr>';
   var groupSh='<div class="tw"><table class="std"><thead><tr><th>Product group</th><th class="num">Potential</th><th class="num">Target</th><th class="num">Actual</th><th class="num">Var</th><th class="num">Ach %</th><th class="num">Share %</th><th class="num">Last Qtr</th><th class="num">QoQ %</th></tr></thead><tbody>'+gRows+gTot+'</tbody></table></div><p class="note">Lakh sheets. '+(cur&&cur.net?'Net of credit notes.':'Invoiced.')+'</p>';
   var pRow=function(label,o,pq,a,v){var l=res.prior?(o.bothNet?o.Psh:o.Psh0):null;return '<tr><td><b>'+esc(label)+'</b></td>'+cell(pq.tgt>0?pq.tgt:null,lk)+'<td class="num">'+lk(o.sh)+'</td>'+cell(v,function(x){return oxSgn(x,lk(Math.abs(x)))})+cell(a,function(x){return oxPct(x)+'%'})+cell(l,lk)+vq(shQoq(o,res))+'</tr>'};

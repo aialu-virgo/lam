@@ -297,9 +297,11 @@ function trendOfSeries(ser){
 }
 /* plants of the scope that have sales loaded in every month of the quarter, out of the plants in scope */
 function quarterCoverage(ms,pset){
-  var pl=pset?Array.from(pset):DS.plants.slice(),n=pl.filter(function(p){return ms.every(function(m){var c=S.cells['INV_'+m];return c&&c.plants&&c.plants[p]})}).length;
-  return {n:n,N:pl.length};
+  /* D57: counted in plant-months; when every plant has the same number of months it reads "k of M months" */
+  var pl=pset?Array.from(pset):DS.plants.slice(),per=pl.map(function(p){return ms.filter(function(m){var c=S.cells['INV_'+m];return c&&c.plants&&c.plants[p]}).length}),n=per.reduce(function(a,b){return a+b},0),same=per.length>0&&per.every(function(k){return k===per[0]});
+  return {n:n,N:pl.length*ms.length,plants:pl.length,k:same?per[0]:null,M:ms.length};
 }
+function covLabel(c){return c?(c.k!=null?c.k+' of '+c.M+' months':c.n+' of '+c.N+' plant-months'):''}
 /* series of closed quarters since history start (up to 12) + current: actual, target, ach for a filter */
 function quarterSeries(f,personSp){
   var cur=curQuarterKey(),qs=closedQuarters().concat([cur]),out=[];
