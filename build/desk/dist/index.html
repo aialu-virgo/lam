@@ -2679,7 +2679,7 @@ function trendCard(title,ent,ctx,personSp,id,opts){
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+26)+'" text-anchor="middle" class="ax a-'+statusOf(s.ach)+'">'+(s.ach!=null?s.ach.toFixed(0)+'%':'—')+'</text>';
     var qv=i>0?ts.qoqAt[i]:null;var noPriorQ=(i===0&&s.q===histStart());if(s.isCur){var pv=ser[i-1].H;qv=(s.H!=null&&pv!=null&&pv>0&&cur.N!==Infinity)?null:qv}
     svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+40)+'" text-anchor="middle" class="ax '+(qv==null?'':qv>=0?'up':'dn')+'">'+(s.isCur?'QTD':(noPriorQ?'no prior':qv==null?(isP?'partial':(i>0&&ser[i-1].H==null&&ser[i-1].Ap!=null?'vs partial':'—')):(qv>0?'+':'')+qv.toFixed(1).replace('-','−')))+'</text>';
-    if(isP&&s.cov)svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+52)+'" text-anchor="middle" class="ax">partial:</text><text x="'+(x(i)+bw/2)+'" y="'+(H-B+63)+'" text-anchor="middle" class="ax">'+s.cov.n+' of '+s.cov.N+' plants</text>';
+    if(isP&&s.cov)svg+='<text x="'+(x(i)+bw/2)+'" y="'+(H-B+52)+'" text-anchor="middle" class="ax">partial:</text><text x="'+(x(i)+bw/2)+'" y="'+(H-B+63)+'" text-anchor="middle" class="ax">'+(s.cov.n>0?s.cov.n+' of '+s.cov.N+' plants':'months missing')+'</text>';
   });
   /* previous-quarter marker on the current bar */
   var pv2=ser.length>1?ser[ser.length-2].H:null;if(pv2!=null)svg+='<line x1="'+(x(n-1)+bw*.1)+'" x2="'+(x(n-1)+bw*.9)+'" y1="'+y(pv2)+'" y2="'+y(pv2)+'" stroke="var(--ink)" stroke-dasharray="3 2" stroke-width="1.5"><title>Previous quarter '+fmtMoney(pv2)+'</title></line>';
@@ -2890,7 +2890,7 @@ function oxTrendSvg(ser,hasTgt){
     if(tg!=null)s+='<line x1="'+(bx-4)+'" x2="'+(bx+w+4)+'" y1="'+y(tg)+'" y2="'+y(tg)+'" stroke="var(--plan)" stroke-width="3"/>';
     if(v!=null)s+='<text x="'+(bx+w/2)+'" y="'+(y(v)-4)+'" text-anchor="middle" class="st vl">'+oxLakh(v)+'</text>';
     s+='<text x="'+(bx+w/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="st">'+esc(q.label.replace(' FY',' ·'))+(q.isCur?'*':'')+'</text>';
-    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+26)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text>'+(q.partial&&q.cov?'<text x="'+(bx+w/2)+'" y="'+(H-B+38)+'" text-anchor="middle" class="st">partial:</text><text x="'+(bx+w/2)+'" y="'+(H-B+49)+'" text-anchor="middle" class="st">'+q.cov.n+' of '+q.cov.N+' plants</text>':'')+'</g>';
+    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+26)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text>'+(q.partial&&q.cov?'<text x="'+(bx+w/2)+'" y="'+(H-B+38)+'" text-anchor="middle" class="st">partial:</text><text x="'+(bx+w/2)+'" y="'+(H-B+49)+'" text-anchor="middle" class="st">'+(q.cov.n>0?q.cov.n+' of '+q.cov.N+' plants':'months missing')+'</text>':'')+'</g>';
   });
   return s+'</svg>';
 }

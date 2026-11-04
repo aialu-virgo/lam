@@ -82,7 +82,7 @@ function oxTrendSvg(ser,hasTgt){
     if(tg!=null)s+='<line x1="'+(bx-4)+'" x2="'+(bx+w+4)+'" y1="'+y(tg)+'" y2="'+y(tg)+'" stroke="var(--plan)" stroke-width="3"/>';
     if(v!=null)s+='<text x="'+(bx+w/2)+'" y="'+(y(v)-4)+'" text-anchor="middle" class="st vl">'+oxLakh(v)+'</text>';
     s+='<text x="'+(bx+w/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="st">'+esc(q.label.replace(' FY',' ·'))+(q.isCur?'*':'')+'</text>';
-    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+26)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text>'+(q.partial&&q.cov?'<text x="'+(bx+w/2)+'" y="'+(H-B+38)+'" text-anchor="middle" class="st">partial:</text><text x="'+(bx+w/2)+'" y="'+(H-B+49)+'" text-anchor="middle" class="st">'+q.cov.n+' of '+q.cov.N+' plants</text>':'')+'</g>';
+    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+26)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text>'+(q.partial&&q.cov?'<text x="'+(bx+w/2)+'" y="'+(H-B+38)+'" text-anchor="middle" class="st">partial:</text><text x="'+(bx+w/2)+'" y="'+(H-B+49)+'" text-anchor="middle" class="st">'+(q.cov.n>0?q.cov.n+' of '+q.cov.N+' plants':'months missing')+'</text>':'')+'</g>';
   });
   return s+'</svg>';
 }
