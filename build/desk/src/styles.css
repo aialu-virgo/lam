@@ -143,3 +143,5 @@ a.btn{text-decoration:none;display:inline-block}
 .ox-detb{display:flex;flex-direction:column;gap:12px;padding-bottom:8px;min-width:0;overflow-x:auto}
 [data-tip]{cursor:pointer}
 #ox-tip{position:fixed;z-index:60;background:var(--ink);color:var(--bg);font-size:12px;padding:7px 10px;border-radius:8px;max-width:260px;pointer-events:none;display:none;line-height:1.35}
+/* D57: value labels sit on a halo of the card colour, drawn after every line, so no line crosses the figures (both themes) */
+svg text.vl{paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round;font-weight:700;fill:var(--ink)}

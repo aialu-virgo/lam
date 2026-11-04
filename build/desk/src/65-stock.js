@@ -74,7 +74,7 @@ async function loadItemIdx(){
   var idx=new Map();
   if(S.itemMeta){var n=S.itemMeta.chunks||1;
     for(var i=0;i<n;i++){var snap=await dget('items/c'+i);if(!snap.exists)continue;var arr=JSON.parse(await ungz(snap.data().z));
-      arr.forEach(function(a){idx.set(String(a[0]).toUpperCase(),[ITEM_GROUPS[a[1]]||'Laminate',+a[2]||0,a[5]!==0])})}}
+      arr.forEach(function(a){idx.set(String(a[0]).toUpperCase(),[ITEM_GROUPS[a[1]]||'Laminate',+a[2]||0,a[5]!==0,a[3]==null?null:+a[3],a[7]||''])})}}
   S.itemIdx=idx;S.itemIdxKey=key;return idx;
 }
 

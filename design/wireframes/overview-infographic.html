@@ -60,8 +60,8 @@ h2{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--in
 .ans b{font-size:19px;line-height:1.2}.ans span{font-size:12.5px;color:var(--ink2)}
 /* tiles */
 .tiles{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}
-.t-hero{grid-column:span 12}.t-sm{grid-column:span 3}.t-6{grid-column:span 7}.t-5{grid-column:span 5}
-@media(max-width:1100px){.t-sm{grid-column:span 6}.t-6,.t-5{grid-column:span 12}}
+.tilerow{grid-column:span 12;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:14px}.t-hero{grid-column:span 12}.t-h{grid-column:span 6}.t-12{grid-column:span 12}.t-sm{grid-column:span 3}.t-6{grid-column:span 7}.t-5{grid-column:span 5}
+@media(max-width:1100px){.t-sm{grid-column:span 6}.t-6,.t-5,.t-h{grid-column:span 12}}
 @media(max-width:620px){.t-sm{grid-column:span 12}}
 .hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.5fr);gap:20px 28px;align-items:center}
 @media(max-width:900px){.hero{grid-template-columns:minmax(0,1fr)}}
@@ -101,9 +101,9 @@ svg .st{fill:var(--ink2)}
 @media(max-width:620px){.zones{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .zone{border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .zone b{font-size:18px;font-family:var(--mono)}.zone small{font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
-.rk{display:grid;grid-template-columns:74px minmax(0,1fr) 92px;gap:8px;align-items:center;font-size:12px;padding:3px 0}
-@media(max-width:420px){.rk{grid-template-columns:62px minmax(0,1fr) 78px}}
-.rk .nm{font-weight:700;overflow-wrap:anywhere}.rk .v{font-family:var(--mono);text-align:right;font-weight:700}
+.rk{display:grid;grid-template-columns:112px minmax(0,1fr) 92px;gap:8px;align-items:center;font-size:12px;padding:3px 0}
+@media(max-width:420px){.rk{grid-template-columns:80px minmax(0,1fr) 96px}}
+.rk .nm{font-weight:700;overflow-wrap:anywhere}.rk .v{font-family:var(--mono);text-align:right;font-weight:700;white-space:nowrap}@media(max-width:420px){.rk .v{font-size:11px}}
 .div{position:relative;height:14px}
 .div::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;border-left:2px solid var(--ink3)}
 .div i{position:absolute;top:2px;bottom:2px;border-radius:4px}
@@ -116,6 +116,11 @@ details{border:1px solid var(--line);border-radius:14px;background:var(--card);p
 summary{cursor:pointer;font-weight:800;font-size:13px}
 .tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px}th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}th:first-child,td:first-child{text-align:left}th{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3)}
 tr.tot td{font-weight:800;background:var(--brand-soft)}
+.sp{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}.sp .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.sp .h b:first-child{overflow-wrap:anywhere}.sp .m{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 8px;font-size:12px;color:var(--ink2);align-items:center}
+.share .f{background:var(--act)}
+.brk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 28px}@media(max-width:900px){.brk{grid-template-columns:minmax(0,1fr)}}
+.br{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}.br .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}.stars{font-size:16px;letter-spacing:1px;white-space:nowrap}.chip.sm{font-size:11px;padding:2px 8px;font-weight:600}
+.sub3{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);font-weight:800;margin:6px 0 0}
 /* state switch */
 [data-state="today"] .full{display:none!important}
 [data-state="loaded"] .today{display:none!important}
@@ -159,38 +164,33 @@ tr.tot td{font-weight:800;background:var(--brand-soft)}
 </div></section>
 
 <!-- small tiles -->
-<section class="card t-sm" data-tip="Value QTD ₹138.2 cr · Target ₹151.4 cr · Ach 91.3% · Last Qtr ₹129.9 cr · QoQ +6.4%" tabindex="0"><h2>₹ value <a class="drill" href="#tbl-group">Table ›</a></h2>
-<div class="tile-big">₹ 138.2 <span class="unit">cr invoiced</span></div>
-<div class="full"><div class="bul"><div class="f b3" style="width:91.3%"></div><div class="tg" style="left:100%;margin-left:-3px"></div></div><p class="note" style="margin:6px 0 0">▼ Watch · 91.3% of ₹ 151.4 cr target</p></div>
-<div class="today empty" style="padding:8px"><span class="nl-t">Target: not loaded</span></div>
-<div class="row"><span class="chip ok">▲ +6.4% QoQ</span><svg viewBox="0 0 90 26" width="90" aria-hidden="true"><polyline points="2,22 17,19 32,15 47,12 62,13 88,5" fill="none" stroke="var(--act)" stroke-width="2"/><circle cx="88" cy="5" r="3" fill="var(--act)"/></svg></div></section>
-
-<section class="card t-sm" data-tip="Collected Q2 FY27 ₹331.5 cr · Last Qtr ₹319.0 cr · QoQ +3.9% · Collection plan not loaded · Data to 30 Sep 2026" tabindex="0"><h2>K9 · Collections <a class="drill" href="#">Table ›</a></h2>
-<div class="tile-big">₹ 331.5 <span class="unit">cr, Q2 FY27</span></div>
-<div class="bul nl"><div class="f" style="width:96.6%;opacity:.55"></div></div>
-<p class="note" style="margin:0">Bar = collected ÷ invoiced (96.6%). Collection plan: <span class="nl-t">not loaded</span>. Oct 2026 receipts: <span class="nl-t">not loaded</span>.</p>
-<div class="row"><span class="chip ok">▲ +3.9% QoQ</span><svg viewBox="0 0 90 26" width="90" aria-hidden="true"><polyline points="2,24 20,18 38,13 56,8 72,8 88,4" fill="none" stroke="var(--act)" stroke-width="2"/><circle cx="88" cy="4" r="3" fill="var(--act)"/></svg></div></section>
-
-<section class="card t-sm" data-tip="Stock days 47 as on 21 Oct 2026 · plan 45 · plan ÷ actual = 95.7% · lower is better · no earlier snapshot" tabindex="0"><h2>K15 · Stock days <a class="drill" href="#">Table ›</a></h2>
-<div class="tile-big">47 <span class="unit">days · 21 Oct</span></div>
+<div class="tilerow">
+<section class="card" data-tip="Collected Q2 FY27 ₹331.5 cr · Last Qtr ₹319.0 cr · QoQ +3.9% · Collected ÷ invoiced 96.6% · Collection plan not loaded · Data to 30 Sep 2026" tabindex="0"><h2>K9 · Collections <a class="drill" href="#">Table ›</a></h2>
+<div class="tile-big">₹ 331.5 <span class="unit">cr collected, Q2 FY27</span></div>
+<div class="row"><span class="chip ok">▲ +3.9% QoQ</span><span class="chip nl">Plan: not loaded</span></div>
+<div id="coll"></div>
+<div><div class="bul nl" style="height:12px"><div class="f" style="width:96.6%;background:var(--act);opacity:.55"></div></div><p class="note" style="margin:6px 0 0"><b>96.6% collected ÷ invoiced</b> (₹ 331.5 ÷ 343.3 cr). A ratio, not Ach %, until a collection plan is loaded. Oct receipts: <span class="nl-t">not loaded</span>. Collections stay in ₹.</p></div></section>
+<section class="card" data-tip="Stock days 47 as on 21 Oct 2026 · plan 45 · plan ÷ actual = 95.7% · lower is better · no earlier snapshot" tabindex="0"><h2>K15 · Stock days <a class="drill" href="#">Table ›</a></h2>
+<div class="tile-big">47 <span class="unit">days · 21 Oct</span></div><p class="note" style="margin:-6px 0 0"><b class="mono">16.0 lakh sheets</b> on hand</p>
 <svg viewBox="0 0 240 92" role="img" aria-label="Stock days by group: Laminate 41, Door 62, PVC sheet 38, Compact board 55; plan 45"><g>
 <rect x="64" y="6" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="8" width="102" height="8" rx="3" fill="var(--b4)" stroke="var(--b4d)" stroke-width="1.5"/><text x="0" y="16" class="st">Laminate</text><text x="220" y="16">▼41</text>
-<rect x="64" y="28" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="30" width="155" height="8" rx="3" fill="var(--b1)" stroke="var(--b1d)" stroke-width="1.5"/><text x="0" y="38" class="st">Door</text><text x="214" y="38" style="fill:var(--red);font-weight:700">▲62 far</text>
+<rect x="64" y="28" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="30" width="155" height="8" rx="3" fill="var(--b1)" stroke="var(--b1d)" stroke-width="1.5"/><text x="0" y="38" class="st">Door</text><text x="220" y="38" style="fill:var(--red);font-weight:700">▲62</text>
 <rect x="64" y="50" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="52" width="95" height="8" rx="3" fill="var(--b4)" stroke="var(--b4d)" stroke-width="1.5"/><text x="0" y="60" class="st">PVC sheet</text><text x="220" y="60">▼38</text>
 <rect x="64" y="72" width="150" height="12" rx="3" fill="var(--track)"/><rect x="64" y="74" width="138" height="8" rx="3" fill="var(--b2)" stroke="var(--b2d)" stroke-width="1.5"/><text x="0" y="82" class="st">Compact</text><text x="214" y="82" style="font-weight:700">▲55</text>
 <line x1="176" y1="2" x2="176" y2="90" stroke="var(--plan)" stroke-width="2"/></g></svg>
 <div class="row full"><span class="chip b3">▲ Watch · 95.7% of plan · 2 days over</span></div><div class="row today"><span class="chip nl">Plan: not loaded</span></div>
 <p class="note" style="margin:0">Line = plan 45 days. Lower is better; bar colour = plan ÷ actual (Laminate 110%, Door 73%, PVC 118%, Compact 82%). One snapshot, so no QoQ yet.</p></section>
 
-<section class="card t-sm"><h2>K10 · Overdue receivables <span class="chip nl">Not loaded</span></h2>
+<section class="card"><h2>K10 · Overdue receivables <span class="chip nl">Not loaded</span></h2>
 <div class="empty"><b>No receivables file yet</b><span>Overdue share and the 0–30 / 31–60 / 61–90 / 90+ ageing bar appear after the Receivables intake. Shown as not loaded, never as zero.</span><div class="bul nl" style="height:12px"></div><a class="drill" href="#">Open Data Intake › Receivables</a></div></section>
 
+</div>
 <!-- trend -->
 <section class="card t-6"><h2>Quarterly trend in lakh sheets, actual vs target <a class="drill" href="#">Table ›</a></h2>
 <div id="trend"></div>
-<div class="legend"><span><i class="k-act"></i>Actual sheets (lakh)</span><span><i class="k-tg"></i><span class="full">Target</span><span class="today">Target (not loaded)</span></span><span><i style="width:14px;height:8px;border:1.5px dashed var(--ink3);border-radius:3px"></i>Run-rate projection</span><span><i style="width:14px;height:8px;background:repeating-linear-gradient(45deg,var(--ink3) 0 2px,transparent 2px 5px);border-radius:3px"></i>Incomplete history</span></div>
+<div class="legend"><span><i class="k-act"></i>Actual sheets (lakh)</span><span><i class="k-tg"></i><span class="full">Target</span><span class="today">Target (not loaded)</span></span><span><i style="width:14px;height:8px;border:1.5px dashed var(--ink3);border-radius:3px"></i>Run-rate projection</span><span><i style="width:14px;height:8px;background:repeating-linear-gradient(45deg,var(--act) 0 2px,var(--card) 2px 5px);border:1px solid var(--act);border-radius:3px"></i>Partial: Q1 FY27, 31 of 42 plants</span></div>
 <div class="callout full note"><b class="warn chip">Stretch</b> Q3 target needs +15.4% QoQ in sheets; average QoQ is +4.9% (2× = 9.8%). For discussion.</div>
-<p class="note" style="margin:0">History starts Q1 FY26 (D28): 7 quarters, not 12. Q1 FY27 has a partial month, so its QoQ and Q2's are not shown ("partial", "vs partial").</p></section>
+<p class="note" style="margin:0">History starts Q1 FY26 (D28): 7 quarters, not 12. Value on each bar is lakh sheets; ₹ in the tap text. Q1 FY27 is partial (31 of 42 plants), so its QoQ and Q2's are not shown ("part." and "n/a" on narrow screens).</p></section>
 
 <!-- groups -->
 <section class="card t-5"><h2>Product group mix (sheets) and achievement <a class="drill" href="#tbl-group">Table ›</a></h2>
@@ -198,6 +198,8 @@ tr.tot td{font-weight:800;background:var(--brand-soft)}
 <div id="groups"></div>
 <p class="note" style="margin:0">Sheets. Bar length = lakh sheets against group potential (grey track); colour = Ach band; tick = target; dashed = Last Qtr.</p></section>
 
+<section class="card t-h"><h2>Thickness split (top 6 + Other) <a class="drill" href="#">Table ›</a></h2><div id="thk"></div><p class="note" style="margin:0">Sheets first, then share and ₹. Real data has about 150 raw thickness values, rounded to 2 decimals; the rest fold into Other. Band bar = Ach % where a target exists, grey share bar = share of sheets (scaled to the largest row) where none does.</p></section>
+<section class="card t-h"><h2>Brand split (top 8 + Other) <a class="drill" href="#">Table ›</a></h2><div id="brd"></div><p class="note" style="margin:0">Same layout. DEMO brand names; real data has 25 brands, 17 fold into Other here.</p></section>
 <!-- zones + ranking -->
 <section class="card t-6"><h2>Zones and plants <a class="drill" href="#">Table ›</a></h2>
 <div class="zones" id="zones"></div>
@@ -206,12 +208,16 @@ tr.tot td{font-weight:800;background:var(--brand-soft)}
 <div class="today empty"><b>Ranking needs targets</b><span>Without a target there is no variance to rank. Until then, Sales › Branch lists plants by ₹ actual and QoQ %.</span></div>
 <p class="note" style="margin:0">Showing 8 of 42 plants. Bar colour = Ach band. Plant names are DEMO.</p></section>
 
+<!-- rating placeholder -->
 <!-- today -->
 <section class="card t-5"><h2>Today · top 3 of cap 5 <a class="drill" href="#">All in Today ›</a></h2>
 <div class="act"><div><span class="pri bad">▲ High</span><b>Door sheets down 7.8% QoQ</b></div><span>Next step: call top 3 Door customers, log reasons</span><span class="m">Owner Sales HOD · due today 3 Nov · why ranked: due today, 0.11 lakh sheets below Last Qtr</span></div>
 <div class="act full"><div><span class="pri bad">▲ High</span><b>Lucknow 1024 at 74.5% of target</b></div><span>Next step: agree catch-up plan with branch manager</span><span class="m">Owner Branch mgr 1024 · due Thu 5 Nov · 14 thousand sheets short</span></div>
 <div class="act"><div><span class="pri warn">● Medium</span><b>Upload Receivables and credit notes</b></div><span>Next step: send Vijay the export in Data Intake</span><span class="m">Owner Data admin · due Fri 6 Nov · Overdue share and Net sales blocked</span></div>
 <p class="note" style="margin:0">Each action: one owner, one due date, one next step. Responses happen in the page.</p></section>
+<section class="card t-12" id="rating"><h2>Branch rating, top 5 and bottom 5 <a class="drill" href="#">All branches ›</a></h2>
+<p class="note" style="margin:0" id="rrule"></p><div class="brk"><div><p class="sub3">Top 5</p><div id="rtop"></div></div><div><p class="sub3">Bottom 5</p><div id="rbot"></div></div></div>
+<div class="callout note" style="border:1px solid var(--line);border-left:4px solid var(--ink3);border-radius:10px;padding:8px 12px"><b>Informational only.</b> The rating is a rule-based reading of three measures. It is not for incentives or disciplinary action; those are SP Sir's decision alone. Stars: 80+ = 5, 60 to under 80 = 4, 40 to under 60 = 3, 20 to under 40 = 2, under 20 = 1.</div></section>
 </div>
 
 <details id="tbl-group"><summary>Detail table: product group, lakh sheets (columns unchanged, opens from every Table › link) <span class="draft">DRAFT, 1 of 3 tables shown</span></summary>
@@ -229,47 +235,86 @@ tr.tot td{font-weight:800;background:var(--brand-soft)}
 (function(){
 var D={q:['Q1 FY26','Q2 FY26','Q3 FY26','Q4 FY26','Q1 FY27','Q2 FY27','Q3 FY27'],a:[27.0,28.4,30.0,31.2,29.6,31.2,12.4],t:[null,null,null,null,30.8,32.5,36.0],q2:[null,5.2,5.6,4.0,null,null,5.1]};
 function el(h){var d=document.createElement('div');d.innerHTML=h;return d}
-/* trend */
-var W=620,H=240,L=34,B=34,T=14,mx=40,x0=L,bw=(W-L-10)/7;
+/* trend: width follows the container so text stays readable at 360 */
+var RS=[288,301,322,336,318,343.3,138.2];
+function drawTrend(){var box=document.getElementById('trend'),W=Math.max(280,Math.floor(box.clientWidth||320)),wide=W>=520,H=wide?250:232,L=28,B=wide?46:36,T=16,mx=40,bw=(W-L-2)/7,fs=wide?10:9;
 function y(v){return T+(H-T-B)*(1-v/mx)}
-var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Quarterly actual versus target, Q1 FY26 to Q3 FY27">';
-[0,10,20,30,40].forEach(function(v){s+='<line x1="'+L+'" x2="'+W+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)"/><text x="0" y="'+(y(v)+3)+'">'+v+'</text>'});
-s+='<defs><pattern id="h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--track)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink3)" stroke-width="2"/></pattern></defs>';
-D.q.forEach(function(q,i){var bx=L+i*bw+bw*.18,w=bw*.64,v=D.a[i],cur=i==6,part=i==4;
- var tip=q+' · actual '+v+' lakh sheets'+(cur?' to date (28 of 74 days)':'')+(D.t[i]?' · target '+D.t[i]+' lakh · Ach '+(cur?'91.2% of pro-rated (13.6)':(v/D.t[i]*100).toFixed(1)+'%'):'')+(D.q2[i]!=null?' · QoQ +'+D.q2[i]+'%':part?' · incomplete history (partial month)':i==5?' · QoQ not shown, previous quarter is partial':'');
+var s='<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" role="img" aria-label="Quarterly sheets in lakh, actual versus target, Q1 FY26 to Q3 FY27 to date" style="--fs:'+fs+'px">';
+[0,10,20,30,40].forEach(function(v){s+='<line x1="'+L+'" x2="'+W+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)"/><text x="0" y="'+(y(v)+3)+'" style="font-size:'+fs+'px">'+v+'</text>'});
+s+='<defs><pattern id="h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--card)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--act)" stroke-width="2.5"/></pattern></defs>';
+D.q.forEach(function(q,i){var bx=L+i*bw+bw*.14,w=bw*.72,v=D.a[i],cur=i==6,part=i==4,cx=bx+w/2;
+ var tip=q+' · '+v+' lakh sheets (₹'+RS[i]+' cr)'+(cur?' to date (28 of 74 days)':'')+(D.t[i]?' · target '+D.t[i]+' lakh · Ach '+(cur?'91.2% of pro-rated (13.6)':(v/D.t[i]*100).toFixed(1)+'%'):'')+(D.q2[i]!=null?' · QoQ +'+D.q2[i]+'%':part?' · partial: 31 of 42 plants, QoQ not shown':i==5?' · QoQ not shown, previous quarter is partial':'');
  s+='<g data-tip="'+tip+'" tabindex="0">';
  if(cur){s+='<rect x="'+bx+'" y="'+y(32.8)+'" width="'+w+'" height="'+(y(0)-y(32.8))+'" rx="4" fill="none" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="4 3"/>'}
- s+='<rect x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+(y(0)-y(v))+'" rx="4" fill="'+(part?'url(#h)':'var(--act)')+'"/>';
- if(D.t[i]){s+='<g class="full"><line x1="'+(bx-4)+'" x2="'+(bx+w+4)+'" y1="'+y(D.t[i])+'" y2="'+y(D.t[i])+'" stroke="var(--plan)" stroke-width="3"/></g>'}
- s+='<text x="'+(bx+w/2)+'" y="'+(H-20)+'" text-anchor="middle" class="st">'+q.replace(' FY',' ·')+'</text>';
- var qq=D.q2[i];s+='<text x="'+(bx+w/2)+'" y="'+(H-6)+'" text-anchor="middle" style="fill:'+(qq==null?'var(--ink3)':'var(--green)')+';font-weight:700">'+(qq==null?(i==0?'n/a':i==4?'partial':'vs partial'):'▲'+qq+'%')+'</text></g>'});
-s+='</svg>';document.getElementById('trend').innerHTML=s;
+ s+='<rect x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+(y(0)-y(v))+'" rx="4" fill="'+(part?'url(#h)':'var(--act)')+'" '+(part?'stroke="var(--act)" stroke-width="1.5"':'')+'/>';
+ var top=y(v);if(D.t[i]){s+='<g class="full"><line x1="'+(bx-3)+'" x2="'+(bx+w+3)+'" y1="'+y(D.t[i])+'" y2="'+y(D.t[i])+'" stroke="var(--plan)" stroke-width="3"/></g>';top=Math.min(top,y(D.t[i]))}
+ s+='<text x="'+cx+'" y="'+(top-4)+'" text-anchor="middle" style="font-size:'+fs+'px;font-weight:700;fill:var(--ink)">'+v.toFixed(1)+'</text>';
+ s+='<text x="'+cx+'" y="'+(H-B+13)+'" text-anchor="middle" class="st" style="font-size:'+fs+'px">'+(cur?'Q3 QTD':q.replace(' FY',"'"))+'</text>';
+ var qq=D.q2[i];s+='<text x="'+cx+'" y="'+(H-B+25)+'" text-anchor="middle" style="font-size:'+fs+'px;font-weight:700;fill:'+(qq==null?'var(--ink3)':'var(--green)')+'">'+(qq==null?(i==0?'n/a':wide?(i==4?'partial':'vs partial'):(i==4?'part.':'n/a')):'▲'+qq+'%')+'</text>';
+ if(part&&wide)s+='<text x="'+cx+'" y="'+(H-B+37)+'" text-anchor="middle" style="font-size:'+fs+'px;fill:var(--ink2)">31 of 42 plants</text>';
+ s+='</g>'});
+s+='</svg>';box.innerHTML=s}
+drawTrend();if(window.ResizeObserver){var _w=0;new ResizeObserver(function(){var w=document.getElementById('trend').clientWidth;if(Math.abs(w-_w)>4){_w=w;drawTrend()}}).observe(document.getElementById('trend'))}
 /* groups */
-var G=[['Laminate','--g1',7.60,8.00,12.4,6.95],['Door','--g2',1.30,1.62,2.6,1.41],['PVC sheet','--g3',2.70,2.55,4.2,2.50],['Compact board','--g4',0.80,1.43,2.3,0.94]];
+var GR={'Laminate':84.1,'Door':31.4,'PVC sheet':15.9,'Compact board':6.8};var G=[['Laminate','--g1',7.60,8.00,12.4,6.95],['Door','--g2',1.30,1.62,2.6,1.41],['PVC sheet','--g3',2.70,2.55,4.2,2.50],['Compact board','--g4',0.80,1.43,2.3,0.94]];
 function bd(a){return a>=100?4:a>=90?3:a>=75?2:1}
 function st(a){var b=bd(a);return [b,['','▼▼ Far behind','▼ Behind','▲ Watch','● On target'][b]]}
 var gh='',tb='';G.forEach(function(g){var a=g[2]/g[3]*100,qq=(g[2]/g[5]-1)*100,sh=g[2]/g[4]*100,S=st(a);
- gh+='<div class="grp" data-tip="'+g[0]+' (lakh sheets) · Potential '+g[4]+' · Target '+g[3].toFixed(2)+' · Actual '+g[2].toFixed(2)+' · Var '+(g[2]-g[3]).toFixed(2)+' · Ach '+a.toFixed(1)+'% · Share '+sh.toFixed(1)+'% · Last Qtr '+g[5]+' · QoQ '+qq.toFixed(1)+'%" tabindex="0"><div class="h"><span><i class="sw" style="background:var('+g[1]+')"></i><b>'+g[0]+'</b> <span class="mono">'+g[2].toFixed(2)+' lakh</span></span><span class="row"><span class="chip full b'+S[0]+'">'+S[1]+' '+a.toFixed(1)+'%</span><span class="chip today nl">Ach: not loaded</span><span class="chip '+(qq<-5?'bad':'ok')+'">'+(qq<0?'▼ ':'▲ +')+qq.toFixed(1)+'% QoQ</span></span></div>'
+ gh+='<div class="grp" data-tip="'+g[0]+' (lakh sheets) · Potential '+g[4]+' · Target '+g[3].toFixed(2)+' · Actual '+g[2].toFixed(2)+' · Var '+(g[2]-g[3]).toFixed(2)+' · Ach '+a.toFixed(1)+'% · Share '+sh.toFixed(1)+'% · Last Qtr '+g[5]+' · QoQ '+qq.toFixed(1)+'%" tabindex="0"><div class="h"><span><i class="sw" style="background:var('+g[1]+')"></i><b>'+g[0]+'</b> <span class="mono">'+g[2].toFixed(2)+' lakh</span> <span class="note">₹ '+GR[g[0]]+' cr</span></span><span class="row"><span class="chip full b'+S[0]+'">'+S[1]+' '+a.toFixed(1)+'%</span><span class="chip today nl">Ach: not loaded</span><span class="chip '+(qq<-5?'bad':'ok')+'">'+(qq<0?'▼ ':'▲ +')+qq.toFixed(1)+'% QoQ</span></span></div>'
  +'<div class="bul"><div class="f full b'+S[0]+'" style="width:'+(g[2]/g[4]*100)+'%"></div><div class="f today" style="width:'+(g[2]/g[4]*100)+'%;background:var(--act)"></div><div class="lq" style="left:'+(g[5]/g[4]*100)+'%"></div><div class="tg full" style="left:'+(g[3]/g[4]*100)+'%"></div></div></div>';
  tb+='<tr><td><b>'+g[0]+'</b></td><td>'+g[4].toFixed(2)+'</td><td>'+g[3].toFixed(2)+'</td><td>'+g[2].toFixed(2)+'</td><td>'+(g[2]-g[3]).toFixed(2)+'</td><td>'+a.toFixed(1)+'%</td><td>'+sh.toFixed(1)+'%</td><td>'+g[5].toFixed(2)+'</td><td>'+qq.toFixed(1)+'%</td><td>'+(qq>0?'▲':'▼')+'</td></tr>'});
 tb+='<tr class="tot"><td>Total (lakh sheets)</td><td>21.50</td><td>13.60</td><td>12.40</td><td>−1.20</td><td>91.2%</td><td>57.7%</td><td>11.80</td><td>+5.1%</td><td>▲</td></tr>';
 document.getElementById('groups').innerHTML=gh;document.getElementById('tb').innerHTML=tb;
 /* zones */
-var Z=[['North',3.75,3.45,3.30],['West',4.25,4.20,3.95],['South',3.40,2.85,2.80],['East',2.20,1.90,1.75]],zh='';
-Z.forEach(function(z){var a=z[2]/z[1]*100,qq=(z[2]/z[3]-1)*100,S=st(a);zh+='<div class="zone" data-tip="'+z[0]+' (lakh sheets) · Target '+z[1].toFixed(2)+' · Actual '+z[2].toFixed(2)+' · Ach '+a.toFixed(1)+'% · Last Qtr '+z[3].toFixed(2)+' · QoQ +'+qq.toFixed(1)+'%" tabindex="0"><small>'+z[0]+'</small><b class="full">'+a.toFixed(0)+'%</b><b class="today nl-t" style="font-size:13px">Ach: not loaded</b><div class="bul"><div class="f full b'+S[0]+'" style="width:'+Math.min(a,100)+'%"></div><div class="f today" style="width:'+Math.min(a,100)+'%;background:var(--act)"></div></div><span class="chip full b'+S[0]+'">'+S[1]+'</span><span class="chip ok">▲ +'+qq.toFixed(1)+'% QoQ</span></div>'});
+var Z=[['North',3.75,3.45,3.30,38.4],['West',4.25,4.20,3.95,45.9],['South',3.40,2.85,2.80,33.6],['East',2.20,1.90,1.75,20.3]],zh='';
+Z.forEach(function(z){var a=z[2]/z[1]*100,qq=(z[2]/z[3]-1)*100,S=st(a);zh+='<div class="zone" data-tip="'+z[0]+' (lakh sheets) · Target '+z[1].toFixed(2)+' · Actual '+z[2].toFixed(2)+' · Ach '+a.toFixed(1)+'% · Last Qtr '+z[3].toFixed(2)+' · QoQ +'+qq.toFixed(1)+'%" tabindex="0"><small>'+z[0]+'</small><span class="mono" style="font-size:12px"><b>'+z[2].toFixed(2)+'</b> lakh · ₹'+z[4]+' cr</span><b class="full">'+a.toFixed(0)+'%</b><b class="today nl-t" style="font-size:13px">Ach: not loaded</b><div class="bul"><div class="f full b'+S[0]+'" style="width:'+Math.min(a,100)+'%"></div><div class="f today" style="width:'+Math.min(a,100)+'%;background:var(--act)"></div></div><span class="chip full b'+S[0]+'">'+S[1]+'</span><span class="chip ok">▲ +'+qq.toFixed(1)+'% QoQ</span></div>'});
 document.getElementById('zones').innerHTML=zh;
 /* ranking */
 var R=[['1024 Lucknow',55,41],['1036 Coimbatore',46,35],['1019 Kolkata',64,55],['1042 Jaipur',43,35],['1015 Hyderabad',53,46],['1021 Indore',37,41],['1033 Pune',60,66],['1028 Surat',49,57]],rh='';
 R.forEach(function(r){var v=r[2]-r[1],a=r[2]/r[1]*100,w=Math.abs(v)/16*50,neg=v<0,b=bd(a);
  rh+='<div class="rk" data-tip="'+r[0]+' (thousand sheets) · Target '+r[1]+' · Actual '+r[2]+' · Var '+v+' · Ach '+a.toFixed(1)+'%" tabindex="0"><span class="nm">'+r[0]+'</span><div class="div"><i style="'+(neg?'right:50%':'left:50%')+';width:'+w+'%;background:var(--b'+b+');border:2px solid var(--b'+b+'d)"></i></div><span class="v">'+(neg?'▼ ':'▲ +')+v+' · '+a.toFixed(0)+'%</span></div>'});
 document.getElementById('rank').innerHTML=rh;
+
+/* collections: 6 quarters + QTD slot, values printed */
+(function(){var v=[279,291,306,318,319.0,331.5],q=['Q1\'26','Q2\'26','Q3\'26','Q4\'26','Q1\'27','Q2\'27','Q3 QTD'],W=280,H=92,s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Collections in ₹ crore, last six quarters; Q3 to date not loaded">',sl=W/7;
+v.forEach(function(x,i){var h=x/340*54,bx=i*sl+7,w=sl-14;s+='<g data-tip="'+q[i].replace("'","")+' collected ₹'+x+' cr'+(i?' · QoQ '+((x/v[i-1]-1)*100).toFixed(1)+'%':'')+'" tabindex="0"><rect x="'+bx+'" y="'+(68-h)+'" width="'+w+'" height="'+h+'" rx="3" fill="var(--act)"/><text x="'+(bx+w/2)+'" y="'+(64-h)+'" text-anchor="middle" style="font-size:9px;font-weight:700;fill:var(--ink)">'+Math.round(x)+'</text><text x="'+(bx+w/2)+'" y="82" text-anchor="middle" class="st" style="font-size:9px">'+q[i]+'</text></g>'});
+s+='<g data-tip="Q3 FY27 to date: Oct 2026 receipts not loaded" tabindex="0"><rect x="'+(6*sl+7)+'" y="30" width="'+(sl-14)+'" height="38" rx="3" fill="none" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+(6*sl+sl/2)+'" y="52" text-anchor="middle" style="font-size:8px">n/l</text><text x="'+(6*sl+sl/2)+'" y="82" text-anchor="middle" class="st" style="font-size:9px">'+q[6]+'</text></g></svg>';
+document.getElementById('coll').innerHTML=s})();
+/* thickness + brand split rows */
+var TH=[['1.00 MM',3.60,37.8,3.30,3.70],['0.80 MM',2.95,26.0,3.20,3.30],['1.25 MM',1.80,23.4,1.60,1.55],['1.50 MM',1.10,16.5,1.05,null],['0.92 MM',0.85,8.2,0.80,null],['0.72 MM',0.70,5.6,0.55,null],['Other (about 144 values)',1.40,20.7,1.30,null]];
+var BR=[['DEMO Brand A',2.60,30.7,2.40,2.70],['DEMO Brand B',2.15,23.4,2.00,2.00],['DEMO Brand C',1.70,17.2,1.80,null],['DEMO Brand D',1.35,16.7,1.20,null],['DEMO Brand E',1.10,11.0,1.00,null],['DEMO Brand F',0.90,10.4,0.85,null],['DEMO Brand G',0.75,7.1,0.70,null],['DEMO Brand H',0.60,5.4,0.62,null],['Other (17 brands)',1.25,16.3,1.23,null]];
+function splitRows(id,rows){var mxs=Math.max.apply(null,rows.map(function(r){return r[1]})),h='';rows.forEach(function(r){var sh=r[1]/12.4*100,qq=(r[1]/r[3]-1)*100,a=r[4]?r[1]/r[4]*100:null,S=a!=null?st(a):null;
+ var tip=r[0]+' · '+r[1].toFixed(2)+' lakh sheets · '+sh.toFixed(1)+'% of sheets · ₹'+r[2]+' cr · Last Qtr '+r[3].toFixed(2)+' · QoQ '+qq.toFixed(1)+'%'+(a!=null?' · Target '+r[4].toFixed(2)+' · Ach '+a.toFixed(1)+'%':' · no target');
+ var share='<div class="bul share"><div class="f" style="width:'+(r[1]/mxs*100)+'%"></div></div>';
+ h+='<div class="sp" data-tip="'+tip+'" tabindex="0"><div class="h"><b>'+r[0]+'</b><span class="mono"><b>'+r[1].toFixed(2)+'</b> lakh</span></div>'
+  +(a!=null?'<div class="full"><div class="bul"><div class="f b'+S[0]+'" style="width:'+Math.min(a,100)+'%"></div></div></div><div class="today">'+share+'</div>':share)
+  +'<div class="m"><span>'+sh.toFixed(1)+'% share · ₹ '+r[2].toFixed(1)+' cr</span><span class="row">'+(a!=null?'<span class="chip sm full b'+S[0]+'">'+S[1]+' '+a.toFixed(1)+'%</span>':'<span class="chip sm nl">no target</span>')+'<span class="chip sm '+(qq<-5?'bad':'ok')+'">'+(qq<0?'▼ ':'▲ +')+qq.toFixed(1)+'% QoQ</span></span></div></div>'});return h}
+document.getElementById('thk').innerHTML=splitRows('thk',TH);document.getElementById('brd').innerHTML=splitRows('brd',BR);
+/* branch rating: weighted percentile rank, 50/30/20 */
+var CITY={1012:'Ahmedabad',1013:'Bhopal',1014:'Chennai',1015:'Hyderabad',1016:'Nagpur',1017:'Patna',1018:'Ludhiana',1019:'Kolkata',1020:'Guwahati',1021:'Indore',1022:'Raipur',1023:'Kochi',1024:'Lucknow',1025:'Vadodara',1026:'Bhubaneswar',1027:'Dehradun',1028:'Surat',1029:'Ranchi',1030:'Visakhapatnam',1031:'Mysuru',1032:'Rajkot',1033:'Pune',1034:'Kanpur',1035:'Madurai',1036:'Coimbatore',1037:'Agra',1038:'Jabalpur',1039:'Nashik',1040:'Varanasi',1041:'Vijayawada',1042:'Jaipur',1043:'Thrissur',1044:'Amritsar',1045:'Jodhpur',1046:'Siliguri',1047:'Mangaluru'};
+var FIX={1024:74.5,1036:76.1,1019:85.9,1042:81.4,1015:86.8,1021:110.8,1033:110.0,1028:116.3};
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+var rnd=rng(11),BRS=[];for(var c=1012;c<=1047;c++){var ach=FIX[c]||(78+rnd()*40);BRS.push({c:c,n:CITY[c],ach:ach,qoq:-9+rnd()*26,col:(c==1029)?null:84+rnd()*20,stk:(c==1017||c==1046)?null:30+rnd()*38})}
+function pctOf(list,key,hi){var a=list.filter(function(b){return b[key]!=null});a.forEach(function(b){var w=0,t=0;a.forEach(function(o){if(o===b)return;if(hi?o[key]<b[key]:o[key]>b[key])w++;else if(o[key]===b[key])t++});b['p_'+key]=(w+.5*t)/(a.length-1)*100});}
+function stars(sc){return sc>=80?5:sc>=60?4:sc>=40?3:sc>=20?2:1}
+function rate(state){var key=state=='loaded'?'ach':'qoq';BRS.forEach(function(b){b.sk=b[key]});pctOf(BRS,'sk',true);pctOf(BRS,'col',true);pctOf(BRS,'stk',false);
+ BRS.forEach(function(b){var parts=[['sk',50],['col',30],['stk',20]].filter(function(p){return b[p[0]]!=null}),W=parts.reduce(function(a,p){return a+p[1]},0);b.n3=parts.length;b.score=parts.reduce(function(a,p){return a+b['p_'+p[0]]*p[1]},0)/W;b.st=stars(b.score);b.W=parts.map(function(p){return p[0]+' '+Math.round(p[1]/W*100)+'%'}).join(', ')});
+ var o=BRS.slice().sort(function(a,b){return b.score-a.score});
+ function row(b,rk){var chip=function(l,v,p){return v==null?'<span class="chip sm nl">'+l+': n/a</span>':'<span class="chip sm">'+l+' '+v+' · P'+Math.round(p)+'</span>'};
+  var tip=b.c+' '+b.n+' · score '+b.score.toFixed(0)+' → '+b.st+' of 5 stars · Sales '+(state=='loaded'?'Ach '+b.ach.toFixed(1)+'% in sheets':'QoQ '+b.qoq.toFixed(1)+'% in sheets (no target)')+' P'+Math.round(b.p_sk)+' (50%) · Collection '+(b.col==null?'n/a':b.col.toFixed(1)+'% collected ÷ invoiced P'+Math.round(b.p_col)+' (30%)')+' · Stock days '+(b.stk==null?'n/a':b.stk.toFixed(0)+' days P'+Math.round(b.p_stk)+' (20%, lower is better)')+' · weights used: '+b.W;
+  return '<div class="br" data-tip="'+tip+'" tabindex="0"><div class="h"><span><b class="mono">#'+rk+'</b> <b>'+b.n+'</b> <span class="note mono">'+b.c+'</span></span><span class="stars" aria-label="'+b.st+' of 5 stars"><span aria-hidden="true">'+'★'.repeat(b.st)+'☆'.repeat(5-b.st)+'</span> <span class="mono" style="font-size:12px">'+b.score.toFixed(0)+'</span></span></div><div class="row">'
+  +chip('Sales',state=='loaded'?b.ach.toFixed(0)+'%':(b.qoq<0?'':'+')+b.qoq.toFixed(0)+'% QoQ',b.p_sk)+chip('Coll.',b.col==null?null:b.col.toFixed(0)+'%',b.p_col)+chip('Stock',b.stk==null?null:b.stk.toFixed(0)+'d',b.p_stk)+'</div>'+(b.n3<3?'<span class="note">based on '+b.n3+' of 3 measures, others reweighted</span>':'')+'</div>'}
+ document.getElementById('rtop').innerHTML=o.slice(0,5).map(function(b,i){return row(b,i+1)}).join('');
+ document.getElementById('rbot').innerHTML=o.slice(-5).map(function(b,i){return row(b,o.length-4+i)}).join('');
+ document.getElementById('rrule').innerHTML='Score = weighted percentile rank among '+o.length+' in-scope branches: sales 50% ('+(state=='loaded'?'Ach % in sheets':'QoQ % in sheets, because no target is loaded')+'), collection efficiency 30% (collected ÷ invoiced ₹, Q2 FY27), stock days 20% (lower is better). P = percentile. A missing measure is dropped and the rest reweighted.'}
+rate('loaded');
 /* tooltip */
 var tip=document.getElementById('tip');
 function show(e){var t=e.target.closest&&e.target.closest('[data-tip]');if(!t){tip.style.display='none';return}tip.textContent=t.getAttribute('data-tip');tip.style.display='block';var r=t.getBoundingClientRect();tip.style.left=Math.max(8,Math.min(innerWidth-270,r.left))+'px';tip.style.top=Math.max(8,r.top-tip.offsetHeight-8)+'px'}
 document.addEventListener('pointerover',show);document.addEventListener('focusin',show);document.addEventListener('click',show);document.addEventListener('focusout',function(){tip.style.display='none'});
 /* state + theme */
 var root=document.getElementById('root');
-function setS(s){root.setAttribute('data-state',s);document.getElementById('s-loaded').setAttribute('aria-pressed',s=='loaded');document.getElementById('s-today').setAttribute('aria-pressed',s=='today');document.getElementById('basis').textContent=s=='loaded'?'Net sales (credit notes loaded for 42 of 42 plants)':'Invoiced sales (credit notes not loaded: 0 of 42 plants)'}
+function setS(s){root.setAttribute('data-state',s);document.getElementById('s-loaded').setAttribute('aria-pressed',s=='loaded');document.getElementById('s-today').setAttribute('aria-pressed',s=='today');rate(s);drawTrend();document.getElementById('basis').textContent=s=='loaded'?'Net sales (credit notes loaded for 42 of 42 plants)':'Invoiced sales (credit notes not loaded: 0 of 42 plants)'}
 document.getElementById('s-loaded').onclick=function(){setS('loaded')};document.getElementById('s-today').onclick=function(){setS('today')};
 var th=['system','light','dark'],ti=0;document.getElementById('th').onclick=function(){ti=(ti+1)%3;var h=document.documentElement;if(th[ti]=='system')h.removeAttribute('data-theme');else h.setAttribute('data-theme',th[ti]);this.textContent='Theme: '+th[ti]};
 })();

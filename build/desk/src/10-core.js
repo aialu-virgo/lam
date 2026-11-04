@@ -138,6 +138,11 @@ function statusOf(ach,lowerBetter){
   if(lowerBetter){/* ach is actual/plan for lower-better KPIs */return ach<=100?'green':ach<=110?'orange':'red'}
   return ach>=CFG.status_green_pct?'green':ach>=CFG.status_orange_pct?'orange':'red';
 }
+/* D55: an achievement above 300% means the target is wrong (never a real result): it is shown as "Check target", not as a number */
+var ACH_MAX=300;
+function achCap(a){return a!=null&&a>ACH_MAX}
+/* D57: the same guard for Share of potential: above 300% the potential is wrong, show "Check potential" */
+function shareTxt(o){return o.shareCheck?'<b class="a-orange">Check potential</b>':(o.share!=null?o.share.toFixed(1)+'%':((o.pot==null||o.pot<=0)?'Potential not set':'—'))}
 /* D45: lower-is-better KPIs (K10, K15, K16, K19, K20, K21): achievement = plan / actual x 100, capped at 200%; actual 0 is "Within plan" */
 function achLower(actual,plan){
   if(actual==null||isNaN(actual)||plan==null||isNaN(plan))return {ach:null,within:false};

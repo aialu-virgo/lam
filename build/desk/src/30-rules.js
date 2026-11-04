@@ -77,6 +77,7 @@ function ownerFor(rule,ctx){
   if(rule==='R2')chain=[ctx.plant?accountsFor(ctx.plant):null,bm,hodFor('Accounts'),mg,sa];
   else if(rule==='R4')chain=[ctx.plant?plantUserFor(ctx.plant):null,bm,hodFor('Plant'),mg,sa];
   else if(rule==='R5')chain=[ctx.uploader?uByEmail(ctx.uploader):null,sa];
+  else if(rule==='R8')chain=[sa];
   else if(rule==='R7'&&ctx.kind==='group')chain=[hodFor('Sales'),mg,sa];
   else if(rule==='R7'&&ctx.kind==='person')chain=[ctx.sp?userBySp(ctx.sp):null,bm,hodFor('Sales'),mg,sa];
   else if(rule==='R7'&&ctx.kind==='customer')chain=[ctx.sp?userBySp(ctx.sp):null,bm,hodFor('Sales'),mg,sa];
@@ -87,7 +88,7 @@ function ownerFor(rule,ctx){
 /* ---- candidate builders ---- */
 function mkCand(rule,key,period,o){
   var own=ownerFor(rule,o.ctx||{});
-  var dept={R1:'Sales',R2:'Accounts',R4:'Plant',R5:'HO',R6:'Sales',R7:'Sales'}[rule];
+  var dept={R1:'Sales',R2:'Accounts',R4:'Plant',R5:'HO',R6:'Sales',R7:'Sales',R8:'HO'}[rule];
   return {id:actionIdOf(rule,[key,period]),rule:rule,period:period,title:o.title,source:o.source,owner:own.u?own.u.email:'',ownerUp:own.up,department:dept,plant:o.plant||'',group:o.group||'',customer:o.customer||'',
     due:addWD(TODAY(),CFG['due_'+rule]||3),next_step:o.next,value:Math.round(o.value||0),meta:o.meta||{}};
 }
@@ -108,6 +109,22 @@ function evalR1(){
     });
   })});
   return {out:out,live:true};
+}
+/* D55/D57: a real target (or potential) that gives more than 300% is probably wrong: ask the Super admin to check it. The text never prints the absurd figure. */
+function evalR8(){
+  var out=[],t=TODAY(),q=curQuarterKey(),ms=qMonths(q),N=wdBetween(ms[0]+'-01',t),w=walk(ms,N);
+  if(!S.potential.length)return {out:out,live:null};
+  DS.plants.forEach(function(plant){GROUPS.forEach(function(g){
+    var f={plant:plant,group:g},pw=planW(f,w),where=plantShort(plant)+', '+g+', '+qLabel(q);if(!pw.any)return;
+    var act=sumF(f,w).n;
+    if(pw.tgt>0&&achCap(act/pw.tgt*100))out.push(mkCand('R8',plant+'_'+g,q,{title:'Check target · '+where,plant:plant,group:g,value:act-pw.tgt,ctx:{plant:plant},
+      source:{label:'Rule R8 · achievement is over '+ACH_MAX+'% of the target',page:'overview',plant:plant,group:g},
+      next:'Achievement is over '+ACH_MAX+'% of the target: check the target ('+where+'). Open Admin › Market potential, then correct the target or confirm it is real.',meta:{kind:'target'}}));
+    if(pw.pot>0&&achCap(act/pw.pot*100))out.push(mkCand('R8',plant+'_'+g+'_pot',q,{title:'Check potential · '+where,plant:plant,group:g,value:act-pw.pot,ctx:{plant:plant},
+      source:{label:'Rule R8 · share of potential is over '+ACH_MAX+'%',page:'overview',plant:plant,group:g},
+      next:'Share of potential is over '+ACH_MAX+'%: check the potential ('+where+'). Open Admin › Market potential, then correct the potential or confirm it is real.',meta:{kind:'potential'}}));
+  })});
+  return {out:out,live:null};
 }
 function evalR2(){
   var out=[],items=[];(S.recv||[]).forEach(function(d){(d.rows||[]).forEach(function(r){items.push({plant:d.plant,inv:r[0],cust:r[1],name:r[2],due:r[3],open:r[4]})})});
@@ -208,7 +225,7 @@ async function runEngine(){
   if(S.engSig===sig||S.engBusy)return;
   S.engBusy=true;S.engSig=sig;S.engStatus='Checking rules...';
   try{
-    var res=[evalR1(),evalR2(),evalR4(),evalR5(),evalR6()];res.push(await evalR7());
+    var res=[evalR1(),evalR2(),evalR4(),evalR5(),evalR6()];res.push(await evalR7());res.push(evalR8());
     var all=[];res.forEach(function(r){all=all.concat(r.out)});
     /* existing actions are never duplicated; new ones capped per rule per run, largest value first */
     var have={};S.actions.forEach(function(a){have[a.id]=1});
