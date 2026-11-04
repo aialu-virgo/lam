@@ -17,6 +17,10 @@ function oxQoqChip(q,unit){
   if(q&&q.state==='ok')return '<span class="ox-chip '+(q.v>=0?'ok':'bad')+'">'+(q.v>=0?'▲ +':'▼ −')+Math.abs(q.v).toFixed(1)+'% '+(unit||'QoQ')+'</span>';
   return '<span class="ox-chip nl">'+esc(unit||'QoQ')+' · '+esc((q&&q.txt)||'—')+'</span>';
 }
+/* D55: achievement above 300% is a wrong target: no number, "Check target" instead */
+function oxAchV(a,t){return t>0&&!achCap(a/t*100)?a/t*100:null}
+function oxAchCk(a,t){return t>0&&achCap(a/t*100)}
+function oxAchChip(x){return x.ck?'<span class="ox-chip warn">Check target</span>':x.ach!=null?oxBandChip(x.ach):'<span class="ox-chip nl">Ach: not loaded</span>'}
 function oxDrill(k,label){return '<button class="ox-drill" data-act="ox-open" data-k="'+k+'">'+(label||'Table ›')+'</button>'}
 /* bullet bar: act (coloured by band), target tick, last-quarter dashed marker, grey track = potential (or the largest figure when there is no potential) */
 function oxBul(o){
@@ -40,7 +44,7 @@ function oxSeries(ctx){
     if(has&&s.net&&sp==null){shNet=sh0-cnFor(ff,w).sheets}
     var P=sp==null?planQ(f,s.q):null,tgt=P&&P.nLeaf&&P.tgtSh>0?P.tgtSh:null,tgtTo=null;
     if(s.isCur&&sp==null){var pq=planQtyF(f,w);tgtTo=pq.any&&pq.tgt>0?pq.tgt:null}
-    return {q:s.q,label:s.label,isCur:s.isCur,full:s.loaded,partial:has&&!s.loaded&&!s.isCur,has:has,sh0:sh0,shNet:shNet,net:s.net,H:shNet!=null?shNet:sh0,tgt:tgt,tgtTo:s.isCur?tgtTo:tgt,N:s.N,A:s.A,ach:s.ach};
+    return {q:s.q,label:s.label,cov:s.cov,isCur:s.isCur,full:s.loaded,partial:has&&!s.loaded&&!s.isCur,has:has,sh0:sh0,shNet:shNet,net:s.net,H:shNet!=null?shNet:sh0,tgt:tgt,tgtTo:s.isCur?tgtTo:tgt,N:s.N,A:s.A,ach:s.ach};
   });
 }
 function oxQoqAt(ser,i){
@@ -57,7 +61,7 @@ function oxTrendStats(ser){
   return trendStats(inv,{pairs:function(i){var a=ser[i],p=ser[i-1];return a&&p&&a.net&&p.net&&a.full&&p.full&&!a.isCur?[a.shNet,p.shNet]:null}});
 }
 function oxTrendSvg(ser,hasTgt){
-  var W=620,H=240,L=34,B=34,T=14,n=ser.length,bw=(W-L-10)/n,vals=[];
+  var W=620,H=262,L=34,B=58,T=14,n=ser.length,bw=(W-L-10)/n,vals=[];
   ser.forEach(function(s){[s.H,s.tgt,s.tgtTo].forEach(function(v){if(v!=null)vals.push(v)})});
   var proj=null,cur=ser[n-1];
   if(cur&&cur.isCur&&cur.has&&cur.N>0&&cur.N!==Infinity){var wdTot=qMonths(cur.q).reduce(function(a,m){return a+WD(m)},0);if(wdTot>cur.N)proj=cur.H/cur.N*wdTot}
@@ -76,8 +80,9 @@ function oxTrendSvg(ser,hasTgt){
       s+='<rect x="'+bx+'" y="'+y(v)+'" width="'+w+'" height="'+Math.max(1,y(0)-y(v))+'" rx="4" fill="'+(q.partial?'url(#oxh)':'var(--act)')+'"/>';
     }
     if(tg!=null)s+='<line x1="'+(bx-4)+'" x2="'+(bx+w+4)+'" y1="'+y(tg)+'" y2="'+y(tg)+'" stroke="var(--plan)" stroke-width="3"/>';
-    s+='<text x="'+(bx+w/2)+'" y="'+(H-20)+'" text-anchor="middle" class="st">'+esc(q.label.replace(' FY',' ·'))+(q.isCur?'*':'')+'</text>';
-    s+='<text x="'+(bx+w/2)+'" y="'+(H-6)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text></g>';
+    if(v!=null)s+='<text x="'+(bx+w/2)+'" y="'+(y(v)-4)+'" text-anchor="middle" class="st vl">'+oxLakh(v)+'</text>';
+    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+13)+'" text-anchor="middle" class="st">'+esc(q.label.replace(' FY',' ·'))+(q.isCur?'*':'')+'</text>';
+    s+='<text x="'+(bx+w/2)+'" y="'+(H-B+26)+'" text-anchor="middle" style="fill:'+(qq.v==null?'var(--ink3)':qq.v>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(qq.v==null?esc(qq.txt):(qq.v>=0?'▲':'▼')+Math.abs(qq.v).toFixed(1)+'%')+'</text>'+(q.partial&&q.cov?'<text x="'+(bx+w/2)+'" y="'+(H-B+38)+'" text-anchor="middle" class="st">partial:</text><text x="'+(bx+w/2)+'" y="'+(H-B+49)+'" text-anchor="middle" class="st">'+q.cov.n+' of '+q.cov.N+' plants</text>':'')+'</g>';
   });
   return s+'</svg>';
 }
@@ -87,18 +92,18 @@ function pageOverview(){
   var res=ctx.res,tot=figs({},ctx),sc=ctx.sc,today=TODAY(),pset=ctx.plants;
   var f0=Object.assign({plants:ctx.plants},ctx.base),own=!!sc.sp;
   var q=planQty(ctx),shQ=shQoq(tot,res),ser=oxSeries(ctx),tsSh=oxTrendStats(ser),cur=ser[ser.length-1];
-  var tgtOk=q.tgt>0,potOk=q.pot>0,ach=tgtOk?tot.sh/q.tgt*100:null,var_=tgtOk?tot.sh-q.tgt:null,share=potOk?tot.sh/q.pot*100:null;
+  var heroCk=oxAchCk(tot.sh,q.tgt),tgtOk=q.tgt>0&&!heroCk,potOk=q.pot>0,ach=tgtOk?tot.sh/q.tgt*100:null,var_=tgtOk?tot.sh-q.tgt:null,share=potOk?tot.sh/q.pot*100:null;
   var lastSh=res.prior?(tot.bothNet?tot.Psh:tot.Psh0):null;
   var basisTxt=tot.basis==='Net'?'Net sales (credit notes loaded for every plant in scope)':'Invoiced sales ('+cnNote(tot).replace(/^Invoiced · /,'').replace(/\.$/,'')+')';
   /* groups */
-  var groups=distinct('group').map(function(g){var o=figs({group:g},ctx,{noTrend:true}),pq=planQtyF(Object.assign({plants:ctx.plants},ctx.base,{group:g}),res.cur);return {g:g,o:o,pq:pq,ach:pq.tgt>0?o.sh/pq.tgt*100:null,q:shQoq(o,res)}});
+  var groups=distinct('group').map(function(g){var o=figs({group:g},ctx,{noTrend:true}),pq=planQtyF(Object.assign({plants:ctx.plants},ctx.base,{group:g}),res.cur);return {g:g,o:o,pq:pq,ach:oxAchV(o.sh,pq.tgt),ck:oxAchCk(o.sh,pq.tgt),q:shQoq(o,res)}});
   var totSh=groups.reduce(function(a,x){return a+x.o.sh},0)||1;
   /* zones and plants */
   var plantsIn=distinct('plant').filter(function(p){return plantInScope(sc,p)&&(!ctx.f.plant||p===ctx.f.plant)});
   var zoneOf=function(p){var r=S.plants.find(function(x){return x.plant_code===p});return r&&r.zone?r.zone:''};
   var zoneMap={};plantsIn.forEach(function(p){var z=zoneOf(p);if(z)(zoneMap[z]=zoneMap[z]||[]).push(p)});
-  var zones=Object.keys(zoneMap).sort().map(function(z){var ps=new Set(zoneMap[z]),o=figs({plants:ps},ctx,{noTrend:true}),pq=planQtyF(Object.assign({},f0,{plants:ps}),res.cur);return {z:z,o:o,pq:pq,ach:pq.tgt>0?o.sh/pq.tgt*100:null,q:shQoq(o,res)}});
-  var plants=plantsIn.map(function(p){var o=figs({plant:p,plants:undefined},ctx,{noTrend:true}),pq=planQtyF(Object.assign({},f0,{plants:undefined,plant:p}),res.cur);return {p:p,o:o,pq:pq,ach:pq.tgt>0?o.sh/pq.tgt*100:null,v:pq.tgt>0?o.sh-pq.tgt:null}});
+  var zones=Object.keys(zoneMap).sort().map(function(z){var ps=new Set(zoneMap[z]),o=figs({plants:ps},ctx,{noTrend:true}),pq=planQtyF(Object.assign({},f0,{plants:ps}),res.cur);return {z:z,o:o,pq:pq,ach:oxAchV(o.sh,pq.tgt),ck:oxAchCk(o.sh,pq.tgt),q:shQoq(o,res)}});
+  var plants=plantsIn.map(function(p){var o=figs({plant:p,plants:undefined},ctx,{noTrend:true}),pq=planQtyF(Object.assign({},f0,{plants:undefined,plant:p}),res.cur);return {p:p,o:o,pq:pq,ach:oxAchV(o.sh,pq.tgt),ck:oxAchCk(o.sh,pq.tgt),v:pq.tgt>0&&!oxAchCk(o.sh,pq.tgt)?o.sh-pq.tgt:null}});
   /* actions for the Today panel and the answer strip */
   var u=effUser(),cand=todayCandidates(u),ranked=rankSort(cand,today),cap=capFor(u),showN=Math.min(3,cap),topAct=ranked.slice(0,showN);
   var h='<div class="ox">';
@@ -108,7 +113,7 @@ function pageOverview(){
   var behind=[];
   if(tgtOk){groups.forEach(function(x){if(x.ach!=null&&x.ach<90)behind.push(x.g)});zones.forEach(function(x){if(x.ach!=null&&x.ach<90)behind.push(x.z)})}
   var decl=groups.filter(function(x){return x.q.state==='ok'&&x.q.v<-5}).sort(function(a,b){return a.q.v-b.q.v});
-  var a1=tgtOk?'<b>'+oxPct(ach)+'% of target</b><span>In sheets: '+oxLakh(Math.abs(var_))+' lakh '+(var_<0?'behind':'ahead of')+' the '+(res.pro?'pro-rated ':'')+'target.'+(share!=null?' '+share.toFixed(1)+'% of market potential.':'')+' Worth '+fmtMoney(tot.A)+'.</span>'
+  var a1=heroCk?'<b>'+oxLakh(tot.sh)+' lakh sheets</b><span>Check target: achievement is above '+ACH_MAX+'%, so the target is probably wrong. Asked of the Super admin.</span>':tgtOk?'<b>'+oxPct(ach)+'% of target</b><span>In sheets: '+oxLakh(Math.abs(var_))+' lakh '+(var_<0?'behind':'ahead of')+' the '+(res.pro?'pro-rated ':'')+'target.'+(share!=null?' '+share.toFixed(1)+'% of market potential.':'')+' Worth '+fmtMoney(tot.A)+'.</span>'
     :'<b>'+oxLakh(tot.sh)+' lakh sheets</b><span>'+(tot.A!=null?'Worth '+fmtMoney(tot.A)+'. ':'')+'Target'+(potOk?'':' and potential')+' not loaded, so no Ach % yet.</span>';
   var a2=shQ.state==='ok'?'<b>'+(shQ.v>=0?'▲ +':'▼ −')+Math.abs(shQ.v).toFixed(1)+'% sheets</b><span>vs '+esc(res.priorLabel)+(tot.qoq&&tot.qoq.state==='ok'?' (₹ '+oxSgn(tot.qoq.v,Math.abs(tot.qoq.v).toFixed(1))+'%)':'')+'. '+(tsSh.short?'Trend: history too short.':'Trend '+(tsSh.dir==='rising'?'rising':tsSh.dir==='falling'?'falling':'flat')+(tsSh.avg!=null?', average '+fmtPct(tsSh.avg,true):'')+'.')+'</span>'
     :'<b>QoQ not shown</b><span>'+esc(shQ.txt||'no prior quarter')+'. '+(res.prior?'Compared with '+esc(res.priorLabel)+'.':'')+'</span>';
@@ -121,7 +126,7 @@ function pageOverview(){
   /* hero */
   var heroTip='Actual '+oxLakh(tot.sh)+' lakh sheets ('+fmtMoney(tot.A)+')'+(lastSh!=null?' · Last Qtr '+oxLakh(lastSh)+' lakh':'')+(shQ.state==='ok'?' · QoQ '+oxSgn(shQ.v,Math.abs(shQ.v).toFixed(1))+'%':'');
   h+='<section class="ox-card ox-hero-c"><h2>K1 · Sales in sheets · '+esc(res.label)+oxDrill('groupsh')+'</h2><div class="ox-hero"><div'+oxTip(heroTip)+'><div class="ox-big">'+oxLakh(tot.sh)+'<span class="ox-unit"> lakh sheets</span></div>'
-   +'<div class="ox-row" style="margin-top:6px">'+oxQoqChip(shQ)+(ach!=null?oxBandChip(ach):'<span class="ox-chip nl">Ach % · not loaded</span>')+(tot.kind==='draft'?'<span class="ox-chip nl">Draft target</span>':'')+'</div>'
+   +'<div class="ox-row" style="margin-top:6px">'+oxQoqChip(shQ)+(heroCk?'<span class="ox-chip warn">Check target</span>':ach!=null?oxBandChip(ach):'<span class="ox-chip nl">Ach % · not loaded</span>')+(tot.kind==='draft'?'<span class="ox-chip nl">Draft target</span>':'')+'</div>'
    +'<p class="ox-sec mono">'+fmtMoney(tot.A)+' <span class="ox-unit">'+(tot.basis==='Net'?'net value':'invoiced value')+(tot.qoq&&tot.qoq.state==='ok'?', ₹ '+oxSgn(tot.qoq.v,Math.abs(tot.qoq.v).toFixed(1))+'% QoQ':'')+'</span></p>'
    +'<p class="note" style="margin:4px 0 0">Laminate, Door, PVC sheet, Compact board. Internal transfers excluded.'+(res.pro&&res.wdN!=null?' '+res.wdN+' of '+res.wdTot+' working days elapsed.':'')+'</p></div>'
    +'<div><div'+oxTip('Actual '+oxLakh(tot.sh)+' · Target '+(tgtOk?oxLakh(q.tgt):'not loaded')+' · Potential '+(potOk?oxLakh(q.pot):'not loaded')+' lakh sheets'+(lastSh!=null?' · Last Qtr '+oxLakh(lastSh):'')+(ach!=null?' · Ach '+oxPct(ach)+'%':''))+'>'
@@ -177,7 +182,7 @@ function pageOverview(){
   /* groups */
   h+='<section class="ox-card ox-t5"><h2>Product group mix (sheets) and achievement'+oxDrill('groupsh')+'</h2><div class="ox-mix" role="img" aria-label="Sheet mix">'+groups.map(function(x,i){return '<i style="width:'+(x.o.sh/totSh*100).toFixed(1)+'%;background:var(--g'+(i+1)+')"'+oxTip(x.g+' '+(x.o.sh/totSh*100).toFixed(1)+'% of sheets')+'></i>'}).join('')+'</div>'
    +groups.map(function(x,i){var o=x.o,lastG=res.prior?(o.bothNet?o.Psh:o.Psh0):null,tip=x.g+' (lakh sheets) · Potential '+(x.pq.pot>0?oxLakh(x.pq.pot):'not loaded')+' · Target '+(x.pq.tgt>0?oxLakh(x.pq.tgt):'not loaded')+' · Actual '+oxLakh(o.sh)+(x.ach!=null?' · Ach '+oxPct(x.ach)+'%':'')+(lastG!=null?' · Last Qtr '+oxLakh(lastG):'')+(x.q.state==='ok'?' · QoQ '+oxSgn(x.q.v,Math.abs(x.q.v).toFixed(1))+'%':'');
-     return '<div class="ox-grp"'+oxTip(tip)+'><div class="h"><span><i class="sw" style="background:var(--g'+(i+1)+')"></i><b>'+esc(x.g)+'</b> <span class="mono">'+oxLakh(o.sh)+' lakh</span></span><span class="ox-row">'+(x.ach!=null?oxBandChip(x.ach):'<span class="ox-chip nl">Ach: not loaded</span>')+oxQoqChip(x.q)+'</span></div>'
+     return '<div class="ox-grp"'+oxTip(tip)+'><div class="h"><span><i class="sw" style="background:var(--g'+(i+1)+')"></i><b>'+esc(x.g)+'</b> <span class="mono">'+oxLakh(o.sh)+' lakh</span></span><span class="ox-row">'+oxAchChip(x)+oxQoqChip(x.q)+'</span></div>'
      +oxBul({act:o.sh,tgt:x.pq.tgt,pot:x.pq.pot,last:lastG,band:x.ach!=null?oxBand(x.ach):null,aria:x.g+' '+oxLakh(o.sh)+' lakh sheets'})+'</div>'}).join('')
    +'<p class="note" style="margin:0">Sheets. Bar length = lakh sheets against group potential (grey track); colour = Ach band; tick = target; dashed = Last Qtr.</p></section>';
   /* zones and plants */

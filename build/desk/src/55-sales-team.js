@@ -180,7 +180,7 @@ function kpiCompute(id,u,ctx){
    case 'K20':Object.assign(K,{name:'Escalations reached (L2 or L3)',kind:'n',actual:cur.esc,plan:0,lower:true,last:prv.esc});break;
    case 'K21':Object.assign(K,{name:'Data errors %',kind:'pct',actual:cur.rd>0?cur.rj/cur.rd*100:(cur.ups?0:null),plan:1,lower:true,last:prv.rd>0?prv.rj/prv.rd*100:null,detail:cur.ups+' uploads in the quarter'});break;
    case 'K22':Object.assign(K,{name:'Follow-ups sent on time %',kind:'pct',actual:pct(cur.sentOk,cur.drafts),plan:90,last:pct(prv.sentOk,prv.drafts),detail:cur.sentOk+' of '+cur.drafts+' drafts'});break;
-   case 'K23':{var leaves=S.potential.filter(function(x){return x.fy_quarter===q&&(!f||!f.plants||f.plants.has(x.plant_code))}),qs0=qMonths(q)[0]+'-01',okn=leaves.filter(function(x){var a=approvedOf(x);return a&&(!x.approved||!x.approved.at||x.approved.at.slice(0,10)<=qs0)}).length;Object.assign(K,{name:'Plans on time %',kind:'pct',actual:leaves.length?okn/leaves.length*100:null,plan:100,detail:okn+' of '+leaves.length+' leaves approved before the quarter'});break}
+   case 'K23':{var leaves=S.potential.filter(function(x){return x.fy_quarter===q&&!(x.demo&&realActual(x.plant_code,x.fy_quarter))&&(!f||!f.plants||f.plants.has(x.plant_code))}),qs0=qMonths(q)[0]+'-01',okn=leaves.filter(function(x){var a=approvedOf(x);return a&&(!x.approved||!x.approved.at||x.approved.at.slice(0,10)<=qs0)}).length;Object.assign(K,{name:'Plans on time %',kind:'pct',actual:leaves.length?okn/leaves.length*100:null,plan:100,detail:okn+' of '+leaves.length+' leaves approved before the quarter'});break}
    case 'K24':{var okc=0,tot2=0;closedQuarters().forEach(function(k){tot2++;if(covStatus('INV',k).st==='ok')okc++});Object.assign(K,{name:'History coverage %',kind:'pct',actual:okc/tot2*100,plan:100,detail:okc+' of '+tot2+' quarters loaded (invoice)'});break}
    case 'K25':Object.assign(K,{name:'Closures verified in 3 days %',kind:'pct',actual:pct(cur.verOk,cur.owed),plan:90,last:pct(prv.verOk,prv.owed),detail:cur.verOk+' of '+cur.owed});break;
   }
@@ -188,7 +188,7 @@ function kpiCompute(id,u,ctx){
   /* achievement and status */
   if(K.plan!=null&&K.actual!=null&&K.kind!=='text'){
     if(K.lower){var al=achLower(K.actual,K.plan);K.ach=al.ach;K.within=al.within;K.over=!!al.over;K.status=K.plan>0?(al.within?'green':statusOf(K.ach)):(K.actual<=K.plan?'green':K.actual<=1?'orange':'red')}
-    else{K.ach=K.plan>0?K.actual/K.plan*100:null;K.status=statusOf(K.ach)}
+    else{K.ach=K.plan>0?K.actual/K.plan*100:null;if(achCap(K.ach)){K.check=true;K.ach=null}K.status=statusOf(K.ach)}
   }else K.status=K.none||K.kind==='text'?'none':'none';
   if(id==='K1'&&K.actual!=null){K.status=statusOf(K.actual)}
   return K;
@@ -209,7 +209,7 @@ function kpiTable(u,ctx){
      var qoq='—';
      if(K.id==='K1'||K.id==='K2'||K.id==='K3')qoq=qoqCell(K.qoq);
      else if(K.last!=null&&K.actual!=null){var d=K.actual-K.last;qoq=K.kind==='pct'?'<span class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'−')+Math.abs(d).toFixed(1)+' pts</span>':(K.last>0?qoqCell(qoqOf(K.actual,K.last,{})):(d===0?'0':(d>0?'+':'−')+Math.abs(d)))}
-     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.over?'<b class="a-red">Over plan</b>':K.within?'<b class="a-green">Within plan</b>':K.ach!=null?fmtAch(K.ach):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
+     return '<tr><td><b>'+K.id+'</b> '+esc(K.name)+(K.detail?'<div class="note">'+esc(K.detail)+'</div>':'')+'</td><td class="num">'+(K.plan!=null?fmtK(K,K.plan):'<span class="pill mute">No plan</span>')+'</td><td class="num">'+(K.txtOnly?'<span class="note">'+esc(K.txtOnly)+'</span>':K.pending?'—':fmtK(K,K.actual))+'</td><td class="num">'+(varv!=null?(varv>=0?'+':'−')+fmtK(K,Math.abs(varv)):'—')+'</td><td class="num">'+(K.check?'<b class="a-orange">Check target</b>':K.over?'<b class="a-red">Over plan</b>':K.within?'<b class="a-green">Within plan</b>':K.ach!=null?fmtAch(K.ach):'—')+'</td><td class="num">'+(K.last!=null?fmtK(K,K.last):'—')+'</td><td class="num">'+qoq+'</td><td>'+(K.pending?statusPill('pending','Pending'):statusPill(K.status))+'</td></tr>'}).join('')+'</tbody></table></div>';
   return {html:h,on:on,scored:scored,total:rows.length};
 }
 function teamPeople(u){
