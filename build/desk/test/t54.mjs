@@ -97,6 +97,24 @@ ok('still exactly 50 user_id-bearing records',ids6.length===50,'n='+ids6.length)
  ok('upload: blank user_id on a placeholder row keeps id 1003, flag, slp_code and uid',x.user_id==='1003'&&x.placeholder===true&&x.slp_code==='SLP9'&&x.uid==='VIEW1'&&x.active===false,JSON.stringify(x));
  const hd=(await b.page.innerText('#pg')).replace(/\n/g,' ');ok('header counts real users and placeholders separately',/USERS\s*·\s*\d+\s*·\s*PLACEHOLDERS\s*\d+/i.test(hd),(hd.match(/USERS ·[^A]*/i)||[''])[0]);
  await b.ctx.close()}
+/* QA pass 2 */
+{const H3="user_id,email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code\n";
+ fs.writeFileSync(SP+'t54-p2.csv',H3+'1099,priya.k@virgo.test,Priya K,Accounts,Accounts,,,,5,Y,\n'+'1077,legacy.new@virgo.test,Legacy N,Accounts,Accounts,,,,5,Y,\n');
+ await page.setInputFiles('#up-users',SP+'t54-p2.csv');await page.waitForTimeout(1500);
+ let sA=await st();const mA=await page.innerText('#up-msg');
+ ok('upload: email-only match whose record already has a different User ID is rejected',/priya\.k@virgo\.test already has User ID 1002; change it in Admin/.test(mA)&&sA['users/u1002'].user_id==='1002','');
+ /* bulk assignment: stored record without a user_id gets one */
+ const keyN=Object.keys(sA).find(k=>/^users\//.test(k)&&!sA[k].user_id&&sA[k].email);const em=sA[keyN].email;
+ fs.writeFileSync(SP+'t54-p2b.csv',H3+'1088,'+em+','+sA[keyN].name+','+sA[keyN].role+','+sA[keyN].department+',,,,5,Y,'+(sA[keyN].sales_employee_code||'')+'\n');
+ await page.setInputFiles('#up-users',SP+'t54-p2b.csv');await page.waitForTimeout(1500);sA=await st();
+ ok('upload: record without a user_id may be given one by an email-only match (same doc)',sA[keyN]&&sA[keyN].user_id==='1088',em+' '+(await page.innerText('#up-msg')).slice(-120));
+ /* form: clearing the User ID is refused; changing it is allowed */
+ await page.click('[data-act="user-edit"][data-id="u1002"]');await page.waitForSelector('#d-userid');await page.fill('#d-userid','');await page.click('[data-act="user-save"]');await page.waitForTimeout(500);
+ const e1=await page.innerText('#d-err');const s7=await st();
+ ok('form: clearing a stored User ID is rejected and nothing is written',/User ID cannot be removed/.test(e1)&&s7['users/u1002'].user_id==='1002',e1);
+ await page.fill('#d-userid','1002');await page.fill('#d-userid','2002');await page.click('[data-act="user-save"]');await page.waitForTimeout(800);
+ ok('form: changing to another unused 4-digit User ID is allowed',(await st())['users/u1002'].user_id==='2002','');
+}
 /* legacy CSV without user_id column still loads */
 fs.writeFileSync(SP+'t54-legacy.csv','email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code\nlegacy@virgo.test,Legacy L,Accounts,Accounts,,,,5,Y,\n');
 await page.setInputFiles('#up-users',SP+'t54-legacy.csv');await page.waitForTimeout(2000);

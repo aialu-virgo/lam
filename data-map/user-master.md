@@ -46,6 +46,7 @@ Email valid and unique; role in list; every plant code exists; `reports_to_email
 
 **Upload matching.** A row is matched by `user_id` first, then by email.
 - Email rebind: a row whose `user_id` matches a **placeholder** may change that record's email (this is how a placeholder becomes a real person). If it matches a real user and the email differs, the row is rejected ("User ID n belongs to x; change the email in Admin › Users"). If `user_id` matches record A and the email matches a different record B, the row is rejected.
+- A row matched by email only: if the stored record has no `user_id`, the row's `user_id` is set (bulk ID assignment). If the stored record already has a different `user_id`, the row is rejected ("<email> already has User ID n; change it in Admin › Users"). In the form, a User ID can be changed to another unused 4-digit id but never cleared ("User ID cannot be removed").
 - Blank or missing `user_id` keeps the stored one; the upload never clears it. Fields the upload does not carry (for example `slp_code`, `uid`) are kept as stored; the `placeholder` flag is dropped only when the merged record is no longer an inactive `@placeholder.invalid` row.
 
 ## Coverage (12 quarters)
