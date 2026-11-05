@@ -14,7 +14,8 @@ var CN_FIELDS=[
  {k:'item',label:'Item code',canon:'item_code',req:1,c:['ItemCode','ITEMCODE','Product Code']},
  {k:'qty',label:'Quantity (sheets)',canon:'qty_sheets',c:['Quantity','QUANTITY','Invoice Qty']},
  {k:'value',label:'Line value (excl. GST)',canon:'net_value_inr',req:1,c:['LineTotal','LINETOTAL','Total Amount (Item)']},
- {k:'base',label:'Base document (invoice)',canon:'base_ref',c:['BaseRef','BASEREF','Reference Document']},
+ {k:'base',label:'Base document (invoice)',canon:'base_ref',c:['BaseRef','BASEREF','Reference Document','RefNo']},
+ {k:'acct',label:'Sale account name (transfer flag)',canon:'sale_account_name',c:['AcctName','Account Name']},
  {k:'type',label:'Billing type (S/4)',canon:'billing_type',c:['Billing Type']}];
 function cnMapKey(sys,layout){return sys+'_creditnote_'+String(layout||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function cnDetectB1(headers){
@@ -35,9 +36,9 @@ function cnStart(file,rows,headers,det,sheetPicked){
   U.stage='mapping';renderUpload();
 }
 async function cnParse(){
-  var map=U.map,rows=U.rows,col=function(k){return map[k]==null?-1:map[k]},cB=col('branch'),cD=col('doc'),cL=col('line'),cT=col('date'),cC=col('cust'),cI=col('item'),cQ=col('qty'),cV=col('value'),cBa=col('base'),cTy=col('type');
+  var map=U.map,rows=U.rows,col=function(k){return map[k]==null?-1:map[k]},cB=col('branch'),cD=col('doc'),cL=col('line'),cT=col('date'),cC=col('cust'),cI=col('item'),cQ=col('qty'),cV=col('value'),cBa=col('base'),cTy=col('type'),cAc=col('acct'),tset=new Set();S.transfers.forEach(function(t){if(t.flag!==false)tset.add(String(t.code).toUpperCase())});
   var idx=await loadItemIdx(),resolve=plantResolver(),per=U.period,today=TODAY(),lo=histLoYm();
-  var res={read:rows.length,good:0,rejected:0,rejects:[],reasons:{},period:per,layout:U.layout,acp:{rows:0,value:0},other:{rows:0,value:0},preHist:{rows:0,value:0},unknownBranch:{},nonCredit:0,months:{},pm:new Map(),minDate:null,maxDate:null,value:0,sheets:0,itemMaster:idx.size>0,covMonths:[]};
+  var res={read:rows.length,good:0,rejected:0,rejects:[],reasons:{},period:per,layout:U.layout,acp:{rows:0,value:0},other:{rows:0,value:0},preHist:{rows:0,value:0},unknownBranch:{},xfer:{rows:0,value:0},xferMaster:0,nonCredit:0,months:{},pm:new Map(),minDate:null,maxDate:null,value:0,sheets:0,itemMaster:idx.size>0,covMonths:[]};
   var rej=function(i,doc,field,reason,val){res.rejected++;res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,doc,'',field,reason,val==null?'':val])};
   var T0=Date.now(),seen=new Set();res.dup=0;
   for(var i=0;i<rows.length;i++){
@@ -59,6 +60,9 @@ async function cnParse(){
     if(pl.business==='ACP'||+pl.plant_code>=1050){res.acp.rows++;res.acp.value+=val;continue}
     if(pl.active===false){rej(i,doc,'Plant','Plant is switched off in Admin',pl.plant_code);continue}
     if(ym<lo){res.preHist.rows++;res.preHist.value+=val;continue}
+    /* internal transfers are excluded the way sales excludes them: the stock-outward account or a customer in the Admin transfer list */
+    var acN=cAc>=0?norm(r[cAc]):'',byMaster=cC>=0&&tset.has(String(r[cC]==null?'':r[cC]).trim().toUpperCase());
+    if(acN==='sales gst - stock outward'||byMaster){res.xfer.rows++;res.xfer.value+=val;if(byMaster)res.xferMaster++;continue}
     var item=String(r[cI]==null?'':r[cI]).trim().toUpperCase(),it=idx.get(item);
     if(!it){res.other.rows++;res.other.value+=val;continue}
     var line=cL>=0?String(r[cL]==null?'':r[cL]).trim().replace(/\.0$/,''):'',dk=pl.plant_code+'|'+doc+'|'+line+'|'+item+'|'+qty+'|'+val;
@@ -114,6 +118,7 @@ function cnResultHtml(locked){
   if(!r.itemMaster)it.push({st:'need',t:'No item master loaded',n:null,d:'The product group and sheets need the item master (Admin › Item master).'});
   if(r.other.rows)it.push({st:'info',t:'Items not in the item master (counted, not stored)',n:r.other.rows,d:esc(fmtMoney(r.other.value)+'. The item master holds laminate-scope items only.')});
   if(r.acp.rows)it.push({st:'info',t:'ACP plants skipped',n:r.acp.rows,d:esc(fmtMoney(r.acp.value))});
+  if(r.xfer.rows)it.push({st:'info',t:'Internal transfers excluded (as in sales)',n:r.xfer.rows,d:esc(fmtMoney(r.xfer.value)+'; '+fmtN(r.xferMaster)+' via the Admin transfer list')});
   if(r.preHist.rows)it.push({st:'info',t:'Before history start ('+qLabel(histStart())+')',n:r.preHist.rows,d:'Not loaded; no action needed (D28).'});
   if(r.nonCredit)it.push({st:'info',t:'Invoice rows (billing type F2) skipped',n:r.nonCredit,d:'This file is for credit notes only.'});
   if(r.dup)it.push({st:'fixed',t:'Repeated lines removed',n:r.dup,d:''});
