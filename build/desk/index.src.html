@@ -1008,7 +1008,7 @@ function validateUser(u,isNew,selfId){
   if(u.user_id){if(!/^\d{4}$/.test(u.user_id))errs.push('User ID must be 4 digits');else if(S.users.some(function(x){return x.user_id===u.user_id&&(isNew||x._id!==selfId)}))errs.push('User ID '+u.user_id+' is already used')}
   if(!u.name)errs.push('Name is required');
   if(/@placeholder\.invalid$/i.test(u.email||'')&&u.active!==false)errs.push('A placeholder e-mail cannot be switched on. Enter the real e-mail first');
-  if(isPH(u)){if(!u.user_id)errs.push('A placeholder needs a User ID');return errs}
+  if(isPH(u)){if(!u.user_id)errs.push('A placeholder needs a User ID');if(u.reports_to_email)errs.push('A placeholder cannot have a reports-to');return errs}
   if(ROLES.indexOf(u.role)<0)errs.push('Role is not one of the 8 roles');
   if(!u.department)errs.push('Department is required');
   if(u.plant_codes){u.plant_codes.split(';').forEach(function(c){c=c.trim();if(c&&!S.plants.some(function(p){return p.plant_code===c}))errs.push('Plant code '+c+' is not in the plant master')})}
