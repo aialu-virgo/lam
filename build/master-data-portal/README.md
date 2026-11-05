@@ -36,9 +36,9 @@ Replace the placeholder dropdown lists (`OPTIONS`: department, finish, thickness
 Keep the GST list a subset of 0, 0.25, 3, 5, 12, 18, 28. After any CONFIG change, **Deploy > Manage deployments > Edit > New version > Deploy** (the web app URL stays the same).
 
 ## 3. Run setup once
-1. Select function `setup`, click **Run**, then **Review permissions** and allow (Sheets, Drive, send e-mail, external requests, your e-mail address).
+1. Select function `setup` (run it once, signed in as data@virgoasia.com; it also refuses anyone who is not an authorised admin if called from the web page), click **Run**, then **Review permissions** and allow (Sheets, Drive, send e-mail, external requests, your e-mail address).
 2. Check the log: it prints the new spreadsheet URL ("Virgo Asia Master Data Requests", sheets "Item Master Requests" and "Admins") and the Drive folder. Their IDs are saved in Script Properties (`SPREADSHEET_ID`, `DRIVE_FOLDER_ID`); the request counter is `REQ_COUNTER`.
-3. Do not rename or reorder the first 29 columns of "Item Master Requests". Columns 30-31 (Last Updated, Updated By) are audit columns.
+3. Text values starting with `=`, `+`, `-` or `@` are stored with a leading apostrophe so they can never run as formulas. Do not rename or reorder the first 29 columns of "Item Master Requests". Columns 30-31 (Last Updated, Updated By) are audit columns.
 
 ## 4. Deploy as web app
 **Deploy > New deployment > Web app**: Execute as **Me (data@virgoasia.com)**; Who has access **Anyone within virgoasia.com** (matches the manifest). Copy the `/exec` URL. Optional deep links: `?page=item`, `?page=status`, `?page=reports`.

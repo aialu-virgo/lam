@@ -95,8 +95,10 @@ function doGet(e) {
   }
 }
 
-/** Used by Index.html: <?!= include('Styles') ?> */
-function include(name) {
+/** Private (trailing underscore: not callable from the browser). Used by Index.html: <?!= include_('Styles') ?> */
+var INCLUDE_ALLOW = ['Styles', 'JavaScript', 'ItemForm', 'StatusTracking', 'Admin'];
+function include_(name) {
+  if (INCLUDE_ALLOW.indexOf(name) < 0) throw new Error('Include not allowed: ' + name);
   return HtmlService.createHtmlOutputFromFile(name).getContent();
 }
 
@@ -122,6 +124,15 @@ function run_(fn) {
     console.error(e && e.stack || e);
     return { ok: false, error: 'Unexpected error: ' + (e && e.message ? e.message : e) };
   }
+}
+
+/** Neutralise spreadsheet formulas: a leading = + - @ (or tab/CR) gets an apostrophe prefix. */
+function safeCell_(v) {
+  if (typeof v === 'string' && /^[=+\-@\t\r]/.test(v)) return "'" + v;
+  return v;
+}
+function unsafeCell_(v) {
+  return (typeof v === 'string' && /^'[=+\-@\t\r]/.test(v)) ? v.slice(1) : v;
 }
 
 function esc_(s) {
@@ -215,6 +226,7 @@ function getRootFolder_() {
 
 /** Run once from the editor: creates sheet + folder, seeds admin, triggers the authorisation prompt. */
 function setup() {
+  requireAdmin_();   // public functions are callable from the page: only an authorised admin may run setup
   var sh = getRequestSheet_();
   getAdminSheet_();
   var folder = getRootFolder_();
@@ -234,7 +246,7 @@ function listAdmins_() {
   var rows = last > 1 ? sh.getRange(2, 1, last - 1, 3).getValues() : [];
   var out = [], seen = {};
   rows.forEach(function (r) {
-    var e = String(r[0] || '').trim().toLowerCase();
+    var e = unsafeCell_(String(r[0] || '')).trim().toLowerCase();
     if (e && !seen[e]) { seen[e] = true; out.push({ email: e, addedBy: String(r[1] || ''), addedOn: String(r[2] || '') }); }
   });
   var seed = CONFIG.SEED_ADMIN.toLowerCase();
@@ -435,7 +447,7 @@ function submitItemRequest(payload) {
       rec.adminComments = '';
       rec.lastUpdated = now;
       rec.updatedBy = 'Requester';
-      var row = COLS.map(function (c) { var x = rec[c[1]]; return x === undefined ? '' : x; });
+      var row = COLS.map(function (c) { var x = rec[c[1]]; return x === undefined ? '' : safeCell_(x); });
       sheet.appendRow(row);
       rowIndex = sheet.getLastRow();
       SpreadsheetApp.flush();
@@ -451,13 +463,13 @@ function submitItemRequest(payload) {
       result.attachments = saved.links.length;
       if (saved.links.length) {
         var cell = sheet.getRange(findRow_(sheet, requestNumber), colIndex_('attachmentLink'));
-        cell.setValue(saved.folderUrl + '\n' + saved.links.join('\n'));
+        cell.setValue(safeCell_(saved.folderUrl + '\n' + saved.links.join('\n')));
         d._attachmentText = saved.folderUrl;
       }
     } catch (e) {
       console.error(e && e.stack || e);
       result.attachmentError = 'Request saved, but attachments could not be stored: ' + e.message;
-      try { sheet.getRange(findRow_(sheet, requestNumber), colIndex_('attachmentLink')).setValue('UPLOAD FAILED: ' + e.message); } catch (e2) { /* ignore */ }
+      try { sheet.getRange(findRow_(sheet, requestNumber), colIndex_('attachmentLink')).setValue(safeCell_('UPLOAD FAILED: ' + e.message)); } catch (e2) { /* ignore */ }
     }
 
     // E-mail (failure must never lose the request)
@@ -511,6 +523,38 @@ function plainBody_(requestNumber, now, d) {
   return lines.join('\n');
 }
 
+/**
+ * Retry attachments for a request whose upload failed. Accepts only the requester's own request:
+ * the e-mail given must match the row, and (when the visitor is identified) the signed-in e-mail too.
+ * Only allowed while the row's Attachment Link says "UPLOAD FAILED".
+ */
+function retryAttachments(payload) {
+  return run_(function () {
+    payload = payload || {};
+    var num = String(payload.requestNumber || '').trim().toUpperCase();
+    var email = String(payload.email || '').trim().toLowerCase();
+    var problems = validateFiles_(payload.files);
+    if (!payload.files || !payload.files.length) problems.push('Choose at least one file.');
+    if (problems.length) throw UserError(problems.join(' '));
+    var sheet = getRequestSheet_();
+    var r = findRow_(sheet, num);
+    if (r < 0) throw UserError('Request ' + num + ' was not found.');
+    var cur = sheet.getRange(r, 1, 1, COLS.length).getValues()[0];
+    var rowEmail = unsafeCell_(String(cur[colIndex_('email') - 1])).toLowerCase();
+    var me = activeEmail_();
+    if (!email || rowEmail !== email || (me && me !== rowEmail)) throw UserError('This request does not belong to you.');
+    if (String(cur[colIndex_('attachmentLink') - 1]).indexOf('UPLOAD FAILED') !== 0) {
+      throw UserError('Attachments for ' + num + ' do not need a retry.');
+    }
+    var saved = saveAttachments_(num, payload.files);
+    var rr = findRow_(sheet, num);
+    sheet.getRange(rr, colIndex_('attachmentLink')).setValue(safeCell_(saved.folderUrl + '\n' + saved.links.join('\n')));
+    sheet.getRange(rr, colIndex_('lastUpdated')).setValue(new Date());
+    SpreadsheetApp.flush();
+    return { requestNumber: num, attachments: saved.links.length };
+  });
+}
+
 /* ============================ Row reading ============================ */
 
 function readAllRows_(sheet) {
@@ -527,7 +571,7 @@ function readAllRows_(sheet) {
         o[c[1]] = fmt_(v);
         if (c[1] === 'requestDate') o._month = fmt_(v, 'yyyy-MM');
       } else {
-        o[c[1]] = (v === null || v === undefined) ? '' : String(v);
+        o[c[1]] = (v === null || v === undefined) ? '' : unsafeCell_(String(v));
       }
     });
     out.push(o);
@@ -621,15 +665,15 @@ function adminUpdateRequest(p) {
       if (r < 0) throw UserError('Request ' + num + ' was not found.');
       var cur = sheet.getRange(r, 1, 1, COLS.length).getValues()[0];
       oldStatus = String(cur[colIndex_('status') - 1]);
-      requesterEmail = String(cur[colIndex_('email') - 1]);
+      requesterEmail = unsafeCell_(String(cur[colIndex_('email') - 1]));
       var history = String(cur[colIndex_('adminComments') - 1] || '');
       if (status !== oldStatus) lines.push('[' + stamp + '] ' + admin + ': Status changed from ' + oldStatus + ' to ' + status + '.');
       if (comment) lines.push('[' + stamp + '] ' + admin + ': ' + comment.replace(/\r?\n/g, ' '));
       if (!lines.length) throw UserError('Nothing to update: change the status or add a comment.');
       sheet.getRange(r, colIndex_('status')).setValue(status);
-      sheet.getRange(r, colIndex_('adminComments')).setValue((history ? history + '\n' : '') + lines.join('\n'));
+      sheet.getRange(r, colIndex_('adminComments')).setValue(safeCell_((history ? history + '\n' : '') + lines.join('\n')));
       sheet.getRange(r, colIndex_('lastUpdated')).setValue(now);
-      sheet.getRange(r, colIndex_('updatedBy')).setValue(admin);
+      sheet.getRange(r, colIndex_('updatedBy')).setValue(safeCell_(admin));
       SpreadsheetApp.flush();
       updated = true;
     } finally {
@@ -667,7 +711,7 @@ function adminExportXlsx(requestNumbers) {
       rows = rows.filter(function (r) { return want[r.requestNumber]; });
     }
     var header = COLS.map(function (c) { return c[0]; });
-    var data = [header].concat(rows.map(function (r) { return COLS.map(function (c) { return String(r[c[1]]); }); }));
+    var data = [header].concat(rows.map(function (r) { return COLS.map(function (c) { return safeCell_(String(r[c[1]])); }); }));
     var tmp = SpreadsheetApp.create('tmp-export-' + new Date().getTime());
     var id = tmp.getId();
     try {
@@ -712,7 +756,7 @@ function adminAddAdmin(email) {
     lock.waitLock(30000);
     try {
       if (listAdmins_().some(function (a) { return a.email === e; })) throw UserError(e + ' is already an admin.');
-      sh.appendRow([e, me, fmt_(new Date())]);
+      sh.appendRow([safeCell_(e), safeCell_(me), fmt_(new Date())]);
       SpreadsheetApp.flush();
     } finally {
       lock.releaseLock();
@@ -733,7 +777,7 @@ function adminRemoveAdmin(email) {
     try {
       var last = sh.getLastRow(), removed = false;
       for (var r = last; r >= 2; r--) {
-        if (String(sh.getRange(r, 1).getValue()).trim().toLowerCase() === e) { sh.deleteRow(r); removed = true; }
+        if (unsafeCell_(String(sh.getRange(r, 1).getValue())).trim().toLowerCase() === e) { sh.deleteRow(r); removed = true; }
       }
       if (!removed) throw UserError(e + ' is not in the admin list.');
       SpreadsheetApp.flush();

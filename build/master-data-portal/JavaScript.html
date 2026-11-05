@@ -110,6 +110,13 @@
     else { el.classList.remove('is-invalid'); if (fb) fb.textContent = ''; }
   }
 
+  var KEEP = ['requestorName', 'department', 'email', 'mobile'];
+  function keepValues() { var o = {}; KEEP.forEach(function (k) { o[k] = $('f_' + k).value; }); return o; }
+  function restoreValues(o) {
+    KEEP.forEach(function (k) { if (o[k]) $('f_' + k).value = o[k]; });
+    if (!$('f_email').value && APP.config.user.email) $('f_email').value = APP.config.user.email;
+  }
+
   function initForm() {
     var cfg = APP.config;
     var selects = document.querySelectorAll('#itemForm select[data-options]');
@@ -191,19 +198,44 @@
       if (res.mail.errors && res.mail.errors.length) warn.push('Your request is saved, but e-mail had a problem: ' + res.mail.errors.join(' '));
       var html = '<p class="mb-1">Your Request Number is <strong>' + esc(res.requestNumber) + '</strong>. Keep it to track the status.</p>' +
         '<p class="mb-0 small">Attachments saved: ' + esc(res.attachments) + '. Acknowledgement e-mail: ' + (res.mail.requester ? 'sent' : 'not sent') + '.</p>';
-      $('itemSuccess').innerHTML = '<div class="alert alert-success" role="alert">' + html + '</div>';
-      if (warn.length) showAlert('itemAlert', 'warning', warn.join(' '));
-      $('itemForm').reset(); APP.files = []; renderFiles(); $('fileError').textContent = '';
-      FIELD_KEYS.forEach(function (k) { setFieldError(k, ''); });
-      $('f_requestDate').value = APP.config.now;
-      if (APP.config.user.email) $('f_email').value = APP.config.user.email;
+      if (res.attachmentError) {
+        // Request is saved but files were not: keep form and files, offer a retry against the same number.
+        APP.retry = { requestNumber: res.requestNumber, email: fields.email };
+        html += '<p class="mt-2 mb-2 small">Your files are still selected below. Retry the upload, or e-mail them quoting ' + esc(res.requestNumber) + '.</p>' +
+          '<button type="button" class="btn btn-sm btn-primary me-2" id="retryBtn">Retry upload</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-secondary" id="newReqBtn">Start a new request</button>';
+        $('itemSuccess').innerHTML = '<div class="alert alert-warning" role="alert">' + html + '</div>';
+        $('retryBtn').addEventListener('click', retryUpload);
+        $('newReqBtn').addEventListener('click', function () { $('itemForm').reset(); });
+        if (warn.length) showAlert('itemAlert', 'warning', warn.join(' '));
+      } else {
+        $('itemForm').reset();
+        $('itemSuccess').innerHTML = '<div class="alert alert-success" role="alert">' + html + '</div>';
+        if (warn.length) showAlert('itemAlert', 'warning', warn.join(' '));
+      }
       window.scrollTo(0, 0);
     }).catch(function (err) {
       if (err.fieldErrors) Object.keys(err.fieldErrors).forEach(function (k) { setFieldError(k, err.fieldErrors[k]); });
       showAlert('itemAlert', 'danger', err.message);
       window.scrollTo(0, 0);
     }).then(function () {
-      btn.disabled = false; $('resetBtn').disabled = false; btn.textContent = orig;
+      btn.disabled = !!APP.retry; $('resetBtn').disabled = false; btn.textContent = orig;
+    });
+  }
+
+  function retryUpload() {
+    var r = APP.retry, btn = $('retryBtn');
+    if (!r) return;
+    if (!APP.files.length || !checkFiles()) { showAlert('itemAlert', 'danger', 'Select valid files first.'); return; }
+    btn.disabled = true; btn.textContent = 'Uploading...'; clearAlert('itemAlert');
+    Promise.all(APP.files.map(readBase64)).then(function (files) {
+      return call('retryAttachments', { requestNumber: r.requestNumber, email: r.email, files: files });
+    }).then(function (res) {
+      $('itemForm').reset();
+      $('itemSuccess').innerHTML = '<div class="alert alert-success" role="alert">Attachments saved for <strong>' + esc(res.requestNumber) + '</strong> (' + esc(res.attachments) + ' file(s)).</div>';
+    }).catch(function (err) {
+      showAlert('itemAlert', 'danger', 'Retry failed: ' + err.message);
+      btn.disabled = false; btn.textContent = 'Retry upload';
     });
   }
 
@@ -265,8 +297,19 @@
   var PALETTE = '#1f4e8c';
   function drawChart(id, type, items, horizontal) {
     if (APP.charts[id]) { APP.charts[id].destroy(); delete APP.charts[id]; }
-    if (typeof Chart === 'undefined') { $(id).parentNode.innerHTML = '<div class="text-muted small">Chart library could not be loaded.</div>'; return; }
-    APP.charts[id] = new Chart($(id), {
+    var canvas = $(id);
+    if (!canvas) return;
+    if (typeof Chart === 'undefined') {
+      canvas.style.display = 'none';
+      if (!canvas.parentNode.querySelector('.chart-msg')) {
+        var m = document.createElement('div'); m.className = 'chart-msg text-muted small'; m.textContent = 'Chart library could not be loaded.';
+        canvas.parentNode.appendChild(m);
+      }
+      return;
+    }
+    canvas.style.display = '';
+    var old = canvas.parentNode.querySelector('.chart-msg'); if (old) old.remove();
+    APP.charts[id] = new Chart(canvas, {
       type: type,
       data: { labels: items.map(function (i) { return i.label; }), datasets: [{ label: 'Requests', data: items.map(function (i) { return i.count; }),
         backgroundColor: PALETTE, borderColor: PALETTE, tension: .25, fill: false }] },
@@ -386,8 +429,9 @@
       e.target.value = ''; renderFiles(); checkFiles();
     });
     $('itemForm').addEventListener('reset', function () {
-      APP.files = []; renderFiles(); $('fileError').textContent = '';
-      setTimeout(function () { $('f_requestDate').value = APP.config.now; FIELD_KEYS.forEach(function (k) { setFieldError(k, ''); }); }, 0);
+      var kept = keepValues(); APP.files = []; APP.retry = null; renderFiles(); $('fileError').textContent = '';
+      clearAlert('itemSuccess'); $('submitBtn').disabled = false;
+      setTimeout(function () { $('f_requestDate').value = APP.config.now; FIELD_KEYS.forEach(function (k) { setFieldError(k, ''); }); restoreValues(kept); }, 0);
     });
     $('trackForm').addEventListener('submit', submitTrack);
     $('tblSearch').addEventListener('input', renderTable);
