@@ -4,7 +4,7 @@
  *   creditnotes/<plant>-<ym>~<i>    further gzipped line chunks of a big plant-month
  *   creditnotes/cov_<ym>            {ym, upload}: the month is covered by a credit-note file (a plant with none then has none)
  * D40: once every month of a quarter (up to today) is covered, achievement and growth for that quarter use Net = invoiced - credit notes. */
-S.cnRaw=[];S.cn=[];S.cnCov={};S.cnSig='';
+S.cnRaw=[];S.cnLock={};S.cn=[];S.cnCov={};S.cnSig='';
 var CN_FIELDS=[
  {k:'branch',label:'Branch / plant',canon:'plant_code',req:1,c:['BPLName','BRANCHNAME','Branch Name','Branch','Plant']},
  {k:'doc',label:'Credit note number',canon:'source_doc_no',req:1,c:['DocNum','DOCNUM','Invoice Document Number','Credit Memo']},
@@ -80,7 +80,9 @@ function cnReplaceRisk(res){
     if((old.n||0)>P.lines.length){var o=out[P.ym]||(out[P.ym]={ym:P.ym,plants:0,oldLines:0,newLines:0});o.plants++;o.oldLines+=old.n||0;o.newLines+=P.lines.length}});
   Object.keys(out).sort().forEach(function(k){list.push(out[k])});return list;
 }
-function cnCanLoad(){var r=U&&U.res;if(!r)return false;if(!(r.good>0)&&!r.covMonths.length)return false;if(cnReplaceRisk(r).length&&!U.confirmReplace)return false;return true}
+function cnMonthsOf(r){var m={};r.covMonths.forEach(function(x){m[x]=1});r.pm.forEach(function(P){m[P.ym]=1});return Object.keys(m).sort()}
+function cnLockedIn(ms){return ms.filter(function(m){return S.cnLock&&S.cnLock[m]})}
+function cnCanLoad(){var r=U&&U.res;if(!r)return false;if(cnLockedIn(cnMonthsOf(r)).length)return false;if(!(r.good>0)&&!r.covMonths.length)return false;if(cnReplaceRisk(r).length&&!U.confirmReplace)return false;return true}
 function cnRender(){
   var el=$('#i-upload');if(!el)return;var st=U.stage,locked=st==='validating'||st==='loading';
   var stepIdx={mapping:2,validating:3,validated:3,loading:4,done:4}[st]||1;
@@ -120,6 +122,8 @@ function cnResultHtml(locked){
   h+=fixesPanel(it,'Fixes applied');
   var ms=Object.keys(r.months).sort();
   h+='<div class="tw hscroll" style="max-height:220px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Lines</th><th class="num">Sheets</th><th class="num">Credit notes</th></tr></thead><tbody>'+ms.map(function(m){var M=r.months[m];return '<tr><td>'+esc(ymLabel(m))+'</td><td class="num">'+fmtN(M.lines)+'</td><td class="num">'+fmtN(Math.round(M.sheets))+'</td><td class="num">'+fmtMoney(M.value)+'</td></tr>'}).join('')+'</tbody></table></div>';
+  var lk=cnLockedIn(cnMonthsOf(r));
+  if(lk.length)h+='<div class="banner err" style="display:block"><b>Locked: '+esc(lk.map(ymLabel).join(', '))+'.</b> These credit-note months cannot be replaced until a Super admin unlocks them with a reason (Data Intake › Credit-note locks). This file is not loaded.</div>';
   var rep=cnReplaceRisk(r);
   if(rep.length)h+='<div class="banner warn" style="display:block"><b>Safety check stopped this file: it would replace '+rep.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more credit-note lines than the new data.</b><div class="tw hscroll" style="max-height:160px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Plant-months</th><th class="num">Lines held now</th><th class="num">In this file</th></tr></thead><tbody>'+rep.map(function(x){return '<tr><td>'+esc(ymLabel(x.ym))+'</td><td class="num">'+x.plants+'</td><td class="num">'+fmtN(x.oldLines)+'</td><td class="num">'+fmtN(x.newLines)+'</td></tr>'}).join('')+'</tbody></table></div><label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="cn-confrep" '+(U.confirmReplace?'checked':'')+' '+(locked?'disabled':'')+'> I confirm: replace these months ('+rep.map(function(x){return ymLabel(x.ym)}).join(', ')+')</label></div>';
   h+='<div class="banner info" style="display:block"><label class="chip"><input type="checkbox" data-chg="cn-allbr" '+(U.allBranches?'checked':'')+' '+(locked?'disabled':'')+'> This file covers all branches</label><div class="note">Tick when the export holds every branch: a plant with no credit note in these months then counts as covered (it has none) and the Net view applies to it. Untick for a partial export: only plants with rows are covered. '+fmtN(Object.keys((function(){var o={};r.pm.forEach(function(P){o[P.plant]=1});return o})()).length)+' of '+cnLamPlants().length+' plants have rows in this file.</div></div>'
@@ -133,6 +137,7 @@ async function cnValidate(){
 }
 async function cnLoad(){
   if(!superOnly('load credit notes')||!U||!U.res||!cnCanLoad())return;
+  if(cnLockedIn(cnMonthsOf(U.res)).length)return;
   var r=U.res,uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!U.demoFlag,done=0,total=r.pm.size,atNow=nowISO();
   U.stage='loading';U.progressMsg='Writing...';cnRender();await tick();
   var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice(),B=bkNew(uid,'CN',demo);
@@ -177,6 +182,7 @@ document.addEventListener('change',function(ev){
 function cnLamPlants(){return S.plants.filter(function(p){return p.active!==false&&p.business!=='ACP'&&+p.plant_code<1050}).map(function(p){return p.plant_code})}
 function ingestCN(){
   S.cn=S.cnRaw.filter(function(d){return d.plant&&d.ym&&d.groups&&!d.chunk});
+  S.cnLock={};S.cnRaw.forEach(function(d){if(d.lock&&d.ym)S.cnLock[d.ym]=d});
   var cov={},by={};
   S.cn.forEach(function(d){(cov[d.ym]||(cov[d.ym]=new Set())).add(d.plant);(by[d.ym]||(by[d.ym]=[])).push(d)});
   S.cnRaw.forEach(function(d){if(!d.cov||!d.ym)return;var st=cov[d.ym]||(cov[d.ym]=new Set());
@@ -186,6 +192,7 @@ function ingestCN(){
 }
 function cnUndoPlan(uid){var docs=S.cnRaw.filter(function(d){return d.upload===uid&&!d.cov});var ms={};docs.forEach(function(d){ms[d.ym]=1});return {docs:docs,cov:S.cnRaw.filter(function(d){return d.upload===uid&&d.cov}),months:Object.keys(ms).sort()}}
 async function cnUndo(uid){
+  var lkd=cnLockedIn(cnUndoPlan(uid).months);if(lkd.length)throw new Error('credit-note month(s) '+lkd.map(ymLabel).join(', ')+' are locked; a Super admin must unlock them with a reason first.');
   var pl=cnUndoPlan(uid),u=S.uploads.find(function(x){return x._id===uid}),all=pl.docs.concat(pl.cov),q=all.slice();
   await Promise.all([0,1,2,3].map(async function(){while(q.length){var d=q.shift();await ddel('creditnotes/'+d._id)}}));
   var curK={};S.cnRaw.forEach(function(d){if(d.plant&&d.ym&&!d.cov)curK[d.plant+'|'+d.ym]=1});
@@ -201,7 +208,8 @@ async function cnUndo(uid){
 function cnCov(qkey){
   var months=qMonths(qkey),cur=TODAY().slice(0,7),elig=months.filter(function(m){return m<=cur}),pl=cnLamPlants(),total=pl.length*elig.length,present=0;
   var detail=months.map(function(ym){var n=pl.filter(function(p){return S.cnCov[ym]&&S.cnCov[ym].has(p)}).length;if(ym<=cur)present+=n;return {ym:ym,plants:n}});
-  return {st:present===0?'miss':(total>0&&present>=total?'ok':'part'),detail:detail,ref:pl.length,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
+  var lm=elig.filter(function(m){return S.cnCov[m]}),lk=lm.filter(function(m){return S.cnLock&&S.cnLock[m]}).length;
+  return {lock:lm.length&&lk===lm.length?'all':(lk?'some':''),st:present===0?'miss':(total>0&&present>=total?'ok':'part'),detail:detail,ref:pl.length,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
 }
 
 /* ================= the Net view (D40, per plant, D45) ================= */
@@ -238,3 +246,34 @@ function cnPanel(ctx,f){
   var allCov=cnFor(base,ms).covered;
   return '<section class="card"><div class="hd"><h2>Invoiced · Credit notes · Net</h2><span class="note">'+(allCov?'Net is the headline for this period':'Headline stays invoiced where credit notes are not loaded for every plant in scope')+'</span></div><div class="tw hscroll"><table class="std"><thead><tr><th>Month</th><th class="num">Invoiced ₹</th><th class="num">Invoiced sheets</th><th class="num">Credit notes ₹</th><th class="num">Credit note sheets</th><th class="num">Net ₹</th><th class="num">Net sheets</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note">Net = invoiced − credit notes. Targets are set on invoiced sales. A plant uses Net only when all its months of the quarter are covered by a credit-note file; a company, zone or group total uses Net only when every plant in scope is covered. Growth compares Net with Net only when both quarters are covered, otherwise invoiced with invoiced.</p></section>';
 }
+/* ================= D60: credit-note files never go through the sales intake ================= */
+/* returns the reason a file looks like a credit-note register, or '' */
+function creditLike(name,headers,rows,sheetsSeen,sheetPicked){
+  if(/credit[\s_\-]*note|cn[\s_\-]*register|a\/?r[\s_\-]*credit|credit[\s_\-]*memo/i.test(String(name||'')))return 'the file name says credit note';
+  var sh=[sheetPicked].concat(sheetsSeen||[]).join(' ');if(/credit/i.test(sh))return 'a sheet is named credit';
+  var ix=headerIndex(headers||[]),n=Math.min((rows||[]).length,3000);
+  var cols=Object.keys(ix).filter(function(k){return /doc ?type|document type|invoice type|trans ?type|object|billing type/.test(k)});
+  for(var c=0;c<cols.length;c++){var ci=ix[cols[c]],hit=0,seen=0;for(var i=1;i<n;i++){var v=String(rows[i][ci]==null?'':rows[i][ci]).trim();if(!v)continue;seen++;if(/credit note|credit memo|a\/r credit|^orin$|^14$/i.test(v)||(/billing type/.test(cols[c])&&/^(g2|re)$/i.test(v)))hit++}
+    if(seen&&hit/seen>0.5)return 'the '+cols[c]+' column says credit note'}
+  return '';
+}
+Object.assign(handlers,{
+ 'cn-offer':function(){var i=U&&U.cnOffer;if(!i)return;cnStart(i.file,i.rows,i.headers,{sys:i.sys||'B1',layout:(i.sys==='S4'?'S/4':'B1')+' credit notes (sales-register layout)'},i.sheetPicked)}
+});
+
+/* ================= D60: lock credit-note months ================= */
+function cnLockPanel(){
+  var ms=Object.keys(S.cnCov||{}).sort();if(!ms.length&&!Object.keys(S.cnLock||{}).length)return '';
+  var sa=effRole()==='Super admin'&&!readOnly(),any=ms.some(function(m){return !S.cnLock[m]});
+  return '<div class="banner info" style="display:block" id="cn-locks"><b>Credit-note locks</b> <span class="note" style="color:inherit">A locked month cannot be replaced or undone until a Super admin unlocks it with a reason (logged).</span>'
+   +'<div class="row" style="margin-top:6px;flex-wrap:wrap">'+ms.map(function(m){var l=S.cnLock[m];return '<span class="chip"><b>'+esc(ymLabel(m))+'</b> '+(l?'<span class="pill ok" title="Locked by '+esc(who(l.by||''))+' '+esc(l.at?istStr(l.at):'')+'">🔒 Locked</span>':'<span class="pill mute">Open</span>')+(sa?(l?' <button class="btn sm" data-act="cn-unlock" data-ym="'+m+'">Unlock</button>':' <button class="btn sm" data-act="cn-lock" data-ym="'+m+'">Lock</button>'):'')+'</span>'}).join(' ')+'</div>'
+   +(sa&&any?'<div class="row" style="margin-top:6px"><button class="btn sm pri" data-act="cn-lock-all">Lock all loaded months</button></div>':'')+'</div>';
+}
+Object.assign(handlers,{
+ 'cn-lock':async function(t){if(!superOnly('lock credit notes'))return;var ym=t.getAttribute('data-ym');await dset('creditnotes/lock_'+ym,{lock:true,ym:ym,by:whoAmI(),at:nowISO()});await auditW('credit note month locked',ym,{ym:ym})},
+ 'cn-lock-all':async function(){if(!superOnly('lock credit notes'))return;var ms=Object.keys(S.cnCov||{}).filter(function(m){return !S.cnLock[m]});for(var i=0;i<ms.length;i++)await dset('creditnotes/lock_'+ms[i],{lock:true,ym:ms[i],by:whoAmI(),at:nowISO()});await auditW('credit note months locked',ms.join(','),{months:ms});toast('Locked '+ms.length+' credit-note month'+(ms.length===1?'':'s'))},
+ 'cn-unlock':function(t){if(!superOnly('unlock credit notes'))return;var ym=t.getAttribute('data-ym');openDlg('<h3>Unlock credit notes for '+esc(ymLabel(ym))+'</h3><p class="note">Unlocking allows this month to be replaced or undone. A reason is required and is logged in the audit trail.</p><div class="fld"><label for="cn-unlock-reason">Reason (at least 10 characters)</label><input id="cn-unlock-reason" class="in" data-chg="cn-unlock-reason" autocomplete="off"></div><div class="row"><button class="btn pri" data-act="cn-unlock-go" data-ym="'+ym+'" id="cn-unlock-go" disabled>Unlock</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>')},
+ 'cn-unlock-go':async function(t){var ym=t.getAttribute('data-ym'),r=($('#cn-unlock-reason')||{}).value||'';if(r.trim().length<10){var e=$('#d-err');if(e)e.innerHTML='<div class="banner err">Give a reason of at least 10 characters.</div>';return}
+   await ddel('creditnotes/lock_'+ym);await auditW('credit note month unlocked',ym,{ym:ym,reason:r.trim().slice(0,300)});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'credit note month unlocked',ym:ym,reason:r.trim().slice(0,300)});closeDlg();toast('Unlocked '+ymLabel(ym))}
+});
+document.addEventListener('input',function(ev){var t=ev.target;if(t&&t.id==='cn-unlock-reason'){var b=$('#cn-unlock-go');if(b)b.disabled=t.value.trim().length<10}});
