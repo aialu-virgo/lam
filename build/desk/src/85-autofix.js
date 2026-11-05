@@ -357,6 +357,7 @@ function canLoad(r,locked){
   if(!r||!(r.good>0)||locked)return false;
   var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
   if(closedQs.length&&U.reason.trim().length<10)return false;
+  if(cnLockedIn(oxMonthList(r)).length)return false;/* D61: months whose credit notes are locked cannot be replaced by a sales load */
   if(replaceRisk(r).length&&!U.confirmReplace)return false;
   return true;
 }
@@ -416,7 +417,17 @@ function undoDialog0(uid){
    +'<p class="note">Undo cannot bring back what this upload replaced. Any month it overwrote lost its earlier figures, so upload those months again. Months it created are simply removed. '+(pl.later?pl.later+' plant-month'+(pl.later===1?'':'s')+' written by this upload were already replaced by a later upload; those are left alone. ':'')+(u.closedQuarters&&u.closedQuarters.length?'Quarters it closed ('+esc(u.closedQuarters.map(qLabel).join(', '))+') stay closed; reopen them in the coverage grid if needed. ':'')+'</p>'
    +'<div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'" '+(sa&&pl.n+(pl.act?1:0)+pl.fus.length>=0?'':'disabled')+'>Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');
 }
-async function undoUpload(uid){
+/* D61: nothing is deleted before the backup is checked. An incomplete backup stops a plain or bulk undo; only the explicit "Undo and remove these months" click (opts.confirmIncomplete) goes on, and then nothing is restored. */
+async function undoUpload(uid,opts){
+  if(!superOnly('undo an upload'))return;
+  var us0=S.uploads.find(function(x){return x._id===uid});
+  if(us0&&(us0.entity||'INV')==='INV'){var lk0=cnLockedIn(((undoPlan(uid)||{}).months)||[]);if(lk0.length){var m0='credit notes are locked for '+lk0.map(ymLabel).join(', ')+'; a Super admin must unlock them (Data Intake › Credit-note locks) before this sales upload can be undone. Nothing was changed.';var e0=document.getElementById('d-err');if(e0)e0.innerHTML='<div class="banner err">Undo stopped: '+esc(m0)+'</div>';throw new Error(m0)}}
+  if(bkHas(uid)){var c0=bkCheck(uid);
+    if(!c0.ok&&!(opts&&opts.confirmIncomplete)){var m1='Backup incomplete for '+((us0&&us0.file)||uid)+': '+(c0.have||0)+' of '+(c0.of||'?')+' parts are usable. Nothing was changed; use "Undo and remove these months" on that upload to remove its months without restoring.';var e1=document.getElementById('d-err');if(e1)e1.innerHTML='<div class="banner err">Undo stopped: '+esc(m1)+'</div>';throw new Error(m1)}}
+  S.bkAllowIncomplete=!!(opts&&opts.confirmIncomplete);
+  try{return await undoUpload0(uid)}finally{S.bkAllowIncomplete=false}
+}
+async function undoUpload0(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
   if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],us.entity==='RC'?'snap':null,'<p>The data this upload held was removed. Upload the file again if you still need it.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
@@ -451,7 +462,7 @@ async function undoUpload(uid){
 }
 Object.assign(handlers,{
  'hist-undo':function(t){undoDialog(t.getAttribute('data-id'))},
- 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'))},
+ 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'),{confirmIncomplete:true})},
  'u-swap-serial':async function(){if(!U||!U.res)return;U.swapSerial=true;U.stage='validating';U.progressMsg='Reading date cells swapped...';renderUpload();await runValidation()},
  'u-unswap':async function(){if(!U||!U.res)return;U.swapSerial=false;U.stage='validating';renderUpload();await runValidation()}
 });

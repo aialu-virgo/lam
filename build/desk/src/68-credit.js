@@ -20,7 +20,9 @@ var CN_FIELDS=[
 function cnMapKey(sys,layout){return sys+'_creditnote_'+String(layout||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function cnDetectB1(headers){
   var set={};headers.forEach(function(h){set[norm(h)]=1});
-  return set['docnum']&&set['docdate']&&set['cardcode']&&set['itemcode']&&set['linetotal']&&set['baseref']&&!set['invoice type']&&!set['catagory']?{kind:'cn',sys:'B1',layout:'B1 credit notes (ORIN / RIN1)'}:null;
+  /* credit notes reference the base invoice: BaseRef, or the RefNo / RefDate pair of the credit-note register; sales lines carry neither */
+  var base=set['baseref']||(set['refno']&&set['refdate']);
+  return set['docnum']&&set['docdate']&&set['cardcode']&&set['itemcode']&&set['linetotal']&&base&&!set['invoice type']?{kind:'cn',sys:'B1',layout:'B1 credit notes (ORIN / RIN1)'}:null;
 }
 function cnS4Share(headers,rows){
   var ix=headerIndex(headers),bi=ix['billing type'];if(bi==null)return 0;var n=0,non=0;
@@ -260,6 +262,10 @@ function creditLike(name,headers,rows,sheetsSeen,sheetPicked){
   var cols=Object.keys(ix).filter(function(k){return /doc ?type|document type|invoice type|trans ?type|object|billing type/.test(k)});
   for(var c=0;c<cols.length;c++){var ci=ix[cols[c]],hit=0,seen=0;for(var i=1;i<n;i++){var v=String(rows[i][ci]==null?'':rows[i][ci]).trim();if(!v)continue;seen++;if(/credit note|credit memo|a\/r credit|^orin$|^14$/i.test(v)||(/billing type/.test(cols[c])&&/^(g2|re)$/i.test(v)))hit++}
     if(seen&&hit/seen>0.5)return 'the '+cols[c]+' column says credit note'}
+  /* by content: the account columns name a credit memo, or the RefNo / RefDate pair references a base invoice next to docnum */
+  var ac=Object.keys(ix).filter(function(k){return /^(acctname|account|account name)$/.test(k)});
+  for(var a=0;a<ac.length;a++){var ai=ix[ac[a]],h2=0,s2=0;for(var j=1;j<n;j++){var w=String(rows[j][ai]==null?'':rows[j][ai]).trim();if(!w)continue;s2++;if(/credit (memo|note)|sales return|a\/r credit/i.test(w))h2++}if(s2&&h2/s2>0.5)return 'the '+ac[a]+' column names a credit memo'}
+  if(ix['docnum']!=null&&ix['refno']!=null&&ix['refdate']!=null)return 'RefNo and RefDate point to the original invoice (sales lines have none)';
   return '';
 }
 Object.assign(handlers,{

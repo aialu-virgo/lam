@@ -111,7 +111,7 @@ function bkHas(uid){return S.backups.some(function(d){return d.upload===uid})}
 /* restore the saved documents for which allow(path) is true; cell entries of sales plant-months are returned for the caller to merge */
 async function bkRestore(uid,allow){
   var docs=bkFor(uid),n=0,cells=[];S.bkLast={units:0,incomplete:false};
-  var chk=bkCheck(uid);if(!chk.ok){S.bkLast.incomplete=true;return {n:0,cells:[],incomplete:true}}
+  var chk=bkCheck(uid);if(!chk.ok){S.bkLast.incomplete=true;if(!S.bkAllowIncomplete)throw new Error('Backup incomplete: nothing was restored and the backup is kept.');return {n:0,cells:[],incomplete:true}}
   var parts={};
   for(var i=0;i<docs.length;i++){var items=JSON.parse(await ungz(docs[i].z));
     for(var j=0;j<items.length;j++){var it=items[j];
