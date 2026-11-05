@@ -74,6 +74,29 @@ ok('upload: user_id column accepted; 1002 updated in its own doc to a real user 
 ok('upload: placeholder row with only id/name/email accepted and stays a placeholder',s5['users/u1003']&&s5['users/u1003'].placeholder===true&&s5['users/u1003'].active===false,'');
 ok('upload: reports-to a placeholder rejected; duplicate id (1001 is taken by another e-mail) rejected; row without id is fine',!/user1005/.test(JSON.stringify(s5['users/u1004']||{}))&&s5['users/u1004'].reports_to_email===''&&!s5['users/b_virgo_test']&&(s5['users/u1005']||{}).email==='a@virgo.test'&&/Duplicate User ID/.test(um)&&!!s5['users/no_id_virgo_test']&&!s5['users/no_id_virgo_test'].user_id,um.slice(0,300));
 ok('upload: still exactly 50 user_id-bearing records',ids5.length===50,'n='+ids5.length);
+/* QA round 2: rebind rules and blank user_id */
+const HDR="user_id,email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code\n";
+fs.writeFileSync(SP+'t54-rebind.csv',HDR
++'1002,hijack@virgo.test,Priya K,Accounts,Accounts,,,,5,Y,\n'
++'1001,priya.k@virgo.test,Asha,Accounts,Accounts,,,,5,Y,\n'
++'1006,rebind.ph@virgo.test,Rita,Accounts,Accounts,,,,5,Y,\n');
+await page.setInputFiles('#up-users',SP+'t54-rebind.csv');await page.waitForTimeout(2500);
+const um2=await page.innerText('#up-msg');const s6=await st();
+ok('upload: user_id of a REAL user with a different email is rejected with the Admin > Users message',/User ID 1002 belongs to priya\.k@virgo\.test; change the email in Admin/.test(um2)&&s6['users/u1002'].email==='priya.k@virgo.test'&&!Object.values(s6).some(u=>u&&u.email==='hijack@virgo.test'),um2.slice(-300));
+ok('upload: user_id matches record A but email matches record B is rejected, neither changed',/belongs to real\.one@virgo\.test and the email belongs to another record/.test(um2)&&s6['users/u1001'].email==='real.one@virgo.test'&&s6['users/u1002'].name==='Priya K','');
+ok('upload: user_id of a PLACEHOLDER may take a new email (same doc, flag cleared)',s6['users/u1006']&&s6['users/u1006'].email==='rebind.ph@virgo.test'&&s6['users/u1006'].active===true&&!s6['users/u1006'].placeholder&&s6['users/u1006'].user_id==='1006','');
+fs.writeFileSync(SP+'t54-blank2.csv',HDR+',priya.k@virgo.test,Priya K2,Accounts,Accounts,,,,5,Y,\n');
+await page.setInputFiles('#up-users',SP+'t54-blank2.csv');await page.waitForTimeout(2500);const s6b=await st();
+ok('upload: blank user_id on a real user row keeps the stored user_id (never cleared)',s6b['users/u1002'].user_id==='1002'&&s6b['users/u1002'].name==='Priya K2','');
+const ids6=Object.keys(s6b).filter(k=>/^users\//.test(k)&&s6[k].user_id);
+ok('still exactly 50 user_id-bearing records',ids6.length===50,'n='+ids6.length);
+{const sx=JSON.parse(JSON.stringify(s6));sx['users/u1003'].slp_code='SLP9';sx['users/u1003'].uid='VIEW1';
+ const b=await open(browser,{store:sx});await b.page.waitForTimeout(3500);await b.page.evaluate(()=>{location.hash='#/admin'});await b.page.waitForTimeout(500);await b.page.click('[data-act="atab"][data-t="users"]');
+ fs.writeFileSync(SP+'t54-blank.csv',HDR+',user1003@placeholder.invalid,User 3,,,,,,5,N,\n');
+ await b.page.setInputFiles('#up-users',SP+'t54-blank.csv');await b.page.waitForTimeout(2500);const sy=await b.page.evaluate(()=>window.__mockStore());const x=sy['users/u1003'];
+ ok('upload: blank user_id on a placeholder row keeps id 1003, flag, slp_code and uid',x.user_id==='1003'&&x.placeholder===true&&x.slp_code==='SLP9'&&x.uid==='VIEW1'&&x.active===false,JSON.stringify(x));
+ const hd=(await b.page.innerText('#pg')).replace(/\n/g,' ');ok('header counts real users and placeholders separately',/USERS\s*·\s*\d+\s*·\s*PLACEHOLDERS\s*\d+/i.test(hd),(hd.match(/USERS ·[^A]*/i)||[''])[0]);
+ await b.ctx.close()}
 /* legacy CSV without user_id column still loads */
 fs.writeFileSync(SP+'t54-legacy.csv','email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code\nlegacy@virgo.test,Legacy L,Accounts,Accounts,,,,5,Y,\n');
 await page.setInputFiles('#up-users',SP+'t54-legacy.csv');await page.waitForTimeout(2000);
