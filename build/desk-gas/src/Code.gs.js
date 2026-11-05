@@ -1,15 +1,20 @@
 /* Virgo Laminates Performance Desk: Apps Script server (file Code.gs).
- * Serves the page (HTML file "Index") and keeps the shared database in one Google Spreadsheet created on first use.
- * Sheet "db": A collection, B docId, C part ("i/n/v": part number, parts in doc, write token), D json (<= 45,000 characters), E updatedAt, F updatedBy.
- * Sheet "meta": B1 holds {"revs":{collection: counter}} (bumped on every write to that collection).
- * Script Properties: DESK_SHEET_ID. Identity is Session.getActiveUser().getEmail(). */
+ * Serves the page (HTML file "Index") and keeps the shared database in one Google Spreadsheet created on first use (ID in Script Property DESK_SHEET_ID).
+ * Storage: ONE SHEET PER COLLECTION, named c_<collection>. Row = one part of one document:
+ *   A id, B part "i/n/token" (part number, parts in the document, write token), C len (characters in D), D json (<= 45,000 characters), E updatedAt, F updatedBy.
+ * All parts of a document are appended together, so they sit in adjacent rows. An update appends the new parts under a new token and only then deletes the old rows,
+ * so the old complete version stays readable until the new one is complete. A reader takes the newest token whose parts are all present.
+ * Revisions: Script Property DESK_REVS = {"revs":{collection:n},"wts":ms}. n is odd while a write to that collection is in progress and even otherwise; every write adds 2.
+ * A read is accepted only when the revision was even and unchanged from before to after the read (sequence lock), so a page never mixes two versions. */
 var SEED_SUPER = ['data@virgoasia.com', 'spa@virgoasia.com'];
 var PART_CHARS = 45000;          // Google Sheets allows 50,000 characters per cell
 var MAX_DOC_CHARS = 262144;      // 256 KiB per document, as the page assumes
-var READ_PAGE_CHARS = 3000000;   // one deskRead page
+var PAGE_CHARS = 2500000;        // characters per page read (one getValues)
+var PAGE_ROWS = 4000;            // rows per page read
+var STALE_WRITE_MS = 150000;     // an odd revision older than this is a crashed write and is ignored
 var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'phasing', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes'];
 var SHARED_COLLECTIONS = ['potential', 'actions', 'followups', 'log', 'planlocks'];
-var DB_HEADER = ['collection', 'docId', 'part', 'json', 'updatedAt', 'updatedBy'];
+var HEADER = ['id', 'part', 'len', 'json', 'updatedAt', 'updatedBy'];
 
 function doGet(e) {
   var email = activeEmail_();
@@ -37,103 +42,121 @@ function wrap_(fn) {
 function fail_(code, message) { var e = new Error(message); e.deskCode = code; throw e; }
 function activeEmail_() { return String(Session.getActiveUser().getEmail() || '').toLowerCase(); }
 
+/* ---------- revisions ---------- */
+function revsGet_() {
+  var v = PropertiesService.getScriptProperties().getProperty('DESK_REVS'), m = null;
+  try { m = JSON.parse(v); } catch (e) {}
+  if (!m || !m.revs) m = { revs: {}, wts: 0 };
+  return m;
+}
+function revsSave_(m) { PropertiesService.getScriptProperties().setProperty('DESK_REVS', JSON.stringify(m)); }
+function writing_(m, col) { return (m.revs[col] || 0) % 2 === 1 && Date.now() - (m.wts || 0) < STALE_WRITE_MS; }
+
 /* ---------- storage ---------- */
-function sheetId_(create) {
+function ssId_(create) {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('DESK_SHEET_ID');
-  if (id) return id;
-  if (!create) return null;
+  if (id || !create) return id;
   var lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
     id = props.getProperty('DESK_SHEET_ID');
     if (!id) {
       var ss = SpreadsheetApp.create('Virgo Desk database (do not edit)');
-      var db = ss.getSheets()[0]; db.setName('db');
-      db.getRange(1, 1, 1, 6).setValues([DB_HEADER]);
-      db.getRange(1, 1, db.getMaxRows(), 4).setNumberFormat('@');
-      var meta = ss.insertSheet('meta'); meta.getRange(1, 1, 1, 2).setNumberFormat('@').setValues([['state', '{"revs":{}}']]);
+      ss.getSheets()[0].setName('info');
+      ss.getSheetByName('info').getRange(1, 1).setValue('One sheet per collection (c_<name>). Edited only by the Desk web app. Do not edit by hand.');
       props.setProperty('DESK_SHEET_ID', ss.getId()); id = ss.getId();
     }
   } finally { lock.releaseLock(); }
   return id;
 }
-function book_() { return SpreadsheetApp.openById(sheetId_(true)); }
-function dbSheet_() { return book_().getSheetByName('db'); }
-function readMeta_(ss) {
-  var cache = CacheService.getScriptCache(), c = cache.get('desk_meta');
-  if (c) { try { return JSON.parse(c); } catch (e) {} }
-  var m = readMetaFresh_(ss); cache.put('desk_meta', JSON.stringify(m), 300); return m;
+function book_(create) { var id = ssId_(create); return id ? SpreadsheetApp.openById(id) : null; }
+function colSheet_(ss, col, create) {
+  var sh = ss.getSheetByName('c_' + col);
+  if (sh || !create) return sh;
+  sh = ss.insertSheet('c_' + col);
+  sh.getRange(1, 1, 1, 6).setValues([HEADER]);
+  sh.getRange('A:B').setNumberFormat('@');
+  sh.getRange('D:D').setNumberFormat('@');
+  if (sh.getMaxColumns() > 6) sh.deleteColumns(7, sh.getMaxColumns() - 6);
+  return sh;
 }
-function readMetaFresh_(ss) {
-  var v = (ss || book_()).getSheetByName('meta').getRange(1, 2).getValue();
-  try { var m = JSON.parse(v); if (!m.revs) m.revs = {}; return m; } catch (e) { return { revs: {} }; }
+function partOf_(p) { var a = String(p).split('/'); return { i: +a[0], n: +a[1], t: a[2] || '' }; }
+function runs_(nums) { var out = []; nums.forEach(function (r) { var l = out[out.length - 1]; if (l && l[0] + l[1] === r) l[1]++; else out.push([r, 1]); }); return out; }
+/* rows: [[id, part, len, json]] (any order) -> {docs:[{id,token,json}], skipped:n}. Per id the newest token whose parts are all present wins. */
+function assemble_(rows) {
+  var byId = Object.create(null), ids = [];
+  rows.forEach(function (r) {
+    var p = partOf_(r[1]), g = byId[r[0]];
+    if (!g) { g = byId[r[0]] = Object.create(null); ids.push(r[0]); }
+    var t = g[p.t] || (g[p.t] = { n: p.n, parts: Object.create(null), c: 0 });
+    if (!(p.i in t.parts)) { t.parts[p.i] = String(r[3]); t.c++; }
+  });
+  var docs = [], skipped = 0;
+  ids.forEach(function (id) {
+    var toks = Object.keys(byId[id]).sort().reverse(), done = false;
+    for (var k = 0; k < toks.length && !done; k++) {
+      var t = byId[id][toks[k]];
+      if (t.c === t.n) { var s = []; for (var i = 0; i < t.n; i++) s.push(t.parts[i]); docs.push({ id: id, token: toks[k], json: s.join('') }); done = true; }
+    }
+    if (!done) skipped++;
+  });
+  return { docs: docs, skipped: skipped };
 }
-function writeMeta_(ss, m) {
-  var s = JSON.stringify(m);
-  ss.getSheetByName('meta').getRange(1, 2).setValue(s);
-  CacheService.getScriptCache().put('desk_meta', s, 300);
-}
-/* key index: rows of the db sheet as {col, id, part:"i/n/v", row} */
-function keyRows_(sheet) {
-  var last = sheet.getLastRow();
-  if (last < 2) return [];
-  var v = sheet.getRange(2, 1, last - 1, 3).getValues(), out = [];
-  for (var i = 0; i < v.length; i++) if (v[i][0] !== '') out.push({ col: String(v[i][0]), id: String(v[i][1]), part: String(v[i][2]), row: i + 2 });
-  return out;
-}
-function parsePart_(p) { var a = String(p).split('/'); return { i: +a[0], n: +a[1], v: a[2] || '' }; }
-/* group rows of one doc into a complete part list, or null when the doc is mid-write or damaged */
-function completeParts_(rows) {
-  var best = null, byV = Object.create(null);
-  rows.forEach(function (r) { var p = parsePart_(r.part); r.p = p; (byV[p.v] = byV[p.v] || []).push(r); });
-  var vs = Object.keys(byV);
-  for (var k = 0; k < vs.length; k++) {
-    var list = byV[vs[k]], n = list[0].p.n, seen = Object.create(null), ok = true;
-    list.forEach(function (r) { if (r.p.n !== n) ok = false; seen[r.p.i] = r; });
-    for (var i = 0; i < n; i++) if (!seen[i]) ok = false;
-    if (ok && list.length === n) { best = []; for (var j = 0; j < n; j++) best.push(seen[j]); break; }
+/* pages of whole documents: [[firstRow,lastRow]] from one read of columns A:C */
+function plan_(sh) {
+  var last = sh ? sh.getLastRow() : 0;
+  if (last < 2) return { rows: 0, chars: 0, pages: [] };
+  var v = sh.getRange(2, 1, last - 1, 3).getValues(), pages = [], start = 2, chars = 0, n = 0, total = 0;
+  for (var i = 0; i < v.length; i++) {
+    var p = partOf_(v[i][1]); chars += +v[i][2] || 0; n++; total += +v[i][2] || 0;
+    if ((p.i === p.n - 1 || i === v.length - 1) && (chars >= PAGE_CHARS || n >= PAGE_ROWS || i === v.length - 1)) { pages.push([start, i + 2]); start = i + 3; chars = 0; n = 0; }
   }
-  return best;
+  return { rows: v.length, chars: total, pages: pages };
 }
-function runs_(rowNums) { // sorted ascending -> [[start,len]]
-  var out = [];
-  rowNums.forEach(function (r) { var l = out[out.length - 1]; if (l && l[0] + l[1] === r) l[1]++; else out.push([r, 1]); });
+function readPage_(sh, r1, r2) {
+  if (r2 < r1 || r2 - r1 + 1 > 20000) fail_('invalid_argument', 'Bad page.');
+  return assemble_(sh.getRange(r1, 1, r2 - r1 + 1, 4).getValues());
+}
+/* run a read under the sequence lock: the collection's revision must be even and unchanged around fn */
+function stable_(col, wantRev, fn) {
+  var m0 = revsGet_(), r0 = m0.revs[col] || 0;
+  if (wantRev !== undefined && wantRev !== null && wantRev !== r0) fail_('stale', 'The collection changed.');
+  if (writing_(m0, col)) fail_('unavailable', 'busy');
+  var out = fn(r0);
+  var r1 = revsGet_().revs[col] || 0;
+  if (r1 !== r0) fail_(wantRev !== undefined && wantRev !== null ? 'stale' : 'unavailable', 'The collection changed during the read.');
   return out;
 }
-function readJson_(sheet, rows) { // rows: [{row}] -> {row: string}
-  var res = Object.create(null), nums = rows.map(function (r) { return r.row; }).sort(function (a, b) { return a - b; });
-  runs_(nums).forEach(function (r) { var v = sheet.getRange(r[0], 4, r[1], 1).getValues(); for (var i = 0; i < r[1]; i++) res[r[0] + i] = String(v[i][0]); });
-  return res;
-}
-function groupDocs_(rows, col) { // -> {id: [rows]}
-  var g = Object.create(null);
-  rows.forEach(function (r) { if (r.col === col) (g[r.id] = g[r.id] || []).push(r); });
-  return g;
+/* whole collection read on the server (small collections only: users, seed check) */
+function readAll_(ss, col) {
+  for (var a = 0; a < 3; a++) {
+    try {
+      return stable_(col, null, function () {
+        var sh = colSheet_(ss, col, false), pl = plan_(sh), docs = [], skipped = 0;
+        pl.pages.forEach(function (p) { var r = readPage_(sh, p[0], p[1]); docs = docs.concat(r.docs); skipped += r.skipped; });
+        return { docs: docs, skipped: skipped };
+      });
+    } catch (e) { if (a === 2 || !e.deskCode) throw e; Utilities.sleep(250); }
+  }
 }
 
 /* ---------- access ---------- */
 function resolveUser_(email) {
   var out = { email: email, role: null, active: false, name: '', seed: SEED_SUPER.indexOf(email) >= 0 };
   if (!email) return out;
-  var ss = sheetId_(false) ? book_() : null, u = null;
+  var ss = book_(false), u = null;
   if (ss) {
-    var meta = readMeta_(ss), ck = 'acl_' + (meta.revs.users || 0) + '_' + email, cache = CacheService.getScriptCache(), c = cache.get(ck);
+    var rev = revsGet_().revs.users || 0, ck = 'acl_' + rev + '_' + email, cache = CacheService.getScriptCache(), c = cache.get(ck);
     if (c) { try { u = JSON.parse(c).u; } catch (e) {} }
-    if (!c) {
-      var sheet = ss.getSheetByName('db'), rows = keyRows_(sheet), g = groupDocs_(rows, 'users'), ids = Object.keys(g);
-      var all = [];
-      ids.forEach(function (id) { var p = completeParts_(g[id]); if (p) all = all.concat(p); });
-      var js = readJson_(sheet, all);
-      ids.forEach(function (id) {
-        var p = completeParts_(g[id]); if (!p) return;
-        try { var d = JSON.parse(p.map(function (r) { return js[r.row]; }).join('')); if (String(d.email || '').toLowerCase() === email) u = { role: d.role, active: d.active !== false, name: d.name || '' }; } catch (e) {}
+    else {
+      readAll_(ss, 'users').docs.forEach(function (d) {
+        try { var o = JSON.parse(d.json); if (String(o.email || '').toLowerCase() === email) u = { role: o.role, active: o.active !== false, name: o.name || '' }; } catch (e) {}
       });
       cache.put(ck, JSON.stringify({ u: u }), 120);
     }
   }
   if (u) { out.role = u.role; out.active = u.active; out.name = u.name; }
-  if (out.seed && !(u && u.active === false)) { out.role = 'Super admin'; out.active = true; }
-  if (out.seed && u && u.active === false) { out.role = 'Super admin'; out.active = true; } // seed admins cannot be locked out, as in the page
+  if (out.seed) { out.role = 'Super admin'; out.active = true; } // seed admins cannot be locked out, as in the page
   return out;
 }
 function requireUser_() {
@@ -141,18 +164,16 @@ function requireUser_() {
   if (!email) fail_('unauthenticated', 'Your Google account email is not visible to this web app.');
   return resolveUser_(email);
 }
+function isAdmin_(who) { return who.role === 'Super admin' && who.active; }
 function canWrite_(who, col) {
-  if (ADMIN_COLLECTIONS.indexOf(col) >= 0) return who.role === 'Super admin' && who.active;
+  if (ADMIN_COLLECTIONS.indexOf(col) >= 0) return isAdmin_(who);
   if (SHARED_COLLECTIONS.indexOf(col) >= 0) return !!who.role && who.active;
   return false;
 }
 function knownCol_(col) { return ADMIN_COLLECTIONS.indexOf(col) >= 0 || SHARED_COLLECTIONS.indexOf(col) >= 0; }
 function checkId_(id) { if (typeof id !== 'string' || !id || id.length > 300 || id.indexOf('/') >= 0) fail_('invalid_argument', 'Bad document id.'); }
-/* a registered, active user reads everything (no row filter, as on claude.ai). An inactive user sees only their own user record; an unknown email sees nothing, so the page shows "Ask your admin for access". */
-function readFilter_(who, col, id) {
-  if (who.role && who.active) return true;
-  return false;
-}
+/* a registered, active user reads everything (no row filter, as on claude.ai; decision D66). Inactive and unknown emails read nothing. */
+function canRead_(who) { return !!(who.role && who.active); }
 
 /* ---------- API called by the page ---------- */
 function deskBoot() {
@@ -161,61 +182,60 @@ function deskBoot() {
     return { ok: true, email: email, owner: who.role === 'Super admin', name: who.name, url: ScriptApp.getService().getUrl() };
   });
 }
+/* cheap poll: the revision map (one Script Property read) */
 function deskRevs() {
-  return wrap_(function () {
-    requireUser_();
-    if (!sheetId_(false)) return { ok: true, revs: {} };
-    return { ok: true, revs: readMeta_(book_()).revs };
-  });
+  return wrap_(function () { requireUser_(); return { ok: true, revs: revsGet_().revs }; });
 }
-/* one page of a collection, documents in id order; cursor = last docId already returned */
-function deskRead(col, cursor) {
+/* step 1 of reading a collection: its revision and the pages (row ranges of whole documents) to fetch with deskPage */
+function deskPlan(col) {
   return wrap_(function () {
     var who = requireUser_();
     if (!knownCol_(col)) fail_('invalid_argument', 'Unknown collection.');
-    if (!sheetId_(false)) return { ok: true, docs: [], next: null, rev: 0 };
-    var ss = book_(), sheet = ss.getSheetByName('db'), rev = readMeta_(ss).revs[col] || 0;
-    var g = groupDocs_(keyRows_(sheet), col), ids = Object.keys(g).sort();
-    var allowed = readFilter_(who, col);
-    if (!allowed) return { ok: true, docs: [], next: null, rev: rev };
-    if (cursor) ids = ids.filter(function (id) { return id > cursor; });
-    var docs = [], chars = 0, next = null, busy = false;
-    for (var i = 0; i < ids.length; i++) {
-      var parts = completeParts_(g[ids[i]]);
-      if (!parts) { busy = true; continue; }
-      if (docs.length && chars >= READ_PAGE_CHARS) { next = docs[docs.length - 1].id; break; }
-      var js = readJson_(sheet, parts);
-      var json = parts.map(function (r) { return js[r.row]; }).join('');
-      docs.push({ id: ids[i], json: json }); chars += json.length;
-    }
-    if (busy) fail_('unavailable', 'busy');
-    return { ok: true, docs: docs, next: next, rev: rev };
+    var ss = canRead_(who) ? book_(false) : null;
+    return stable_(col, null, function (rev) {
+      var pl = ss ? plan_(colSheet_(ss, col, false)) : { rows: 0, chars: 0, pages: [] };
+      return { ok: true, rev: rev, rows: pl.rows, chars: pl.chars, pages: pl.pages };
+    });
   });
 }
-function deskGetMany(keys) { // keys: ["col/id", ...] -> {docs:[{key,json|null}]}
+/* step 2: ONE getValues over rows r1..r2; returns the complete documents in them. rev must still be the plan's revision. */
+function deskPage(col, r1, r2, rev) {
   return wrap_(function () {
     var who = requireUser_();
-    if (!sheetId_(false)) return { ok: true, docs: keys.map(function (k) { return { key: k, json: null }; }) };
-    var sheet = dbSheet_(), rows = keyRows_(sheet), idx = Object.create(null);
-    rows.forEach(function (r) { (idx[r.col + '/' + r.id] = idx[r.col + '/' + r.id] || []).push(r); });
-    var out = [], need = [];
+    if (!knownCol_(col) || !canRead_(who)) fail_('invalid_argument', 'Unknown collection.');
+    var ss = book_(false), sh = ss && colSheet_(ss, col, false);
+    return stable_(col, rev, function () { var r = readPage_(sh, r1, r2); return { ok: true, docs: r.docs, skipped: r.skipped }; });
+  });
+}
+function deskGetMany(keys) { // keys: ["col/id", ...] -> docs:[{key,json|null}]
+  return wrap_(function () {
+    var who = requireUser_(), byCol = Object.create(null), out = {};
     keys.forEach(function (k) {
       var i = String(k).indexOf('/'), col = k.slice(0, i);
       if (!knownCol_(col)) fail_('invalid_argument', 'Unknown collection.');
-      if (!readFilter_(who, col)) { out.push({ key: k, json: null, parts: null }); return; }
-      var rs = idx[k]; if (!rs) { out.push({ key: k, json: null, parts: null }); return; }
-      var p = completeParts_(rs); if (!p) fail_('unavailable', 'busy');
-      out.push({ key: k, parts: p }); need = need.concat(p);
+      (byCol[col] = byCol[col] || []).push(k.slice(i + 1)); out[k] = null;
     });
-    var js = readJson_(sheet, need);
-    return { ok: true, docs: out.map(function (o) { return { key: o.key, json: o.parts ? o.parts.map(function (r) { return js[r.row]; }).join('') : null }; }) };
+    var ss = canRead_(who) ? book_(false) : null;
+    Object.keys(byCol).forEach(function (col) {
+      var sh = ss && colSheet_(ss, col, false); if (!sh) return;
+      stable_(col, null, function () {
+        var last = sh.getLastRow(); if (last < 2) return;
+        var v = sh.getRange(2, 1, last - 1, 2).getValues(), want = Object.create(null), rows = [];
+        byCol[col].forEach(function (id) { want[id] = 1; });
+        for (var i = 0; i < v.length; i++) if (want[v[i][0]]) rows.push({ row: i + 2, id: String(v[i][0]), part: v[i][1] });
+        var js = Object.create(null);
+        runs_(rows.map(function (r) { return r.row; })).forEach(function (r) { var d = sh.getRange(r[0], 4, r[1], 1).getValues(); for (var k = 0; k < r[1]; k++) js[r[0] + k] = String(d[k][0]); });
+        var asm = assemble_(rows.map(function (r) { return [r.id, r.part, 0, js[r.row]]; }));
+        asm.docs.forEach(function (d) { out[col + '/' + d.id] = d.json; });
+      });
+    });
+    return { ok: true, docs: keys.map(function (k) { return { key: k, json: out[k] }; }) };
   });
 }
 /* ops: [{op:'set', col, id, json}|{op:'delete', col, id}]. All ops are checked before any is applied. */
 function deskWrite(ops) {
   return wrap_(function () {
-    var who = requireUser_();
-    var final = Object.create(null), order = [];
+    var who = requireUser_(), final = Object.create(null), order = [];
     (ops || []).forEach(function (o) {
       if (!o || (o.op !== 'set' && o.op !== 'delete')) fail_('invalid_argument', 'Bad operation.');
       if (!knownCol_(o.col)) fail_('invalid_argument', 'Unknown collection.');
@@ -234,93 +254,109 @@ function deskWrite(ops) {
     try { return applyOps_(who, final, order); } finally { lock.releaseLock(); }
   });
 }
+function beginWrite_(cols) { // under the lock: make every touched revision odd
+  var m = revsGet_();
+  cols.forEach(function (c) { var r = m.revs[c] || 0; if (r % 2) r++; m.revs[c] = r + 1; });
+  m.wts = Date.now(); revsSave_(m); return m;
+}
+function endWrite_(cols) {
+  var m = revsGet_(); cols.forEach(function (c) { var r = m.revs[c] || 0; m.revs[c] = r % 2 ? r + 1 : r; }); revsSave_(m); return m;
+}
 function applyOps_(who, final, order) {
-  var ss = book_(), sheet = ss.getSheetByName('db'), rows = keyRows_(sheet), idx = Object.create(null);
-  rows.forEach(function (r) { (idx[r.col + '/' + r.id] = idx[r.col + '/' + r.id] || []).push(r); });
-  var now = new Date().toISOString(), token = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  var updates = Object.create(null), appends = [], dels = [], cols = Object.create(null);
-  order.forEach(function (k) {
-    var o = final[k], ex = idx[k] || []; cols[o.col] = 1;
-    if (o.op === 'delete') { ex.forEach(function (r) { dels.push(r.row); }); return; }
-    var n = Math.max(1, Math.ceil(o.json.length / PART_CHARS)), exr = ex.slice().sort(function (a, b) { return a.row - b.row; });
-    for (var i = 0; i < n; i++) {
-      var vals = [o.col, o.id, i + '/' + n + '/' + token, o.json.slice(i * PART_CHARS, (i + 1) * PART_CHARS), now, who.email];
-      if (i < exr.length) updates[exr[i].row] = vals; else appends.push(vals);
-    }
-    for (var j = n; j < exr.length; j++) dels.push(exr[j].row);
-  });
-  var rowsSorted = Object.keys(updates).map(Number).sort(function (a, b) { return a - b; });
-  // pass 1: new and changed parts, pass 2: removals, so a reader never sees a doc with fewer parts than it should have
-  runs_(rowsSorted).forEach(function (r) { var vals = []; for (var i = 0; i < r[1]; i++) vals.push(updates[r[0] + i]); sheet.getRange(r[0], 1, r[1], 6).setValues(vals); });
-  if (appends.length) {
-    var last = sheet.getLastRow(), need = last + appends.length - sheet.getMaxRows();
-    if (need > 0) sheet.insertRowsAfter(sheet.getMaxRows(), need + 500);
-    sheet.getRange(last + 1, 1, appends.length, 6).setNumberFormat('@').setValues(appends);
+  var ss = book_(true), cols = [], byCol = Object.create(null), now = new Date().toISOString();
+  order.forEach(function (k) { var o = final[k]; if (!byCol[o.col]) { byCol[o.col] = []; cols.push(o.col); } byCol[o.col].push(o); });
+  var m = beginWrite_(cols), revs = {};
+  try {
+    cols.forEach(function (col) {
+      var sh = colSheet_(ss, col, true), ops = byCol[col], ids = Object.create(null), old = [], add = [], last = sh.getLastRow();
+      ops.forEach(function (o) { ids[o.id] = 1; });
+      if (last >= 2) { var v = sh.getRange(2, 1, last - 1, 1).getValues(); for (var i = 0; i < v.length; i++) if (ids[v[i][0]]) old.push(i + 2); }
+      var tok = ('000000000' + (m.revs[col] || 0)).slice(-9) + Math.random().toString(36).slice(2, 5);
+      ops.forEach(function (o) {
+        if (o.op !== 'set') return;
+        var n = Math.max(1, Math.ceil(o.json.length / PART_CHARS));
+        for (var i = 0; i < n; i++) { var s = o.json.slice(i * PART_CHARS, (i + 1) * PART_CHARS); add.push([o.id, i + '/' + n + '/' + tok, s.length, s, now, who.email]); }
+      });
+      // 1) append the new versions, 2) only then delete every old row of those ids
+      if (add.length) {
+        var need = last + add.length - sh.getMaxRows();
+        if (need > 0) sh.insertRowsAfter(sh.getMaxRows(), need + 500);
+        sh.getRange(last + 1, 1, add.length, 6).setValues(add);
+      }
+      runs_(old.sort(function (a, b) { return a - b; })).reverse().forEach(function (r) { sh.deleteRows(r[0], r[1]); });
+    });
+  } finally {
+    m = endWrite_(cols);
   }
-  dels.sort(function (a, b) { return b - a; });
-  var asc = dels.slice().sort(function (a, b) { return a - b; }), dr = runs_(asc);
-  for (var i = dr.length - 1; i >= 0; i--) sheet.deleteRows(dr[i][0], dr[i][1]);
-  var meta = readMetaFresh_(ss), revs = {};
-  Object.keys(cols).forEach(function (c) { meta.revs[c] = (meta.revs[c] || 0) + 1; revs[c] = meta.revs[c]; });
-  writeMeta_(ss, meta);
+  cols.forEach(function (c) { revs[c] = m.revs[c]; });
   return { ok: true, revs: revs };
 }
-/* Restore support (Super admin only) */
+/* ---------- restore support (Super admin only) ---------- */
 function deskStats() {
   return wrap_(function () {
     var who = requireUser_();
-    if (!(who.role === 'Super admin' && who.active)) fail_('permission_denied', 'Super admin only.');
-    if (!sheetId_(false)) return { ok: true, counts: {}, empty: true, seedOnly: true, revs: {} };
-    var ss = book_(), sheet = ss.getSheetByName('db'), rows = keyRows_(sheet), seen = Object.create(null), counts = Object.create(null);
-    rows.forEach(function (r) { var k = r.col + '/' + r.id; if (!seen[k]) { seen[k] = 1; counts[r.col] = (counts[r.col] || 0) + 1; } });
+    if (!isAdmin_(who)) fail_('permission_denied', 'Super admin only.');
+    var ss = book_(false), counts = Object.create(null), allCols = ADMIN_COLLECTIONS.concat(SHARED_COLLECTIONS);
+    if (ss) allCols.forEach(function (c) {
+      var sh = colSheet_(ss, c, false), last = sh ? sh.getLastRow() : 0; if (last < 2) return;
+      var v = sh.getRange(2, 1, last - 1, 1).getValues(), seen = Object.create(null), n = 0;
+      v.forEach(function (r) { if (!seen[r[0]]) { seen[r[0]] = 1; n++; } });
+      if (n) counts[c] = n;
+    });
     var cols = Object.keys(counts), seedOnly = cols.every(function (c) { return c === 'users' || c === 'plants'; });
-    if (seedOnly && cols.length) {
-      ['users', 'plants'].forEach(function (c) {
-        var g = groupDocs_(rows, c), ps = [];
-        Object.keys(g).forEach(function (id) { var p = completeParts_(g[id]); if (p) ps = ps.concat(p); else seedOnly = false; });
-        var js = readJson_(sheet, ps);
-        Object.keys(g).forEach(function (id) { var p = completeParts_(g[id]); if (!p) return; try { if (JSON.parse(p.map(function (r) { return js[r.row]; }).join('')).seed !== true) seedOnly = false; } catch (e) { seedOnly = false; } });
-      });
-    }
-    return { ok: true, counts: Object.assign({}, counts), empty: !cols.length, seedOnly: seedOnly, revs: readMetaFresh_(ss).revs };
+    if (seedOnly && cols.length) ['users', 'plants'].forEach(function (c) {
+      if (!counts[c]) return;
+      var r = readAll_(ss, c); if (r.skipped) seedOnly = false;
+      r.docs.forEach(function (d) { try { if (JSON.parse(d.json).seed !== true) seedOnly = false; } catch (e) { seedOnly = false; } });
+    });
+    return { ok: true, counts: Object.assign({}, counts), empty: !cols.length, seedOnly: seedOnly, revs: revsGet_().revs };
   });
 }
 /* remove every document of the named collections (restore with "replace everything") */
 function deskWipe(cols) {
   return wrap_(function () {
     var who = requireUser_();
-    if (!(who.role === 'Super admin' && who.active)) fail_('permission_denied', 'Super admin only.');
+    if (!isAdmin_(who)) fail_('permission_denied', 'Super admin only.');
     (cols || []).forEach(function (c) { if (!knownCol_(c)) fail_('invalid_argument', 'Unknown collection.'); });
     var lock = LockService.getScriptLock(); lock.waitLock(30000);
     try {
-      var ss = book_(), sheet = ss.getSheetByName('db'), rows = keyRows_(sheet), del = [], hit = Object.create(null);
-      rows.forEach(function (r) { if (cols.indexOf(r.col) >= 0) { del.push(r.row); hit[r.col] = 1; } });
-      var dr = runs_(del.sort(function (a, b) { return a - b; }));
-      for (var i = dr.length - 1; i >= 0; i--) sheet.deleteRows(dr[i][0], dr[i][1]);
-      var meta = readMetaFresh_(ss); Object.keys(hit).forEach(function (c) { meta.revs[c] = (meta.revs[c] || 0) + 1; });
-      writeMeta_(ss, meta);
-      return { ok: true, removedRows: del.length };
+      var ss = book_(false), hit = [];
+      if (ss) (cols || []).forEach(function (c) { var sh = colSheet_(ss, c, false); if (sh && sh.getLastRow() >= 2) hit.push(c); });
+      if (!hit.length) return { ok: true, removedRows: 0 };
+      beginWrite_(hit); var n = 0;
+      try { hit.forEach(function (c) { var sh = colSheet_(ss, c, false), last = sh.getLastRow(); n += last - 1; sh.deleteRows(2, last - 1); }); }
+      finally { endWrite_(hit); }
+      return { ok: true, removedRows: n };
     } finally { lock.releaseLock(); }
   });
 }
-/* CRC-32 of one collection, in the same form the backup manifest uses: id + "\n" + json + "\n" per document in id order (Super admin only) */
-function deskDigest(col) {
+/* checksum of the documents in rows r1..r2 (whole documents): count, characters and the sum of per-document CRC-32 of id + "\n" + json + "\n" (mod 2^32) */
+function deskDigestPage(col, r1, r2, rev) {
   return wrap_(function () {
     var who = requireUser_();
-    if (!(who.role === 'Super admin' && who.active)) fail_('permission_denied', 'Super admin only.');
+    if (!isAdmin_(who)) fail_('permission_denied', 'Super admin only.');
     if (!knownCol_(col)) fail_('invalid_argument', 'Unknown collection.');
-    if (!sheetId_(false)) return { ok: true, docs: 0, crc32: crcHex_(0xFFFFFFFF) };
-    var sheet = dbSheet_(), g = groupDocs_(keyRows_(sheet), col), ids = Object.keys(g).sort(), crc = 0xFFFFFFFF, n = 0, tbl = crcTable_();
-    var parts = ids.map(function (id) { var p = completeParts_(g[id]); if (!p) fail_('unavailable', 'busy'); return p; });
-    var all = []; parts.forEach(function (p) { all = all.concat(p); });
-    var js = readJson_(sheet, all);
-    ids.forEach(function (id, i) {
-      var line = id + '\n' + parts[i].map(function (r) { return js[r.row]; }).join('') + '\n', b = Utilities.newBlob(line).getBytes();
-      for (var k = 0; k < b.length; k++) crc = tbl[(crc ^ (b[k] & 255)) & 255] ^ (crc >>> 8);
-      n++;
+    var ss = book_(false), sh = ss && colSheet_(ss, col, false);
+    return stable_(col, rev, function () {
+      var r = readPage_(sh, r1, r2), sum = 0, chars = 0;
+      r.docs.forEach(function (d) { sum = (sum + docCrc_(d.id, d.json)) % 4294967296; chars += d.json.length; });
+      return { ok: true, docs: r.docs.length, chars: chars, sum: sum, skipped: r.skipped };
     });
-    return { ok: true, docs: n, crc32: crcHex_(crc >>> 0) };
   });
 }
-function crcTable_() { var t = [], c, n, k; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; }
-function crcHex_(c) { return ('0000000' + ((c ^ 0xFFFFFFFF) >>> 0).toString(16)).slice(-8); }
+var CRC_T_ = null;
+function crcTable_() { if (CRC_T_) return CRC_T_; var t = [], c, n, k; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return (CRC_T_ = t); }
+function docCrc_(id, json) {
+  var t = crcTable_(), crc = 0xFFFFFFFF, s = id + '\n' + json + '\n';
+  function put(b) { crc = t[(crc ^ b) & 255] ^ (crc >>> 8); }
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    if (c >= 0xD800 && c < 0xDC00 && i + 1 < s.length) { var d = s.charCodeAt(i + 1); if (d >= 0xDC00 && d < 0xE000) { c = 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00); i++; } }
+    if (c >= 0xD800 && c < 0xE000) c = 0xFFFD;
+    if (c < 0x80) put(c);
+    else if (c < 0x800) { put(0xC0 | (c >> 6)); put(0x80 | (c & 63)); }
+    else if (c < 0x10000) { put(0xE0 | (c >> 12)); put(0x80 | ((c >> 6) & 63)); put(0x80 | (c & 63)); }
+    else { put(0xF0 | (c >> 18)); put(0x80 | ((c >> 12) & 63)); put(0x80 | ((c >> 6) & 63)); put(0x80 | (c & 63)); }
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}

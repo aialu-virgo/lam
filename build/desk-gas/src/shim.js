@@ -1,9 +1,9 @@
 /* Apps Script runtime shim: gives the Desk the same window.claude surface it uses on claude.ai (use('user'|'downloads'|'db')),
- * implemented on google.script.run. Reads poll (20 s visible, 90 s hidden) and refresh at once after this tab's own writes. */
+ * implemented on google.script.run. Reads poll the revision map (30 s visible, 90 s hidden) and refresh at once after this tab's own writes. */
 (function () {
   var BOOT = window.__GAS_BOOT || null;
   window.__GAS = true;
-  var POLL_MS = 20000, POLL_HIDDEN_MS = 90000, CONC = 4, WRITE_WINDOW = 25;
+  var POLL_MS = 30000, POLL_HIDDEN_MS = 90000, CONC = 4, WRITE_WINDOW = 25;
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   /* ---- call queue: at most CONC server calls at once ---- */
   var running = 0, waitQ = [];
@@ -13,7 +13,9 @@
     return new Promise(function (resolve, reject) {
       var gsr = window.google && window.google.script && window.google.script.run;
       if (!gsr) { reject({ code: 'unavailable', message: 'Apps Script runtime is not available' }); return; }
-      gsr.withSuccessHandler(resolve).withFailureHandler(function (e) { reject({ code: 'unavailable', message: (e && e.message) || String(e) }); })[fn].apply(gsr, args);
+      /* each withX returns a NEW runner that carries the handlers; the method must be called on that runner */
+      var runner = gsr.withSuccessHandler(resolve).withFailureHandler(function (e) { reject({ code: 'unavailable', message: (e && e.message) || String(e) }); });
+      runner[fn].apply(runner, args);
     });
   }
   async function call(fn, args) {
@@ -42,17 +44,22 @@
     return { docs: arr, size: arr.length, empty: !arr.length, docChanges: function () { return []; }, metadata: {} };
   }
   function emit(c) { c.subs.slice().forEach(function (s) { try { s.next(makeSnap(c, s.q)); } catch (e) { setTimeout(function () { throw e; }); } }); }
+  /* a collection is read as: deskPlan (revision + pages of whole documents), then one deskPage per page (one getValues each); a changed revision restarts it */
   async function fetchAll(c) {
-    for (var attempt = 0; attempt < 3; attempt++) {
-      var docs = new Map(), cursor = null, rev = null;
-      do {
-        var r = await call('deskRead', [c.name, cursor]);
-        if (rev === null) rev = r.rev;
-        r.docs.forEach(function (d) { docs.set(d.id, JSON.parse(d.json)); });
-        cursor = r.next;
-      } while (cursor);
-      return { docs: docs, rev: rev };
+    var last = null;
+    for (var attempt = 0; attempt < 5; attempt++) {
+      try {
+        var plan = await call('deskPlan', [c.name]);
+        var pages = await Promise.all(plan.pages.map(function (p) { return call('deskPage', [c.name, p[0], p[1], plan.rev]); }));
+        var best = new Map(), skipped = 0;
+        pages.forEach(function (pg) { skipped += pg.skipped || 0; pg.docs.forEach(function (d) { var o = best.get(d.id); if (!o || d.token > o.token) best.set(d.id, d); }); });
+        var docs = new Map();
+        best.forEach(function (d, id) { try { docs.set(id, JSON.parse(d.json)); } catch (e) { skipped++; } });
+        if (skipped) { try { console.warn('Desk: ' + skipped + ' damaged document(s) skipped in ' + c.name); } catch (e) {} }
+        return { docs: docs, rev: plan.rev, skipped: skipped };
+      } catch (e) { last = e; if (e && (e.code === 'stale' || e.code === 'unavailable')) { await sleep(300 * (attempt + 1)); continue; } throw e; }
     }
+    throw last || { code: 'unavailable', message: 'could not read ' + c.name };
   }
   function refresh(c) {
     if (c.loading) { c.again = true; return c.loading; }
@@ -88,7 +95,7 @@
       call('deskWrite', [g.map(function (w) { return w.op; })]).then(function (r) {
         var bump = {};
         g.forEach(function (w) { var c = cols[w.op.col]; if (c && c.loaded) { if (w.op.op === 'set') c.docs.set(w.op.id, JSON.parse(w.op.json)); else c.docs.delete(w.op.id); } bump[w.op.col] = 1; });
-        Object.keys(bump).forEach(function (n) { var c = cols[n]; if (!c) return; var rv = r.revs[n]; if (c.loaded && rv === c.rev + 1) c.rev = rv; else c.stale = true; if (c.subs.length) { if (c.loaded) emit(c); if (c.stale) refresh(c); } });
+        Object.keys(bump).forEach(function (n) { var c = cols[n]; if (!c) return; var rv = r.revs[n]; if (c.loaded && rv === c.rev + 2) c.rev = rv; else c.stale = true; if (c.subs.length) { if (c.loaded) emit(c); if (c.stale) refresh(c); } });
         g.forEach(function (w) { w.res(); });
       }, function (e) { g.forEach(function (w) { w.rej(e); }); });
     });
