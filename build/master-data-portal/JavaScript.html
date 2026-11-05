@@ -206,7 +206,12 @@
           '<button type="button" class="btn btn-sm btn-outline-secondary" id="newReqBtn">Start a new request</button>';
         $('itemSuccess').innerHTML = '<div class="alert alert-warning" role="alert">' + html + '</div>';
         $('retryBtn').addEventListener('click', retryUpload);
-        $('newReqBtn').addEventListener('click', function () { $('itemForm').reset(); });
+        $('newReqBtn').addEventListener('click', function () {
+          var num = APP.retry ? APP.retry.requestNumber : res.requestNumber;
+          APP.retry = null; $('itemForm').reset();
+          $('itemSuccess').innerHTML = '<div class="alert alert-info" role="alert">Request <strong>' + esc(num) +
+            '</strong> saved; files not attached - e-mail them quoting this number.</div>';
+        });
         if (warn.length) showAlert('itemAlert', 'warning', warn.join(' '));
       } else {
         $('itemForm').reset();
@@ -231,7 +236,7 @@
     Promise.all(APP.files.map(readBase64)).then(function (files) {
       return call('retryAttachments', { requestNumber: r.requestNumber, email: r.email, files: files });
     }).then(function (res) {
-      $('itemForm').reset();
+      APP.retry = null; APP.files = []; renderFiles(); $('itemForm').reset();
       $('itemSuccess').innerHTML = '<div class="alert alert-success" role="alert">Attachments saved for <strong>' + esc(res.requestNumber) + '</strong> (' + esc(res.attachments) + ' file(s)).</div>';
     }).catch(function (err) {
       showAlert('itemAlert', 'danger', 'Retry failed: ' + err.message);
@@ -429,8 +434,13 @@
       e.target.value = ''; renderFiles(); checkFiles();
     });
     $('itemForm').addEventListener('reset', function () {
-      var kept = keepValues(); APP.files = []; APP.retry = null; renderFiles(); $('fileError').textContent = '';
-      clearAlert('itemSuccess'); $('submitBtn').disabled = false;
+      var kept = keepValues(); $('fileError').textContent = '';
+      if (APP.retry) {
+        // Retry pending: keep the retry panel, request number and selected files; only "Start a new request" discards them.
+        $('submitBtn').disabled = true;
+      } else {
+        APP.files = []; renderFiles(); clearAlert('itemSuccess'); $('submitBtn').disabled = false;
+      }
       setTimeout(function () { $('f_requestDate').value = APP.config.now; FIELD_KEYS.forEach(function (k) { setFieldError(k, ''); }); restoreValues(kept); }, 0);
     });
     $('trackForm').addEventListener('submit', submitTrack);

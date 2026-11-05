@@ -403,7 +403,9 @@ var MIME_BY_EXT = {
 
 function saveAttachments_(requestNumber, files) {
   if (!files || !files.length) return { folderUrl: '', links: [] };
-  var folder = getRootFolder_().createFolder(requestNumber);
+  var root = getRootFolder_();
+  var existing = root.getFoldersByName(requestNumber);   // reuse the request's subfolder (retry) instead of duplicating
+  var folder = existing.hasNext() ? existing.next() : root.createFolder(requestNumber);
   if (CONFIG.SHARE_FOLDER_WITH_DOMAIN) {
     try { folder.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { console.warn('Folder sharing not applied: ' + e.message); }
   }
