@@ -25,3 +25,7 @@ build/demo-data/output/
 # OS / editor
 .DS_Store
 *.swp
+
+# Generated Apps Script files
+build/desk-gas/out/
+*.txt.bak
