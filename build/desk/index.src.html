@@ -359,6 +359,8 @@ function periodOptions(){
   return o;
 }
 function updateUploadPeriods(){var el=$('#u-period');if(el&&U&&U.stage!=='validating'&&U.stage!=='loading'){var v=el.value;el.innerHTML=periodOptions();el.value=U.period}}
+function oxMonthList(r){var m={};try{r.pm.forEach(function(P){m[P.ym]=1})}catch(e){}return Object.keys(m).sort()}
+function oxMonthsOf(r){var m={};try{r.pm.forEach(function(P){m[P.ym]=1})}catch(e){}return Object.keys(m).sort().map(function(x){return ymLabel(x)}).join(', ')||'the months in the file'}
 function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:'auto',entity:'INV',file:null,name:'',size:0,headers:[],rows:[],sys:null,map:{},savedMap:false,res:null,msg:'',closeAfter:true,reason:'',confirmDates:false,anyway:false,confirmReplace:false,swapSerial:false,expMonth:'auto',progress:0,progressMsg:''}}
 function renderUpload(){var _e=$('#i-upload');withScroll(_e,renderUpload0)}
 function renderUpload0(){
@@ -381,7 +383,7 @@ function renderUpload0(){
      +'<div class="note" style="margin-top:6px">One file per entity per quarter, or a multi-quarter file split by document date. The file is read in this browser; nothing is sent anywhere else.</div>'
      +(st==='parsing'?'<div style="margin-top:10px"><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(U.msg||'Reading file...')+'</div></div>':'')+'</div>';
     if(U.transferDone&&st==='idle')h+=U.transferDone;
-    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+(U.imp?'<button class="btn sm pri" data-act="imp-rc">Import as receivables</button><button class="btn sm pri" data-act="imp-cn">Import as credit notes</button>':'')+'</div>';
+    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+(U.cnOffer?'<button class="btn sm pri" data-act="cn-offer">Load as credit notes</button>':'')+(U.imp?'<button class="btn sm pri" data-act="imp-rc">Import as receivables</button><button class="btn sm pri" data-act="imp-cn">Import as credit notes</button>':'')+'</div>';
   }
   if(st==='mapping'||st==='validating'||st==='validated'||st==='loading'||st==='done'){
     h+='<div class="banner info"><span><b>'+esc(U.name)+'</b> &middot; '+fmtN(U.rows.length)+' data rows &middot; '+U.headers.length+' columns &middot; detected source <b>'+(U.sys==='B1'?'SAP B1':'SAP S/4HANA')+'</b>'+(U.savedMap?' &middot; saved mapping applied':'')+'</span><button class="btn sm" data-act="u-reset" '+(locked?'disabled':'')+'>Choose another file</button></div>';
@@ -436,8 +438,10 @@ function resultHtml(){
   }
   h+='<div class="grid2"><div><h3 class="note" style="margin:0 0 6px">By quarter (split by document date)</h3><div class="tw"><table><thead><tr><th>Quarter</th><th class="num">Rows</th><th class="num">Plants</th><th class="num">Months</th><th>Status</th></tr></thead><tbody>'+qrows+'</tbody></table></div></div>'
    +'<div><h3 class="note" style="margin:0 0 6px">By product group (in scope)</h3><div class="tw"><table><thead><tr><th>Group</th><th class="num">Lines</th><th class="num">Net value</th></tr></thead><tbody>'+grows+'</tbody></table></div></div></div>';
+  var lockedM=cnLockedIn(oxMonthList(r));
+  if(lockedM.length)h+='<div class="banner err" style="display:block"><b>Locked: '+esc(lockedM.map(ymLabel).join(', '))+'.</b> Credit notes are locked for these months, so their sales cannot be replaced. A Super admin must unlock them (Data Intake › Credit-note locks) first. This file is not loaded.</div>';
   var closedQs=qs.filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(closedQs.length)h+='<div class="banner err" style="display:block"><b>Closed quarter in this file: '+closedQs.map(qLabel).join(', ')+'.</b> Reloading a closed quarter needs Super admin and is logged. <div class="fld" style="margin-top:8px"><label for="u-reason">Reason for reload (required)</label><input id="u-reason" class="in" data-chg="reason" value="'+esc(U.reason)+'" '+(locked?'disabled':'')+'></div></div>';
+  if(closedQs.length)h+='<div class="banner err" style="display:block"><b>Closed quarter in this file: '+closedQs.map(qLabel).join(', ')+'.</b> Reloading a closed quarter needs Super admin and is logged. <div class="note" style="color:inherit">This will <b>replace the real sales</b> of '+esc(oxMonthsOf(r))+' with the rows of <b>'+esc(U.name)+'</b>. Check that this file is a sales export.</div><div class="fld" style="margin-top:8px"><label for="u-reason">Reason for reload (required, at least 10 characters; a bare YES is not accepted)</label><input id="u-reason" class="in" data-chg="reason" value="'+esc(U.reason)+'" '+(locked?'disabled':'')+'></div></div>';
   h+='<label class="chip" style="align-self:flex-start"><input type="checkbox" id="u-docs" data-chg="keepdocs" '+(U.keepDocs===false?'':'checked')+' '+(locked?'disabled':'')+'> Keep the document index (needed to drill down to a source document; uses most of the storage)</label>';
   if(U.mode==='historic')h+='<label class="chip" style="align-self:flex-start"><input type="checkbox" id="u-close" data-chg="closeafter" '+(U.closeAfter?'checked':'')+' '+(locked?'disabled':'')+'> Close quarters that become complete and have ended</label>';
   var can=canLoad(r,locked);
@@ -467,7 +471,7 @@ function renderCov0(){
   var head='<tr><th>Entity</th>'+g.list.map(function(k){return '<th class="'+(k===g.cur?'cur':'')+'" title="'+qMonths(k)[0]+' to '+qMonths(k)[2]+'">'+qLabel(k).replace(' ','<br>')+(k===g.cur?'<br>open':'')+'</th>'}).join('')+'</tr>';
   var body=ENTITIES.map(function(e){
     if(!e.live)return '<tr><td>'+e.label+'</td>'+g.list.map(function(){return '<td><span class="cell na" title="Not built yet">&ndash;</span></td>'}).join('')+'</tr>';
-    return '<tr><td><b>'+e.label+'</b></td>'+g.list.map(function(k){var c=covStatus(e.k,k);var sym=glyph(c.st);var sel=S.covSel===e.k+'|'+k;return '<td><button class="cell '+c.st+'" data-act="cov" data-ent="'+e.k+'" data-q="'+k+'" aria-pressed="'+sel+'" aria-label="'+e.label+' '+qLabel(k)+': '+({ok:'loaded',part:'partial',miss:'missing'})[c.st]+(c.closed?', closed':'')+'">'+sym+(c.closed?'<sup style="font-size:8px">L</sup>':'')+'</button></td>'}).join('')+'</tr>';
+    return '<tr><td><b>'+e.label+'</b></td>'+g.list.map(function(k){var c=covStatus(e.k,k);var sym=glyph(c.st)+(c.lock==='all'?' 🔒':c.lock==='some'?' ◐':'');var sel=S.covSel===e.k+'|'+k;return '<td><button class="cell '+c.st+'" data-act="cov" data-ent="'+e.k+'" data-q="'+k+'" aria-pressed="'+sel+'" aria-label="'+e.label+' '+qLabel(k)+': '+({ok:'loaded',part:'partial',miss:'missing'})[c.st]+(c.closed?', closed':'')+'">'+sym+(c.closed?'<sup style="font-size:8px">L</sup>':'')+'</button></td>'}).join('')+'</tr>';
   }).join('');
   var det='';
   if(S.covSel){
@@ -478,7 +482,7 @@ function renderCov0(){
      +(effRole()!=='Super admin'||readOnly()?'<span class="note">Closing, reopening and reloading a quarter is for a Super admin.</span>':(c.closed?'<button class="btn sm" data-act="reopen" data-q="'+p[1]+'">Reopen quarter (reason required, logged)</button>':(c.st!=='miss'?'<button class="btn sm" data-act="close-q" data-q="'+p[1]+'">Close quarter</button>':'')))+'</div></div>';
   }
   el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; quarters since '+qLabel(histStart())+' (history start, D28)</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
-   +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det
+   +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det+cnLockPanel()
    +'<p class="note">FY runs April to March; Q1 = Apr to Jun. A partial quarter greys its QoQ figures with "incomplete history" in the business views. Tap a cell for detail. Closed quarters are locked; reloading needs Super admin and is logged. Q3 FY27 is the current quarter, shown for reference. Other entities arrive later.</p>';
 }
 /* keep every inner scroll position across a re-render of a container (a snapshot or timer tick must not throw the reader back to the top) */
@@ -487,7 +491,7 @@ function withScroll(container,fn){
   fn();
   if(container){Array.prototype.forEach.call(container.querySelectorAll('.tw,.hscroll'),function(e,i){if(pos[i]){e.scrollTop=pos[i][0];e.scrollLeft=pos[i][1]}})}
 }
-S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:'',showReplaced:false};
+S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:'',showReplaced:false,sel:{}};function histSa(){return effRole()==='Super admin'&&!readOnly()}
 var ENT_NAME={CU:'Customers',RC:'Receivables',CL:'Collections',ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
 function histRows(){
   var f=S.hist,q=(f.q||'').toLowerCase();
@@ -496,17 +500,18 @@ function histRows(){
     return (!f.src||u.sys===f.src)&&(!f.ent||(u.entity||'INV')===f.ent)&&(!f.status||u.status===f.status)&&(!q||((u.file||'')+' '+(u.by||'')+' '+(u.periodLabel||'')+' '+(u.status||'')+' '+(u.demo?'demo':'')).toLowerCase().indexOf(q)>=0);
   });
 }
-function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u),u.backup_removed||'']}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
+function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u),u.backup_removed||'']}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open),Object.keys(S.hist.sel),histSa(),Object.keys(S.cnLock||{})])}
 function histBodyHtml(){
   var all=histRows(),rows=all.slice(0,S.hist.shown);
   if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
   if(!all.length)return '<div class="empty sm">No upload matches these filters.</div>';
   var open=S.hist.open;
-  return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
+  return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr>'+(histSa()?'<th>Pick</th>':'')+'<th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(u){
      var fn=u.file||'',isOpen=!!open[u._id];
-     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST'||u.entity==='CL'||u.entity==='RC'||u.entity==='CN')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
-     if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
+     var undoable=(u.status!=='Undone')&&['INV','ST','CL','RC','CN'].indexOf(u.entity||'INV')>=0;
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'">'+(histSa()?'<td>'+(undoable?'<input type="checkbox" data-act="hist-sel" data-id="'+esc(u._id)+'" aria-label="Select '+esc(fn)+' for undo" '+(S.hist.sel[u._id]?'checked':'')+'>':'')+'</td>':'')+'<td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST'||u.entity==='CL'||u.entity==='RC'||u.entity==='CN')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
+     if(isOpen)tr+='<tr class="hdet"><td colspan="12"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
      return tr}).join('')
    +'</tbody></table></div>'
    +'<div class="row" style="justify-content:space-between;align-items:center"><span class="note">Showing '+rows.length+' of '+all.length+(all.length!==S.uploads.length?' (filtered from '+S.uploads.length+')':'')+'. Click a row for the full file name and details.</span>'+(all.length>rows.length?'<button class="btn sm" data-act="hist-more">Show 15 more</button>':'')+'</div>';
@@ -519,11 +524,12 @@ function renderHist(){
     var sel=function(id,label,cur,opts,nm){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="hist-f" data-k="'+nm+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(cur===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'};
     el.innerHTML='<div class="hd"><h2>Upload history</h2><span class="note" id="hist-count"></span></div>'
      +'<div class="row" id="hist-ctl" style="align-items:flex-end">'+sel('hf-src','Source',f.src,srcs.map(function(x){return [x,x==='B1'?'SAP B1':x==='S4'?'SAP S/4':x]}),'src')+sel('hf-ent','Entity',f.ent,ents.map(function(x){return [x,ENT_NAME[x]||x]}),'ent')+sel('hf-st','Status',f.status,sts.map(function(x){return [x,x]}),'status')
-     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div><div class="fld"><label>&nbsp;</label><label class="chip"><input type="checkbox" id="hf-rep" data-chg="hist-rep" '+(f.showReplaced?'checked':'')+'> Show replaced (<span id="hist-rep-n">0</span>)</label></div></div><div id="hist-body"></div>';
+     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div>'+(histSa()?'<div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-bulk" id="hist-bulk">Undo selected (0)</button></div>':'')+'<div class="fld"><label>&nbsp;</label><label class="chip"><input type="checkbox" id="hf-rep" data-chg="hist-rep" '+(f.showReplaced?'checked':'')+'> Show replaced (<span id="hist-rep-n">0</span>)</label></div></div><div id="hist-body"></div>';
     S.hist.sig='';
   }
   if(S.hist.sig===sig)return;S.hist.sig=sig;
   var rn=$('#hist-rep-n');if(rn)rn.textContent=String(S.uploads.filter(function(u){return !!histReplacedBy(u)}).length);
+  var bb0=$('#hist-bulk');if(bb0)bb0.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')';
   var c=$('#hist-count');if(c)c.textContent=fmtN(S.uploads.length)+' upload'+(S.uploads.length===1?'':'s');
   var body=$('#hist-body');withScroll(body,function(){body.innerHTML=histBodyHtml()});
 }
@@ -601,6 +607,9 @@ async function onFile(file){
     var cud=d.type==='unknown'?custDetect(headers):null;if(cud){U=newU();U.mode=mode;U.period=period;U.msg='This is a customer master ('+cud.layout+'), not a transaction export. Load it from Admin > Customers.';renderUpload();return}
     var rdt=recvDetect(headers);if(rdt){recvStart(file,rows,headers,rdt,sheetPicked);return}
     var cnd=cnDetectB1(headers)||(d.type==='invoice'&&d.sys==='S4'&&cnS4Share(headers,rows)>0.5?{kind:'cn',sys:'S4',layout:'S/4 billing credit memos'}:null);if(cnd){cnStart(file,rows,headers,cnd,sheetPicked);return}
+    var cnGuard=creditLike(file.name,headers,rows,sheetsSeen,sheetPicked);
+    if(ent==='CN'&&d.type==='invoice'){cnStart(file,rows,headers,{sys:d.sys,layout:(d.sys==='S4'?'S/4':'B1')+' credit notes (sales-register layout)'},sheetPicked);return}
+    if(d.type==='invoice'&&cnGuard){U=newU();U.mode=mode;U.period=period;U.cnOffer={file:file,rows:rows,headers:headers,sys:d.sys,sheetPicked:sheetPicked};U.msg='This file looks like a credit-note register ('+cnGuard+'). Credit notes must not be loaded as sales: they would replace your sales for these months.';renderUpload();return}
     if(d.type==='unknown'){var cdt=collDetect(headers);if(cdt){collStart(file,rows,headers,sheetPicked);return}var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
     if(d.type==='master'&&d.what==='transfers'){U=newU();U.mode=mode;U.period=period;U.offer={file:file,rows:rows,what:'transfers'};U.msg='This file is the internal-transfer list (CardCode, CardName, Tranfser), not the sales export'+(sheetsSeen&&sheetsSeen.length>1?'. Sheets in the workbook: '+sheetsSeen.join('; ')+'. Save the DATA sheet as the CSV, or load the whole XLSX':'')+'. You can load it as the Internal-transfer list instead.';renderUpload();return}
     if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}
@@ -814,6 +823,7 @@ async function packChunks(sys,P){
 }
 async function runLoad(opts){
   var r=U.res,sys=U.sys,demo=!!opts.demo,by=whoAmI();
+  var lkS=cnLockedIn(oxMonthList(r));if(lkS.length){var lm='credit notes are locked for '+lkS.map(ymLabel).join(', ')+'; unlock them first. Nothing was changed.';toast(lm);throw new Error(lm)}
   if(demo&&hasRealData()){toast(DEMO_OFF_MSG);throw new Error(DEMO_OFF_MSG)}
   U.stage='loading';cancelFlag=false;U.progress=0;U.progressMsg='Preparing...';renderUpload();await tick();
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);

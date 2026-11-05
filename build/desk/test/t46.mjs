@@ -62,7 +62,7 @@ const clean=G.invoices({shape:'B1',plants,months:['2026-04'],docsPerPlantMonth:2
 const thin=G.invoices({shape:'B1',plants:[plants[0]],months:['2026-04'],docsPerPlantMonth:2,seed:5,dateStyle:'iso'});fs.writeFileSync(AF+'Combine Sale bk 2026-04 thin.csv',csvOf(thin.headers,thin.rows));
 await page.evaluate(()=>{window.__NOAUTOLOAD=false});
 const inv=async f=>{await up(f);await page.evaluate(()=>{const b=document.querySelector('[data-act="u-validate"]');if(b)b.click()});await page.waitForFunction(()=>window.__desk.U.stage==='done'||window.__desk.U.stage==='validated',null,{timeout:90000});
-  if(await page.evaluate(()=>window.__desk.U.stage)==='validated'){if(await page.$('[data-chg="confrep"]'))await page.check('[data-chg="confrep"]');if(await page.$('#u-reason'))await page.fill('#u-reason','reload');await page.waitForTimeout(300);await page.click('[data-act="u-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:90000})}await page.waitForTimeout(800)};
+  if(await page.evaluate(()=>window.__desk.U.stage)==='validated'){if(await page.$('[data-chg="confrep"]'))await page.check('[data-chg="confrep"]');if(await page.$('#u-reason'))await page.fill('#u-reason','reload for the test');await page.waitForTimeout(300);await page.click('[data-act="u-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:90000})}await page.waitForTimeout(800)};
 await inv(AF+'Combine Sale bk 2026-04 clean.csv');
 const cell0=(await ms('^cells/INV_2026-04'))['cells/INV_2026-04'].plants[plants[0].code];
 await inv(AF+'Combine Sale bk 2026-04 thin.csv');

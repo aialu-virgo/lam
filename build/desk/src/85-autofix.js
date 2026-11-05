@@ -356,7 +356,8 @@ function replaceRisk(r){
 function canLoad(r,locked){
   if(!r||!(r.good>0)||locked)return false;
   var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(closedQs.length&&U.reason.trim().length<3)return false;
+  if(closedQs.length&&U.reason.trim().length<10)return false;
+  if(cnLockedIn(oxMonthList(r)).length)return false;/* D61: months whose credit notes are locked cannot be replaced by a sales load */
   if(replaceRisk(r).length&&!U.confirmReplace)return false;
   return true;
 }
@@ -396,7 +397,10 @@ function undoPlan(uid){
   var aId=actionIdOf('R5',[uid,'upload']);
   return {u:u,mine:mine,months:Object.keys(mine).sort(),n:n,later:Math.max(0,(u.plantMonths||0)-n),actId:aId,act:S.actions.find(function(a){return a.id===aId}),fus:S.followups.filter(function(f){return f.action_id===aId})};
 }
-function undoDialog(uid){undoDialog0(uid);bkDialogNote(uid)}
+function undoDialog(uid){undoDialog0(uid);bkDialogNote(uid);
+  var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&us.entity==='CN'){var l=cnLockedIn(cnUndoPlan(uid).months);if(l.length){var e=document.getElementById('d-err');if(e)e.insertAdjacentHTML('beforebegin','<div class="banner err" style="display:block"><b>Locked: '+esc(l.map(ymLabel).join(', '))+'.</b> A Super admin must unlock these months with a reason before this upload can be undone.</div>');var g=document.querySelector('[data-act="undo-go"]');if(g)g.disabled=true}}
+}
 function undoDialog0(uid){
   var us=S.uploads.find(function(x){return x._id===uid});
   if(us&&(us.entity==='RC'||us.entity==='CN')){var rc=us.entity==='RC',ps=rc?S.recvSnaps.find(function(x){return x.upload===uid}):cnUndoPlan(uid);
@@ -413,7 +417,17 @@ function undoDialog0(uid){
    +'<p class="note">Undo cannot bring back what this upload replaced. Any month it overwrote lost its earlier figures, so upload those months again. Months it created are simply removed. '+(pl.later?pl.later+' plant-month'+(pl.later===1?'':'s')+' written by this upload were already replaced by a later upload; those are left alone. ':'')+(u.closedQuarters&&u.closedQuarters.length?'Quarters it closed ('+esc(u.closedQuarters.map(qLabel).join(', '))+') stay closed; reopen them in the coverage grid if needed. ':'')+'</p>'
    +'<div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'" '+(sa&&pl.n+(pl.act?1:0)+pl.fus.length>=0?'':'disabled')+'>Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');
 }
-async function undoUpload(uid){
+/* D61: nothing is deleted before the backup is checked. An incomplete backup stops a plain or bulk undo; only the explicit "Undo and remove these months" click (opts.confirmIncomplete) goes on, and then nothing is restored. */
+async function undoUpload(uid,opts){
+  if(!superOnly('undo an upload'))return;
+  var us0=S.uploads.find(function(x){return x._id===uid});
+  if(us0&&(us0.entity||'INV')==='INV'){var lk0=cnLockedIn(((undoPlan(uid)||{}).months)||[]);if(lk0.length){var m0='credit notes are locked for '+lk0.map(ymLabel).join(', ')+'; a Super admin must unlock them (Data Intake › Credit-note locks) before this sales upload can be undone. Nothing was changed.';var e0=document.getElementById('d-err');if(e0)e0.innerHTML='<div class="banner err">Undo stopped: '+esc(m0)+'</div>';throw new Error(m0)}}
+  if(bkHas(uid)){var c0=bkCheck(uid);
+    if(!c0.ok&&!(opts&&opts.confirmIncomplete)){var m1='Backup incomplete for '+((us0&&us0.file)||uid)+': '+(c0.have||0)+' of '+(c0.of||'?')+' parts are usable. Nothing was changed; use "Undo and remove these months" on that upload to remove its months without restoring.';var e1=document.getElementById('d-err');if(e1)e1.innerHTML='<div class="banner err">Undo stopped: '+esc(m1)+'</div>';throw new Error(m1)}}
+  S.bkAllowIncomplete=!!(opts&&opts.confirmIncomplete);
+  try{return await undoUpload0(uid)}finally{S.bkAllowIncomplete=false}
+}
+async function undoUpload0(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
   if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],us.entity==='RC'?'snap':null,'<p>The data this upload held was removed. Upload the file again if you still need it.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
@@ -448,7 +462,7 @@ async function undoUpload(uid){
 }
 Object.assign(handlers,{
  'hist-undo':function(t){undoDialog(t.getAttribute('data-id'))},
- 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'))},
+ 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'),{confirmIncomplete:true})},
  'u-swap-serial':async function(){if(!U||!U.res)return;U.swapSerial=true;U.stage='validating';U.progressMsg='Reading date cells swapped...';renderUpload();await runValidation()},
  'u-unswap':async function(){if(!U||!U.res)return;U.swapSerial=false;U.stage='validating';renderUpload();await runValidation()}
 });
@@ -482,7 +496,8 @@ function histReplacedBy(u){
   return later[0]||null;
 }
 function histStatusPill(u){
-  var rm=u.backup_removed?' <span class="note" title="'+esc(u.backup_removed_why||'')+'">Undo no longer restores (backup removed '+esc(istStr(u.backup_removed))+')</span>':'';
+  var lk=(u.entity==='CN'&&u.months&&u.months.some(function(m){return S.cnLock&&S.cnLock[m]}))?' <span class="pill ok" title="Credit-note month locked">🔒 Locked</span>':'';
+  var rm=lk+(u.backup_removed?' <span class="note" title="'+esc(u.backup_removed_why||'')+'">Undo no longer restores (backup removed '+esc(istStr(u.backup_removed))+')</span>':'');
   return histStatusPill0(u)+rm;
 }
 function histStatusPill0(u){
@@ -501,6 +516,53 @@ async function afterValidate(){
   if(replaceRisk(U.res).length&&!U.confirmReplace)why.push('it would replace months that hold more lines');
   if(U.res.dateInfo.mixed&&!U.confirmDates)why.push('the swapped-date range needs your confirmation');
   var closedQs=Object.keys(U.res.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(closedQs.length&&U.reason.trim().length<3)why.push('a closed quarter needs a reload reason');
+  if(closedQs.length&&U.reason.trim().length<10)why.push('a closed quarter needs a reload reason of at least 10 characters');
   if(why.length)toast('Not loaded yet: '+why.join('; ')+'. This is a safety check, not a rejected row.');
 }
+
+/* ================= D60: bulk Undo ("Undo selected"), newest first, through the existing integrity-checked Undo ================= */
+function bulkPlanLine(u){
+  var e=u.entity||'INV',n=0,unit='plant-months';
+  if(e==='INV'){var p=undoPlan(u._id);n=p?p.n:0}
+  else if(e==='CL'){n=collUndoPlan(u._id).docs.length}
+  else if(e==='CN'){n=cnUndoPlan(u._id).docs.filter(function(d){return !d.chunk}).length}
+  else{n=1;unit='snapshot'}
+  return {n:n,unit:unit};
+}
+async function bulkBackupUnits(uid){
+  var chk=bkCheck(uid);if(chk.none)return {txt:'no backup: the months are removed, upload them again',ok:true};
+  if(!chk.ok)return {txt:'backup incomplete: nothing will be restored',ok:false};
+  var docs=bkFor(uid),n=0;
+  for(var i=0;i<docs.length;i++){var items=JSON.parse(await ungz(docs[i].z));items.forEach(function(it){if(/^collections\/|^creditnotes\/[^~]*$|\/rsnap_|\/snap_|^cellpart:/.test(it.p))n++})}
+  return {txt:'restores the previous data for '+n+' plant-month'+(n===1?'':'s'),ok:true};
+}
+function bulkSelected(){
+  return Object.keys(S.hist.sel).map(function(id){return S.uploads.find(function(x){return x._id===id})}).filter(function(u){return u&&u.status!=='Undone'}).sort(function(a,b){return a.at<b.at?1:-1});
+}
+Object.assign(handlers,{
+ 'hist-sel':function(t){var id=t.getAttribute('data-id');if(S.hist.sel[id])delete S.hist.sel[id];else S.hist.sel[id]=true;S.hist.sig='';var bb=$('#hist-bulk');if(bb)bb.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')'},
+ 'hist-bulk':async function(){
+  if(!superOnly('undo uploads'))return;
+  var list=bulkSelected();if(!list.length){toast('Tick the uploads to undo first');return}
+  openDlg('<h3>Undo '+list.length+' upload'+(list.length===1?'':'s')+', newest first</h3><p class="note" style="margin:0">Each one uses the normal Undo, with its integrity check. The run stops at the first failure.</p><ol id="bulk-list">'+list.map(function(u){var pl=bulkPlanLine(u);return '<li id="bk-'+esc(u._id)+'"><b>'+esc(u.file||u._id)+'</b> · '+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+' · '+esc(u.periodLabel||'')+' · removes '+pl.n+' '+pl.unit+' · <span class="note bu">checking the backup...</span></li>'}).join('')+'</ol><div class="row"><button class="btn pri" data-act="bulk-go" id="bulk-go">Undo these '+list.length+' now</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="bulk-out"></div><div id="d-err"></div>');
+  for(var i=0;i<list.length;i++){var r=await bulkBackupUnits(list[i]._id),el=document.querySelector('#bk-'+list[i]._id.replace(/[^\w-]/g,'')+' .bu');if(el)el.textContent=r.txt}
+ },
+ 'bulk-go':async function(){
+  if(!superOnly('undo uploads'))return;
+  var list=bulkSelected(),out=document.getElementById('bulk-out'),btn=document.getElementById('bulk-go');if(btn)btn.disabled=true;
+  var o1=openDlg,c1=closeDlg,done=[];
+  for(var i=0;i<list.length;i++){
+    var cap='';openDlg=function(h){cap=h};closeDlg=function(){};
+    var err=null;
+    try{await undoUpload(list[i]._id)}catch(e){err=dbErrText(e)}
+    openDlg=o1;closeDlg=c1;
+    var de=document.getElementById('d-err');if(!err&&de&&/Undo stopped/.test(de.textContent)){err=de.textContent.replace(/^[\s\S]*?Undo stopped:\s*/,'').trim();de.innerHTML=''}
+    if(!err&&/Undo stopped/.test(cap)){var m=/Undo stopped: ([^<]*)/.exec(cap);err=m?m[1]:'Undo stopped'}
+    if(err){if(out)out.innerHTML='<div class="banner err" style="display:block"><b>Stopped at '+esc(list[i].file||list[i]._id)+'.</b> '+esc(err)+' '+done.length+' of '+list.length+' were undone; nothing after this one was touched.</div>'+(done.length?'<p class="note">Undone: '+esc(done.join(', '))+'</p>':'');return}
+    done.push(list[i].file||list[i]._id);delete S.hist.sel[list[i]._id];
+    if(out)out.innerHTML='<div class="note">'+done.length+' of '+list.length+' undone...</div>';
+  }
+  S.hist.sig='';if(out)out.innerHTML='<div class="banner ok" style="display:block"><b>All '+list.length+' undone</b> (newest first): '+esc(done.join(', '))+'.</div>';
+  var bb=$('#hist-bulk');if(bb)bb.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')';
+ }
+});

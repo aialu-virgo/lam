@@ -667,6 +667,8 @@ function periodOptions(){
   return o;
 }
 function updateUploadPeriods(){var el=$('#u-period');if(el&&U&&U.stage!=='validating'&&U.stage!=='loading'){var v=el.value;el.innerHTML=periodOptions();el.value=U.period}}
+function oxMonthList(r){var m={};try{r.pm.forEach(function(P){m[P.ym]=1})}catch(e){}return Object.keys(m).sort()}
+function oxMonthsOf(r){var m={};try{r.pm.forEach(function(P){m[P.ym]=1})}catch(e){}return Object.keys(m).sort().map(function(x){return ymLabel(x)}).join(', ')||'the months in the file'}
 function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:'auto',entity:'INV',file:null,name:'',size:0,headers:[],rows:[],sys:null,map:{},savedMap:false,res:null,msg:'',closeAfter:true,reason:'',confirmDates:false,anyway:false,confirmReplace:false,swapSerial:false,expMonth:'auto',progress:0,progressMsg:''}}
 function renderUpload(){var _e=$('#i-upload');withScroll(_e,renderUpload0)}
 function renderUpload0(){
@@ -689,7 +691,7 @@ function renderUpload0(){
      +'<div class="note" style="margin-top:6px">One file per entity per quarter, or a multi-quarter file split by document date. The file is read in this browser; nothing is sent anywhere else and nothing is saved.</div>'
      +(st==='parsing'?'<div style="margin-top:10px"><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(U.msg||'Reading file...')+'</div></div>':'')+'</div>';
     if(U.transferDone&&st==='idle')h+=U.transferDone;
-    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+(U.imp?'<button class="btn sm pri" data-act="imp-rc">Import as receivables</button><button class="btn sm pri" data-act="imp-cn">Import as credit notes</button>':'')+'</div>';
+    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+(U.cnOffer?'<button class="btn sm pri" data-act="cn-offer">Load as credit notes</button>':'')+(U.imp?'<button class="btn sm pri" data-act="imp-rc">Import as receivables</button><button class="btn sm pri" data-act="imp-cn">Import as credit notes</button>':'')+'</div>';
   }
   if(st==='mapping'||st==='validating'||st==='validated'||st==='loading'||st==='done'){
     h+='<div class="banner info"><span><b>'+esc(U.name)+'</b> &middot; '+fmtN(U.rows.length)+' data rows &middot; '+U.headers.length+' columns &middot; detected source <b>'+(U.sys==='B1'?'SAP B1':'SAP S/4HANA')+'</b>'+(U.savedMap?' &middot; saved mapping applied':'')+'</span><button class="btn sm" data-act="u-reset" '+(locked?'disabled':'')+'>Choose another file</button></div>';
@@ -744,8 +746,10 @@ function resultHtml(){
   }
   h+='<div class="grid2"><div><h3 class="note" style="margin:0 0 6px">By quarter (split by document date)</h3><div class="tw"><table><thead><tr><th>Quarter</th><th class="num">Rows</th><th class="num">Plants</th><th class="num">Months</th><th>Status</th></tr></thead><tbody>'+qrows+'</tbody></table></div></div>'
    +'<div><h3 class="note" style="margin:0 0 6px">By product group (in scope)</h3><div class="tw"><table><thead><tr><th>Group</th><th class="num">Lines</th><th class="num">Net value</th></tr></thead><tbody>'+grows+'</tbody></table></div></div></div>';
+  var lockedM=cnLockedIn(oxMonthList(r));
+  if(lockedM.length)h+='<div class="banner err" style="display:block"><b>Locked: '+esc(lockedM.map(ymLabel).join(', '))+'.</b> Credit notes are locked for these months, so their sales cannot be replaced. A Super admin must unlock them (Data Intake › Credit-note locks) first. This file is not loaded.</div>';
   var closedQs=qs.filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(closedQs.length)h+='<div class="banner err" style="display:block"><b>Closed quarter in this file: '+closedQs.map(qLabel).join(', ')+'.</b> Reloading a closed quarter needs Super admin and is logged. <div class="fld" style="margin-top:8px"><label for="u-reason">Reason for reload (required)</label><input id="u-reason" class="in" data-chg="reason" value="'+esc(U.reason)+'" '+(locked?'disabled':'')+'></div></div>';
+  if(closedQs.length)h+='<div class="banner err" style="display:block"><b>Closed quarter in this file: '+closedQs.map(qLabel).join(', ')+'.</b> Reloading a closed quarter needs Super admin and is logged. <div class="note" style="color:inherit">This will <b>replace the real sales</b> of '+esc(oxMonthsOf(r))+' with the rows of <b>'+esc(U.name)+'</b>. Check that this file is a sales export.</div><div class="fld" style="margin-top:8px"><label for="u-reason">Reason for reload (required, at least 10 characters; a bare YES is not accepted)</label><input id="u-reason" class="in" data-chg="reason" value="'+esc(U.reason)+'" '+(locked?'disabled':'')+'></div></div>';
   h+='<label class="chip" style="align-self:flex-start"><input type="checkbox" id="u-docs" data-chg="keepdocs" '+(U.keepDocs===false?'':'checked')+' '+(locked?'disabled':'')+'> Keep the document index (needed to drill down to a source document; uses most of the storage)</label>';
   if(U.mode==='historic')h+='<label class="chip" style="align-self:flex-start"><input type="checkbox" id="u-close" data-chg="closeafter" '+(U.closeAfter?'checked':'')+' '+(locked?'disabled':'')+'> Close quarters that become complete and have ended</label>';
   var can=canLoad(r,locked);
@@ -775,7 +779,7 @@ function renderCov0(){
   var head='<tr><th>Entity</th>'+g.list.map(function(k){return '<th class="'+(k===g.cur?'cur':'')+'" title="'+qMonths(k)[0]+' to '+qMonths(k)[2]+'">'+qLabel(k).replace(' ','<br>')+(k===g.cur?'<br>open':'')+'</th>'}).join('')+'</tr>';
   var body=ENTITIES.map(function(e){
     if(!e.live)return '<tr><td>'+e.label+'</td>'+g.list.map(function(){return '<td><span class="cell na" title="Not built yet">&ndash;</span></td>'}).join('')+'</tr>';
-    return '<tr><td><b>'+e.label+'</b></td>'+g.list.map(function(k){var c=covStatus(e.k,k);var sym=glyph(c.st);var sel=S.covSel===e.k+'|'+k;return '<td><button class="cell '+c.st+'" data-act="cov" data-ent="'+e.k+'" data-q="'+k+'" aria-pressed="'+sel+'" aria-label="'+e.label+' '+qLabel(k)+': '+({ok:'loaded',part:'partial',miss:'missing'})[c.st]+(c.closed?', closed':'')+'">'+sym+(c.closed?'<sup style="font-size:8px">L</sup>':'')+'</button></td>'}).join('')+'</tr>';
+    return '<tr><td><b>'+e.label+'</b></td>'+g.list.map(function(k){var c=covStatus(e.k,k);var sym=glyph(c.st)+(c.lock==='all'?' 🔒':c.lock==='some'?' ◐':'');var sel=S.covSel===e.k+'|'+k;return '<td><button class="cell '+c.st+'" data-act="cov" data-ent="'+e.k+'" data-q="'+k+'" aria-pressed="'+sel+'" aria-label="'+e.label+' '+qLabel(k)+': '+({ok:'loaded',part:'partial',miss:'missing'})[c.st]+(c.closed?', closed':'')+'">'+sym+(c.closed?'<sup style="font-size:8px">L</sup>':'')+'</button></td>'}).join('')+'</tr>';
   }).join('');
   var det='';
   if(S.covSel){
@@ -786,7 +790,7 @@ function renderCov0(){
      +(effRole()!=='Super admin'||readOnly()?'<span class="note">Closing, reopening and reloading a quarter is for a Super admin.</span>':(c.closed?'<button class="btn sm" data-act="reopen" data-q="'+p[1]+'">Reopen quarter (reason required, logged)</button>':(c.st!=='miss'?'<button class="btn sm" data-act="close-q" data-q="'+p[1]+'">Close quarter</button>':'')))+'</div></div>';
   }
   el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; quarters since '+qLabel(histStart())+' (history start, D28)</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
-   +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det
+   +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det+cnLockPanel()
    +'<p class="note">FY runs April to March; Q1 = Apr to Jun. A partial quarter greys its QoQ figures with "incomplete history" in the business views. Tap a cell for detail. Closed quarters are locked; reloading needs Super admin and is logged. Q3 FY27 is the current quarter, shown for reference. Other entities arrive later.</p>';
 }
 /* keep every inner scroll position across a re-render of a container (a snapshot or timer tick must not throw the reader back to the top) */
@@ -795,7 +799,7 @@ function withScroll(container,fn){
   fn();
   if(container){Array.prototype.forEach.call(container.querySelectorAll('.tw,.hscroll'),function(e,i){if(pos[i]){e.scrollTop=pos[i][0];e.scrollLeft=pos[i][1]}})}
 }
-S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:'',showReplaced:false};
+S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:'',showReplaced:false,sel:{}};function histSa(){return effRole()==='Super admin'&&!readOnly()}
 var ENT_NAME={CU:'Customers',RC:'Receivables',CL:'Collections',ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
 function histRows(){
   var f=S.hist,q=(f.q||'').toLowerCase();
@@ -804,17 +808,18 @@ function histRows(){
     return (!f.src||u.sys===f.src)&&(!f.ent||(u.entity||'INV')===f.ent)&&(!f.status||u.status===f.status)&&(!q||((u.file||'')+' '+(u.by||'')+' '+(u.periodLabel||'')+' '+(u.status||'')+' '+(u.demo?'demo':'')).toLowerCase().indexOf(q)>=0);
   });
 }
-function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u),u.backup_removed||'']}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
+function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u),u.backup_removed||'']}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open),Object.keys(S.hist.sel),histSa(),Object.keys(S.cnLock||{})])}
 function histBodyHtml(){
   var all=histRows(),rows=all.slice(0,S.hist.shown);
   if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
   if(!all.length)return '<div class="empty sm">No upload matches these filters.</div>';
   var open=S.hist.open;
-  return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
+  return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr>'+(histSa()?'<th>Pick</th>':'')+'<th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(u){
      var fn=u.file||'',isOpen=!!open[u._id];
-     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST'||u.entity==='CL'||u.entity==='RC'||u.entity==='CN')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
-     if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
+     var undoable=(u.status!=='Undone')&&['INV','ST','CL','RC','CN'].indexOf(u.entity||'INV')>=0;
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'">'+(histSa()?'<td>'+(undoable?'<input type="checkbox" data-act="hist-sel" data-id="'+esc(u._id)+'" aria-label="Select '+esc(fn)+' for undo" '+(S.hist.sel[u._id]?'checked':'')+'>':'')+'</td>':'')+'<td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST'||u.entity==='CL'||u.entity==='RC'||u.entity==='CN')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
+     if(isOpen)tr+='<tr class="hdet"><td colspan="12"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
      return tr}).join('')
    +'</tbody></table></div>'
    +'<div class="row" style="justify-content:space-between;align-items:center"><span class="note">Showing '+rows.length+' of '+all.length+(all.length!==S.uploads.length?' (filtered from '+S.uploads.length+')':'')+'. Click a row for the full file name and details.</span>'+(all.length>rows.length?'<button class="btn sm" data-act="hist-more">Show 15 more</button>':'')+'</div>';
@@ -827,11 +832,12 @@ function renderHist(){
     var sel=function(id,label,cur,opts,nm){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="hist-f" data-k="'+nm+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(cur===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'};
     el.innerHTML='<div class="hd"><h2>Upload history</h2><span class="note" id="hist-count"></span></div>'
      +'<div class="row" id="hist-ctl" style="align-items:flex-end">'+sel('hf-src','Source',f.src,srcs.map(function(x){return [x,x==='B1'?'SAP B1':x==='S4'?'SAP S/4':x]}),'src')+sel('hf-ent','Entity',f.ent,ents.map(function(x){return [x,ENT_NAME[x]||x]}),'ent')+sel('hf-st','Status',f.status,sts.map(function(x){return [x,x]}),'status')
-     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div><div class="fld"><label>&nbsp;</label><label class="chip"><input type="checkbox" id="hf-rep" data-chg="hist-rep" '+(f.showReplaced?'checked':'')+'> Show replaced (<span id="hist-rep-n">0</span>)</label></div></div><div id="hist-body"></div>';
+     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div>'+(histSa()?'<div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-bulk" id="hist-bulk">Undo selected (0)</button></div>':'')+'<div class="fld"><label>&nbsp;</label><label class="chip"><input type="checkbox" id="hf-rep" data-chg="hist-rep" '+(f.showReplaced?'checked':'')+'> Show replaced (<span id="hist-rep-n">0</span>)</label></div></div><div id="hist-body"></div>';
     S.hist.sig='';
   }
   if(S.hist.sig===sig)return;S.hist.sig=sig;
   var rn=$('#hist-rep-n');if(rn)rn.textContent=String(S.uploads.filter(function(u){return !!histReplacedBy(u)}).length);
+  var bb0=$('#hist-bulk');if(bb0)bb0.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')';
   var c=$('#hist-count');if(c)c.textContent=fmtN(S.uploads.length)+' upload'+(S.uploads.length===1?'':'s');
   var body=$('#hist-body');withScroll(body,function(){body.innerHTML=histBodyHtml()});
 }
@@ -909,6 +915,9 @@ async function onFile(file){
     var cud=d.type==='unknown'?custDetect(headers):null;if(cud){U=newU();U.mode=mode;U.period=period;U.msg='This is a customer master ('+cud.layout+'), not a transaction export. Load it from Admin > Customers.';renderUpload();return}
     var rdt=recvDetect(headers);if(rdt){recvStart(file,rows,headers,rdt,sheetPicked);return}
     var cnd=cnDetectB1(headers)||(d.type==='invoice'&&d.sys==='S4'&&cnS4Share(headers,rows)>0.5?{kind:'cn',sys:'S4',layout:'S/4 billing credit memos'}:null);if(cnd){cnStart(file,rows,headers,cnd,sheetPicked);return}
+    var cnGuard=creditLike(file.name,headers,rows,sheetsSeen,sheetPicked);
+    if(ent==='CN'&&d.type==='invoice'){cnStart(file,rows,headers,{sys:d.sys,layout:(d.sys==='S4'?'S/4':'B1')+' credit notes (sales-register layout)'},sheetPicked);return}
+    if(d.type==='invoice'&&cnGuard){U=newU();U.mode=mode;U.period=period;U.cnOffer={file:file,rows:rows,headers:headers,sys:d.sys,sheetPicked:sheetPicked};U.msg='This file looks like a credit-note register ('+cnGuard+'). Credit notes must not be loaded as sales: they would replace your sales for these months.';renderUpload();return}
     if(d.type==='unknown'){var cdt=collDetect(headers);if(cdt){collStart(file,rows,headers,sheetPicked);return}var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
     if(d.type==='master'&&d.what==='transfers'){U=newU();U.mode=mode;U.period=period;U.offer={file:file,rows:rows,what:'transfers'};U.msg='This file is the internal-transfer list (CardCode, CardName, Tranfser), not the sales export'+(sheetsSeen&&sheetsSeen.length>1?'. Sheets in the workbook: '+sheetsSeen.join('; ')+'. Save the DATA sheet as the CSV, or load the whole XLSX':'')+'. You can load it as the Internal-transfer list instead.';renderUpload();return}
     if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}
@@ -1122,6 +1131,7 @@ async function packChunks(sys,P){
 }
 async function runLoad(opts){
   var r=U.res,sys=U.sys,demo=!!opts.demo,by=whoAmI();
+  var lkS=cnLockedIn(oxMonthList(r));if(lkS.length){var lm='credit notes are locked for '+lkS.map(ymLabel).join(', ')+'; unlock them first. Nothing was changed.';toast(lm);throw new Error(lm)}
   if(demo&&hasRealData()){toast(DEMO_OFF_MSG);throw new Error(DEMO_OFF_MSG)}
   U.stage='loading';cancelFlag=false;U.progress=0;U.progressMsg='Preparing...';renderUpload();await tick();
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -4278,7 +4288,7 @@ Object.assign(handlers,{
  *   creditnotes/<plant>-<ym>~<i>    further gzipped line chunks of a big plant-month
  *   creditnotes/cov_<ym>            {ym, upload}: the month is covered by a credit-note file (a plant with none then has none)
  * D40: once every month of a quarter (up to today) is covered, achievement and growth for that quarter use Net = invoiced - credit notes. */
-S.cnRaw=[];S.cn=[];S.cnCov={};S.cnSig='';
+S.cnRaw=[];S.cnLock={};S.cn=[];S.cnCov={};S.cnSig='';
 var CN_FIELDS=[
  {k:'branch',label:'Branch / plant',canon:'plant_code',req:1,c:['BPLName','BRANCHNAME','Branch Name','Branch','Plant']},
  {k:'doc',label:'Credit note number',canon:'source_doc_no',req:1,c:['DocNum','DOCNUM','Invoice Document Number','Credit Memo']},
@@ -4288,12 +4298,15 @@ var CN_FIELDS=[
  {k:'item',label:'Item code',canon:'item_code',req:1,c:['ItemCode','ITEMCODE','Product Code']},
  {k:'qty',label:'Quantity (sheets)',canon:'qty_sheets',c:['Quantity','QUANTITY','Invoice Qty']},
  {k:'value',label:'Line value (excl. GST)',canon:'net_value_inr',req:1,c:['LineTotal','LINETOTAL','Total Amount (Item)']},
- {k:'base',label:'Base document (invoice)',canon:'base_ref',c:['BaseRef','BASEREF','Reference Document']},
+ {k:'base',label:'Base document (invoice)',canon:'base_ref',c:['BaseRef','BASEREF','Reference Document','RefNo']},
+ {k:'acct',label:'Sale account name (transfer flag)',canon:'sale_account_name',c:['AcctName','Account Name']},
  {k:'type',label:'Billing type (S/4)',canon:'billing_type',c:['Billing Type']}];
 function cnMapKey(sys,layout){return sys+'_creditnote_'+String(layout||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function cnDetectB1(headers){
   var set={};headers.forEach(function(h){set[norm(h)]=1});
-  return set['docnum']&&set['docdate']&&set['cardcode']&&set['itemcode']&&set['linetotal']&&set['baseref']&&!set['invoice type']&&!set['catagory']?{kind:'cn',sys:'B1',layout:'B1 credit notes (ORIN / RIN1)'}:null;
+  /* credit notes reference the base invoice: BaseRef, or the RefNo / RefDate pair of the credit-note register; sales lines carry neither */
+  var base=set['baseref']||(set['refno']&&set['refdate']);
+  return set['docnum']&&set['docdate']&&set['cardcode']&&set['itemcode']&&set['linetotal']&&base&&!set['invoice type']?{kind:'cn',sys:'B1',layout:'B1 credit notes (ORIN / RIN1)'}:null;
 }
 function cnS4Share(headers,rows){
   var ix=headerIndex(headers),bi=ix['billing type'];if(bi==null)return 0;var n=0,non=0;
@@ -4309,9 +4322,9 @@ function cnStart(file,rows,headers,det,sheetPicked){
   U.stage='mapping';renderUpload();
 }
 async function cnParse(){
-  var map=U.map,rows=U.rows,col=function(k){return map[k]==null?-1:map[k]},cB=col('branch'),cD=col('doc'),cL=col('line'),cT=col('date'),cC=col('cust'),cI=col('item'),cQ=col('qty'),cV=col('value'),cBa=col('base'),cTy=col('type');
+  var map=U.map,rows=U.rows,col=function(k){return map[k]==null?-1:map[k]},cB=col('branch'),cD=col('doc'),cL=col('line'),cT=col('date'),cC=col('cust'),cI=col('item'),cQ=col('qty'),cV=col('value'),cBa=col('base'),cTy=col('type'),cAc=col('acct'),tset=new Set();S.transfers.forEach(function(t){if(t.flag!==false)tset.add(String(t.code).toUpperCase())});
   var idx=await loadItemIdx(),resolve=plantResolver(),per=U.period,today=TODAY(),lo=histLoYm();
-  var res={read:rows.length,good:0,rejected:0,rejects:[],reasons:{},period:per,layout:U.layout,acp:{rows:0,value:0},other:{rows:0,value:0},preHist:{rows:0,value:0},unknownBranch:{},nonCredit:0,months:{},pm:new Map(),minDate:null,maxDate:null,value:0,sheets:0,itemMaster:idx.size>0,covMonths:[]};
+  var res={read:rows.length,good:0,rejected:0,rejects:[],reasons:{},period:per,layout:U.layout,acp:{rows:0,value:0},other:{rows:0,value:0},preHist:{rows:0,value:0},unknownBranch:{},xfer:{rows:0,value:0},xferMaster:0,nonCredit:0,months:{},pm:new Map(),minDate:null,maxDate:null,value:0,sheets:0,itemMaster:idx.size>0,covMonths:[]};
   var rej=function(i,doc,field,reason,val){res.rejected++;res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,doc,'',field,reason,val==null?'':val])};
   var T0=Date.now(),seen=new Set();res.dup=0;
   for(var i=0;i<rows.length;i++){
@@ -4333,6 +4346,9 @@ async function cnParse(){
     if(pl.business==='ACP'||+pl.plant_code>=1050){res.acp.rows++;res.acp.value+=val;continue}
     if(pl.active===false){rej(i,doc,'Plant','Plant is switched off in Admin',pl.plant_code);continue}
     if(ym<lo){res.preHist.rows++;res.preHist.value+=val;continue}
+    /* internal transfers are excluded the way sales excludes them: the stock-outward account or a customer in the Admin transfer list */
+    var acN=cAc>=0?norm(r[cAc]):'',byMaster=cC>=0&&tset.has(String(r[cC]==null?'':r[cC]).trim().toUpperCase());
+    if(acN==='sales gst - stock outward'||byMaster){res.xfer.rows++;res.xfer.value+=val;if(byMaster)res.xferMaster++;continue}
     var item=String(r[cI]==null?'':r[cI]).trim().toUpperCase(),it=idx.get(item);
     if(!it){res.other.rows++;res.other.value+=val;continue}
     var line=cL>=0?String(r[cL]==null?'':r[cL]).trim().replace(/\.0$/,''):'',dk=pl.plant_code+'|'+doc+'|'+line+'|'+item+'|'+qty+'|'+val;
@@ -4354,7 +4370,9 @@ function cnReplaceRisk(res){
     if((old.n||0)>P.lines.length){var o=out[P.ym]||(out[P.ym]={ym:P.ym,plants:0,oldLines:0,newLines:0});o.plants++;o.oldLines+=old.n||0;o.newLines+=P.lines.length}});
   Object.keys(out).sort().forEach(function(k){list.push(out[k])});return list;
 }
-function cnCanLoad(){var r=U&&U.res;if(!r)return false;if(!(r.good>0)&&!r.covMonths.length)return false;if(cnReplaceRisk(r).length&&!U.confirmReplace)return false;return true}
+function cnMonthsOf(r){var m={};r.covMonths.forEach(function(x){m[x]=1});r.pm.forEach(function(P){m[P.ym]=1});return Object.keys(m).sort()}
+function cnLockedIn(ms){return ms.filter(function(m){return S.cnLock&&S.cnLock[m]})}
+function cnCanLoad(){var r=U&&U.res;if(!r)return false;if(cnLockedIn(cnMonthsOf(r)).length)return false;if(!(r.good>0)&&!r.covMonths.length)return false;if(cnReplaceRisk(r).length&&!U.confirmReplace)return false;return true}
 function cnRender(){
   var el=$('#i-upload');if(!el)return;var st=U.stage,locked=st==='validating'||st==='loading';
   var stepIdx={mapping:2,validating:3,validated:3,loading:4,done:4}[st]||1;
@@ -4386,6 +4404,7 @@ function cnResultHtml(locked){
   if(!r.itemMaster)it.push({st:'need',t:'No item master loaded',n:null,d:'The product group and sheets need the item master (Admin › Item master).'});
   if(r.other.rows)it.push({st:'info',t:'Items not in the item master (counted, not stored)',n:r.other.rows,d:esc(fmtMoney(r.other.value)+'. The item master holds laminate-scope items only.')});
   if(r.acp.rows)it.push({st:'info',t:'ACP plants skipped',n:r.acp.rows,d:esc(fmtMoney(r.acp.value))});
+  if(r.xfer.rows)it.push({st:'info',t:'Internal transfers excluded (as in sales)',n:r.xfer.rows,d:esc(fmtMoney(r.xfer.value)+'; '+fmtN(r.xferMaster)+' via the Admin transfer list')});
   if(r.preHist.rows)it.push({st:'info',t:'Before history start ('+qLabel(histStart())+')',n:r.preHist.rows,d:'Not loaded; no action needed (D28).'});
   if(r.nonCredit)it.push({st:'info',t:'Invoice rows (billing type F2) skipped',n:r.nonCredit,d:'This file is for credit notes only.'});
   if(r.dup)it.push({st:'fixed',t:'Repeated lines removed',n:r.dup,d:''});
@@ -4394,6 +4413,8 @@ function cnResultHtml(locked){
   h+=fixesPanel(it,'Fixes applied');
   var ms=Object.keys(r.months).sort();
   h+='<div class="tw hscroll" style="max-height:220px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Lines</th><th class="num">Sheets</th><th class="num">Credit notes</th></tr></thead><tbody>'+ms.map(function(m){var M=r.months[m];return '<tr><td>'+esc(ymLabel(m))+'</td><td class="num">'+fmtN(M.lines)+'</td><td class="num">'+fmtN(Math.round(M.sheets))+'</td><td class="num">'+fmtMoney(M.value)+'</td></tr>'}).join('')+'</tbody></table></div>';
+  var lk=cnLockedIn(cnMonthsOf(r));
+  if(lk.length)h+='<div class="banner err" style="display:block"><b>Locked: '+esc(lk.map(ymLabel).join(', '))+'.</b> These credit-note months cannot be replaced until a Super admin unlocks them with a reason (Data Intake › Credit-note locks). This file is not loaded.</div>';
   var rep=cnReplaceRisk(r);
   if(rep.length)h+='<div class="banner warn" style="display:block"><b>Safety check stopped this file: it would replace '+rep.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more credit-note lines than the new data.</b><div class="tw hscroll" style="max-height:160px;overflow:auto"><table><thead><tr><th>Month</th><th class="num">Plant-months</th><th class="num">Lines held now</th><th class="num">In this file</th></tr></thead><tbody>'+rep.map(function(x){return '<tr><td>'+esc(ymLabel(x.ym))+'</td><td class="num">'+x.plants+'</td><td class="num">'+fmtN(x.oldLines)+'</td><td class="num">'+fmtN(x.newLines)+'</td></tr>'}).join('')+'</tbody></table></div><label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="cn-confrep" '+(U.confirmReplace?'checked':'')+' '+(locked?'disabled':'')+'> I confirm: replace these months ('+rep.map(function(x){return ymLabel(x.ym)}).join(', ')+')</label></div>';
   h+='<div class="banner info" style="display:block"><label class="chip"><input type="checkbox" data-chg="cn-allbr" '+(U.allBranches?'checked':'')+' '+(locked?'disabled':'')+'> This file covers all branches</label><div class="note">Tick when the export holds every branch: a plant with no credit note in these months then counts as covered (it has none) and the Net view applies to it. Untick for a partial export: only plants with rows are covered. '+fmtN(Object.keys((function(){var o={};r.pm.forEach(function(P){o[P.plant]=1});return o})()).length)+' of '+cnLamPlants().length+' plants have rows in this file.</div></div>'
@@ -4407,6 +4428,7 @@ async function cnValidate(){
 }
 async function cnLoad(){
   if(!superOnly('load credit notes')||!U||!U.res||!cnCanLoad())return;
+  if(cnLockedIn(cnMonthsOf(U.res)).length)return;
   var r=U.res,uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!U.demoFlag,done=0,total=r.pm.size,atNow=nowISO();
   U.stage='loading';U.progressMsg='Writing...';cnRender();await tick();
   var list=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1}),q=list.slice(),B=bkNew(uid,'CN',demo);
@@ -4451,6 +4473,7 @@ document.addEventListener('change',function(ev){
 function cnLamPlants(){return S.plants.filter(function(p){return p.active!==false&&p.business!=='ACP'&&+p.plant_code<1050}).map(function(p){return p.plant_code})}
 function ingestCN(){
   S.cn=S.cnRaw.filter(function(d){return d.plant&&d.ym&&d.groups&&!d.chunk});
+  S.cnLock={};S.cnRaw.forEach(function(d){if(d.lock&&d.ym)S.cnLock[d.ym]=d});
   var cov={},by={};
   S.cn.forEach(function(d){(cov[d.ym]||(cov[d.ym]=new Set())).add(d.plant);(by[d.ym]||(by[d.ym]=[])).push(d)});
   S.cnRaw.forEach(function(d){if(!d.cov||!d.ym)return;var st=cov[d.ym]||(cov[d.ym]=new Set());
@@ -4460,6 +4483,7 @@ function ingestCN(){
 }
 function cnUndoPlan(uid){var docs=S.cnRaw.filter(function(d){return d.upload===uid&&!d.cov});var ms={};docs.forEach(function(d){ms[d.ym]=1});return {docs:docs,cov:S.cnRaw.filter(function(d){return d.upload===uid&&d.cov}),months:Object.keys(ms).sort()}}
 async function cnUndo(uid){
+  var lkd=cnLockedIn(cnUndoPlan(uid).months);if(lkd.length)throw new Error('credit-note month(s) '+lkd.map(ymLabel).join(', ')+' are locked; a Super admin must unlock them with a reason first.');
   var pl=cnUndoPlan(uid),u=S.uploads.find(function(x){return x._id===uid}),all=pl.docs.concat(pl.cov),q=all.slice();
   await Promise.all([0,1,2,3].map(async function(){while(q.length){var d=q.shift();await ddel('creditnotes/'+d._id)}}));
   var curK={};S.cnRaw.forEach(function(d){if(d.plant&&d.ym&&!d.cov)curK[d.plant+'|'+d.ym]=1});
@@ -4475,7 +4499,8 @@ async function cnUndo(uid){
 function cnCov(qkey){
   var months=qMonths(qkey),cur=TODAY().slice(0,7),elig=months.filter(function(m){return m<=cur}),pl=cnLamPlants(),total=pl.length*elig.length,present=0;
   var detail=months.map(function(ym){var n=pl.filter(function(p){return S.cnCov[ym]&&S.cnCov[ym].has(p)}).length;if(ym<=cur)present+=n;return {ym:ym,plants:n}});
-  return {st:present===0?'miss':(total>0&&present>=total?'ok':'part'),detail:detail,ref:pl.length,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
+  var lm=elig.filter(function(m){return S.cnCov[m]}),lk=lm.filter(function(m){return S.cnLock&&S.cnLock[m]}).length;
+  return {lock:lm.length&&lk===lm.length?'all':(lk?'some':''),st:present===0?'miss':(total>0&&present>=total?'ok':'part'),detail:detail,ref:pl.length,closed:!!(S.periods[qkey]&&S.periods[qkey].status==='closed')};
 }
 
 /* ================= the Net view (D40, per plant, D45) ================= */
@@ -4512,6 +4537,41 @@ function cnPanel(ctx,f){
   var allCov=cnFor(base,ms).covered;
   return '<section class="card"><div class="hd"><h2>Invoiced · Credit notes · Net</h2><span class="note">'+(allCov?'Net is the headline for this period':'Headline stays invoiced where credit notes are not loaded for every plant in scope')+'</span></div><div class="tw hscroll"><table class="std"><thead><tr><th>Month</th><th class="num">Invoiced ₹</th><th class="num">Invoiced sheets</th><th class="num">Credit notes ₹</th><th class="num">Credit note sheets</th><th class="num">Net ₹</th><th class="num">Net sheets</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="note">Net = invoiced − credit notes. Targets are set on invoiced sales. A plant uses Net only when all its months of the quarter are covered by a credit-note file; a company, zone or group total uses Net only when every plant in scope is covered. Growth compares Net with Net only when both quarters are covered, otherwise invoiced with invoiced.</p></section>';
 }
+/* ================= D60: credit-note files never go through the sales intake ================= */
+/* returns the reason a file looks like a credit-note register, or '' */
+function creditLike(name,headers,rows,sheetsSeen,sheetPicked){
+  if(/credit[\s_\-]*note|cn[\s_\-]*register|a\/?r[\s_\-]*credit|credit[\s_\-]*memo/i.test(String(name||'')))return 'the file name says credit note';
+  var sh=[sheetPicked].concat(sheetsSeen||[]).join(' ');if(/credit/i.test(sh))return 'a sheet is named credit';
+  var ix=headerIndex(headers||[]),n=Math.min((rows||[]).length,3000);
+  var cols=Object.keys(ix).filter(function(k){return /doc ?type|document type|invoice type|trans ?type|object|billing type/.test(k)});
+  for(var c=0;c<cols.length;c++){var ci=ix[cols[c]],hit=0,seen=0;for(var i=1;i<n;i++){var v=String(rows[i][ci]==null?'':rows[i][ci]).trim();if(!v)continue;seen++;if(/credit note|credit memo|a\/r credit|^orin$|^14$/i.test(v)||(/billing type/.test(cols[c])&&/^(g2|re)$/i.test(v)))hit++}
+    if(seen&&hit/seen>0.5)return 'the '+cols[c]+' column says credit note'}
+  /* by content: the account columns name a credit memo, or the RefNo / RefDate pair references a base invoice next to docnum */
+  var ac=Object.keys(ix).filter(function(k){return /^(acctname|account|account name)$/.test(k)});
+  for(var a=0;a<ac.length;a++){var ai=ix[ac[a]],h2=0,s2=0;for(var j=1;j<n;j++){var w=String(rows[j][ai]==null?'':rows[j][ai]).trim();if(!w)continue;s2++;if(/credit (memo|note)|sales return|a\/r credit/i.test(w))h2++}if(s2&&h2/s2>0.5)return 'the '+ac[a]+' column names a credit memo'}
+  if(ix['docnum']!=null&&ix['refno']!=null&&ix['refdate']!=null)return 'RefNo and RefDate point to the original invoice (sales lines have none)';
+  return '';
+}
+Object.assign(handlers,{
+ 'cn-offer':function(){var i=U&&U.cnOffer;if(!i)return;cnStart(i.file,i.rows,i.headers,{sys:i.sys||'B1',layout:(i.sys==='S4'?'S/4':'B1')+' credit notes (sales-register layout)'},i.sheetPicked)}
+});
+
+/* ================= D60: lock credit-note months ================= */
+function cnLockPanel(){
+  var ms=Object.keys(S.cnCov||{}).sort();if(!ms.length&&!Object.keys(S.cnLock||{}).length)return '';
+  var sa=effRole()==='Super admin'&&!readOnly(),any=ms.some(function(m){return !S.cnLock[m]});
+  return '<div class="banner info" style="display:block" id="cn-locks"><b>Credit-note locks</b> <span class="note" style="color:inherit">A locked month cannot be replaced or undone until a Super admin unlocks it with a reason (logged).</span>'
+   +'<div class="row" style="margin-top:6px;flex-wrap:wrap">'+ms.map(function(m){var l=S.cnLock[m];return '<span class="chip"><b>'+esc(ymLabel(m))+'</b> '+(l?'<span class="pill ok" title="Locked by '+esc(who(l.by||''))+' '+esc(l.at?istStr(l.at):'')+'">🔒 Locked</span>':'<span class="pill mute">Open</span>')+(sa?(l?' <button class="btn sm" data-act="cn-unlock" data-ym="'+m+'">Unlock</button>':' <button class="btn sm" data-act="cn-lock" data-ym="'+m+'">Lock</button>'):'')+'</span>'}).join(' ')+'</div>'
+   +(sa&&any?'<div class="row" style="margin-top:6px"><button class="btn sm pri" data-act="cn-lock-all">Lock all loaded months</button></div>':'')+'</div>';
+}
+Object.assign(handlers,{
+ 'cn-lock':async function(t){if(!superOnly('lock credit notes'))return;var ym=t.getAttribute('data-ym');await dset('creditnotes/lock_'+ym,{lock:true,ym:ym,by:whoAmI(),at:nowISO()});await auditW('credit note month locked',ym,{ym:ym})},
+ 'cn-lock-all':async function(){if(!superOnly('lock credit notes'))return;var ms=Object.keys(S.cnCov||{}).filter(function(m){return !S.cnLock[m]});for(var i=0;i<ms.length;i++)await dset('creditnotes/lock_'+ms[i],{lock:true,ym:ms[i],by:whoAmI(),at:nowISO()});await auditW('credit note months locked',ms.join(','),{months:ms});toast('Locked '+ms.length+' credit-note month'+(ms.length===1?'':'s'))},
+ 'cn-unlock':function(t){if(!superOnly('unlock credit notes'))return;var ym=t.getAttribute('data-ym');openDlg('<h3>Unlock credit notes for '+esc(ymLabel(ym))+'</h3><p class="note">Unlocking allows this month to be replaced or undone. A reason is required and is logged in the audit trail.</p><div class="fld"><label for="cn-unlock-reason">Reason (at least 10 characters)</label><input id="cn-unlock-reason" class="in" data-chg="cn-unlock-reason" autocomplete="off"></div><div class="row"><button class="btn pri" data-act="cn-unlock-go" data-ym="'+ym+'" id="cn-unlock-go" disabled>Unlock</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>')},
+ 'cn-unlock-go':async function(t){var ym=t.getAttribute('data-ym'),r=($('#cn-unlock-reason')||{}).value||'';if(r.trim().length<10){var e=$('#d-err');if(e)e.innerHTML='<div class="banner err">Give a reason of at least 10 characters.</div>';return}
+   await ddel('creditnotes/lock_'+ym);await auditW('credit note month unlocked',ym,{ym:ym,reason:r.trim().slice(0,300)});await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'credit note month unlocked',ym:ym,reason:r.trim().slice(0,300)});closeDlg();toast('Unlocked '+ymLabel(ym))}
+});
+document.addEventListener('input',function(ev){var t=ev.target;if(t&&t.id==='cn-unlock-reason'){var b=$('#cn-unlock-go');if(b)b.disabled=t.value.trim().length<10}});
 
 /* ---- src/69-cust.js ---- */
 /* ================= Customer master (D39, 23 Oct 2026): Admin, replace-all like the item master =================
@@ -5832,7 +5892,8 @@ function replaceRisk(r){
 function canLoad(r,locked){
   if(!r||!(r.good>0)||locked)return false;
   var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(closedQs.length&&U.reason.trim().length<3)return false;
+  if(closedQs.length&&U.reason.trim().length<10)return false;
+  if(cnLockedIn(oxMonthList(r)).length)return false;/* D61: months whose credit notes are locked cannot be replaced by a sales load */
   if(replaceRisk(r).length&&!U.confirmReplace)return false;
   return true;
 }
@@ -5872,7 +5933,10 @@ function undoPlan(uid){
   var aId=actionIdOf('R5',[uid,'upload']);
   return {u:u,mine:mine,months:Object.keys(mine).sort(),n:n,later:Math.max(0,(u.plantMonths||0)-n),actId:aId,act:S.actions.find(function(a){return a.id===aId}),fus:S.followups.filter(function(f){return f.action_id===aId})};
 }
-function undoDialog(uid){undoDialog0(uid);bkDialogNote(uid)}
+function undoDialog(uid){undoDialog0(uid);bkDialogNote(uid);
+  var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&us.entity==='CN'){var l=cnLockedIn(cnUndoPlan(uid).months);if(l.length){var e=document.getElementById('d-err');if(e)e.insertAdjacentHTML('beforebegin','<div class="banner err" style="display:block"><b>Locked: '+esc(l.map(ymLabel).join(', '))+'.</b> A Super admin must unlock these months with a reason before this upload can be undone.</div>');var g=document.querySelector('[data-act="undo-go"]');if(g)g.disabled=true}}
+}
 function undoDialog0(uid){
   var us=S.uploads.find(function(x){return x._id===uid});
   if(us&&(us.entity==='RC'||us.entity==='CN')){var rc=us.entity==='RC',ps=rc?S.recvSnaps.find(function(x){return x.upload===uid}):cnUndoPlan(uid);
@@ -5889,7 +5953,17 @@ function undoDialog0(uid){
    +'<p class="note">Undo cannot bring back what this upload replaced. Any month it overwrote lost its earlier figures, so upload those months again. Months it created are simply removed. '+(pl.later?pl.later+' plant-month'+(pl.later===1?'':'s')+' written by this upload were already replaced by a later upload; those are left alone. ':'')+(u.closedQuarters&&u.closedQuarters.length?'Quarters it closed ('+esc(u.closedQuarters.map(qLabel).join(', '))+') stay closed; reopen them in the coverage grid if needed. ':'')+'</p>'
    +'<div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'" '+(sa&&pl.n+(pl.act?1:0)+pl.fus.length>=0?'':'disabled')+'>Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');
 }
-async function undoUpload(uid){
+/* D61: nothing is deleted before the backup is checked. An incomplete backup stops a plain or bulk undo; only the explicit "Undo and remove these months" click (opts.confirmIncomplete) goes on, and then nothing is restored. */
+async function undoUpload(uid,opts){
+  if(!superOnly('undo an upload'))return;
+  var us0=S.uploads.find(function(x){return x._id===uid});
+  if(us0&&(us0.entity||'INV')==='INV'){var lk0=cnLockedIn(((undoPlan(uid)||{}).months)||[]);if(lk0.length){var m0='credit notes are locked for '+lk0.map(ymLabel).join(', ')+'; a Super admin must unlock them (Data Intake › Credit-note locks) before this sales upload can be undone. Nothing was changed.';var e0=document.getElementById('d-err');if(e0)e0.innerHTML='<div class="banner err">Undo stopped: '+esc(m0)+'</div>';throw new Error(m0)}}
+  if(bkHas(uid)){var c0=bkCheck(uid);
+    if(!c0.ok&&!(opts&&opts.confirmIncomplete)){var m1='Backup incomplete for '+((us0&&us0.file)||uid)+': '+(c0.have||0)+' of '+(c0.of||'?')+' parts are usable. Nothing was changed; use "Undo and remove these months" on that upload to remove its months without restoring.';var e1=document.getElementById('d-err');if(e1)e1.innerHTML='<div class="banner err">Undo stopped: '+esc(m1)+'</div>';throw new Error(m1)}}
+  S.bkAllowIncomplete=!!(opts&&opts.confirmIncomplete);
+  try{return await undoUpload0(uid)}finally{S.bkAllowIncomplete=false}
+}
+async function undoUpload0(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
   if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],us.entity==='RC'?'snap':null,'<p>The data this upload held was removed. Upload the file again if you still need it.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
@@ -5924,7 +5998,7 @@ async function undoUpload(uid){
 }
 Object.assign(handlers,{
  'hist-undo':function(t){undoDialog(t.getAttribute('data-id'))},
- 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'))},
+ 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'),{confirmIncomplete:true})},
  'u-swap-serial':async function(){if(!U||!U.res)return;U.swapSerial=true;U.stage='validating';U.progressMsg='Reading date cells swapped...';renderUpload();await runValidation()},
  'u-unswap':async function(){if(!U||!U.res)return;U.swapSerial=false;U.stage='validating';renderUpload();await runValidation()}
 });
@@ -5958,7 +6032,8 @@ function histReplacedBy(u){
   return later[0]||null;
 }
 function histStatusPill(u){
-  var rm=u.backup_removed?' <span class="note" title="'+esc(u.backup_removed_why||'')+'">Undo no longer restores (backup removed '+esc(istStr(u.backup_removed))+')</span>':'';
+  var lk=(u.entity==='CN'&&u.months&&u.months.some(function(m){return S.cnLock&&S.cnLock[m]}))?' <span class="pill ok" title="Credit-note month locked">🔒 Locked</span>':'';
+  var rm=lk+(u.backup_removed?' <span class="note" title="'+esc(u.backup_removed_why||'')+'">Undo no longer restores (backup removed '+esc(istStr(u.backup_removed))+')</span>':'');
   return histStatusPill0(u)+rm;
 }
 function histStatusPill0(u){
@@ -5977,9 +6052,56 @@ async function afterValidate(){
   if(replaceRisk(U.res).length&&!U.confirmReplace)why.push('it would replace months that hold more lines');
   if(U.res.dateInfo.mixed&&!U.confirmDates)why.push('the swapped-date range needs your confirmation');
   var closedQs=Object.keys(U.res.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(closedQs.length&&U.reason.trim().length<3)why.push('a closed quarter needs a reload reason');
+  if(closedQs.length&&U.reason.trim().length<10)why.push('a closed quarter needs a reload reason of at least 10 characters');
   if(why.length)toast('Not loaded yet: '+why.join('; ')+'. This is a safety check, not a rejected row.');
 }
+
+/* ================= D60: bulk Undo ("Undo selected"), newest first, through the existing integrity-checked Undo ================= */
+function bulkPlanLine(u){
+  var e=u.entity||'INV',n=0,unit='plant-months';
+  if(e==='INV'){var p=undoPlan(u._id);n=p?p.n:0}
+  else if(e==='CL'){n=collUndoPlan(u._id).docs.length}
+  else if(e==='CN'){n=cnUndoPlan(u._id).docs.filter(function(d){return !d.chunk}).length}
+  else{n=1;unit='snapshot'}
+  return {n:n,unit:unit};
+}
+async function bulkBackupUnits(uid){
+  var chk=bkCheck(uid);if(chk.none)return {txt:'no backup: the months are removed, upload them again',ok:true};
+  if(!chk.ok)return {txt:'backup incomplete: nothing will be restored',ok:false};
+  var docs=bkFor(uid),n=0;
+  for(var i=0;i<docs.length;i++){var items=JSON.parse(await ungz(docs[i].z));items.forEach(function(it){if(/^collections\/|^creditnotes\/[^~]*$|\/rsnap_|\/snap_|^cellpart:/.test(it.p))n++})}
+  return {txt:'restores the previous data for '+n+' plant-month'+(n===1?'':'s'),ok:true};
+}
+function bulkSelected(){
+  return Object.keys(S.hist.sel).map(function(id){return S.uploads.find(function(x){return x._id===id})}).filter(function(u){return u&&u.status!=='Undone'}).sort(function(a,b){return a.at<b.at?1:-1});
+}
+Object.assign(handlers,{
+ 'hist-sel':function(t){var id=t.getAttribute('data-id');if(S.hist.sel[id])delete S.hist.sel[id];else S.hist.sel[id]=true;S.hist.sig='';var bb=$('#hist-bulk');if(bb)bb.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')'},
+ 'hist-bulk':async function(){
+  if(!superOnly('undo uploads'))return;
+  var list=bulkSelected();if(!list.length){toast('Tick the uploads to undo first');return}
+  openDlg('<h3>Undo '+list.length+' upload'+(list.length===1?'':'s')+', newest first</h3><p class="note" style="margin:0">Each one uses the normal Undo, with its integrity check. The run stops at the first failure.</p><ol id="bulk-list">'+list.map(function(u){var pl=bulkPlanLine(u);return '<li id="bk-'+esc(u._id)+'"><b>'+esc(u.file||u._id)+'</b> · '+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+' · '+esc(u.periodLabel||'')+' · removes '+pl.n+' '+pl.unit+' · <span class="note bu">checking the backup...</span></li>'}).join('')+'</ol><div class="row"><button class="btn pri" data-act="bulk-go" id="bulk-go">Undo these '+list.length+' now</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="bulk-out"></div><div id="d-err"></div>');
+  for(var i=0;i<list.length;i++){var r=await bulkBackupUnits(list[i]._id),el=document.querySelector('#bk-'+list[i]._id.replace(/[^\w-]/g,'')+' .bu');if(el)el.textContent=r.txt}
+ },
+ 'bulk-go':async function(){
+  if(!superOnly('undo uploads'))return;
+  var list=bulkSelected(),out=document.getElementById('bulk-out'),btn=document.getElementById('bulk-go');if(btn)btn.disabled=true;
+  var o1=openDlg,c1=closeDlg,done=[];
+  for(var i=0;i<list.length;i++){
+    var cap='';openDlg=function(h){cap=h};closeDlg=function(){};
+    var err=null;
+    try{await undoUpload(list[i]._id)}catch(e){err=dbErrText(e)}
+    openDlg=o1;closeDlg=c1;
+    var de=document.getElementById('d-err');if(!err&&de&&/Undo stopped/.test(de.textContent)){err=de.textContent.replace(/^[\s\S]*?Undo stopped:\s*/,'').trim();de.innerHTML=''}
+    if(!err&&/Undo stopped/.test(cap)){var m=/Undo stopped: ([^<]*)/.exec(cap);err=m?m[1]:'Undo stopped'}
+    if(err){if(out)out.innerHTML='<div class="banner err" style="display:block"><b>Stopped at '+esc(list[i].file||list[i]._id)+'.</b> '+esc(err)+' '+done.length+' of '+list.length+' were undone; nothing after this one was touched.</div>'+(done.length?'<p class="note">Undone: '+esc(done.join(', '))+'</p>':'');return}
+    done.push(list[i].file||list[i]._id);delete S.hist.sel[list[i]._id];
+    if(out)out.innerHTML='<div class="note">'+done.length+' of '+list.length+' undone...</div>';
+  }
+  S.hist.sig='';if(out)out.innerHTML='<div class="banner ok" style="display:block"><b>All '+list.length+' undone</b> (newest first): '+esc(done.join(', '))+'.</div>';
+  var bb=$('#hist-bulk');if(bb)bb.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')';
+ }
+});
 
 /* ---- src/86-backup.js ---- */
 /* ================= Backups for replacing uploads (D45, 23 Oct 2026) =================
@@ -6095,7 +6217,7 @@ function bkHas(uid){return S.backups.some(function(d){return d.upload===uid})}
 /* restore the saved documents for which allow(path) is true; cell entries of sales plant-months are returned for the caller to merge */
 async function bkRestore(uid,allow){
   var docs=bkFor(uid),n=0,cells=[];S.bkLast={units:0,incomplete:false};
-  var chk=bkCheck(uid);if(!chk.ok){S.bkLast.incomplete=true;return {n:0,cells:[],incomplete:true}}
+  var chk=bkCheck(uid);if(!chk.ok){S.bkLast.incomplete=true;if(!S.bkAllowIncomplete)throw new Error('Backup incomplete: nothing was restored and the backup is kept.');return {n:0,cells:[],incomplete:true}}
   var parts={};
   for(var i=0;i<docs.length;i++){var items=JSON.parse(await ungz(docs[i].z));
     for(var j=0;j<items.length;j++){var it=items[j];
