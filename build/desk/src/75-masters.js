@@ -270,7 +270,7 @@ async function sempLoad(){
       await dset('actions/'+id,a);
     }
     var byCode={};r.people.forEach(function(p){byCode[norm(p[0])]=p;if(p[13])byCode[norm(p[13])]=p});var filled=0;
-    for(var ui=0;ui<S.users.length;ui++){var uu=S.users[ui];if(uu.reports_to_email||uu.pseudo)continue;
+    for(var ui=0;ui<S.users.length;ui++){var uu=S.users[ui];if(uu.reports_to_email||uu.pseudo||uu.placeholder)continue;
       var pp=r.people.find(function(p){return (p[7]&&p[7]===uu.email)||(uu.sales_employee_code&&(norm(uu.sales_employee_code)===norm(p[0])||norm(uu.sales_employee_code)===norm(p[13]||'~')))});
       var mg=pp&&pp[11]?byCode[norm(pp[11])]:null;
       if(mg&&mg[7]&&mg[7]!==uu.email){var ud=Object.assign({},uu,{reports_to_email:mg[7],slp_code:pp[9]||uu.slp_code||'',reports_to_code:pp[11]});delete ud._id;await dset('users/'+uu._id,ud);filled++}}
