@@ -27,7 +27,7 @@ fs.writeFileSync(AF+FN,csvOf(B1H,rowsB1));
 await up(AF+FN);
 let d=await page.evaluate(()=>({kind:window.__desk.U.kind,layout:window.__desk.U.layout,per:window.__desk.U.period}));
 ok('B1 ORIN/RIN1 layout detected as credit notes; period read from the file name',d.kind==='cn'&&/B1 credit notes/.test(d.layout)&&d.per&&d.per.from==='2026-07-01',JSON.stringify(d));
-await val();
+await val();console.log('MSG',await page.evaluate(()=>window.__desk.U.msg+' '+window.__desk.U.stage));
 let r=await page.evaluate(()=>{const u=window.__desk.U.res;return {good:u.good,rej:u.rejected,reasons:Object.keys(u.reasons),acp:u.acp.rows,other:u.other.rows,dup:u.dup,months:u.covMonths,stage:window.__desk.U.stage,value:u.value}});
 ok('counts: 3 lines loaded, ACP skipped, non-laminate counted, repeated line removed, 3 rejected (branch, out of period, value)',r.good===3&&r.rej===3&&r.acp===1&&r.other===1&&r.dup===1&&r.stage==='done',JSON.stringify(r));
 ok('covers Jul, Aug, Sep 2026 from the period in the file name',JSON.stringify(r.months)===JSON.stringify(['2026-07','2026-08','2026-09']),JSON.stringify(r.months));

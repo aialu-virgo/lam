@@ -870,11 +870,11 @@ async function onFile(file){
     var d=detect(headers);
     var sheetsSeen=U.sheetsSeen,sheetPicked=U.sheetPicked;
     var cud=d.type==='unknown'?custDetect(headers):null;if(cud){U=newU();U.mode=mode;U.period=period;U.msg='This is a customer master ('+cud.layout+'), not a transaction export. Load it from Admin > Customers.';renderUpload();return}
+    var rdt=recvDetect(headers);if(rdt){recvStart(file,rows,headers,rdt,sheetPicked);return}
+    var cnd=cnDetectB1(headers)||(d.type==='invoice'&&d.sys==='S4'&&cnS4Share(headers,rows)>0.5?{kind:'cn',sys:'S4',layout:'S/4 billing credit memos'}:null);if(cnd){cnStart(file,rows,headers,cnd,sheetPicked);return}
     var cnGuard=creditLike(file.name,headers,rows,sheetsSeen,sheetPicked);
     if(ent==='CN'&&d.type==='invoice'){cnStart(file,rows,headers,{sys:d.sys,layout:(d.sys==='S4'?'S/4':'B1')+' credit notes (sales-register layout)'},sheetPicked);return}
     if(d.type==='invoice'&&cnGuard){U=newU();U.mode=mode;U.period=period;U.cnOffer={file:file,rows:rows,headers:headers,sys:d.sys,sheetPicked:sheetPicked};U.msg='This file looks like a credit-note register ('+cnGuard+'). Credit notes must not be loaded as sales: they would replace your sales for these months.';renderUpload();return}
-    var rdt=recvDetect(headers);if(rdt){recvStart(file,rows,headers,rdt,sheetPicked);return}
-    var cnd=cnDetectB1(headers)||(d.type==='invoice'&&d.sys==='S4'&&cnS4Share(headers,rows)>0.5?{kind:'cn',sys:'S4',layout:'S/4 billing credit memos'}:null);if(cnd){cnStart(file,rows,headers,cnd,sheetPicked);return}
     if(d.type==='unknown'){var cdt=collDetect(headers);if(cdt){collStart(file,rows,headers,sheetPicked);return}var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
     if(d.type==='master'&&d.what==='transfers'){U=newU();U.mode=mode;U.period=period;U.offer={file:file,rows:rows,what:'transfers'};U.msg='This file is the internal-transfer list (CardCode, CardName, Tranfser), not the sales export'+(sheetsSeen&&sheetsSeen.length>1?'. Sheets in the workbook: '+sheetsSeen.join('; ')+'. Save the DATA sheet as the CSV, or load the whole XLSX':'')+'. You can load it as the Internal-transfer list instead.';renderUpload();return}
     if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}

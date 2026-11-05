@@ -35,7 +35,7 @@ console.log(JSON.stringify(st2));
 /* the replace guard stops this one (bigger month already held? no: fewer lines) -> a safety stop, stated in one line */
 ok('a file that would replace a bigger month is stopped by the safety check, not by rejects',st2.stage==='validated'&&/Safety check stopped this file: it would replace/.test(await page.innerText('#i-upload')),'');
 await page.check('[data-chg="confrep"]');await page.waitForTimeout(300);
-const rb=await page.$('#u-reason');if(rb)await rb.fill('reload');
+const rb=await page.$('#u-reason');if(rb)await rb.fill('reload for the test');
 await page.click('[data-act="u-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:90000});
 await page.waitForTimeout(5000);
 const a2=await page.evaluate(()=>Object.values(window.__mockStore()).filter(v=>v&&v.rule==='R5').length);

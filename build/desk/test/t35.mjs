@@ -58,7 +58,7 @@ const inp2=await page.$('input[type=file]');await inp2.setInputFiles(AF+'Combine
 let tx=await page.innerText('#i-upload');
 ok('re-upload with fewer lines than the month already holds waits for a confirm that lists the month',await page.evaluate(()=>window.__desk.U.stage==='validated')&&/it would replace \d+ plant-months/.test(tx)&&/Apr 2026/.test(tx),'');
 await page.check('[data-chg="confrep"]');await page.waitForTimeout(300);
-const rb=await page.$('#u-reason');if(rb)await rb.fill('reload');
+const rb=await page.$('#u-reason');if(rb)await rb.fill('reload for the test');
 await page.click('[data-act="u-load"]');await page.waitForFunction(()=>window.__desk.U.stage==='done',null,{timeout:90000});
 await page.click('[data-act="u-reset"]').catch(()=>{});await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(600);
 const ids=await page.evaluate(()=>Object.entries(window.__mockStore()).filter(([k,v])=>k.startsWith('uploads/')&&v.file&&/04 clean/.test(v.file)).map(([k])=>k.slice(8)));
