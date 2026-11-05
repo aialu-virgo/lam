@@ -345,18 +345,22 @@ function deskDigestPage(col, r1, r2, rev) {
   });
 }
 var CRC_T_ = null;
-function crcTable_() { if (CRC_T_) return CRC_T_; var t = [], c, n, k; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return (CRC_T_ = t); }
+function crcTable_() { if (CRC_T_) return CRC_T_; var t = new Int32Array(256), c, n, k; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = c & 1 ? (-306674912 ^ (c >>> 1)) : (c >>> 1); t[n] = c; } return (CRC_T_ = t); }
+function crcByte_(t, crc, b) { return t[(crc ^ b) & 255] ^ (crc >>> 8); }
+/* CRC-32 of id + "\n" + json + "\n" as UTF-8 (lone surrogates become U+FFFD, as TextEncoder does) */
 function docCrc_(id, json) {
-  var t = crcTable_(), crc = 0xFFFFFFFF, s = id + '\n' + json + '\n';
-  function put(b) { crc = t[(crc ^ b) & 255] ^ (crc >>> 8); }
-  for (var i = 0; i < s.length; i++) {
-    var c = s.charCodeAt(i);
-    if (c >= 0xD800 && c < 0xDC00 && i + 1 < s.length) { var d = s.charCodeAt(i + 1); if (d >= 0xDC00 && d < 0xE000) { c = 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00); i++; } }
-    if (c >= 0xD800 && c < 0xE000) c = 0xFFFD;
-    if (c < 0x80) put(c);
-    else if (c < 0x800) { put(0xC0 | (c >> 6)); put(0x80 | (c & 63)); }
-    else if (c < 0x10000) { put(0xE0 | (c >> 12)); put(0x80 | ((c >> 6) & 63)); put(0x80 | (c & 63)); }
-    else { put(0xF0 | (c >> 18)); put(0x80 | ((c >> 12) & 63)); put(0x80 | ((c >> 6) & 63)); put(0x80 | (c & 63)); }
+  var t = crcTable_(), crc = -1, parts = [id, '\n', json, '\n'];
+  for (var p = 0; p < 4; p++) {
+    var s = parts[p], n = s.length;
+    for (var i = 0; i < n; i++) {
+      var c = s.charCodeAt(i);
+      if (c < 0x80) { crc = crcByte_(t, crc, c); continue; }
+      if (c >= 0xD800 && c < 0xDC00 && i + 1 < n) { var d = s.charCodeAt(i + 1); if (d >= 0xDC00 && d < 0xE000) { c = 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00); i++; } }
+      if (c >= 0xD800 && c < 0xE000) c = 0xFFFD;
+      if (c < 0x800) { crc = crcByte_(t, crc, 0xC0 | (c >> 6)); crc = crcByte_(t, crc, 0x80 | (c & 63)); }
+      else if (c < 0x10000) { crc = crcByte_(t, crc, 0xE0 | (c >> 12)); crc = crcByte_(t, crc, 0x80 | ((c >> 6) & 63)); crc = crcByte_(t, crc, 0x80 | (c & 63)); }
+      else { crc = crcByte_(t, crc, 0xF0 | (c >> 18)); crc = crcByte_(t, crc, 0x80 | ((c >> 12) & 63)); crc = crcByte_(t, crc, 0x80 | ((c >> 6) & 63)); crc = crcByte_(t, crc, 0x80 | (c & 63)); }
+    }
   }
-  return (crc ^ 0xFFFFFFFF) >>> 0;
+  return (crc ^ -1) >>> 0;
 }

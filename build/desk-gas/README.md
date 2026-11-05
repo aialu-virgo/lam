@@ -17,14 +17,16 @@ Two files are used because Apps Script keeps server code (`.gs`) and page (`.htm
 Paste `Desk-Code.gs.txt` the same way only if it was re-issued.
 
 ## Moving the data from claude.ai (once, on your own computer)
-1. On the claude.ai Desk: Admin > Tools > **Download full backup**, then **Save all files** (a manifest and one or more part files). Keep them on your computer only.
-2. Open the new Apps Script Desk: Admin > Tools > **Restore from backup**, select all the files together. The page checks sizes and checksums, then writes. It refuses if the database already holds data unless you tick "Replace everything". The result table must show every collection "ok".
+**Cutover rule: no uploads and no edits on the claude.ai Desk between Download and Restore.** Anything changed after the download is not in the backup. Tell the team to stay out until the restore is verified.
+1. On the claude.ai Desk: Admin > Tools > **Download full backup**, then **Save all files** (a manifest and one or more part files). Keep them on your computer only. If the page says data changed while the backup was being made, make it again.
+2. Open the new Apps Script Desk: Admin > Tools > **Restore from backup**, select all the files together. The page checks every file, id, size and checksum before it writes anything. It refuses when the database already holds data unless you tick "Replace everything".
+3. **Keep the tab open** until the table shows every collection "ok". If it stops partway the page says "Restore incomplete": tick "Replace everything" and run Restore again (a re-run clears first, so it is safe).
 
 ## Good to know
 - Access is by the Users list in Admin. Anyone else in the domain sees "Ask your admin for access" and receives no data.
 - Only a Super admin can write the admin collections; the server refuses everyone else.
 - **Reads are not filtered by row.** A signed-in user with a role can read every collection through browser tools, as on claude.ai today.
-- Other people's changes appear within about 20 seconds (the page polls).
+- Other people's changes appear within about 30 seconds (the page checks a small revision map and re-reads only what changed).
 - If someone has several Google accounts open, the link may open under the wrong one; use a private window or `/u/1/`.
-- Do not edit the database spreadsheet by hand. Its link is in Drive; its ID is in Project Settings > Script Properties (`DESK_SHEET_ID`).
+- The database is one spreadsheet with one sheet per collection (`c_inv`, `c_users` ...), plus two Script Properties (`DESK_SHEET_ID`, `DESK_REVS`). Do not edit it by hand. Its link is in your Drive.
 - If a save fails with "database is full" or "quota", tell the Delivery Lead: Google Sheets and Apps Script have size and daily limits that this page cannot raise.

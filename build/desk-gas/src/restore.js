@@ -1,7 +1,7 @@
 /* Admin > Tools > "Restore from backup" (Apps Script build only). Reads the files of a "Download full backup" in this browser, checks EVERYTHING (files, ids, sizes, counts, checksums)
  * before any write, then clears the database and writes the documents through google.script.run in batches. Nothing leaves the browser except those writes to this Apps Script project. */
 (function () {
-  var R = { stage: 'idle', msg: '', pct: 0, replace: false, rows: null, report: null, err: '', docs: null, man: null, started: false, written: {} };
+  var R = { n: 0, stage: 'idle', msg: '', pct: 0, replace: false, rows: null, report: null, err: '', docs: null, man: null, started: false, written: {} };
   var BATCH_CHARS = 900000, BATCH_DOCS = 60, MAX_DOC = 262144;
   var X = (window.__deskExt = window.__deskExt || {});
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -35,7 +35,7 @@
   };
   function badId(id) { return typeof id !== 'string' || !id || id.length > 300 || id.indexOf('/') >= 0; }
   async function readFiles(list) {
-    R.err = ''; R.rows = null; R.report = null; R.docs = null; R.man = null; R.started = false; R.written = {}; R.stage = 'working'; R.msg = 'Reading files'; R.pct = 0; refresh();
+    R.n++; R.err = ''; R.rows = null; R.report = null; R.docs = null; R.man = null; R.started = false; R.written = {}; R.stage = 'working'; R.msg = 'Reading files'; R.pct = 0; refresh();
     try {
       var texts = {}, man = null;
       for (var i = 0; i < list.length; i++) {

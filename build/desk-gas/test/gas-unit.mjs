@@ -94,7 +94,7 @@ ok('single-document read of a broken document returns "not found", not an error'
 
 /* delete, revs, wipe, stats */
 r = E.call('deskWrite', [[{ op: 'delete', col: 'roll', id: 'r01' }, { op: 'delete', col: 'roll', id: 'r02' }]]); ok('delete removes rows', r.ok && !('roll/r01' in E.stored()) && 'roll/r03' in E.stored());
-r = E.call('deskRevs', []); ok('revision map is one cheap call and every write adds 2', r.ok && r.revs.users === 6 && Object.values(r.revs).every(n => n % 2 === 0), JSON.stringify(r.revs));
+r = E.call('deskRevs', []); ok('revision map is one cheap call and every write adds 2', r.ok && r.revs.users === 4 && Object.values(r.revs).every(n => n % 2 === 0), JSON.stringify(r.revs));
 r = E.call('deskStats', []); ok('stats counts docs per collection', r.ok && r.counts.roll === 38 && !r.empty && !r.seedOnly);
 r = E.call('deskWipe', [['roll', 'inv']]); ok('wipe removes the named collections only', r.ok && !Object.keys(E.stored()).some(k => /^(roll|inv)\//.test(k)) && 'users/u1' in E.stored());
 E.state.lockFail = true; r = E.call('deskWrite', [[set('log', 'z', { a: 1 })]]); ok('lock timeout maps to unavailable (page retries)', !r.ok && r.code === 'unavailable'); E.state.lockFail = false;

@@ -13,4 +13,4 @@ related:
 - [build-gas.mjs](build-gas.mjs): reads `build/desk/dist/index.html`, injects the runtime shim and restore tool, writes `out/` (git-ignored).
 - [src/Code.gs.js](src/Code.gs.js): server (`Code.gs`); [src/shim.js](src/shim.js): `window.claude` on `google.script.run`; [src/restore.js](src/restore.js): Admin > Restore from backup.
 - [README.md](README.md): paste, deploy, redeploy, move data from claude.ai.
-- test/: `node test/gas-unit.mjs` (server logic), `node test/gas-e2e.mjs` (page, three sign-ins, upload, backup round trip).
+- test/: `gas-unit.mjs` (server logic), `gas-e2e.mjs` (page, three sign-ins, upload, backup and restore round trip, failure cases), `gas-perf.mjs` (synthetic 80 MB store: calls and getValues volume).
