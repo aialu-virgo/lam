@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>Virgo Asia Master Data Portal</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <?!= include('Styles'); ?>
+</head>
+<body data-initial-view="<?= initialView ?>">
+
+<nav class="navbar vp-nav">
+  <div class="container-xl">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="#" id="brandLink">
+      <!-- Logo slot: set CONFIG.LOGO_URL in Code.gs. Shows the badge when no logo is configured. -->
+      <img id="logoImg" class="vp-logo" alt="Logo" hidden>
+      <span id="logoBadge" class="vp-badge">V</span>
+      <span class="vp-title">Virgo Asia Master Data Portal</span>
+    </a>
+    <div class="d-flex align-items-center gap-2">
+      <span class="small text-muted d-none d-md-inline" id="whoAmI"></span>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="homeBtn" hidden>Home</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container-xl py-4">
+  <div id="globalAlert"></div>
+
+  <!-- HOME -->
+  <section id="view-home" class="vp-view">
+    <h1 class="h4 mb-1">What would you like to do?</h1>
+    <p class="text-muted mb-4">Choose a module. Requests are reviewed by the Master Data team.</p>
+    <div class="row g-3">
+      <div class="col-12 col-sm-6 col-lg-4">
+        <button type="button" class="vp-card card h-100 w-100 text-start disabled-card" data-soon="Customer Creation">
+          <div class="card-body"><div class="vp-icon">C</div><h2 class="h6">Customer Creation</h2>
+          <p class="small text-muted mb-2">Request a new customer master.</p><span class="badge text-bg-secondary">Coming soon</span></div>
+        </button>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-4">
+        <button type="button" class="vp-card card h-100 w-100 text-start disabled-card" data-soon="Vendor Creation">
+          <div class="card-body"><div class="vp-icon">V</div><h2 class="h6">Vendor Creation</h2>
+          <p class="small text-muted mb-2">Request a new vendor master.</p><span class="badge text-bg-secondary">Coming soon</span></div>
+        </button>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-4">
+        <button type="button" class="vp-card card h-100 w-100 text-start" data-view="item">
+          <div class="card-body"><div class="vp-icon">I</div><h2 class="h6">Item Creation</h2>
+          <p class="small text-muted mb-0">Request a new item / material master with drawings.</p></div>
+        </button>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-4">
+        <button type="button" class="vp-card card h-100 w-100 text-start" data-view="status">
+          <div class="card-body"><div class="vp-icon">S</div><h2 class="h6">Request Status Tracking</h2>
+          <p class="small text-muted mb-0">Search by Request Number or your E-mail ID.</p></div>
+        </button>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-4">
+        <button type="button" class="vp-card card h-100 w-100 text-start" data-view="reports" data-admin="1">
+          <div class="card-body"><div class="vp-icon">D</div><h2 class="h6">Dashboard Reports <span class="badge text-bg-warning admin-tag">Admin</span></h2>
+          <p class="small text-muted mb-0">KPIs, charts, review and Excel export.</p></div>
+        </button>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-4">
+        <button type="button" class="vp-card card h-100 w-100 text-start" data-view="users" data-admin="1">
+          <div class="card-body"><div class="vp-icon">U</div><h2 class="h6">User Management <span class="badge text-bg-warning admin-tag">Admin</span></h2>
+          <p class="small text-muted mb-0">Add or remove portal administrators.</p></div>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <?!= include('ItemForm'); ?>
+  <?!= include('StatusTracking'); ?>
+  <?!= include('Admin'); ?>
+</main>
+
+<div class="vp-busy" id="busy" hidden><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Working...</span></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<?!= include('JavaScript'); ?>
+</body>
+</html>

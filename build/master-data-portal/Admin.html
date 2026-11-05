@@ -1,0 +1,88 @@
+<!-- Admin views: Dashboard Reports (KPIs, charts, requests table) and User Management. Included by Index.html. -->
+<section id="view-reports" class="vp-view">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h4 mb-0">Dashboard Reports</h1>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-primary btn-sm" id="refreshBtn">Refresh</button>
+      <button type="button" class="btn btn-primary btn-sm" id="exportBtn">Export to Excel (.xlsx)</button>
+    </div>
+  </div>
+  <div id="reportsAlert"></div>
+  <div id="reportsBody" hidden>
+    <div class="row g-3 mb-3" id="kpiRow">
+      <div class="col-6 col-md"><div class="kpi"><div class="n" id="kpiTotal">0</div><div class="l">Total requests</div></div></div>
+      <div class="col-6 col-md"><div class="kpi"><div class="n" id="kpiPending">0</div><div class="l">Pending</div></div></div>
+      <div class="col-6 col-md"><div class="kpi"><div class="n" id="kpiApproved">0</div><div class="l">Approved</div></div></div>
+      <div class="col-6 col-md"><div class="kpi"><div class="n" id="kpiRejected">0</div><div class="l">Rejected</div></div></div>
+      <div class="col-12 col-md"><div class="kpi"><div class="n" id="kpiErp">0</div><div class="l">Created in ERP</div></div></div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-4"><div class="vp-section mb-0"><h2>Monthly requests</h2><div class="chart-box"><canvas id="chartMonthly"></canvas></div></div></div>
+      <div class="col-12 col-lg-4"><div class="vp-section mb-0"><h2>Factory-wise</h2><div class="chart-box"><canvas id="chartFactory"></canvas></div></div></div>
+      <div class="col-12 col-lg-4"><div class="vp-section mb-0"><h2>Category-wise</h2><div class="chart-box"><canvas id="chartCategory"></canvas></div></div></div>
+    </div>
+
+    <div class="vp-section">
+      <h2>All requests</h2>
+      <div class="row g-2 mb-3">
+        <div class="col-12 col-md-6"><input type="search" class="form-control" id="tblSearch" placeholder="Search number, name, e-mail, item, brand..."></div>
+        <div class="col-6 col-md-3"><select class="form-select" id="tblStatus"><option value="">All statuses</option></select></div>
+        <div class="col-6 col-md-3 d-flex align-items-center"><span class="small text-muted" id="tblCount"></span></div>
+      </div>
+      <div class="table-wrap">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead><tr><th>Request No.</th><th>Date</th><th>Requestor</th><th>Item description</th><th>Factory</th><th>Category</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tblBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="editTitle">Request</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">
+          <div id="editAlert"></div>
+          <dl class="row small mb-3" id="editDetails"></dl>
+          <div class="mb-3"><div class="form-label">Comment history</div><div class="comments-box" id="editHistory"></div></div>
+          <div class="row g-3">
+            <div class="col-md-5"><label class="form-label" for="editStatus">Status</label><select class="form-select" id="editStatus"></select></div>
+            <div class="col-12"><label class="form-label" for="editComment">Add comment (appended with your name and time)</label>
+              <textarea class="form-control" id="editComment" rows="3" maxlength="1000"></textarea></div>
+            <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" id="editNotify" checked>
+              <label class="form-check-label" for="editNotify">E-mail the requester about this update</label></div></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" id="editSave">Save update</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="view-users" class="vp-view">
+  <h1 class="h4 mb-3">User Management</h1>
+  <div id="usersAlert"></div>
+  <div id="usersBody" hidden>
+    <div class="vp-section">
+      <h2>Add administrator</h2>
+      <form id="addAdminForm" class="row g-2 align-items-end" novalidate>
+        <div class="col-12 col-md-8"><label class="form-label" for="newAdmin">Google account e-mail</label>
+          <input type="email" class="form-control" id="newAdmin" maxlength="254" placeholder="name@virgoasia.com"></div>
+        <div class="col-12 col-md-4 d-grid"><button class="btn btn-primary" type="submit" id="addAdminBtn">Add admin</button></div>
+      </form>
+    </div>
+    <div class="vp-section">
+      <h2>Current administrators</h2>
+      <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+        <thead><tr><th>E-mail</th><th>Added by</th><th>Added on</th><th></th></tr></thead>
+        <tbody id="adminBody"></tbody></table></div>
+    </div>
+  </div>
+</section>

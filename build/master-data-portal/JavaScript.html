@@ -1,0 +1,422 @@
+<script>
+(function () {
+  'use strict';
+
+  var APP = { config: null, dash: null, charts: {}, files: [], editing: null, adminsInfo: null };
+
+  /* ---------- helpers ---------- */
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function busy(on) { $('busy').hidden = !on; }
+
+  /** Promise wrapper for google.script.run; every server function returns {ok, data|error}. */
+  function call(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      if (!window.google || !google.script || !google.script.run) {
+        reject(new Error('This page must be opened from the deployed web app URL.'));
+        return;
+      }
+      var runner = google.script.run
+        .withSuccessHandler(function (out) {
+          if (out && out.ok) { resolve(out.data); return; }
+          var err = new Error((out && out.error) || 'Unknown error');
+          err.fieldErrors = out && out.fieldErrors;
+          reject(err);
+        })
+        .withFailureHandler(function (e) { reject(new Error((e && e.message) || String(e))); });
+      runner[fn].apply(runner, args);
+    });
+  }
+
+  function showAlert(containerId, type, message, extraHtml) {
+    var box = $(containerId);
+    box.innerHTML = '';
+    var div = document.createElement('div');
+    div.className = 'alert alert-' + type + ' alert-dismissible fade show';
+    div.setAttribute('role', 'alert');
+    var span = document.createElement('span');
+    span.textContent = message;
+    div.appendChild(span);
+    if (extraHtml) { var x = document.createElement('div'); x.innerHTML = extraHtml; div.appendChild(x); }
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn-close'; b.setAttribute('data-bs-dismiss', 'alert'); b.setAttribute('aria-label', 'Close');
+    div.appendChild(b);
+    box.appendChild(div);
+  }
+  function clearAlert(id) { $(id).innerHTML = ''; }
+
+  function statusBadge(st) {
+    var cls = { 'Submitted': 'secondary', 'Under Review': 'info', 'Clarification Required': 'warning', 'Approved': 'success',
+      'Rejected': 'danger', 'Created in ERP': 'primary' }[st] || 'secondary';
+    return '<span class="badge text-bg-' + cls + '">' + esc(st) + '</span>';
+  }
+
+  /* ---------- navigation (single page; no top-level navigation) ---------- */
+  var ADMIN_VIEWS = { reports: 1, users: 1 };
+  function showView(name) {
+    if (ADMIN_VIEWS[name] && APP.config && !APP.config.user.isAdmin) {
+      showAlert('globalAlert', 'warning', 'Admin access only. ' + (APP.config.user.email
+        ? APP.config.user.email + ' is not an authorised admin.' : 'Your account could not be identified.'));
+      name = 'home';
+    } else {
+      clearAlert('globalAlert');
+    }
+    var views = document.querySelectorAll('.vp-view');
+    for (var i = 0; i < views.length; i++) views[i].classList.remove('active');
+    $('view-' + name).classList.add('active');
+    $('homeBtn').hidden = name === 'home';
+    window.scrollTo(0, 0);
+    if (name === 'reports') loadDashboard();
+    if (name === 'users') loadAdmins();
+  }
+
+  /* ---------- item form ---------- */
+  var FIELD_KEYS = ['requestorName', 'department', 'email', 'mobile', 'itemDescription', 'design', 'finish', 'thickness',
+    'thicknessType', 'size', 'length', 'width', 'brand', 'hsnCode', 'factory', 'plantCode', 'purchaseGroup', 'itemCategory',
+    'priceGroupName', 'baseUom', 'materialGroup', 'gstPercent', 'preferredVendor', 'remarks'];
+  var EMAIL_RE = /^[^\s@,;<>()"']+@[^\s@,;<>()"']+\.[^\s@,;<>()"']{2,}$/;
+
+  function normMobile(raw) {
+    var s = String(raw || '').replace(/[\s\-().]/g, '');
+    if (/^\+91\d{10}$/.test(s)) s = s.slice(3);
+    else if (/^91\d{10}$/.test(s)) s = s.slice(2);
+    else if (/^0\d{10}$/.test(s)) s = s.slice(1);
+    return s;
+  }
+
+  function validateField(k) {
+    var el = $('f_' + k), v = String(el.value || '').trim(), msg = '';
+    var required = APP.config.required.indexOf(k) >= 0;
+    if (!v) { if (required) msg = 'This field is required.'; }
+    else if (k === 'email') { if (!EMAIL_RE.test(v)) msg = 'Enter a valid e-mail address.'; }
+    else if (k === 'mobile') { if (!/^[6-9]\d{9}$/.test(normMobile(v))) msg = 'Enter a 10-digit Indian mobile number (starts with 6-9).'; }
+    else if (k === 'hsnCode') { if (!/^(\d{4}|\d{6}|\d{8})$/.test(v)) msg = 'HSN code must be 4, 6 or 8 digits.'; }
+    else if (k === 'thickness' || k === 'length' || k === 'width') {
+      if (!/^\d+(\.\d{1,4})?$/.test(v) || parseFloat(v) <= 0) msg = 'Enter a number greater than 0.';
+    }
+    setFieldError(k, msg);
+    return !msg;
+  }
+  function setFieldError(k, msg) {
+    var el = $('f_' + k);
+    if (!el) return;
+    var fb = el.parentNode.querySelector('.invalid-feedback');
+    if (msg) { el.classList.add('is-invalid'); if (fb) fb.textContent = msg; }
+    else { el.classList.remove('is-invalid'); if (fb) fb.textContent = ''; }
+  }
+
+  function initForm() {
+    var cfg = APP.config;
+    var selects = document.querySelectorAll('#itemForm select[data-options]');
+    for (var i = 0; i < selects.length; i++) {
+      var s = selects[i], list = cfg.options[s.getAttribute('data-options')] || [];
+      s.innerHTML = '';
+      var ph = document.createElement('option'); ph.value = ''; ph.textContent = 'Select...'; s.appendChild(ph);
+      list.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; s.appendChild(op); });
+    }
+    FIELD_KEYS.forEach(function (k) {
+      var lab = document.querySelector('label[for="f_' + k + '"]');
+      if (lab && cfg.required.indexOf(k) >= 0) lab.classList.add('req-mark');
+      $('f_' + k).addEventListener('blur', function () { validateField(k); });
+      $('f_' + k).addEventListener('change', function () { validateField(k); });
+    });
+    $('f_requestDate').value = cfg.now;
+    if (cfg.user.email) $('f_email').value = cfg.user.email;
+    var l = cfg.limits;
+    $('fileHelp').textContent = 'Up to ' + l.maxFiles + ' files, ' + l.maxFileMb + ' MB each (' + l.maxTotalMb + ' MB total). Allowed: ' + l.allowedExt.join(', ') + '.';
+    $('f_files').setAttribute('accept', l.allowedExt.map(function (e) { return '.' + e; }).join(','));
+  }
+
+  function renderFiles() {
+    var box = $('fileList');
+    box.innerHTML = '';
+    APP.files.forEach(function (f, i) {
+      var row = document.createElement('div'); row.className = 'file-chip';
+      var name = document.createElement('span'); name.textContent = f.name + ' (' + (f.size / 1048576).toFixed(2) + ' MB)';
+      var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn btn-sm btn-outline-danger'; rm.textContent = 'Remove';
+      rm.addEventListener('click', function () { APP.files.splice(i, 1); renderFiles(); checkFiles(); });
+      row.appendChild(name); row.appendChild(rm); box.appendChild(row);
+    });
+  }
+  function checkFiles() {
+    var l = APP.config.limits, problems = [], total = 0;
+    if (APP.files.length > l.maxFiles) problems.push('At most ' + l.maxFiles + ' files are allowed.');
+    APP.files.forEach(function (f) {
+      var ext = (/\.([A-Za-z0-9]+)$/.exec(f.name) || [, ''])[1].toLowerCase();
+      total += f.size;
+      if (l.allowedExt.indexOf(ext) < 0) problems.push(f.name + ': file type not allowed.');
+      if (f.size > l.maxFileMb * 1048576) problems.push(f.name + ': larger than ' + l.maxFileMb + ' MB.');
+      if (f.size === 0) problems.push(f.name + ': file is empty.');
+    });
+    if (total > l.maxTotalMb * 1048576) problems.push('Total size exceeds ' + l.maxTotalMb + ' MB.');
+    $('fileError').textContent = problems.join(' ');
+    return problems.length === 0;
+  }
+
+  function readBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { var s = String(r.result); resolve({ name: file.name, mimeType: file.type || '', data: s.slice(s.indexOf(',') + 1) }); };
+      r.onerror = function () { reject(new Error('Could not read ' + file.name)); };
+      r.readAsDataURL(file);
+    });
+  }
+
+  function submitItem(ev) {
+    ev.preventDefault();
+    clearAlert('itemAlert'); clearAlert('itemSuccess');
+    var firstBad = null;
+    FIELD_KEYS.forEach(function (k) { if (!validateField(k) && !firstBad) firstBad = k; });
+    var filesOk = checkFiles();
+    if (firstBad || !filesOk) {
+      showAlert('itemAlert', 'danger', 'Please correct the highlighted fields' + (filesOk ? '.' : ' and attachments.'));
+      if (firstBad) $('f_' + firstBad).focus();
+      return;
+    }
+    var fields = {};
+    FIELD_KEYS.forEach(function (k) { fields[k] = $('f_' + k).value.trim(); });
+    var btn = $('submitBtn'), orig = btn.textContent;
+    btn.disabled = true; $('resetBtn').disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Submitting...';
+    Promise.all(APP.files.map(readBase64)).then(function (files) {
+      return call('submitItemRequest', { fields: fields, files: files });
+    }).then(function (res) {
+      var warn = [];
+      if (res.attachmentError) warn.push(res.attachmentError);
+      if (res.mail.errors && res.mail.errors.length) warn.push('Your request is saved, but e-mail had a problem: ' + res.mail.errors.join(' '));
+      var html = '<p class="mb-1">Your Request Number is <strong>' + esc(res.requestNumber) + '</strong>. Keep it to track the status.</p>' +
+        '<p class="mb-0 small">Attachments saved: ' + esc(res.attachments) + '. Acknowledgement e-mail: ' + (res.mail.requester ? 'sent' : 'not sent') + '.</p>';
+      $('itemSuccess').innerHTML = '<div class="alert alert-success" role="alert">' + html + '</div>';
+      if (warn.length) showAlert('itemAlert', 'warning', warn.join(' '));
+      $('itemForm').reset(); APP.files = []; renderFiles(); $('fileError').textContent = '';
+      FIELD_KEYS.forEach(function (k) { setFieldError(k, ''); });
+      $('f_requestDate').value = APP.config.now;
+      if (APP.config.user.email) $('f_email').value = APP.config.user.email;
+      window.scrollTo(0, 0);
+    }).catch(function (err) {
+      if (err.fieldErrors) Object.keys(err.fieldErrors).forEach(function (k) { setFieldError(k, err.fieldErrors[k]); });
+      showAlert('itemAlert', 'danger', err.message);
+      window.scrollTo(0, 0);
+    }).then(function () {
+      btn.disabled = false; $('resetBtn').disabled = false; btn.textContent = orig;
+    });
+  }
+
+  /* ---------- status tracking ---------- */
+  function submitTrack(ev) {
+    ev.preventDefault();
+    clearAlert('trackAlert'); $('trackResults').innerHTML = '';
+    var q = $('trackQuery').value.trim();
+    if (!q) { showAlert('trackAlert', 'danger', 'Enter a Request Number or an E-mail ID.'); return; }
+    var btn = $('trackBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Searching...';
+    call('trackRequest', q).then(function (rows) {
+      if (!rows.length) { showAlert('trackAlert', 'info', 'No request found for "' + q + '".'); return; }
+      $('trackResults').innerHTML = rows.map(function (r) {
+        return '<div class="vp-section"><div class="d-flex flex-wrap justify-content-between gap-2 mb-2"><strong>' + esc(r.requestNumber) +
+          '</strong>' + statusBadge(r.status) + '</div><div class="small text-muted mb-1">Submitted ' + esc(r.requestDate) +
+          ' | Last updated ' + esc(r.lastUpdated) + '</div><div>' + esc(r.itemDescription) + (r.brand ? ' <span class="text-muted">(' + esc(r.brand) + ')</span>' : '') +
+          '</div>' + (r.comments ? '<div class="comments-box mt-2">' + esc(r.comments) + '</div>' : '') + '</div>';
+      }).join('');
+    }).catch(function (err) { showAlert('trackAlert', 'danger', err.message); })
+      .then(function () { btn.disabled = false; btn.textContent = 'Search'; });
+  }
+
+  /* ---------- admin dashboard ---------- */
+  function loadDashboard() {
+    clearAlert('reportsAlert'); $('reportsBody').hidden = true; busy(true);
+    call('adminGetDashboard').then(function (d) {
+      APP.dash = d;
+      $('reportsBody').hidden = false;
+      $('kpiTotal').textContent = d.kpis.total; $('kpiPending').textContent = d.kpis.pending;
+      $('kpiApproved').textContent = d.kpis.approved; $('kpiRejected').textContent = d.kpis.rejected;
+      $('kpiErp').textContent = d.kpis.createdInErp;
+      var sel = $('tblStatus'), cur = sel.value;
+      sel.innerHTML = '<option value="">All statuses</option>' + d.statuses.map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('');
+      sel.value = cur;
+      renderTable(); renderCharts(d);
+    }).catch(function (err) { showAlert('reportsAlert', 'danger', err.message); })
+      .then(function () { busy(false); });
+  }
+
+  function filteredRows() {
+    var q = $('tblSearch').value.trim().toLowerCase(), st = $('tblStatus').value;
+    return (APP.dash ? APP.dash.rows : []).filter(function (r) {
+      if (st && r.status !== st) return false;
+      if (!q) return true;
+      return [r.requestNumber, r.requestorName, r.email, r.itemDescription, r.brand, r.factory, r.itemCategory, r.department]
+        .join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+  }
+  function renderTable() {
+    var rows = filteredRows();
+    $('tblCount').textContent = rows.length + ' of ' + (APP.dash ? APP.dash.rows.length : 0) + ' requests';
+    $('tblBody').innerHTML = rows.map(function (r) {
+      return '<tr><td class="text-nowrap">' + esc(r.requestNumber) + '</td><td class="text-nowrap">' + esc(r.requestDate) + '</td><td>' + esc(r.requestorName) +
+        '</td><td>' + esc(r.itemDescription) + '</td><td>' + esc(r.factory) + '</td><td>' + esc(r.itemCategory) + '</td><td>' + statusBadge(r.status) +
+        '</td><td><button type="button" class="btn btn-sm btn-outline-primary" data-edit="' + esc(r.requestNumber) + '">Open</button></td></tr>';
+    }).join('') || '<tr><td colspan="8" class="text-center text-muted py-4">No requests match.</td></tr>';
+  }
+
+  var PALETTE = '#1f4e8c';
+  function drawChart(id, type, items, horizontal) {
+    if (APP.charts[id]) { APP.charts[id].destroy(); delete APP.charts[id]; }
+    if (typeof Chart === 'undefined') { $(id).parentNode.innerHTML = '<div class="text-muted small">Chart library could not be loaded.</div>'; return; }
+    APP.charts[id] = new Chart($(id), {
+      type: type,
+      data: { labels: items.map(function (i) { return i.label; }), datasets: [{ label: 'Requests', data: items.map(function (i) { return i.count; }),
+        backgroundColor: PALETTE, borderColor: PALETTE, tension: .25, fill: false }] },
+      options: { responsive: true, maintainAspectRatio: false, indexAxis: horizontal ? 'y' : 'x', plugins: { legend: { display: false } },
+        scales: horizontal ? { x: { beginAtZero: true, ticks: { precision: 0 } } } : { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+    });
+  }
+  function renderCharts(d) {
+    drawChart('chartMonthly', 'bar', d.monthly, false);
+    drawChart('chartFactory', 'bar', d.byFactory.slice(0, 10), true);
+    drawChart('chartCategory', 'bar', d.byCategory.slice(0, 10), true);
+  }
+
+  function openEdit(num) {
+    var r = (APP.dash.rows.filter(function (x) { return x.requestNumber === num; }))[0];
+    if (!r) return;
+    APP.editing = r; clearAlert('editAlert');
+    $('editTitle').textContent = r.requestNumber;
+    var keys = [['Requestor', 'requestorName'], ['Department', 'department'], ['Email', 'email'], ['Mobile', 'mobile'], ['Item', 'itemDescription'],
+      ['Design', 'design'], ['Finish', 'finish'], ['Thickness', 'thickness'], ['Thickness type', 'thicknessType'], ['Size', 'size'], ['Length', 'length'],
+      ['Width', 'width'], ['Brand', 'brand'], ['HSN', 'hsnCode'], ['Factory', 'factory'], ['Plant', 'plantCode'], ['Purchase group', 'purchaseGroup'],
+      ['Category', 'itemCategory'], ['Price group', 'priceGroupName'], ['Material group', 'materialGroup'], ['Base UOM', 'baseUom'], ['GST %', 'gstPercent'],
+      ['Vendor', 'preferredVendor'], ['Remarks', 'remarks'], ['Submitted', 'requestDate']];
+    $('editDetails').innerHTML = keys.map(function (p) {
+      return '<dt class="col-4 col-md-3">' + esc(p[0]) + '</dt><dd class="col-8 col-md-3 mb-1">' + esc(r[p[1]] || '-') + '</dd>';
+    }).join('') + '<dt class="col-4 col-md-3">Attachments</dt><dd class="col-8 col-md-9">' + linkify(r.attachmentLink) + '</dd>';
+    $('editHistory').textContent = r.adminComments || 'No comments yet.';
+    $('editStatus').innerHTML = APP.dash.statuses.map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('');
+    $('editStatus').value = r.status; $('editComment').value = '';
+    bootstrap.Modal.getOrCreateInstance($('editModal')).show();
+  }
+  function linkify(text) {
+    if (!text) return 'None';
+    return String(text).split('\n').map(function (line) {
+      var m = /(https:\/\/[^\s]+)$/.exec(line);
+      if (!m) return esc(line);
+      var label = line.slice(0, m.index).replace(/ - $/, '') || 'Open folder';
+      return '<a href="' + esc(m[1]) + '" target="_blank" rel="noopener">' + esc(label) + '</a>';
+    }).join('<br>');
+  }
+  function saveEdit() {
+    var r = APP.editing; if (!r) return;
+    var btn = $('editSave'); btn.disabled = true; clearAlert('editAlert');
+    call('adminUpdateRequest', { requestNumber: r.requestNumber, status: $('editStatus').value, comment: $('editComment').value, notify: $('editNotify').checked })
+      .then(function (res) {
+        bootstrap.Modal.getOrCreateInstance($('editModal')).hide();
+        showAlert('reportsAlert', res.mail.error ? 'warning' : 'success', res.requestNumber + ' updated.' + (res.mail.error ? ' ' + res.mail.error : (res.mail.sent ? ' Requester e-mailed.' : '')));
+        loadDashboard();
+      }).catch(function (err) { showAlert('editAlert', 'danger', err.message); })
+      .then(function () { btn.disabled = false; });
+  }
+
+  function exportXlsx() {
+    var btn = $('exportBtn'), orig = btn.textContent; btn.disabled = true; btn.textContent = 'Preparing...';
+    var nums = filteredRows().map(function (r) { return r.requestNumber; });
+    var all = APP.dash && nums.length === APP.dash.rows.length;
+    call('adminExportXlsx', all ? null : nums).then(function (f) {
+      var bin = atob(f.base64), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([bytes], { type: f.mimeType }));
+      var a = document.createElement('a'); a.href = url; a.download = f.filename; document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1500);
+      showAlert('reportsAlert', 'success', 'Excel file ready: ' + f.filename + ' (' + f.rows + ' rows).');
+    }).catch(function (err) { showAlert('reportsAlert', 'danger', err.message); })
+      .then(function () { btn.disabled = false; btn.textContent = orig; });
+  }
+
+  /* ---------- user management ---------- */
+  function renderAdmins(info) {
+    APP.adminsInfo = info;
+    $('usersBody').hidden = false;
+    $('adminBody').innerHTML = info.admins.map(function (a) {
+      var locked = a.email === info.seed || a.email === info.me;
+      return '<tr><td>' + esc(a.email) + (a.email === info.seed ? ' <span class="badge text-bg-secondary">seed</span>' : '') + '</td><td>' + esc(a.addedBy) +
+        '</td><td>' + esc(a.addedOn) + '</td><td class="text-end">' + (locked ? '' :
+        '<button type="button" class="btn btn-sm btn-outline-danger" data-remove="' + esc(a.email) + '">Remove</button>') + '</td></tr>';
+    }).join('');
+  }
+  function loadAdmins() {
+    clearAlert('usersAlert'); $('usersBody').hidden = true; busy(true);
+    call('adminListAdmins').then(renderAdmins)
+      .catch(function (err) { showAlert('usersAlert', 'danger', err.message); })
+      .then(function () { busy(false); });
+  }
+  function addAdmin(ev) {
+    ev.preventDefault(); clearAlert('usersAlert');
+    var v = $('newAdmin').value.trim(), btn = $('addAdminBtn');
+    if (!EMAIL_RE.test(v)) { showAlert('usersAlert', 'danger', 'Enter a valid e-mail address.'); return; }
+    btn.disabled = true;
+    call('adminAddAdmin', v).then(function (info) { renderAdmins(info); $('newAdmin').value = ''; showAlert('usersAlert', 'success', v.toLowerCase() + ' added.'); })
+      .catch(function (err) { showAlert('usersAlert', 'danger', err.message); })
+      .then(function () { btn.disabled = false; });
+  }
+  function removeAdmin(email) {
+    if (!window.confirm('Remove ' + email + ' as an admin?')) return;
+    busy(true);
+    call('adminRemoveAdmin', email).then(function (info) { renderAdmins(info); showAlert('usersAlert', 'success', email + ' removed.'); })
+      .catch(function (err) { showAlert('usersAlert', 'danger', err.message); })
+      .then(function () { busy(false); });
+  }
+
+  /* ---------- boot ---------- */
+  function wire() {
+    document.addEventListener('click', function (ev) {
+      var t = ev.target.closest ? ev.target.closest('[data-view],[data-soon],[data-edit],[data-remove]') : null;
+      if (!t) return;
+      if (t.hasAttribute('data-view')) showView(t.getAttribute('data-view'));
+      else if (t.hasAttribute('data-soon')) showAlert('globalAlert', 'info', t.getAttribute('data-soon') + ' is coming soon.');
+      else if (t.hasAttribute('data-edit')) openEdit(t.getAttribute('data-edit'));
+      else if (t.hasAttribute('data-remove')) removeAdmin(t.getAttribute('data-remove'));
+    });
+    $('brandLink').addEventListener('click', function (e) { e.preventDefault(); showView('home'); });
+    $('homeBtn').addEventListener('click', function () { showView('home'); });
+    $('itemForm').addEventListener('submit', submitItem);
+    $('f_files').addEventListener('change', function (e) {
+      Array.prototype.forEach.call(e.target.files, function (f) { APP.files.push(f); });
+      e.target.value = ''; renderFiles(); checkFiles();
+    });
+    $('itemForm').addEventListener('reset', function () {
+      APP.files = []; renderFiles(); $('fileError').textContent = '';
+      setTimeout(function () { $('f_requestDate').value = APP.config.now; FIELD_KEYS.forEach(function (k) { setFieldError(k, ''); }); }, 0);
+    });
+    $('trackForm').addEventListener('submit', submitTrack);
+    $('tblSearch').addEventListener('input', renderTable);
+    $('tblStatus').addEventListener('change', renderTable);
+    $('refreshBtn').addEventListener('click', loadDashboard);
+    $('exportBtn').addEventListener('click', exportXlsx);
+    $('editSave').addEventListener('click', saveEdit);
+    $('addAdminForm').addEventListener('submit', addAdmin);
+  }
+
+  function boot() {
+    wire();
+    busy(true);
+    call('getAppConfig').then(function (cfg) {
+      APP.config = cfg;
+      document.title = cfg.title;
+      if (cfg.logoUrl) { var img = $('logoImg'); img.src = cfg.logoUrl; img.hidden = false; $('logoBadge').hidden = true; }
+      $('whoAmI').textContent = cfg.user.email ? 'Signed in: ' + cfg.user.email + (cfg.user.isAdmin ? ' (admin)' : '') : '';
+      var tags = document.querySelectorAll('.admin-tag');
+      for (var i = 0; i < tags.length; i++) tags[i].hidden = !cfg.user.isAdmin;
+      initForm();
+      var v = document.body.getAttribute('data-initial-view') || 'home';
+      showView(v);
+    }).catch(function (err) {
+      showView('home');
+      showAlert('globalAlert', 'danger', 'The portal could not load its settings: ' + err.message);
+    }).then(function () { busy(false); });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>

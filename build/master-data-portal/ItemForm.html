@@ -1,0 +1,89 @@
+<!-- Item Creation view (included by Index.html). Dropdown lists come from CONFIG.OPTIONS in Code.gs. -->
+<section id="view-item" class="vp-view">
+  <h1 class="h4 mb-3">Item Creation Request</h1>
+  <div id="itemAlert"></div>
+  <div id="itemSuccess"></div>
+  <form id="itemForm" novalidate>
+    <div class="vp-section">
+      <h2>General</h2>
+      <div class="row g-3">
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_requestDate">Request Date</label>
+          <input type="text" class="form-control" id="f_requestDate" name="requestDate" readonly><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_requestorName">Requestor Name</label>
+          <input type="text" class="form-control" id="f_requestorName" name="requestorName" maxlength="100" autocomplete="name"><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_department">Department</label>
+          <select class="form-select" id="f_department" name="department" data-options="department"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-6"><label class="form-label" for="f_email">Email ID</label>
+          <input type="email" class="form-control" id="f_email" name="email" maxlength="254" autocomplete="email"><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-6"><label class="form-label" for="f_mobile">Mobile Number</label>
+          <input type="tel" class="form-control" id="f_mobile" name="mobile" maxlength="15" inputmode="numeric" autocomplete="tel" placeholder="10-digit mobile"><div class="invalid-feedback"></div></div>
+      </div>
+    </div>
+
+    <div class="vp-section">
+      <h2>Item Master</h2>
+      <div class="row g-3">
+        <div class="col-12"><label class="form-label" for="f_itemDescription">Item Description</label>
+          <input type="text" class="form-control" id="f_itemDescription" name="itemDescription" maxlength="200"><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_design">Design</label>
+          <input type="text" class="form-control" id="f_design" name="design" maxlength="100"><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_finish">Finish</label>
+          <select class="form-select" id="f_finish" name="finish" data-options="finish"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_thickness">Thickness (mm)</label>
+          <input type="text" class="form-control" id="f_thickness" name="thickness" inputmode="decimal" maxlength="12" autocomplete="off"><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_thicknessType">Thickness Type</label>
+          <select class="form-select" id="f_thicknessType" name="thicknessType" data-options="thicknessType"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_size">Size</label>
+          <select class="form-select" id="f_size" name="size" data-options="size"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_length">Length</label>
+          <input type="text" class="form-control" id="f_length" name="length" inputmode="decimal" maxlength="12" autocomplete="off"><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_width">Width</label>
+          <input type="text" class="form-control" id="f_width" name="width" inputmode="decimal" maxlength="12" autocomplete="off"><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_brand">Brand</label>
+          <select class="form-select" id="f_brand" name="brand" data-options="brand"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_hsnCode">HSN Code</label>
+          <input type="text" class="form-control" id="f_hsnCode" name="hsnCode" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="4, 6 or 8 digits"><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_factory">Factory</label>
+          <select class="form-select" id="f_factory" name="factory" data-options="factory"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_plantCode">Plant Code</label>
+          <select class="form-select" id="f_plantCode" name="plantCode" data-options="plantCode"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_purchaseGroup">Purchase Group</label>
+          <select class="form-select" id="f_purchaseGroup" name="purchaseGroup" data-options="purchaseGroup"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_itemCategory">Item Category</label>
+          <select class="form-select" id="f_itemCategory" name="itemCategory" data-options="itemCategory"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_priceGroupName">Price Group Name</label>
+          <select class="form-select" id="f_priceGroupName" name="priceGroupName" data-options="priceGroupName"></select><div class="invalid-feedback"></div></div>
+      </div>
+    </div>
+
+    <div class="vp-section">
+      <h2>Additional</h2>
+      <div class="row g-3">
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_baseUom">Base Unit of Measure</label>
+          <select class="form-select" id="f_baseUom" name="baseUom" data-options="baseUom"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_materialGroup">Material Group</label>
+          <select class="form-select" id="f_materialGroup" name="materialGroup" data-options="materialGroup"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="f_gstPercent">GST %</label>
+          <select class="form-select" id="f_gstPercent" name="gstPercent" data-options="gstPercent"></select><div class="invalid-feedback"></div></div>
+        <div class="col-12 col-sm-6 col-lg-6"><label class="form-label" for="f_preferredVendor">Preferred Vendor</label>
+          <input type="text" class="form-control" id="f_preferredVendor" name="preferredVendor" maxlength="100"><div class="invalid-feedback"></div></div>
+        <div class="col-12"><label class="form-label" for="f_remarks">Remarks</label>
+          <textarea class="form-control" id="f_remarks" name="remarks" rows="3" maxlength="1000"></textarea><div class="invalid-feedback"></div></div>
+      </div>
+    </div>
+
+    <div class="vp-section">
+      <h2>Attachments</h2>
+      <label class="form-label" for="f_files">Drawings / PDF / Images</label>
+      <input type="file" class="form-control" id="f_files" multiple>
+      <div class="form-text" id="fileHelp"></div>
+      <div id="fileList"></div>
+      <div class="text-danger small mt-1" id="fileError"></div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-end">
+      <button type="reset" class="btn btn-outline-secondary" id="resetBtn">Clear</button>
+      <button type="submit" class="btn btn-primary" id="submitBtn">Submit request</button>
+    </div>
+  </form>
+</section>

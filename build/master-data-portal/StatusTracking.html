@@ -1,0 +1,18 @@
+<!-- Request Status Tracking view (included by Index.html) -->
+<section id="view-status" class="vp-view">
+  <h1 class="h4 mb-3">Request Status Tracking</h1>
+  <div class="vp-section">
+    <form id="trackForm" class="row g-2 align-items-end" novalidate>
+      <div class="col-12 col-md-8">
+        <label for="trackQuery" class="form-label">Request Number or E-mail ID</label>
+        <input type="text" class="form-control" id="trackQuery" maxlength="254" placeholder="VIR-MAT-00001 or name@company.com" autocomplete="off">
+      </div>
+      <div class="col-12 col-md-4 d-grid">
+        <button type="submit" class="btn btn-primary" id="trackBtn">Search</button>
+      </div>
+    </form>
+    <div class="form-text mt-2">E-mail search shows only requests raised with that e-mail address.</div>
+  </div>
+  <div id="trackAlert"></div>
+  <div id="trackResults"></div>
+</section>
