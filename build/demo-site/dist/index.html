@@ -667,6 +667,7 @@ function periodOptions(){
   return o;
 }
 function updateUploadPeriods(){var el=$('#u-period');if(el&&U&&U.stage!=='validating'&&U.stage!=='loading'){var v=el.value;el.innerHTML=periodOptions();el.value=U.period}}
+function oxMonthList(r){var m={};try{r.pm.forEach(function(P){m[P.ym]=1})}catch(e){}return Object.keys(m).sort()}
 function oxMonthsOf(r){var m={};try{r.pm.forEach(function(P){m[P.ym]=1})}catch(e){}return Object.keys(m).sort().map(function(x){return ymLabel(x)}).join(', ')||'the months in the file'}
 function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:'auto',entity:'INV',file:null,name:'',size:0,headers:[],rows:[],sys:null,map:{},savedMap:false,res:null,msg:'',closeAfter:true,reason:'',confirmDates:false,anyway:false,confirmReplace:false,swapSerial:false,expMonth:'auto',progress:0,progressMsg:''}}
 function renderUpload(){var _e=$('#i-upload');withScroll(_e,renderUpload0)}
@@ -745,6 +746,8 @@ function resultHtml(){
   }
   h+='<div class="grid2"><div><h3 class="note" style="margin:0 0 6px">By quarter (split by document date)</h3><div class="tw"><table><thead><tr><th>Quarter</th><th class="num">Rows</th><th class="num">Plants</th><th class="num">Months</th><th>Status</th></tr></thead><tbody>'+qrows+'</tbody></table></div></div>'
    +'<div><h3 class="note" style="margin:0 0 6px">By product group (in scope)</h3><div class="tw"><table><thead><tr><th>Group</th><th class="num">Lines</th><th class="num">Net value</th></tr></thead><tbody>'+grows+'</tbody></table></div></div></div>';
+  var lockedM=cnLockedIn(oxMonthList(r));
+  if(lockedM.length)h+='<div class="banner err" style="display:block"><b>Locked: '+esc(lockedM.map(ymLabel).join(', '))+'.</b> Credit notes are locked for these months, so their sales cannot be replaced. A Super admin must unlock them (Data Intake › Credit-note locks) first. This file is not loaded.</div>';
   var closedQs=qs.filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
   if(closedQs.length)h+='<div class="banner err" style="display:block"><b>Closed quarter in this file: '+closedQs.map(qLabel).join(', ')+'.</b> Reloading a closed quarter needs Super admin and is logged. <div class="note" style="color:inherit">This will <b>replace the real sales</b> of '+esc(oxMonthsOf(r))+' with the rows of <b>'+esc(U.name)+'</b>. Check that this file is a sales export.</div><div class="fld" style="margin-top:8px"><label for="u-reason">Reason for reload (required, at least 10 characters; a bare YES is not accepted)</label><input id="u-reason" class="in" data-chg="reason" value="'+esc(U.reason)+'" '+(locked?'disabled':'')+'></div></div>';
   h+='<label class="chip" style="align-self:flex-start"><input type="checkbox" id="u-docs" data-chg="keepdocs" '+(U.keepDocs===false?'':'checked')+' '+(locked?'disabled':'')+'> Keep the document index (needed to drill down to a source document; uses most of the storage)</label>';
@@ -1128,6 +1131,7 @@ async function packChunks(sys,P){
 }
 async function runLoad(opts){
   var r=U.res,sys=U.sys,demo=!!opts.demo,by=whoAmI();
+  var lkS=cnLockedIn(oxMonthList(r));if(lkS.length){var lm='credit notes are locked for '+lkS.map(ymLabel).join(', ')+'; unlock them first. Nothing was changed.';toast(lm);throw new Error(lm)}
   if(demo&&hasRealData()){toast(DEMO_OFF_MSG);throw new Error(DEMO_OFF_MSG)}
   U.stage='loading';cancelFlag=false;U.progress=0;U.progressMsg='Preparing...';renderUpload();await tick();
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -4300,7 +4304,9 @@ var CN_FIELDS=[
 function cnMapKey(sys,layout){return sys+'_creditnote_'+String(layout||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
 function cnDetectB1(headers){
   var set={};headers.forEach(function(h){set[norm(h)]=1});
-  return set['docnum']&&set['docdate']&&set['cardcode']&&set['itemcode']&&set['linetotal']&&set['baseref']&&!set['invoice type']&&!set['catagory']?{kind:'cn',sys:'B1',layout:'B1 credit notes (ORIN / RIN1)'}:null;
+  /* credit notes reference the base invoice: BaseRef, or the RefNo / RefDate pair of the credit-note register; sales lines carry neither */
+  var base=set['baseref']||(set['refno']&&set['refdate']);
+  return set['docnum']&&set['docdate']&&set['cardcode']&&set['itemcode']&&set['linetotal']&&base&&!set['invoice type']?{kind:'cn',sys:'B1',layout:'B1 credit notes (ORIN / RIN1)'}:null;
 }
 function cnS4Share(headers,rows){
   var ix=headerIndex(headers),bi=ix['billing type'];if(bi==null)return 0;var n=0,non=0;
@@ -4540,6 +4546,10 @@ function creditLike(name,headers,rows,sheetsSeen,sheetPicked){
   var cols=Object.keys(ix).filter(function(k){return /doc ?type|document type|invoice type|trans ?type|object|billing type/.test(k)});
   for(var c=0;c<cols.length;c++){var ci=ix[cols[c]],hit=0,seen=0;for(var i=1;i<n;i++){var v=String(rows[i][ci]==null?'':rows[i][ci]).trim();if(!v)continue;seen++;if(/credit note|credit memo|a\/r credit|^orin$|^14$/i.test(v)||(/billing type/.test(cols[c])&&/^(g2|re)$/i.test(v)))hit++}
     if(seen&&hit/seen>0.5)return 'the '+cols[c]+' column says credit note'}
+  /* by content: the account columns name a credit memo, or the RefNo / RefDate pair references a base invoice next to docnum */
+  var ac=Object.keys(ix).filter(function(k){return /^(acctname|account|account name)$/.test(k)});
+  for(var a=0;a<ac.length;a++){var ai=ix[ac[a]],h2=0,s2=0;for(var j=1;j<n;j++){var w=String(rows[j][ai]==null?'':rows[j][ai]).trim();if(!w)continue;s2++;if(/credit (memo|note)|sales return|a\/r credit/i.test(w))h2++}if(s2&&h2/s2>0.5)return 'the '+ac[a]+' column names a credit memo'}
+  if(ix['docnum']!=null&&ix['refno']!=null&&ix['refdate']!=null)return 'RefNo and RefDate point to the original invoice (sales lines have none)';
   return '';
 }
 Object.assign(handlers,{
@@ -5883,6 +5893,7 @@ function canLoad(r,locked){
   if(!r||!(r.good>0)||locked)return false;
   var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
   if(closedQs.length&&U.reason.trim().length<10)return false;
+  if(cnLockedIn(oxMonthList(r)).length)return false;/* D61: months whose credit notes are locked cannot be replaced by a sales load */
   if(replaceRisk(r).length&&!U.confirmReplace)return false;
   return true;
 }
@@ -5942,7 +5953,17 @@ function undoDialog0(uid){
    +'<p class="note">Undo cannot bring back what this upload replaced. Any month it overwrote lost its earlier figures, so upload those months again. Months it created are simply removed. '+(pl.later?pl.later+' plant-month'+(pl.later===1?'':'s')+' written by this upload were already replaced by a later upload; those are left alone. ':'')+(u.closedQuarters&&u.closedQuarters.length?'Quarters it closed ('+esc(u.closedQuarters.map(qLabel).join(', '))+') stay closed; reopen them in the coverage grid if needed. ':'')+'</p>'
    +'<div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'" '+(sa&&pl.n+(pl.act?1:0)+pl.fus.length>=0?'':'disabled')+'>Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');
 }
-async function undoUpload(uid){
+/* D61: nothing is deleted before the backup is checked. An incomplete backup stops a plain or bulk undo; only the explicit "Undo and remove these months" click (opts.confirmIncomplete) goes on, and then nothing is restored. */
+async function undoUpload(uid,opts){
+  if(!superOnly('undo an upload'))return;
+  var us0=S.uploads.find(function(x){return x._id===uid});
+  if(us0&&(us0.entity||'INV')==='INV'){var lk0=cnLockedIn(((undoPlan(uid)||{}).months)||[]);if(lk0.length){var m0='credit notes are locked for '+lk0.map(ymLabel).join(', ')+'; a Super admin must unlock them (Data Intake › Credit-note locks) before this sales upload can be undone. Nothing was changed.';var e0=document.getElementById('d-err');if(e0)e0.innerHTML='<div class="banner err">Undo stopped: '+esc(m0)+'</div>';throw new Error(m0)}}
+  if(bkHas(uid)){var c0=bkCheck(uid);
+    if(!c0.ok&&!(opts&&opts.confirmIncomplete)){var m1='Backup incomplete for '+((us0&&us0.file)||uid)+': '+(c0.have||0)+' of '+(c0.of||'?')+' parts are usable. Nothing was changed; use "Undo and remove these months" on that upload to remove its months without restoring.';var e1=document.getElementById('d-err');if(e1)e1.innerHTML='<div class="banner err">Undo stopped: '+esc(m1)+'</div>';throw new Error(m1)}}
+  S.bkAllowIncomplete=!!(opts&&opts.confirmIncomplete);
+  try{return await undoUpload0(uid)}finally{S.bkAllowIncomplete=false}
+}
+async function undoUpload0(uid){
   if(!superOnly('undo an upload'))return;
   var us=S.uploads.find(function(x){return x._id===uid});
   if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],us.entity==='RC'?'snap':null,'<p>The data this upload held was removed. Upload the file again if you still need it.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
@@ -5977,7 +5998,7 @@ async function undoUpload(uid){
 }
 Object.assign(handlers,{
  'hist-undo':function(t){undoDialog(t.getAttribute('data-id'))},
- 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'))},
+ 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'),{confirmIncomplete:true})},
  'u-swap-serial':async function(){if(!U||!U.res)return;U.swapSerial=true;U.stage='validating';U.progressMsg='Reading date cells swapped...';renderUpload();await runValidation()},
  'u-unswap':async function(){if(!U||!U.res)return;U.swapSerial=false;U.stage='validating';renderUpload();await runValidation()}
 });
@@ -6196,7 +6217,7 @@ function bkHas(uid){return S.backups.some(function(d){return d.upload===uid})}
 /* restore the saved documents for which allow(path) is true; cell entries of sales plant-months are returned for the caller to merge */
 async function bkRestore(uid,allow){
   var docs=bkFor(uid),n=0,cells=[];S.bkLast={units:0,incomplete:false};
-  var chk=bkCheck(uid);if(!chk.ok){S.bkLast.incomplete=true;return {n:0,cells:[],incomplete:true}}
+  var chk=bkCheck(uid);if(!chk.ok){S.bkLast.incomplete=true;if(!S.bkAllowIncomplete)throw new Error('Backup incomplete: nothing was restored and the backup is kept.');return {n:0,cells:[],incomplete:true}}
   var parts={};
   for(var i=0;i<docs.length;i++){var items=JSON.parse(await ungz(docs[i].z));
     for(var j=0;j<items.length;j++){var it=items[j];
