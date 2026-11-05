@@ -32,6 +32,7 @@ related:
 | Wed 4 Nov 13:45 | Mock-up v3: thickness, brand, collections, branch rating cards (D55) | Product Designer | published 13:19; awaiting approval |
 | Thu 5 Nov 13:00 | v41: credit-note files blocked in sales intake, CN lock, bulk Undo (D60) | Full-Stack Engineer | published 12:13; QA FAIL on undo integrity (D61); v42 12:37, QA passed (D63); Undo cleared |
 | Thu 5 Nov (after Undo) | Sales Apr 2025–Sep 2026 restored; credit notes loaded as credit notes and locked | Vijay + Delivery Lead | open |
+| Thu 5 Nov 23:30 | Desk on Google Apps Script (D66): backup download in claude.ai Desk, restore + Apps Script project in Vijay's Drive, QA passed, Drive link sent | Full-Stack Engineer + Engineering QA | building |
 
 ## Milestones
 **M0 Discovery**
