@@ -94,8 +94,8 @@
     groups.forEach(function (g) {
       call('deskWrite', [g.map(function (w) { return w.op; })]).then(function (r) {
         var bump = {};
-        g.forEach(function (w) { var c = cols[w.op.col]; if (c && c.loaded) { if (w.op.op === 'set') c.docs.set(w.op.id, JSON.parse(w.op.json)); else c.docs.delete(w.op.id); } bump[w.op.col] = 1; });
-        Object.keys(bump).forEach(function (n) { var c = cols[n]; if (!c) return; var rv = r.revs[n]; if (c.loaded && rv === c.rev + 2) c.rev = rv; else c.stale = true; if (c.subs.length) { if (c.loaded) emit(c); if (c.stale) refresh(c); } });
+        g.forEach(function (w) { var c = cols[w.op.col]; if (c && c.loaded) { if (w.op.op === 'set') c.docs.set(w.op.id, JSON.parse(w.op.json)); else if (w.op.op === 'delete') c.docs.delete(w.op.id); else c.stale = true; } bump[w.op.col] = 1; });
+        Object.keys(bump).forEach(function (n) { var c = cols[n]; if (!c) return; var rv = r.revs[n]; if (c.loaded && !c.stale && rv === c.rev + 2) c.rev = rv; else c.stale = true; if (c.subs.length) { if (c.loaded) emit(c); if (c.stale) refresh(c); } });
         g.forEach(function (w) { w.res(); });
       }, function (e) { g.forEach(function (w) { w.rej(e); }); });
     });
@@ -126,7 +126,16 @@
         arm();
         return function () { c.subs = c.subs.filter(function (x) { return x !== s; }); };
       },
-      get: async function () { var c = C(name); if (!c.loaded) await refresh(c); if (!c.loaded) throw { code: 'unavailable', message: 'could not read ' + name }; return makeSnap(c, q); }
+      /* the cache is used only for a collection that is live-subscribed (kept fresh by polling) AND whose server revision is unchanged; otherwise fetch */
+      get: async function () {
+        var c = C(name);
+        if (c.loaded && c.subs.length && !c.stale) {
+          try { var rv = await call('deskRevs', []); if ((rv.revs[name] || 0) === c.rev) return makeSnap(c, q); } catch (e) { /* fall through to a fetch */ }
+        }
+        await refresh(c);
+        if (!c.loaded) throw { code: 'unavailable', message: 'could not read ' + name };
+        return makeSnap(c, q);
+      }
     };
   }
   function docRef(path) {
@@ -134,7 +143,7 @@
     return {
       get: async function () { var j = await getDoc(path); var o = j == null ? undefined : JSON.parse(j); return { id: id, exists: j != null, data: function () { return o; } }; },
       set: function (d) { var j = JSON.stringify(d); if (j.length > 262144) return Promise.reject({ code: 'invalid_argument', message: 'Document too large' }); return write({ op: 'set', col: col, id: id, json: j }); },
-      update: async function (d) { var s = await this.get(); if (!s.exists) throw { code: 'invalid_argument', message: 'missing' }; return write({ op: 'set', col: col, id: id, json: JSON.stringify(Object.assign({}, s.data(), d)) }); },
+      update: function (d) { return write({ op: 'merge', col: col, id: id, json: JSON.stringify(d) }); }, /* merged on the server under the write lock */
       delete: function () { return write({ op: 'delete', col: col, id: id }); }
     };
   }

@@ -8,8 +8,9 @@ Two files are used because Apps Script keeps server code (`.gs`) and page (`.htm
 2. Project Settings (gear): tick **Show "appsscript.json" manifest file**. Open `appsscript.json`, replace everything with `appsscript.json.txt`.
 3. Open `Code.gs`, select all, paste `Desk-Code.gs.txt`.
 4. **+ Add a file > HTML**, name it exactly `Index`. Select all, paste `Desk-Index.txt`. (It is about 1.4 MB; the editor may take a minute.)
-5. **Deploy > New deployment > Web app.** Execute as: **Me**. Who has access: **Anyone in virgoasia.com**. Deploy, accept the permission prompt (Spreadsheets, your email).
-6. Copy the **Web app URL** (ends `/exec`). Open it once as yourself. The first open creates the database spreadsheet "Virgo Desk database (do not edit)" in your Drive.
+5. In the toolbar pick the function **setup** and press **Run**. Accept the permission prompt (Google Sheets and your email address). This creates the database spreadsheet "Virgo Desk database (do not edit)" in your Drive, once. It is safe to run again.
+6. **Deploy > New deployment > Web app.** Execute as: **Me**. Who has access: **Anyone in virgoasia.com**. Deploy.
+7. Copy the **Web app URL** (ends `/exec`) and open it as yourself. Then add the other users in Admin > Users.
 
 ## Every later Desk version (same link)
 1. Open the project, open `Index`, select all, paste the new `Desk-Index.txt`. Save.
@@ -24,9 +25,11 @@ Paste `Desk-Code.gs.txt` the same way only if it was re-issued.
 
 ## Good to know
 - Access is by the Users list in Admin. Anyone else in the domain sees "Ask your admin for access" and receives no data.
-- Only a Super admin can write the admin collections; the server refuses everyone else.
+- Only a Super admin can write the admin collections; the server refuses everyone else. `planlocks` is Super admin or Management / HO only. For `actions` and `followups` the server applies the page's own rules (owner, assigner, the owner's reports-to chain, HOD of the department, Branch manager of the plant, Management, Super admin; a followup also by its recipient).
+- **Not enforced on the server (same as claude.ai today):** field-level changes inside a document an allowed person may write; approver differs from proposer; closed and locked quarters; `potential` and `log` are open to any active user; the audit trail is written by the page, not the server.
 - **Reads are not filtered by row.** A signed-in user with a role can read every collection through browser tools, as on claude.ai today.
 - Other people's changes appear within about 30 seconds (the page checks a small revision map and re-reads only what changed).
 - If someone has several Google accounts open, the link may open under the wrong one; use a private window or `/u/1/`.
 - The database is one spreadsheet with one sheet per collection (`c_inv`, `c_users` ...), plus two Script Properties (`DESK_SHEET_ID`, `DESK_REVS`). Do not edit it by hand. Its link is in your Drive.
 - If a save fails with "database is full" or "quota", tell the Delivery Lead: Google Sheets and Apps Script have size and daily limits that this page cannot raise.
+- **Store size / slow first load:** Admin > Tools > **Measure store size** shows documents and characters per collection. If the first page load is slow or a read fails, lower `PAGE_CHARS` at the top of `Code.gs` (for example from 2500000 to 1000000), paste, and make a New version.

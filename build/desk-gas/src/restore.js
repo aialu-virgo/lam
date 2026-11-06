@@ -9,6 +9,7 @@
   function sup() { return !!(X.isSuper && X.isSuper()); }
   function fmtN(n) { return Number(n).toLocaleString('en-IN'); }
   function guard(ev) { ev.preventDefault(); ev.returnValue = ''; return ''; }
+  X.sizes = async function () { var r = await window.__gasCall('deskSizes', []); return { cols: r.cols, note: 'Apps Script pages are ' + (r.pageChars / 1e6).toFixed(1) + ' M characters (PAGE_CHARS in Code.gs).' }; };
   X.toolsHtml = function () {
     if (!sup()) return '';
     var h = '<section class="card"><div class="hd"><h2>Restore from backup</h2></div>'

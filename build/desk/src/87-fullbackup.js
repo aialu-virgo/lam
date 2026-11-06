@@ -3,7 +3,9 @@
  * (documents, characters and a CRC-32 per collection; bytes and CRC-32 per file). The files are built in this browser tab and saved to the
  * viewer's own computer; nothing is sent anywhere. Doc ids and contents are kept exactly as stored.
  * Checksum of a collection: the sum (mod 2^32, 8 hex digits) of the CRC-32 of id + "\n" + JSON.stringify(data) + "\n" over its documents, so it does not depend on document order.
- * After the export every collection is counted again; any change during the export is flagged in the page and in the manifest (changedDuringExport). */
+ * Every read goes to the source database ({source:'server'}), never to a cached copy. After the export every collection is read AGAIN from the source and compared with the first read
+ * (documents, characters and checksum); any difference, including an edit that changes no count, is flagged in the page and in the manifest (changedDuringExport).
+ * Admin > Tools > "Store size" measures documents and characters per collection (a fresh read here; the Apps Script build asks its server instead). */
 var FB_COLS=['users','plants','periods','cells','mappings','uploads','transfers','potential','planlocks','audit','actions','followups','settings','phasing','roll','receivables','collections','backups','customers','creditnotes','stock','itemmeta','salesmaster','inv','items','rejects','log','orders','deliveries'];
 var FB_MAX=window.__FB_MAX||20000000;
 S.fb={stage:'idle',msg:'',pct:0,files:null,manifest:null};
@@ -16,7 +18,7 @@ function fbSumHex(n){return ('0000000'+(n>>>0).toString(16)).slice(-8)}
 function fbOk(){return viewerRole()==='Super admin'&&!readOnly()}
 async function fbReadAll(col){
   var q=S.db.collection(col);
-  var snap=q.get?await dbRetry(function(){return q.get()}):await new Promise(function(res,rej){var un=q.onSnapshot(function(s){try{un&&un()}catch(e){}res(s)},rej)});
+  var snap=q.get?await dbRetry(function(){return q.get({source:'server'})}):await new Promise(function(res,rej){var un=q.onSnapshot(function(s){try{un&&un()}catch(e){}res(s)},rej)});
   return snap.docs.map(function(d){return {id:d.id,data:d.data()||{}}}).sort(function(a,b){return a.id<b.id?-1:a.id>b.id?1:0});
 }
 async function fbMake(){
@@ -31,6 +33,7 @@ async function fbMake(){
       var text='{"kind":"virgo-desk-backup-part","v":1,"stamp":"'+stamp+'","part":'+n+',"docs":['+cur.join(',')+']}';
       files.push({name:name,text:text,docs:cur.length,saved:false});cur=[];curLen=0;
     }
+    var st1={};
     for(var ci=0;ci<FB_COLS.length;ci++){
       var col=FB_COLS[ci];F.msg='Reading '+col+' ('+(ci+1)+' of '+FB_COLS.length+')';F.pct=Math.round(ci/FB_COLS.length*100);schedule();
       var docs=await fbReadAll(col),sum=0,chars=0,fnames={};
@@ -40,11 +43,19 @@ async function fbMake(){
         if(curLen&&curLen+e.length>(window.__FB_MAX||FB_MAX))flush();
         cur.push(e);curLen+=e.length;fnames[files.length]=1;
       }
+      st1[col]={docs:docs.length,chars:chars,sum:sum};
       man.collections[col]={docs:docs.length,chars:chars,sumcrc32:fbSumHex(sum),files:Object.keys(fnames).map(function(k){return +k})};
     }
     flush();
     var changed=[];
-    for(var cj=0;cj<FB_COLS.length;cj++){F.msg='Checking '+FB_COLS[cj]+' again';F.pct=Math.round(cj/FB_COLS.length*100);schedule();var again=(await fbReadAll(FB_COLS[cj])).length;if(again!==man.collections[FB_COLS[cj]].docs)changed.push({collection:FB_COLS[cj],before:man.collections[FB_COLS[cj]].docs,after:again})}
+    for(var cj=0;cj<FB_COLS.length;cj++){
+      var c2=FB_COLS[cj];F.msg='Checking '+c2+' again';F.pct=Math.round(cj/FB_COLS.length*100);schedule();
+      var d2=await fbReadAll(c2),sum2=0,chars2=0;
+      for(var k2=0;k2<d2.length;k2++){var j2=JSON.stringify(d2[k2].data);sum2=(sum2+fbDocCrc(d2[k2].id,j2))%4294967296;chars2+=j2.length}
+      var a1=st1[c2];
+      if(d2.length!==a1.docs)changed.push({collection:c2,kind:'documents',before:a1.docs,after:d2.length});
+      else if(chars2!==a1.chars||sum2!==a1.sum)changed.push({collection:c2,kind:'content',before:a1.docs,after:d2.length});
+    }
     man.changedDuringExport=changed;F.changed=changed;
     files.forEach(function(f,i){f.bytes=new Blob([f.text]).size;f.crc32=fbCrcOf(f.text);man.files.push({name:f.name,bytes:f.bytes,crc32:f.crc32,docs:f.docs})});
     Object.keys(man.collections).forEach(function(c){man.collections[c].files=man.collections[c].files.map(function(i){return files[i].name})});
@@ -61,6 +72,24 @@ async function fbSaveFile(i){
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([f.text],{type:'application/json'}));a.download=f.name;document.body.appendChild(a);a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},4000);f.saved=true;
 }
+async function fbSizes(){
+  var F=S.fb;if(!fbOk()||F.sizeBusy)return;F.sizeBusy=true;F.size=null;S.lastHtml='';schedule();
+  try{
+    var X=window.__deskExt,rows=[],note='';
+    if(X&&X.sizes){var r=await X.sizes();Object.keys(r.cols).forEach(function(c){rows.push({c:c,docs:r.cols[c].docs,chars:r.cols[c].chars})});note=r.note||''}
+    else for(var i=0;i<FB_COLS.length;i++){var d=await fbReadAll(FB_COLS[i]),ch=0;d.forEach(function(x){ch+=JSON.stringify(x.data).length});if(d.length)rows.push({c:FB_COLS[i],docs:d.length,chars:ch})}
+    rows.sort(function(a,b){return b.chars-a.chars});F.size={rows:rows,note:note}
+  }catch(e){F.size={err:dbErrText(e)}}
+  F.sizeBusy=false;S.lastHtml='';schedule();
+}
+function fbSizeHtml(){
+  var F=S.fb,h='<section class="card"><div class="hd"><h2>Store size</h2></div><p class="note">Documents and characters of stored JSON per collection, so the first live run shows real sizes.</p><div class="row"><button class="btn" data-act="fb-size"'+(F.sizeBusy?' disabled':'')+'>'+(F.sizeBusy?'Measuring...':'Measure store size')+'</button></div>';
+  if(F.size&&F.size.err)h+='<div class="banner warn"><span>'+esc(F.size.err)+'</span></div>';
+  if(F.size&&F.size.rows){var tot=0,td=0;h+='<div class="tw"><table><thead><tr><th>Collection</th><th class="num">Documents</th><th class="num">Characters</th><th class="num">MB</th></tr></thead><tbody>';
+    F.size.rows.forEach(function(r){tot+=r.chars;td+=r.docs;h+='<tr><td>'+esc(r.c)+'</td><td class="num">'+fmtN(r.docs)+'</td><td class="num">'+fmtN(r.chars)+'</td><td class="num">'+(r.chars/1048576).toFixed(2)+'</td></tr>'});
+    h+='<tr><td><b>Total</b></td><td class="num"><b>'+fmtN(td)+'</b></td><td class="num"><b>'+fmtN(tot)+'</b></td><td class="num"><b>'+(tot/1048576).toFixed(2)+'</b></td></tr></tbody></table></div>';if(F.size.note)h+='<p class="note">'+esc(F.size.note)+'</p>'}
+  return h+'</section>';
+}
 function fbHtml(){
   if(!fbOk())return '';
   var F=S.fb,h='<section class="card"><div class="hd"><h2>Full backup</h2></div>'
@@ -68,7 +97,7 @@ function fbHtml(){
    +'<div class="row"><button class="btn pri" data-act="fb-make"'+(F.stage==='working'?' disabled':'')+'>'+(F.stage==='ready'?'Make a new backup':'Download full backup')+'</button>'
    +(F.stage==='working'?'<progress max="100" value="'+F.pct+'" style="width:220px"></progress> <span class="note">'+esc(F.msg)+'</span>':'')+'</div>';
   if(F.stage==='working'||F.stage==='ready')h+='<div class="banner warn"><span><b>Do not upload files or edit anything on this Desk</b> until the backup has been restored on the new Desk. Anything changed after the download is not in the backup.</span></div>';
-  if(F.changed&&F.changed.length)h+='<div class="banner warn"><span><b>Data changed while the backup was being made</b> ('+F.changed.map(function(c){return esc(c.collection)+' '+c.before+' to '+c.after}).join(', ')+'). Make the backup again.</span></div>';
+  if(F.changed&&F.changed.length)h+='<div class="banner warn"><span><b>Data changed while the backup was being made</b> ('+F.changed.map(function(c){return esc(c.collection)+(c.kind==='content'?' (edited)':' '+c.before+' to '+c.after)}).join(', ')+'). Make the backup again.</span></div>';
   if(F.stage==='error')h+='<div class="banner warn"><span>Backup failed: '+esc(F.msg)+'</span></div>';
   if(F.stage==='ready'){
     var docs=0;Object.keys(F.manifest.collections).forEach(function(c){docs+=F.manifest.collections[c].docs});
@@ -76,12 +105,13 @@ function fbHtml(){
     F.files.forEach(function(f,i){h+='<tr><td>'+esc(f.name)+'</td><td class="num">'+(f.manifest?'manifest':fmtN(f.docs))+'</td><td class="num">'+fmtBytes(f.bytes)+'</td><td><button class="btn sm" data-act="fb-save" data-i="'+i+'">'+(f.saved?'Saved, save again':'Save')+'</button></td></tr>'});
     h+='</tbody></table></div><div class="row"><button class="btn" data-act="fb-saveall">Save all files</button></div>';
   }
-  h+='</section>';
+  h+='</section>'+fbSizeHtml();
   var ext=window.__deskExt&&window.__deskExt.toolsHtml;if(ext){try{h+=ext()}catch(e){}}
   return h;
 }
 Object.assign(handlers,{
  'fb-make':function(){return fbMake()},
+ 'fb-size':function(){return fbSizes()},
  'fb-save':async function(t){if(!fbOk())return;await fbSaveFile(+t.getAttribute('data-i'));S.lastHtml='';schedule()},
  'fb-saveall':async function(){if(!fbOk())return;for(var i=0;i<S.fb.files.length;i++){await fbSaveFile(i);await sleep(400)}S.lastHtml='';schedule()}
 });

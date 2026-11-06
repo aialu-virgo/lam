@@ -21,8 +21,9 @@ const ADMIN = ['periods','audit','settings','users','plants','cells','inv','roll
 let refused = 0; ADMIN.forEach(c => { const x = E.call('deskWrite', [[set(c, 'x', { a: 1 })]]); if (!x.ok && x.code === 'permission_denied') refused++; });
 ok('non-admin refused on all ' + ADMIN.length + ' admin collections', refused === ADMIN.length, refused);
 ok('the 21 named admin collections are all in the list', ['periods','audit','settings','users','plants','cells','inv','roll','mappings','transfers','uploads','rejects','items','itemmeta','salesmaster','phasing','orders','deliveries','receivables','collections','stock'].every(c => ADMIN.includes(c)));
-r = E.call('deskWrite', [[set('log', 'l1', { t: 1 }), set('potential', 'p1', { v: 2 }), set('actions', 'a1', { x: 1 }), set('followups', 'f1', { x: 1 }), set('planlocks', 'FY27-Q3', { x: 1 })]]);
-ok('non-admin can write the 5 shared collections', r.ok, JSON.stringify(r));
+r = E.call('deskWrite', [[set('log', 'l1', { t: 1 }), set('potential', 'p1', { v: 2 }), set('actions', 'a1', { assigner: 'se@virgoasia.com', owner: 'se@virgoasia.com' }), set('followups', 'f1', { to_email: 'se@virgoasia.com' })]]);
+ok('a registered user can write potential, log, and their own actions and followups', r.ok, JSON.stringify(r));
+ok('a Sales executive cannot write planlocks', E.call('deskWrite', [[set('planlocks', 'FY27-Q3', { x: 1 })]]).code === 'permission_denied');
 r = E.call('deskWrite', [[set('log', 'l2', { t: 1 }), set('users', 'u9', { email: 'se@virgoasia.com', role: 'Super admin', active: true })]]);
 ok('a mixed batch with one refused op writes nothing', !r.ok && !('log/l2' in E.stored()), JSON.stringify(r));
 r = E.call('deskWrite', [[set('users', 'u2', { email: 'se@virgoasia.com', role: 'Super admin', active: true })]]); ok('non-admin cannot promote self', !r.ok);
@@ -102,3 +103,66 @@ const E2 = makeEnv(); E2.call('deskWrite', [[set('users', 'u1', { email: 'data@v
 r = E2.call('deskStats', []); ok('store holding only seeded users/plants counts as empty for restore', r.ok && r.seedOnly && !r.empty);
 const out = E.ctx.doGet({ parameter: { h: '/action/abc' } });
 ok('doGet injects boot data, sets title, keeps the marker out', out.title === 'Virgo Laminates Performance Desk' && out.html.includes('window.__GAS_BOOT={"email":"data@virgoasia.com"') && !out.html.includes('/*@@GAS_BOOT@@*/') && out.html.includes('"h":"/action/abc"') && out.meta[0][0] === 'viewport');
+
+/* ---------- locks: never re-entered ---------- */
+{
+  const L = makeEnv();
+  ok('the lock mock throws on re-entry (so a nested lock would fail these tests)', (() => { const l = L.ctx.LockService.getScriptLock(); l.waitLock(1); let threw = false; try { L.ctx.LockService.getScriptLock().waitLock(1); } catch (e) { threw = /re-entered/.test(e.message); } l.releaseLock(); return threw; })());
+  ok('setup() creates the database once and is safe to run again', (() => { const a = L.ctx.setup(), b = L.ctx.setup(); return a === b && !!L.sheets.info && L.props.DESK_SHEET_ID === a; })());
+  const L2 = makeEnv(); const d = L2.ctx.doGet({ parameter: {} });
+  ok('doGet creates the database when it is missing, under its own short lock', !!L2.props.DESK_SHEET_ID && d.title === 'Virgo Laminates Performance Desk');
+  const L3 = makeEnv(); const w = L3.call('deskWrite', [[set('log', 'a', { t: 1 })]]);
+  ok('the first deskWrite on a store that was never set up creates it BEFORE taking the write lock (no re-entry)', w.ok && L3.state.held === 0 && !!L3.props.DESK_SHEET_ID, JSON.stringify(w));
+  ok('write, wipe and read paths leave no lock held', (() => { L3.call('deskWipe', [['log']]); L3.call('deskWrite', [[set('log', 'b', { t: 1 })]]); return L3.state.held === 0; })());
+}
+
+/* ---------- role matrix on the server ---------- */
+{
+  const M = makeEnv();
+  const U = (email, role, extra = {}) => set('users', email.split('@')[0], { email, role, active: true, department: 'Sales', plant_codes: '', reports_to_email: '', ...extra });
+  M.call('deskWrite', [[U('data@virgoasia.com', 'Super admin'), U('mgmt@virgoasia.com', 'Management / HO', { department: 'HO' }), U('hod@virgoasia.com', 'HOD'), U('hodx@virgoasia.com', 'HOD', { department: 'Finance' }),
+    U('bm@virgoasia.com', 'Branch / depot manager', { plant_codes: '1012', reports_to_email: 'hod@virgoasia.com' }), U('se@virgoasia.com', 'Sales executive', { reports_to_email: 'bm@virgoasia.com' }), U('se2@virgoasia.com', 'Sales executive', { reports_to_email: 'hod@virgoasia.com' }), U('bm2@virgoasia.com', 'Branch / depot manager', { plant_codes: '1013' })]]);
+  const as = (e, ops) => { M.setEmail(e); return M.call('deskWrite', [ops]); };
+  ok('planlocks: Management / HO may write', as('mgmt@virgoasia.com', [set('planlocks', 'FY27-Q3', { by: 'm' })]).ok);
+  ok('planlocks: Super admin may write', as('data@virgoasia.com', [set('planlocks', 'FY27-Q4', { by: 'm' })]).ok);
+  ok('planlocks: a Sales executive, a HOD and a Branch manager are refused', ['se', 'hod', 'bm'].every(u => as(u + '@virgoasia.com', [set('planlocks', 'FY28-Q1', { by: 'x' })]).code === 'permission_denied'));
+  ok('potential and log stay open to any active user', as('se@virgoasia.com', [set('potential', 'p1', { v: 1 }), set('log', 'l1', { v: 1 })]).ok);
+  const act = { id: 'A1', owner: 'se@virgoasia.com', assigner: 'Desk rule R1', department: 'Sales', plant: '1012', status: 'Open', thread: [] };
+  ok('a HOD (global role) may create a rule-made action', as('hod@virgoasia.com', [set('actions', 'A1', act)]).ok);
+  const upd = (e, patch = {}) => as(e, [set('actions', 'A1', { ...act, ...patch })]);
+  ok('the owner may update their action', upd('se@virgoasia.com', { status: 'In progress' }).ok);
+  ok('an unrelated Sales executive is refused', upd('se2@virgoasia.com').code === 'permission_denied');
+  ok('the owner\'s manager (reports-to) may update', upd('bm@virgoasia.com').ok);
+  as('bm@virgoasia.com', [set('actions', 'A2', { id: 'A2', owner: 'se2@virgoasia.com', assigner: 'bm@virgoasia.com', department: 'Sales', plant: '1099' })]);
+  ok('the HOD of the department may update a manual action; a HOD of another department is refused', as('hod@virgoasia.com', [set('actions', 'A2', { id: 'A2', owner: 'se2@virgoasia.com', assigner: 'bm@virgoasia.com', department: 'Sales', plant: '1099', status: 'x' })]).ok && as('hodx@virgoasia.com', [set('actions', 'A2', { id: 'A2', owner: 'se2@virgoasia.com', assigner: 'bm@virgoasia.com', department: 'Sales', plant: '1099', status: 'y' })]).code === 'permission_denied');
+  ok('the Branch manager of another plant is refused; of the plant is allowed', upd('bm2@virgoasia.com').code === 'permission_denied' && upd('bm@virgoasia.com').ok);
+  ok('Management and Super admin may update any action', upd('mgmt@virgoasia.com').ok && upd('data@virgoasia.com').ok);
+  ok('a user may create an action they assign themselves, not one assigned by someone else', as('se@virgoasia.com', [set('actions', 'A3', { id: 'A3', owner: 'se2@virgoasia.com', assigner: 'se@virgoasia.com', department: 'Sales' })]).ok && as('se@virgoasia.com', [set('actions', 'A4', { id: 'A4', owner: 'se2@virgoasia.com', assigner: 'bm2@virgoasia.com', department: 'Sales' })]).code === 'permission_denied');
+  ok('an action cannot be deleted by an unrelated user', as('se2@virgoasia.com', [{ op: 'delete', col: 'actions', id: 'A1' }]).code === 'permission_denied' && 'actions/A1' in M.stored());
+  const fu = { id: 'f1', action_id: 'A1', to_email: 'bm@virgoasia.com', status: 'Draft' };
+  ok('a followup draft is written by a HOD (engine) and updated by its recipient', as('hod@virgoasia.com', [set('followups', 'f1', fu)]).ok && as('bm@virgoasia.com', [set('followups', 'f1', { ...fu, status: 'Sent' })]).ok);
+  ok('an unrelated user cannot change the followup; the action owner can (not recipient, but owner of the action)', as('se2@virgoasia.com', [set('followups', 'f1', { ...fu, status: 'Dismissed' })]).code === 'permission_denied' && as('se@virgoasia.com', [set('followups', 'f1', { ...fu, status: 'Dismissed' })]).ok);
+  ok('a refused row-level write leaves nothing written from its batch', (() => { const r = as('se2@virgoasia.com', [set('log', 'rl1', { t: 1 }), set('actions', 'A1', act)]); return r.code === 'permission_denied' && !('log/rl1' in M.stored()); })());
+  // merge
+  as('data@virgoasia.com', [set('settings', 'main', { a: 1, b: 1 })]);
+  ok('merge: another user changes a field, then a merge of a different field keeps both (done under the write lock)', (() => { as('data@virgoasia.com', [set('settings', 'main', { a: 5, b: 1 })]); const r = as('data@virgoasia.com', [{ op: 'merge', col: 'settings', id: 'main', json: JSON.stringify({ b: 2 }) }]); return r.ok && JSON.parse(M.stored()['settings/main']).a === 5 && JSON.parse(M.stored()['settings/main']).b === 2; })());
+  ok('merge into a missing document is refused', as('data@virgoasia.com', [{ op: 'merge', col: 'settings', id: 'nope', json: '{"x":1}' }]).code === 'invalid_argument');
+  ok('merge by a non-admin on an admin collection is refused', as('se@virgoasia.com', [{ op: 'merge', col: 'settings', id: 'main', json: '{"x":1}' }]).code === 'permission_denied');
+  M.setEmail('data@virgoasia.com');
+  const sz = M.call('deskSizes'); ok('deskSizes returns documents, rows and characters per collection', sz.ok && sz.cols.users.docs === 8 && sz.cols.users.chars > 100 && sz.pageChars === 2500000, JSON.stringify(sz).slice(0, 120));
+  M.setEmail('se@virgoasia.com'); ok('deskSizes is Super admin only', M.call('deskSizes').code === 'permission_denied');
+}
+
+/* ---------- heartbeat: a long write is never read as a torn batch ---------- */
+{
+  const H = makeEnv();
+  H.call('deskWrite', [Array.from('abcde', (c) => set('settings', c, { c, pad: 'x'.repeat(50) }))]);
+  H.state.deleteCost = 100000;       // every deleteRows "takes" 100 s on the fake clock: 3 deletes = 300 s, longer than the 150 s stale limit
+  const seen = []; H.state.onDelete = () => { seen.push(H.call('deskPlan', ['settings']).code || 'read-allowed'); };
+  const r = H.call('deskWrite', [['a', 'c', 'e'].map((c) => set('settings', c, { c, pad: 'y'.repeat(50), v: 2 }))]);
+  ok('a write whose deletes run past the old 150 s limit: readers still wait (heartbeat refreshed before every delete)', r.ok && seen.length === 3 && seen.every((x) => x === 'unavailable'), JSON.stringify(seen));
+  H.state.onDelete = null; H.state.deleteCost = 0;
+  ok('after the write the revision is even and reads work again', H.call('deskPlan', ['settings']).ok);
+  H.props.DESK_REVS = JSON.stringify({ revs: { ...JSON.parse(H.props.DESK_REVS).revs, settings: 7 }, wts: Date.now() + H.state.skew - 200000 });
+  ok('a heartbeat older than 150 s (crashed writer) is still ignored', H.call('deskPlan', ['settings']).ok);
+}

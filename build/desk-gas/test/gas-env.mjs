@@ -6,7 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export function makeEnv(opts = {}) {
-  const CELL_LIMIT = 50000, state = { email: opts.email || 'data@virgoasia.com', locks: 0, calls: 0, lockFail: false, failAfterSetValues: null };
+  const CELL_LIMIT = 50000, state = { email: opts.email || 'data@virgoasia.com', locks: 0, calls: 0, lockFail: false, failAfterSetValues: null, held: 0, skew: 0, deleteCost: 0, onDelete: null };
   const stats = { gv: [], sv: 0, byFn: {} };
   const sheets = {}, props = {}, cache = {};
   function mkSheet(name) {
@@ -38,20 +38,20 @@ export function makeEnv(opts = {}) {
       getMaxColumns() { return s.maxCols; },
       deleteColumns(from, n) { s.maxCols -= n; },
       insertRowsAfter(after, n) { s.maxRows += n; },
-      deleteRows(start, n) { if (state.failDeleteRows) throw new Error('Service unavailable: injected delete failure'); s.rows.splice(start - 1, n); },
+      deleteRows(start, n) { state.skew += state.deleteCost; if (state.onDelete) state.onDelete(); if (state.failDeleteRows) throw new Error('Service unavailable: injected delete failure'); s.rows.splice(start - 1, n); },
     };
     sheets[name] = s; return s.api;
   }
   const ss = { first: null, getSheets() { return [ss.first]; }, getSheetByName(n) { return sheets[n] ? sheets[n].api : null; }, insertSheet(n) { return mkSheet(n); }, getId() { return 'SHEET1'; } };
   const ctx = {
-    console, Math, Date, JSON, Object, Array, String, Number, Error,
+    console, Math, Date: class extends Date { static now() { return Date.now() + state.skew; } }, JSON, Object, Array, String, Number, Error,
     SpreadsheetApp: { create() { ss.first = mkSheet('Sheet1'); return ss; }, openById(id) { if (id !== 'SHEET1') throw new Error('no such sheet'); return ss; } },
-    LockService: { getScriptLock() { return { waitLock() { state.locks++; if (state.lockFail) throw new Error('Could not obtain lock after 30000 ms'); }, releaseLock() {} }; } },
+    LockService: { getScriptLock() { return { waitLock() { if (state.held > 0) throw new Error('Lock re-entered: the script lock is already held by this execution'); state.locks++; if (state.lockFail) throw new Error('Could not obtain lock after 30000 ms'); state.held++; }, releaseLock() { if (state.held > 0) state.held--; } }; } },
     CacheService: { getScriptCache() { return { get(k) { return k in cache ? cache[k] : null; }, put(k, v) { cache[k] = v; } }; } },
     PropertiesService: { getScriptProperties() { return { getProperty(k) { return k in props ? props[k] : null; }, setProperty(k, v) { if (String(v).length > 9216) throw new Error('Property value too large'); props[k] = v; } }; } },
     Session: { getActiveUser() { return { getEmail() { return state.email; } }; } },
     ScriptApp: { getService() { return { getUrl() { return 'https://script.google.com/a/macros/virgoasia.com/s/XYZ/exec'; } }; } },
-    Utilities: { sleep() {} },
+    Utilities: { sleep() {} }, Logger: { log() {} },
     HtmlService: {
       XFrameOptionsMode: { DEFAULT: 'DEFAULT' },
       createHtmlOutputFromFile() { return { getContent() { return fs.readFileSync(opts.indexFile || path.join(here, '../out/Desk-Index.txt'), 'utf8'); } }; },

@@ -89,6 +89,14 @@ await C.page.click('[data-act="fb-make"]'); await C.page.waitForFunction(() => w
 const fb = await C.page.evaluate(() => ({ stage: window.__desk.S.fb.stage, msg: window.__desk.S.fb.msg, n: window.__desk.S.fb.files && window.__desk.S.fb.files.length, man: window.__desk.S.fb.manifest }));
 ok('backup built', fb.stage === 'ready', JSON.stringify(fb.msg));
 const mock = await C.page.evaluate(() => window.__mockStore());
+await C.page.click('[data-act="fb-size"]'); await C.page.waitForFunction(() => window.__desk.S.fb.size && !window.__desk.S.fb.sizeBusy, null, { timeout: 120000 });
+await C.page.waitForTimeout(800);
+const csz = await C.page.evaluate(() => ({ rows: window.__desk.S.fb.size.rows, txt: document.querySelector('#pg').innerText, store: window.__mockStore() }));
+const expChars = Object.values(csz.store).reduce((n, d) => n + JSON.stringify(d).length, 0), expDocs = Object.keys(csz.store).length;
+const perCol = (entries) => { const o = {}; entries.forEach(([k, len]) => { const c = k.split('/')[0]; (o[c] = o[c] || { docs: 0, chars: 0 }); o[c].docs++; o[c].chars += len; }); return o; };
+const stable = ['inv', 'cells', 'roll', 'plants', 'uploads', 'mappings'];
+const expC = perCol(Object.entries(csz.store).map(([k, d]) => [k, JSON.stringify(d).length]));
+ok('claude.ai build: Store size lists documents and characters per collection; the stable collections match the store exactly', stable.every(c => { const r = csz.rows.find(x => x.c === c); return r && r.docs === expC[c].docs && r.chars === expC[c].chars; }) && /Total/.test(csz.txt) && csz.rows.length >= 15, JSON.stringify(csz.rows.filter(r => stable.includes(r.c)).map(r => [r.c, r.docs, r.chars])) + ' vs ' + JSON.stringify(stable.map(c => [c, expC[c]])));
 const mockCols = {}; Object.keys(mock).forEach(k => { const c = k.split('/')[0]; mockCols[c] = (mockCols[c] || 0) + 1; });
 const manDocs = {}; Object.keys(fb.man.collections).forEach(c => manDocs[c] = fb.man.collections[c].docs);
 ok('manifest lists every collection with the right document count', Object.keys(mockCols).every(c => manDocs[c] === mockCols[c]) && Object.keys(manDocs).length === 29, JSON.stringify({ mockCols, manDocs }));
@@ -168,23 +176,30 @@ await R.page.waitForTimeout(1500);
 await R.page.click('[data-gr="run"]'); await R.page.waitForFunction(() => ['done', 'verified', 'incomplete'].includes(window.__gasRestoreState().stage), null, { timeout: 600000 });
 const got3 = env2.stored(); let bad3 = 0; Object.keys(mock).forEach(k => { if (got3[k] !== JSON.stringify(mock[k])) bad3++; });
 ok('re-running the restore after the failure is safe and ends exactly equal to the backup', (await R.page.evaluate(() => window.__gasRestoreState().stage)) === 'done' && bad3 === 0 && Object.keys(got3).length === Object.keys(mock).length, bad3);
+await R.page.waitForTimeout(2500);
+await R.page.click('[data-act="fb-size"]'); await R.page.waitForFunction(() => window.__desk.S.fb.size && !window.__desk.S.fb.sizeBusy, null, { timeout: 120000 });
+const gsz = await R.page.evaluate(() => ({ rows: window.__desk.S.fb.size.rows, note: window.__desk.S.fb.size.note }));
+const gStore = env2.stored(), expG = perCol(Object.entries(gStore).map(([k, js]) => [k, js.length]));
+ok('Apps Script build: Store size comes from the server, matches the Sheet store for the stable collections, and carries the PAGE_CHARS note', stable.every(c => { const r = gsz.rows.find(x => x.c === c); return r && r.docs === expG[c].docs && r.chars === expG[c].chars && r.chars === expC[c].chars; }) && /PAGE_CHARS/.test(gsz.note), JSON.stringify(gsz.rows.filter(r => stable.includes(r.c)).map(r => [r.c, r.docs, r.chars])))
 // the restored data opens in the page for another user
 const V = await openGas(browser, env2, 'data@virgoasia.com'); await V.page.waitForTimeout(9000);
 ok('a fresh session on the restored store shows the data (uploads and coverage present)', await V.page.evaluate(() => window.__desk.S.uploads.length > 0 && Object.keys(window.__desk.S.cells).length > 0));
 ok('largest backup part is at most the forced size plus one document', maxChars < 300000 + 262144 + 1000, maxChars);
 
+ok('the Apps Script build has no "Sign in to claude.ai" text', !fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '../out/Desk-Index.txt'), 'utf8').includes('Sign in to claude.ai'));
 /* ---------- 4. backup: data changing during the export is flagged ---------- */
 const C2 = await openClaude(browser, { viewer: { email: 'data@virgoasia.com', name: 'Vijay' }, store: JSON.parse(JSON.stringify(mock)), autoload: false }); await C2.page.waitForTimeout(3500);
 await C2.page.evaluate(() => { location.hash = '#/admin'; }); await C2.page.waitForTimeout(600); await C2.page.click('[data-t="tools"]'); await C2.page.waitForTimeout(500);
-await C2.page.evaluate(async () => { const db = await window.claude.use('db'); const oc = db.collection; db.collection = (c) => { const q = oc(c); const g = q.get; q.get = async () => { await new Promise(r => setTimeout(r, 120)); return g.call(q); }; return q; }; });
+/* the source database serves a stale cached copy unless the read asks for the server; every read is slowed so the edit lands between the two passes */
+await C2.page.evaluate(async () => { const db = await window.claude.use('db'); const oc = db.collection, cache = {}; db.collection = (c) => { const q = oc(c); const g = q.get; q.get = async (opts) => { await new Promise(r => setTimeout(r, 120)); if (opts && opts.source === 'server') return g.call(q); return cache[c] || (cache[c] = await g.call(q)); }; return q; }; });
 await C2.page.click('[data-act="fb-make"]');
 await C2.page.waitForFunction(() => /^Reading /.test(window.__desk.S.fb.msg), null, { timeout: 60000 });
 ok('a warning banner is shown while the backup is being made', /Do not upload files or edit anything/.test(await C2.page.innerText('#pg')));
 await C2.page.waitForFunction(() => /^Checking users again/.test(window.__desk.S.fb.msg), null, { timeout: 240000 });
-await C2.page.evaluate(async () => { const db = await window.claude.use('db'); await db.doc('log/changed-during-export').set({ t: 2 }); });
+await C2.page.evaluate(async () => { const db = await window.claude.use('db'); await db.doc('log/rt1').set({ t: 99, txt: 'edited during the export' }); });
 await C2.page.waitForFunction(() => ['ready', 'error'].includes(window.__desk.S.fb.stage), null, { timeout: 240000 });
 const ch = await C2.page.evaluate(() => ({ changed: window.__desk.S.fb.changed, man: window.__desk.S.fb.manifest.changedDuringExport, txt: document.querySelector('#pg').innerText }));
-ok('a change during the export is flagged (banner and manifest)', ch.changed.length === 1 && ch.changed[0].collection === 'log' && ch.changed[0].after === ch.changed[0].before + 1 && ch.man.length === 1 && /Data changed while the backup was being made/.test(ch.txt) && /Do not upload files or edit anything/.test(ch.txt), JSON.stringify(ch.changed));
+ok('an EDIT during the export (same document count) is flagged by the second fresh read, with the source serving a stale cache to non-server reads (banner and manifest)', ch.changed.length === 1 && ch.changed[0].collection === 'log' && ch.changed[0].kind === 'content' && ch.changed[0].after === ch.changed[0].before && ch.man.length === 1 && /Data changed while the backup was being made/.test(ch.txt) && /log \(edited\)/.test(ch.txt) && /Do not upload files or edit anything/.test(ch.txt), JSON.stringify(ch.changed));
 await C2.page.click('[data-act="fb-saveall"]'); await C2.page.waitForTimeout(5000);
 const saved2 = await C2.page.evaluate(() => window.__saved); const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'bk2-')); saved2.forEach(sv => fs.writeFileSync(path.join(tmp2, sv.filename), sv.data));
 await pick(R.page, fs.readdirSync(tmp2).map(f => path.join(tmp2, f))); await R.page.waitForFunction(() => ['verified', 'error'].includes(window.__gasRestoreState().stage), null, { timeout: 40000 }).catch(async () => console.log('DBG', JSON.stringify(await R.page.evaluate(() => { const s = window.__gasRestoreState(); return { st: s.stage, err: s.err, n: document.querySelectorAll('#gr-files').length }; })), fs.readdirSync(tmp2)));
