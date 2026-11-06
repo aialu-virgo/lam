@@ -411,7 +411,7 @@ svg text.vl{paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejo
 (function(){
 'use strict';
 /* ================= constants ================= */
-var SEED_SUPER=['data@virgoasia.com','spa@virgoasia.com'];
+var SEED_SUPER=['data@virgoasia.com','spa@virgoasia.com','ai.acp@virgoasia.com'];
 var ROLES=['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive','Coordinator (sales / CRR)','Accounts','Plant'];
 var GROUPS=['Laminate','Door','PVC sheet','Compact board'];
 var SEGMENT_NOTE='Segments are configurable (open question Q5).';
@@ -560,7 +560,7 @@ async function seedDefaults(){
   try{
     var em=(S.viewer.email||'').toLowerCase();
     if(!S.users.length){
-      for(var i=0;i<SEED_SUPER.length;i++){var e=SEED_SUPER[i];await dset('users/'+slug(e),{email:e,name:e===em?(S.viewer.name||e):(e.indexOf('data@')===0?'Vijay':'SP Sir'),role:'Super admin',department:'HO',plant_codes:'',reports_to_email:'',whatsapp_number:'',today_cap:5,active:true,sales_employee_code:'',seed:true})}
+      for(var i=0;i<SEED_SUPER.length;i++){var e=SEED_SUPER[i];await dset('users/'+slug(e),{email:e,name:e===em?(S.viewer.name||e):({'data@virgoasia.com':'Vijay','spa@virgoasia.com':'SP Sir','ai.acp@virgoasia.com':'Admin AI ACP'}[e]||e),role:'Super admin',department:'HO',plant_codes:'',reports_to_email:'',whatsapp_number:'',today_cap:5,active:true,sales_employee_code:'',seed:true})}
     }
     if(!S.plants.length){
       var dp=defaultPlants();

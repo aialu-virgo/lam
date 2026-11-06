@@ -8,7 +8,7 @@
  * LOCKS: the script lock is taken in exactly two places and never while it is already held: database creation (ssId_, its own short lock) and the write section of
  * deskWrite / deskWipe. The database is created BEFORE any write lock is taken (setup(), doGet, or the first step of deskWrite).
  * A read is accepted only when the revision was even and unchanged from before to after the read (sequence lock), so a page never mixes two versions. */
-var SEED_SUPER = ['data@virgoasia.com', 'spa@virgoasia.com'];
+var SEED_SUPER = ['data@virgoasia.com', 'spa@virgoasia.com', 'ai.acp@virgoasia.com'];
 var PART_CHARS = 45000;          // Google Sheets allows 50,000 characters per cell
 var MAX_DOC_CHARS = 262144;      // 256 KiB per document, as the page assumes
 var PAGE_CHARS = 2500000;        // characters per page read (one getValues)

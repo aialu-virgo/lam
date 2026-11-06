@@ -31,7 +31,7 @@ const set = (col, id, o) => ({ op: 'set', col, id, json: JSON.stringify(o) });
 env.setEmail('data@virgoasia.com');
 let A = await openGas(browser, env, 'data@virgoasia.com'); await A.page.waitForTimeout(6000);
 let st = await A.page.evaluate(() => ({ role: window.__desk.S.role, email: window.__desk.S.viewer.email, owner: window.__desk.S.viewer.owner, db: window.__desk.S.dbState, users: window.__desk.S.users.length }));
-ok('Super admin boots: role, email, owner, database ready, seed users written', st.role === 'Super admin' && st.email === 'data@virgoasia.com' && st.owner && st.db === 'ready' && st.users === 2, JSON.stringify(st));
+ok('Super admin boots: role, email, owner, database ready, seed users written', st.role === 'Super admin' && st.email === 'data@virgoasia.com' && st.owner && st.db === 'ready' && st.users === 3, JSON.stringify(st));
 const sem = await A.page.evaluate(async () => { const base = window.google.script.run; let wrong = 0, right = 0; base.withSuccessHandler(() => { wrong++; }).deskRevs.apply(base, []); await new Promise(r => base.withSuccessHandler(() => { right++; r(); }).deskRevs()); await new Promise(r => setTimeout(r, 400)); return { wrong, right }; });
 ok('the google.script.run mock is strict: a method applied to the base runner loses its handlers; a chained call works', sem.wrong === 0 && sem.right === 1, JSON.stringify(sem));
 env.call('deskWrite', [[set('users', 'se_virgoasia_com', { email: 'se@virgoasia.com', name: 'Se Exec', role: 'Sales executive', department: 'Sales', plant_codes: '', reports_to_email: '', whatsapp_number: '', today_cap: 5, active: true, sales_employee_code: '' })]]);
