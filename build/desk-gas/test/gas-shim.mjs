@@ -10,7 +10,7 @@ const E = makeEnv(), other = (fn, args) => E.call(fn, args);   // "another user"
 const runner = (h = {}) => new Proxy({}, { get(_, fn) {
   if (fn === 'withSuccessHandler') return (s) => runner({ ...h, s });
   if (fn === 'withFailureHandler') return (f) => runner({ ...h, f });
-  return (...args) => setTimeout(() => { try { const r = E.call(fn, JSON.parse(JSON.stringify(args))); h.s && h.s(r); } catch (e) { h.f && h.f(e); } }, 0);
+  return (...args) => setTimeout(() => { try { const r = E.callRaw(fn, JSON.parse(JSON.stringify(args))); h.s && h.s(r); } catch (e) { h.f && h.f(e); } }, 0);
 } });
 const win = { google: { script: { run: runner() } }, __GAS_BOOT: { email: 'data@virgoasia.com', owner: true, name: 'Vijay', url: 'x' }, location: { hash: '' } };
 const doc = { hidden: false, addEventListener() {}, createElement() { return { style: {}, click() {}, remove() {} }; }, body: { appendChild() {} } };
@@ -38,4 +38,10 @@ await db.doc('settings/main').update({ b: 2 });
 const m = await db.doc('settings/main').get(); ok('update() merges on the server: the other user\'s change to "a" survives', JSON.stringify(m.data()) === '{"a":5,"b":2}', JSON.stringify(m.data()));
 s = await db.collection('settings').get(); ok('and the collection read after the merge shows it', show(s) === 'settings=undefined' || show(s) === 'main={"a":5,"b":2}', show(s));
 let threw = null; try { await db.doc('settings/missing').update({ x: 1 }); } catch (e) { threw = e.code; } ok('update() of a missing document is refused', threw === 'invalid_argument', String(threw));
+// per-operation results: a refused operation rejects only its own promise
+other('deskWrite', [[set('users', 'se', { email: 'se@virgoasia.com', role: 'Sales executive', active: true })]]);
+E.setEmail('se@virgoasia.com');
+const rs = await Promise.allSettled([db.doc('actions/n1').set({ id: 'n1' }), db.doc('planlocks/FY27-Q3').set({ by: 'se' }), db.doc('periods/x').set({ a: 1 }), db.doc('log/n2').set({ t: 1 })]);
+ok('flushW: in one batch the allowed writes resolve and only the refused ones reject (actions ok, planlocks refused, periods refused, log ok)', rs[0].status === 'fulfilled' && rs[1].status === 'rejected' && rs[1].reason.code === 'permission_denied' && rs[2].status === 'rejected' && rs[3].status === 'fulfilled', JSON.stringify(rs.map(r => r.status)));
+ok('and the allowed documents were really stored', 'actions/n1' in E.stored() && 'log/n2' in E.stored() && !('planlocks/FY27-Q3' in E.stored()));
 process.exit(process.exitCode || 0);

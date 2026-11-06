@@ -93,10 +93,16 @@
     if (cur.length) groups.push(cur);
     groups.forEach(function (g) {
       call('deskWrite', [g.map(function (w) { return w.op; })]).then(function (r) {
-        var bump = {};
-        g.forEach(function (w) { var c = cols[w.op.col]; if (c && c.loaded) { if (w.op.op === 'set') c.docs.set(w.op.id, JSON.parse(w.op.json)); else if (w.op.op === 'delete') c.docs.delete(w.op.id); else c.stale = true; } bump[w.op.col] = 1; });
+        /* per-operation results: only a refused operation rejects its own promise; the others are applied and resolve */
+        var bump = {}, okW = [];
+        g.forEach(function (w, i) {
+          var res = r.results && r.results[i];
+          if (res && res.ok === false) { w.rej({ code: res.code, message: res.message }); return; }
+          okW.push(w);
+          var c = cols[w.op.col]; if (c && c.loaded) { if (w.op.op === 'set') c.docs.set(w.op.id, JSON.parse(w.op.json)); else if (w.op.op === 'delete') c.docs.delete(w.op.id); else c.stale = true; } bump[w.op.col] = 1;
+        });
         Object.keys(bump).forEach(function (n) { var c = cols[n]; if (!c) return; var rv = r.revs[n]; if (c.loaded && !c.stale && rv === c.rev + 2) c.rev = rv; else c.stale = true; if (c.subs.length) { if (c.loaded) emit(c); if (c.stale) refresh(c); } });
-        g.forEach(function (w) { w.res(); });
+        okW.forEach(function (w) { w.res(); });
       }, function (e) { g.forEach(function (w) { w.rej(e); }); });
     });
   }

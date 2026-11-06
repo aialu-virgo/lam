@@ -100,7 +100,7 @@
         for (var i = 0; i <= list.length; i++) {
           var d = list[i];
           if (d === undefined || (batch.length && (batch.length >= BATCH_DOCS || chars + d.json.length > BATCH_CHARS))) {
-            if (batch.length) { await call('deskWrite', [batch]); done += batch.length; R.written[c] += batch.length; R.pct = Math.min(95, 2 + Math.round(done / Math.max(1, total) * 90)); R.msg = 'Writing ' + c + ' (' + fmtN(done) + ' of ' + fmtN(total) + ')'; refresh(); batch = []; chars = 0; }
+            if (batch.length) { var wr = await call('deskWrite', [batch]); var bad = (wr.results || []).find(function (x) { return x && x.ok === false; }); if (bad) throw new Error('A document was refused by the server: ' + bad.message); done += batch.length; R.written[c] += batch.length; R.pct = Math.min(95, 2 + Math.round(done / Math.max(1, total) * 90)); R.msg = 'Writing ' + c + ' (' + fmtN(done) + ' of ' + fmtN(total) + ')'; refresh(); batch = []; chars = 0; }
           }
           if (d !== undefined) { batch.push({ op: 'set', col: c, id: d.id, json: d.json }); chars += d.json.length; }
         }

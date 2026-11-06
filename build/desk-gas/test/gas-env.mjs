@@ -70,6 +70,10 @@ export function makeEnv(opts = {}) {
     return out;
   }
   return { ctx, state, sheets, stats, props, setEmail(e) { state.email = e; }, stored: storedAll,
-    call(fn, args = []) { state.calls++; stats.byFn[fn] = (stats.byFn[fn] || 0) + 1; return JSON.parse(JSON.stringify(ctx[fn](...args))); },
+    callRaw(fn, args = []) { state.calls++; return JSON.parse(JSON.stringify(ctx[fn](...args))); },
+    call(fn, args = []) { state.calls++; stats.byFn[fn] = (stats.byFn[fn] || 0) + 1; const r = JSON.parse(JSON.stringify(ctx[fn](...args)));
+      /* deskWrite answers per operation; for convenience r.ok / r.code summarise the batch (ok only if every operation was applied), r.results keeps the detail */
+      if (fn === 'deskWrite' && r.ok && Array.isArray(r.results)) { const bad = r.results.find(x => x && x.ok === false); if (bad) { r.callOk = true; r.ok = false; r.code = bad.code; r.message = bad.message; } }
+      return r; },
     rawRows(col) { return sheets['c_' + col] ? sheets['c_' + col].rows : []; } };
 }

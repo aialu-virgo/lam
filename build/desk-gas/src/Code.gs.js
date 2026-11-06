@@ -16,7 +16,6 @@ var PAGE_ROWS = 4000;            // rows per page read
 var STALE_WRITE_MS = 150000;     // an odd revision whose heartbeat (wts) is older than this is a crashed write and is ignored; a live writer refreshes wts before every step
 var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'phasing', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes'];
 var SHARED_COLLECTIONS = ['potential', 'actions', 'followups', 'log', 'planlocks'];
-var GLOBAL_ROLES = ['Super admin', 'Management / HO', 'HOD'];
 var HEADER = ['id', 'part', 'len', 'json', 'updatedAt', 'updatedBy'];
 
 /* Run once from the editor (select setup, Run). Creates the database spreadsheet and triggers the permission prompt. Safe to run again.
@@ -255,27 +254,36 @@ function deskGetMany(keys) { // keys: ["col/id", ...] -> docs:[{key,json|null}]
     return { ok: true, docs: keys.map(function (k) { return { key: k, json: out[k] }; }) };
   });
 }
-/* ops: [{op:'set', col, id, json}|{op:'merge', col, id, json (a patch)}|{op:'delete', col, id}]. All ops are checked before any is applied. */
+/* ops: [{op:'set', col, id, json}|{op:'merge', col, id, json (a patch)}|{op:'delete', col, id}].
+ * Each operation is checked on its own: a refused or invalid operation gets {ok:false, code, message} in results[i] and the allowed operations are still applied.
+ * Returns {ok:true, revs, results:[{ok:true}|{ok:false, code, message}] (same order as ops)}. A whole-call failure (not signed in, lock timeout) returns {ok:false, code, message}. */
+function checkOp_(who, o) {
+  if (!o || (o.op !== 'set' && o.op !== 'merge' && o.op !== 'delete')) fail_('invalid_argument', 'Bad operation.');
+  if (!knownCol_(o.col)) fail_('invalid_argument', 'Unknown collection.');
+  checkId_(o.id);
+  if (!canWrite_(who, o.col)) fail_('permission_denied', 'Writing to ' + o.col + ' needs ' + (ADMIN_COLLECTIONS.indexOf(o.col) >= 0 ? 'the Super admin role.' : o.col === 'planlocks' ? 'Management / HO or Super admin.' : 'an active user.'));
+  if (o.op === 'set' || o.op === 'merge') {
+    if (typeof o.json !== 'string') fail_('invalid_argument', 'Missing document.');
+    if (o.json.length > MAX_DOC_CHARS) fail_('invalid_argument', 'Document too large (' + o.json.length + ' characters, limit ' + MAX_DOC_CHARS + ').');
+    var d; try { d = JSON.parse(o.json); } catch (e) { fail_('invalid_argument', 'Document is not valid JSON.'); }
+    if (!d || typeof d !== 'object' || Array.isArray(d)) fail_('invalid_argument', 'A document must be an object.');
+  }
+}
 function deskWrite(ops) {
   return wrap_(function () {
-    var who = requireUser_(), final = Object.create(null), order = [];
-    (ops || []).forEach(function (o) {
-      if (!o || (o.op !== 'set' && o.op !== 'merge' && o.op !== 'delete')) fail_('invalid_argument', 'Bad operation.');
-      if (!knownCol_(o.col)) fail_('invalid_argument', 'Unknown collection.');
-      checkId_(o.id);
-      if (!canWrite_(who, o.col)) fail_('permission_denied', 'Writing to ' + o.col + ' needs ' + (ADMIN_COLLECTIONS.indexOf(o.col) >= 0 ? 'the Super admin role.' : o.col === 'planlocks' ? 'Management / HO or Super admin.' : 'an active user.'));
-      if (o.op === 'set' || o.op === 'merge') {
-        if (typeof o.json !== 'string') fail_('invalid_argument', 'Missing document.');
-        if (o.json.length > MAX_DOC_CHARS) fail_('invalid_argument', 'Document too large (' + o.json.length + ' characters, limit ' + MAX_DOC_CHARS + ').');
-        var d; try { d = JSON.parse(o.json); } catch (e) { fail_('invalid_argument', 'Document is not valid JSON.'); }
-        if (!d || typeof d !== 'object' || Array.isArray(d)) fail_('invalid_argument', 'A document must be an object.');
-      }
-      var k = o.col + '/' + o.id; if (!(k in final)) order.push(k); final[k] = o;
+    var who = requireUser_(), final = Object.create(null), order = [], results = [], keyOf = [], failed = Object.create(null);
+    (ops || []).forEach(function (o, i) {
+      try { checkOp_(who, o); } catch (e) { if (!e.deskCode) throw e; results[i] = { ok: false, code: e.deskCode, message: e.message }; keyOf[i] = null; return; }
+      var k = o.col + '/' + o.id; keyOf[i] = k; if (!(k in final)) order.push(k); final[k] = o;
     });
-    if (!order.length) return { ok: true, revs: {} };
-    book_(true);                                   // create the database first, under its own short lock, BEFORE the write lock
-    var lock = LockService.getScriptLock(); lock.waitLock(30000);
-    try { return applyOps_(who, final, order); } finally { lock.releaseLock(); }
+    var revs = {};
+    if (order.length) {
+      book_(true);                                   // create the database first, under its own short lock, BEFORE the write lock
+      var lock = LockService.getScriptLock(); lock.waitLock(30000);
+      try { revs = applyOps_(who, final, order, failed).revs; } finally { lock.releaseLock(); }
+    }
+    (ops || []).forEach(function (o, i) { if (keyOf[i] !== null) results[i] = failed[keyOf[i]] ? { ok: false, code: failed[keyOf[i]].code, message: failed[keyOf[i]].message } : { ok: true }; });
+    return { ok: true, revs: revs, results: results };
   });
 }
 function beginWrite_(cols) { // under the lock: make every touched revision odd
@@ -287,57 +295,28 @@ function beat_() { var m = revsGet_(); m.wts = Date.now(); revsSave_(m); } // he
 function endWrite_(cols) {
   var m = revsGet_(); cols.forEach(function (c) { var r = m.revs[c] || 0; m.revs[c] = r % 2 ? r + 1 : r; }); revsSave_(m); return m;
 }
-function parseUsers_(ss) { return readAll_(ss, 'users').docs.map(function (d) { try { return JSON.parse(d.json); } catch (e) { return null; } }).filter(Boolean); }
-function plantsOf_(u) { return String(u && u.plant_codes || '').split(';').map(function (x) { return x.trim(); }).filter(Boolean); }
-function normD_(x) { return String(x || '').trim().toLowerCase(); }
-/* the page's own rules (30-rules.js): canRespond = owner or canManage; canManage = Super admin, Management / HO, the assigner, the HOD of the action's department,
- * the Branch / depot manager holding the action's plant; canVerify adds, for rule-made actions only, the owner's direct manager (reports-to). */
-function actionOk_(me, a, users) {
-  if (!a) return false;
-  if (me.role === 'Super admin' || me.role === 'Management / HO') return true;
-  if (a.owner === me.email || a.assigner === me.email) return true;
-  if (me.role === 'HOD' && normD_(a.department) === normD_(me.department)) return true;
-  if (me.role === 'Branch / depot manager' && a.plant && plantsOf_(me).indexOf(String(a.plant)) >= 0) return true;
-  if (String(a.assigner || '').indexOf('Desk rule') === 0) {
-    var ow = null; users.forEach(function (u) { if (String(u.email || '').toLowerCase() === String(a.owner || '').toLowerCase()) ow = u; });
-    if (ow && String(ow.reports_to_email || '').toLowerCase() === me.email) return true;
-  }
-  return false;
-}
-/* inside the lock, before anything is written: turn merges into full documents, check sizes and the row-level rules for actions and followups */
-function prepare_(ss, who, final, order) {
-  var users = null, getUsers = function () { return users || (users = parseUsers_(ss)); };
-  var want = Object.create(null), existing = Object.create(null);
-  order.forEach(function (k) {
-    var o = final[k], rowLevel = (o.col === 'actions' || o.col === 'followups') && who.role !== 'Super admin' && who.role !== 'Management / HO';
-    if (o.op === 'merge' || rowLevel) (want[o.col] = want[o.col] || []).push(o.id);
-  });
+/* inside the lock, before anything is written: turn merges into full documents. A merge into a missing document fails for that operation only. Returns {key: {code, message}} for failed operations. */
+function prepare_(ss, final, order) {
+  var want = Object.create(null), existing = Object.create(null), failed = Object.create(null);
+  order.forEach(function (k) { var o = final[k]; if (o.op === 'merge') (want[o.col] = want[o.col] || []).push(o.id); });
   Object.keys(want).forEach(function (c) { existing[c] = docsRaw_(colSheet_(ss, c, false), want[c]); });
-  function parsed(c, id) { var j = existing[c] && existing[c][id]; if (j == null) return null; try { return JSON.parse(j); } catch (e) { return null; } }
   order.forEach(function (k) {
-    var o = final[k];
-    if (o.op === 'merge') {
-      var cur = parsed(o.col, o.id); if (!cur) fail_('invalid_argument', 'Cannot update ' + o.col + '/' + o.id + ': it does not exist.');
-      o.json = JSON.stringify(Object.assign(cur, JSON.parse(o.json))); o.op = 'set';
-      if (o.json.length > MAX_DOC_CHARS) fail_('invalid_argument', 'Document too large (' + o.json.length + ' characters, limit ' + MAX_DOC_CHARS + ').');
-    }
-    if ((o.col !== 'actions' && o.col !== 'followups') || who.role === 'Super admin' || who.role === 'Management / HO') return;
-    var ex = parsed(o.col, o.id), ok;
-    if (o.col === 'actions') {
-      if (ex) ok = actionOk_(who, ex, getUsers());
-      else { var nd = o.op === 'set' ? JSON.parse(o.json) : {}; ok = GLOBAL_ROLES.indexOf(who.role) >= 0 || nd.assigner === who.email; }
-    } else {
-      var f = ex || (o.op === 'set' ? JSON.parse(o.json) : {});
-      if ((!ex && GLOBAL_ROLES.indexOf(who.role) >= 0) || String(f.to_email || '').toLowerCase() === who.email) ok = true; // the engine (global roles) creates drafts; changing an existing one follows the action
-      else { var ar = f.action_id ? docsRaw_(colSheet_(ss, 'actions', false), [f.action_id])[f.action_id] : null; var ad = null; try { ad = ar ? JSON.parse(ar) : null; } catch (e) {} ok = !!ad && actionOk_(who, ad, getUsers()); }
-    }
-    if (!ok) fail_('permission_denied', 'You may not change ' + o.col + '/' + o.id + ': it is not yours, not in your reporting line, and you are not its HOD or Management.');
+    var o = final[k]; if (o.op !== 'merge') return;
+    var j = existing[o.col] && existing[o.col][o.id], cur = null;
+    try { cur = j == null ? null : JSON.parse(j); } catch (e) {}
+    if (!cur) { failed[k] = { code: 'invalid_argument', message: 'Cannot update ' + o.col + '/' + o.id + ': it does not exist.' }; return; }
+    var merged = JSON.stringify(Object.assign(cur, JSON.parse(o.json)));
+    if (merged.length > MAX_DOC_CHARS) { failed[k] = { code: 'invalid_argument', message: 'Document too large (' + merged.length + ' characters, limit ' + MAX_DOC_CHARS + ').' }; return; }
+    o.json = merged; o.op = 'set';
   });
+  return failed;
 }
-function applyOps_(who, final, order) {
+function applyOps_(who, final, order, failed) {
   var ss = book_(false);
   if (!ss) fail_('unavailable', 'The database is not set up yet. Run setup() once from the Apps Script editor.');
-  prepare_(ss, who, final, order);
+  var more = prepare_(ss, final, order); Object.keys(more).forEach(function (k) { failed[k] = more[k]; });
+  order = order.filter(function (k) { return !failed[k]; });
+  if (!order.length) return { ok: true, revs: {} };
   var cols = [], byCol = Object.create(null), now = new Date().toISOString();
   order.forEach(function (k) { var o = final[k]; if (!byCol[o.col]) { byCol[o.col] = []; cols.push(o.col); } byCol[o.col].push(o); });
   var m = beginWrite_(cols), revs = {};

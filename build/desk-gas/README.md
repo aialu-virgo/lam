@@ -25,8 +25,8 @@ Paste `Desk-Code.gs.txt` the same way only if it was re-issued.
 
 ## Good to know
 - Access is by the Users list in Admin. Anyone else in the domain sees "Ask your admin for access" and receives no data.
-- Only a Super admin can write the admin collections; the server refuses everyone else. `planlocks` is Super admin or Management / HO only. For `actions` and `followups` the server applies the page's own rules (owner, assigner, HOD of the action's department, Branch manager of the action's plant, Management, Super admin; for rule-made actions also the owner's direct manager; a followup also by its recipient, and a new draft by HOD, Management or Super admin).
-- **Not enforced on the server (same as claude.ai today):** field-level changes inside a document an allowed person may write; approver differs from proposer; closed and locked quarters; `potential` and `log` are open to any active user; the audit trail is written by the page, not the server.
+- Only a Super admin can write the 24 admin collections (periods, users, plants, cells, inv, roll, uploads ... ); the server refuses everyone else. `planlocks` is Super admin or Management / HO only. Unknown and inactive users cannot read or write.
+- **Action and follow-up permissions are enforced by the page, as on claude.ai.** The server lets any active user write `actions`, `followups`, `potential` and `log`; the page decides who may respond to, assign, verify or draft for an action. Not enforced on the server either: field-level changes, approver differs from proposer, closed and locked quarters, and the audit trail (written by the page).
 - **Reads are not filtered by row.** A signed-in user with a role can read every collection through browser tools, as on claude.ai today.
 - Other people's changes appear within about 30 seconds (the page checks a small revision map and re-reads only what changed).
 - If someone has several Google accounts open, the link may open under the wrong one; use a private window or `/u/1/`.

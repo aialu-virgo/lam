@@ -24,8 +24,10 @@ ok('the 21 named admin collections are all in the list', ['periods','audit','set
 r = E.call('deskWrite', [[set('log', 'l1', { t: 1 }), set('potential', 'p1', { v: 2 }), set('actions', 'a1', { assigner: 'se@virgoasia.com', owner: 'se@virgoasia.com' }), set('followups', 'f1', { to_email: 'se@virgoasia.com' })]]);
 ok('a registered user can write potential, log, and their own actions and followups', r.ok, JSON.stringify(r));
 ok('a Sales executive cannot write planlocks', E.call('deskWrite', [[set('planlocks', 'FY27-Q3', { x: 1 })]]).code === 'permission_denied');
-r = E.call('deskWrite', [[set('log', 'l2', { t: 1 }), set('users', 'u9', { email: 'se@virgoasia.com', role: 'Super admin', active: true })]]);
-ok('a mixed batch with one refused op writes nothing', !r.ok && !('log/l2' in E.stored()), JSON.stringify(r));
+r = E.call('deskWrite', [[set('log', 'l2', { t: 1 }), set('users', 'u9', { email: 'se@virgoasia.com', role: 'Super admin', active: true }), set('actions', 'a2', { id: 'a2' })]]);
+ok('a mixed batch: the allowed operations are applied and each result is reported (log ok, users refused, actions ok)', r.callOk && r.results[0].ok && r.results[1].ok === false && r.results[1].code === 'permission_denied' && r.results[2].ok && 'log/l2' in E.stored() && 'actions/a2' in E.stored() && !('users/u9' in E.stored()), JSON.stringify(r.results));
+r = E.call('deskWrite', [[set('planlocks', 'FY27-Q9', { x: 1 }), set('actions', 'a3', { id: 'a3' }), set('followups', 'f3', { id: 'f3' })]]);
+ok('a planlocks refusal does not sink action and followup writes in the same batch', r.results[0].code === 'permission_denied' && r.results[1].ok && r.results[2].ok && 'actions/a3' in E.stored() && 'followups/f3' in E.stored());
 r = E.call('deskWrite', [[set('users', 'u2', { email: 'se@virgoasia.com', role: 'Super admin', active: true })]]); ok('non-admin cannot promote self', !r.ok);
 ok('non-admin refused deskStats', E.call('deskStats').code === 'permission_denied');
 r = E.call('deskWipe', [['log']]); ok('non-admin refused deskWipe', r.code === 'permission_denied' && 'log/l1' in E.stored());
@@ -118,45 +120,28 @@ ok('doGet injects boot data, sets title, keeps the marker out', out.title === 'V
   ok('write, wipe and read paths leave no lock held', (() => { L3.call('deskWipe', [['log']]); L3.call('deskWrite', [[set('log', 'b', { t: 1 })]]); return L3.state.held === 0; })());
 }
 
-/* ---------- role matrix on the server ---------- */
+/* ---------- parity with claude.ai (D21): the page guards actions and followups; the server enforces only the admin collections, planlocks and active users ---------- */
 {
   const M = makeEnv();
   const U = (email, role, extra = {}) => set('users', email.split('@')[0], { email, role, active: true, department: 'Sales', plant_codes: '', reports_to_email: '', ...extra });
   M.call('deskWrite', [[U('data@virgoasia.com', 'Super admin'), U('mgmt@virgoasia.com', 'Management / HO', { department: 'HO' }), U('hod@virgoasia.com', 'HOD'), U('hodx@virgoasia.com', 'HOD', { department: 'Finance' }),
-    U('bm@virgoasia.com', 'Branch / depot manager', { plant_codes: '1012', reports_to_email: 'hod@virgoasia.com' }), U('se@virgoasia.com', 'Sales executive', { reports_to_email: 'bm@virgoasia.com' }), U('se2@virgoasia.com', 'Sales executive', { reports_to_email: 'hod@virgoasia.com' }), U('bm2@virgoasia.com', 'Branch / depot manager', { plant_codes: '1013' })]]);
+    U('bm@virgoasia.com', 'Branch / depot manager', { plant_codes: '1012' }), U('coord@virgoasia.com', 'Coordinator (sales / CRR)', { plant_codes: '1012' }), U('se@virgoasia.com', 'Sales executive'), U('acc@virgoasia.com', 'Accounts'), U('plant@virgoasia.com', 'Plant'),
+    set('users', 'off', { email: 'off@virgoasia.com', role: 'HOD', active: false })]]);
   const as = (e, ops) => { M.setEmail(e); return M.call('deskWrite', [ops]); };
-  ok('planlocks: Management / HO may write', as('mgmt@virgoasia.com', [set('planlocks', 'FY27-Q3', { by: 'm' })]).ok);
-  ok('planlocks: Super admin may write', as('data@virgoasia.com', [set('planlocks', 'FY27-Q4', { by: 'm' })]).ok);
-  ok('planlocks: a Sales executive, a HOD and a Branch manager are refused', ['se', 'hod', 'bm'].every(u => as(u + '@virgoasia.com', [set('planlocks', 'FY28-Q1', { by: 'x' })]).code === 'permission_denied'));
-  ok('potential and log stay open to any active user', as('se@virgoasia.com', [set('potential', 'p1', { v: 1 }), set('log', 'l1', { v: 1 })]).ok);
-  const act = { id: 'A1', owner: 'se@virgoasia.com', assigner: 'Desk rule R1', department: 'Sales', plant: '1012', status: 'Open', thread: [] };
-  ok('a HOD (global role) may create a rule-made action', as('hod@virgoasia.com', [set('actions', 'A1', act)]).ok);
-  const upd = (e, patch = {}) => as(e, [set('actions', 'A1', { ...act, ...patch })]);
-  ok('the owner may update their action', upd('se@virgoasia.com', { status: 'In progress' }).ok);
-  ok('an unrelated Sales executive is refused', upd('se2@virgoasia.com').code === 'permission_denied');
-  ok('the owner\'s manager (reports-to) may update a rule-made action', upd('bm@virgoasia.com').ok);
-  as('bm@virgoasia.com', [set('actions', 'A2', { id: 'A2', owner: 'se2@virgoasia.com', assigner: 'bm@virgoasia.com', department: 'Sales', plant: '1099' })]);
-  ok('HOD of the action\'s own department: allowed (manual and rule-made)', upd('hod@virgoasia.com').ok);
-  ok('HOD of another department: refused, also for a rule-made action', upd('hodx@virgoasia.com').code === 'permission_denied');
-  ok('Branch manager of the action\'s plant: allowed; of another plant: refused', upd('bm@virgoasia.com').ok && upd('bm2@virgoasia.com').code === 'permission_denied');
-  ok('a Branch manager follow-up on a plant action (not the recipient, not the owner) is allowed; another plant\'s manager is refused', (() => { as('data@virgoasia.com', [set('actions', 'AP', { id: 'AP', owner: 'se2@virgoasia.com', assigner: 'mgmt@virgoasia.com', department: 'Sales', plant: '1012' }), set('followups', 'fp', { id: 'fp', action_id: 'AP', to_email: 'se2@virgoasia.com', status: 'Draft' })]); const a = as('bm@virgoasia.com', [set('followups', 'fp', { id: 'fp', action_id: 'AP', to_email: 'se2@virgoasia.com', status: 'Sent' })]); const b = as('bm2@virgoasia.com', [set('followups', 'fp', { id: 'fp', action_id: 'AP', to_email: 'se2@virgoasia.com', status: 'Dismissed' })]); return a.ok && b.code === 'permission_denied'; })());
-  ok('a HOD follow-up on an action of their own department is allowed, another department\'s HOD is refused', as('hod@virgoasia.com', [set('followups', 'fp', { id: 'fp', action_id: 'AP', to_email: 'se2@virgoasia.com', status: 'Sent' })]).ok && as('hodx@virgoasia.com', [set('followups', 'fp', { id: 'fp', action_id: 'AP', to_email: 'se2@virgoasia.com', status: 'Dismissed' })]).code === 'permission_denied');
-  ok('the HOD of the department may update a manual action; a HOD of another department is refused', as('hod@virgoasia.com', [set('actions', 'A2', { id: 'A2', owner: 'se2@virgoasia.com', assigner: 'bm@virgoasia.com', department: 'Sales', plant: '1099', status: 'x' })]).ok && as('hodx@virgoasia.com', [set('actions', 'A2', { id: 'A2', owner: 'se2@virgoasia.com', assigner: 'bm@virgoasia.com', department: 'Sales', plant: '1099', status: 'y' })]).code === 'permission_denied');
-  ok('the Branch manager of another plant is refused; of the plant is allowed', upd('bm2@virgoasia.com').code === 'permission_denied' && upd('bm@virgoasia.com').ok);
-  ok('Management and Super admin may update any action', upd('mgmt@virgoasia.com').ok && upd('data@virgoasia.com').ok);
-  ok('a user may create an action they assign themselves, not one assigned by someone else', as('se@virgoasia.com', [set('actions', 'A3', { id: 'A3', owner: 'se2@virgoasia.com', assigner: 'se@virgoasia.com', department: 'Sales' })]).ok && as('se@virgoasia.com', [set('actions', 'A4', { id: 'A4', owner: 'se2@virgoasia.com', assigner: 'bm2@virgoasia.com', department: 'Sales' })]).code === 'permission_denied');
-  ok('an action cannot be deleted by an unrelated user', as('se2@virgoasia.com', [{ op: 'delete', col: 'actions', id: 'A1' }]).code === 'permission_denied' && 'actions/A1' in M.stored());
-  const fu = { id: 'f1', action_id: 'A1', to_email: 'bm@virgoasia.com', status: 'Draft' };
-  ok('a followup draft is written by a HOD (engine) and updated by its recipient', as('hod@virgoasia.com', [set('followups', 'f1', fu)]).ok && as('bm@virgoasia.com', [set('followups', 'f1', { ...fu, status: 'Sent' })]).ok);
-  ok('an unrelated user cannot change the followup; the action owner can (not recipient, but owner of the action)', as('se2@virgoasia.com', [set('followups', 'f1', { ...fu, status: 'Dismissed' })]).code === 'permission_denied' && as('se@virgoasia.com', [set('followups', 'f1', { ...fu, status: 'Dismissed' })]).ok);
-  ok('a refused row-level write leaves nothing written from its batch', (() => { const r = as('se2@virgoasia.com', [set('log', 'rl1', { t: 1 }), set('actions', 'A1', act)]); return r.code === 'permission_denied' && !('log/rl1' in M.stored()); })());
+  const roles = ['data', 'mgmt', 'hod', 'hodx', 'bm', 'coord', 'se', 'acc', 'plant'];
+  ok('any active user, whatever the role, may write actions, followups, potential and log', roles.every((u) => as(u + '@virgoasia.com', [set('actions', 'A_' + u, { id: 'A_' + u, owner: 'x', assigner: 'Desk rule R1', department: 'Ops' }), set('followups', 'F_' + u, { id: 'F_' + u, action_id: 'A_data', to_email: 'someone@x' }), set('potential', 'P_' + u, { v: 1 }), set('log', 'L_' + u, { v: 1 })]).ok));
+  ok('a coordinator can change an escalation draft and mark it sent (engine path)', as('coord@virgoasia.com', [set('followups', 'f_c1', { id: 'f_c1', action_id: 'A_data', status: 'Drafted' })]).ok && as('coord@virgoasia.com', [{ op: 'merge', col: 'followups', id: 'f_c1', json: '{"status":"Sent"}' }]).ok);
+  ok('a HOD may clear a rule-made action of another department, and several in a row (auto-clear loop does not stop)', ['A_data', 'A_hodx', 'A_se'].every((id) => as('hod@virgoasia.com', [{ op: 'merge', col: 'actions', id, json: '{"cleared":true}' }]).ok));
+  ok('planlocks stays Management / HO and Super admin only', as('mgmt@virgoasia.com', [set('planlocks', 'FY27-Q3', { by: 'm' })]).ok && as('data@virgoasia.com', [set('planlocks', 'FY27-Q4', { by: 'm' })]).ok && ['hod', 'bm', 'se', 'coord', 'acc'].every((u) => as(u + '@virgoasia.com', [set('planlocks', 'FY28-Q1', { by: 'x' })]).code === 'permission_denied'));
+  ok('the 24 admin collections stay Super admin only (a HOD, a manager and a coordinator are refused)', ADMIN.every((c) => ['hod', 'mgmt', 'bm', 'coord'].every((u) => as(u + '@virgoasia.com', [set(c, 'zz', { a: 1 })]).code === 'permission_denied')));
+  ok('inactive and unknown users are refused everywhere', as('off@virgoasia.com', [set('actions', 'Z1', { id: 'Z1' })]).code === 'permission_denied' && as('stranger@virgoasia.com', [set('log', 'Z2', { id: 'Z2' })]).code === 'permission_denied');
   // merge
   as('data@virgoasia.com', [set('settings', 'main', { a: 1, b: 1 })]);
   ok('merge: another user changes a field, then a merge of a different field keeps both (done under the write lock)', (() => { as('data@virgoasia.com', [set('settings', 'main', { a: 5, b: 1 })]); const r = as('data@virgoasia.com', [{ op: 'merge', col: 'settings', id: 'main', json: JSON.stringify({ b: 2 }) }]); return r.ok && JSON.parse(M.stored()['settings/main']).a === 5 && JSON.parse(M.stored()['settings/main']).b === 2; })());
-  ok('merge into a missing document is refused', as('data@virgoasia.com', [{ op: 'merge', col: 'settings', id: 'nope', json: '{"x":1}' }]).code === 'invalid_argument');
+  ok('merge into a missing document fails for that operation only', (() => { const r = as('data@virgoasia.com', [{ op: 'merge', col: 'settings', id: 'nope', json: '{"x":1}' }, set('log', 'after', { t: 1 })]); return r.results[0].code === 'invalid_argument' && r.results[1].ok && 'log/after' in M.stored(); })());
   ok('merge by a non-admin on an admin collection is refused', as('se@virgoasia.com', [{ op: 'merge', col: 'settings', id: 'main', json: '{"x":1}' }]).code === 'permission_denied');
   M.setEmail('data@virgoasia.com');
-  const sz = M.call('deskSizes'); ok('deskSizes returns documents, rows and characters per collection', sz.ok && sz.cols.users.docs === 8 && sz.cols.users.chars > 100 && sz.pageChars === 2500000, JSON.stringify(sz).slice(0, 120));
+  const sz = M.call('deskSizes'); ok('deskSizes returns documents, rows and characters per collection', sz.ok && sz.cols.users.docs === 10 && sz.cols.users.chars > 100 && sz.pageChars === 2500000, JSON.stringify(sz).slice(0, 120));
   M.setEmail('se@virgoasia.com'); ok('deskSizes is Super admin only', M.call('deskSizes').code === 'permission_denied');
 }
 
