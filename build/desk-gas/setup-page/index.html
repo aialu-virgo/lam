@@ -1,0 +1,64 @@
+<title>Desk on Apps Script</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column of numbered setup steps; file copy cards sit inside the step that uses them. Virgo red accent from the Desk (D25). */
+:root{--bg:#f6f4f2;--card:#fff;--line:#e6e1dc;--ink:#17171a;--ink2:#5a5652;--brand:#c4000a;--ok:#0a7a55;--okbg:#e2f6ee;--warnbg:#fdf1dc;--warn:#8f5300;
+--sans:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151312;--card:#1e1c1b;--line:#302c2a;--ink:#f2eeeb;--ink2:#bab4af;--brand:#ff6b6b;--ok:#34d399;--okbg:#12342a;--warnbg:#3a2d12;--warn:#f5b544;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151312;--card:#1e1c1b;--line:#302c2a;--ink:#f2eeeb;--ink2:#bab4af;--brand:#ff6b6b;--ok:#34d399;--okbg:#12342a;--warnbg:#3a2d12;--warn:#f5b544;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px}
+main{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:26px;font-weight:800;margin:0;text-wrap:balance}h1 span{color:var(--brand)}
+.lead{color:var(--ink2);margin:0}
+ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;counter-reset:s}
+ol.steps>li{counter-increment:s;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px 14px 52px;position:relative;min-width:0}
+ol.steps>li::before{content:counter(s);position:absolute;left:14px;top:14px;width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-weight:800;font-size:13px;display:grid;place-items:center}
+li h2{font-size:15px;margin:0 0 4px;font-weight:800}
+li p{margin:4px 0}
+.file{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:8px 10px;margin-top:8px}
+.file code{font-family:var(--mono);font-size:13px;font-weight:600}.file small{color:var(--ink2);font-family:var(--mono);font-size:12px}
+button{font:inherit;font-weight:700;font-size:13px;border:1px solid var(--brand);background:var(--brand);color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;margin-left:auto}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}button[disabled]{opacity:.5;cursor:default}
+.st{font-size:12.5px;font-weight:600}.st.ok{color:var(--ok)}.st.err{color:var(--brand)}
+.box{border-radius:12px;padding:10px 14px;font-size:14px}.box.warn{background:var(--warnbg);color:var(--warn)}.box.ok{background:var(--okbg);color:var(--ok)}
+b.k{font-weight:700}code.i{font-family:var(--mono);font-size:13px}
+textarea{width:100%;min-height:90px;font-family:var(--mono);font-size:11px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;margin-top:6px}
+</style>
+<main>
+<h1>Performance Desk on <span>Google Apps Script</span></h1>
+<p class="lead">Set up once as <b class="k">data@virgoasia.com</b>. Every Virgo Google user can then open the Desk at your own link, with no claude.ai account. About 10 minutes, plus the data move.</p>
+<div class="box warn"><b class="k">Cutover rule:</b> from the moment you download the backup (step 8) until the restore shows every section "ok", nobody uploads or edits on the claude.ai Desk.</div>
+<ol class="steps">
+<li><h2>Create the project</h2><p>Open <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com › New project</a> signed in as data@virgoasia.com. Name it <b class="k">Virgo Desk</b>.</p></li>
+<li><h2>Settings file</h2><p>Project Settings (gear) › tick <b class="k">Show "appsscript.json" manifest file in editor</b>. Open <code class="i">appsscript.json</code>, select all, paste:</p>
+<div class="file" data-f="appsscript.json.txt"><code>appsscript.json</code><small></small><button type="button" id="b1">Copy</button><span class="st"></span></div></li>
+<li><h2>Server code</h2><p>Open <code class="i">Code.gs</code>, select all, paste:</p>
+<div class="file" data-f="Desk-Code.gs.txt"><code>Code.gs</code><small></small><button type="button" id="b2">Copy</button><span class="st"></span></div></li>
+<li><h2>The Desk page</h2><p><b class="k">+ › HTML</b>, name it exactly <code class="i">Index</code>. Select all, paste (about 1.4 MB, the editor may take a minute), then <b class="k">Save</b>:</p>
+<div class="file" data-f="Desk-Index.txt"><code>Index.html</code><small></small><button type="button" id="b3">Copy</button><span class="st"></span></div></li>
+<li><h2>Run setup</h2><p>In the toolbar choose the function <b class="k">setup</b> and press <b class="k">Run</b>. Allow the permissions (Google Sheets and your email address). This creates the spreadsheet "Virgo Desk database (do not edit)" in your Drive.</p></li>
+<li><h2>Deploy</h2><p><b class="k">Deploy › New deployment › Web app</b>. Execute as: <b class="k">Me</b>. Who has access: <b class="k">Anyone within virgoasia.com</b>. Deploy, then copy the <b class="k">Web app URL</b> (ends in <code class="i">/exec</code>). That is the link for all users. Send it to the Delivery Lead.</p></li>
+<li><h2>Open it</h2><p>Open the <code class="i">/exec</code> link yourself. You are a Super admin, so Admin is available.</p></li>
+<li><h2>Download the backup</h2><p>On the <a href="https://claude.ai/artifact/GZei5qVxZeom1fMm45t4nx" target="_blank" rel="noopener">claude.ai Desk</a>: <b class="k">Admin › Tools › Download full backup</b>, then save all files to your computer. If the page says data changed during the backup, run it again.</p></li>
+<li><h2>Restore</h2><p>On the new Desk: <b class="k">Admin › Tools › Restore from backup</b>, select all the backup files together. Keep the tab open until every section shows "ok". If it says "Restore incomplete", tick <b class="k">Replace everything</b> and run it again.</p></li>
+<li><h2>Check and share</h2><p><b class="k">Admin › Tools › Measure store size</b> confirms what loaded. Then share the <code class="i">/exec</code> link with users who are in Admin › Users.</p></li>
+</ol>
+<div class="box ok"><b class="k">Later versions:</b> paste the new Index file, then Deploy › Manage deployments › pencil › Version: New version › Deploy. The link stays the same.</div>
+</main>
+<script>
+(function(){
+var cache={};
+function kb(n){return n>1048576?(n/1048576).toFixed(2)+' MB':Math.round(n/1024)+' KB'}
+document.querySelectorAll('.file').forEach(function(el){
+  var f=el.dataset.f,btn=el.querySelector('button'),st=el.querySelector('.st'),sm=el.querySelector('small');
+  btn.disabled=true;st.textContent='Loading…';
+  fetch(f).then(function(r){if(!r.ok)throw new Error(r.status);return r.text()}).then(function(t){cache[f]=t;sm.textContent=kb(t.length);btn.disabled=false;st.textContent=''}).catch(function(){st.className='st err';st.textContent='Could not load the file. Reload the page.'});
+  btn.addEventListener('click',function(){
+    var t=cache[f];if(t==null)return;
+    function fallback(){st.className='st err';st.textContent='Copy blocked here. Select all in the box below and copy.';if(!el.nextElementSibling||el.nextElementSibling.tagName!=='TEXTAREA'){var ta=document.createElement('textarea');ta.readOnly=true;ta.value=t;el.after(ta);ta.focus();ta.select()}}
+    try{navigator.clipboard.writeText(t).then(function(){st.className='st ok';st.textContent='Copied. Now paste in the editor.'},fallback)}catch(e){fallback()}
+  });
+});
+})();
+</script>
