@@ -49,7 +49,7 @@ export function makeEnv(opts = {}) {
     LockService: { getScriptLock() { return { waitLock() { if (state.held > 0) throw new Error('Lock re-entered: the script lock is already held by this execution'); state.locks++; if (state.lockFail) throw new Error('Could not obtain lock after 30000 ms'); state.held++; }, releaseLock() { if (state.held > 0) state.held--; } }; } },
     CacheService: { getScriptCache() { return { get(k) { return k in cache ? cache[k] : null; }, put(k, v) { cache[k] = v; } }; } },
     PropertiesService: { getScriptProperties() { return { getProperty(k) { return k in props ? props[k] : null; }, setProperty(k, v) { if (String(v).length > 9216) throw new Error('Property value too large'); props[k] = v; } }; } },
-    Session: { getActiveUser() { return { getEmail() { return state.email; } }; } },
+    Session: { getActiveUser() { return { getEmail() { return state.email; } }; }, getEffectiveUser() { return { getEmail() { return state.effective || 'data@virgoasia.com'; } }; } },
     ScriptApp: { getService() { return { getUrl() { return 'https://script.google.com/a/macros/virgoasia.com/s/XYZ/exec'; } }; } },
     Utilities: { sleep() {} }, Logger: { log() {} },
     HtmlService: {

@@ -19,15 +19,20 @@ var SHARED_COLLECTIONS = ['potential', 'actions', 'followups', 'log', 'planlocks
 var GLOBAL_ROLES = ['Super admin', 'Management / HO', 'HOD'];
 var HEADER = ['id', 'part', 'len', 'json', 'updatedAt', 'updatedBy'];
 
-/* Run once from the editor (select setup, Run). Creates the database spreadsheet and triggers the permission prompt. Safe to run again. */
+/* Run once from the editor (select setup, Run). Creates the database spreadsheet and triggers the permission prompt. Safe to run again.
+ * It is also reachable through google.script.run, so it works only for the project owner (the editor run) or an active Super admin. */
 function setup() {
-  var id = ssId_(true), ss = SpreadsheetApp.openById(id);
-  PropertiesService.getScriptProperties().getProperty('DESK_REVS');
-  CacheService.getScriptCache().get('setup');
-  String(Session.getActiveUser().getEmail());
-  ScriptApp.getService().getUrl();
-  Logger.log('Desk database ready: ' + id);
-  return id;
+  return wrap_(function () {
+    var email = activeEmail_(), eff = String(Session.getEffectiveUser().getEmail() || '').toLowerCase();
+    if (!email || !(email === eff || isAdmin_(resolveUser_(email)))) fail_('permission_denied', 'Only the project owner or a Super admin may run setup.');
+    var id = ssId_(true);
+    SpreadsheetApp.openById(id);
+    PropertiesService.getScriptProperties().getProperty('DESK_REVS');
+    CacheService.getScriptCache().get('setup');
+    ScriptApp.getService().getUrl();
+    Logger.log('Desk database ready: ' + id);
+    return { ok: true, id: id };
+  });
 }
 
 function doGet(e) {
@@ -157,7 +162,7 @@ function readAll_(ss, col) {
 
 /* ---------- access ---------- */
 function resolveUser_(email) {
-  var out = { email: email, role: null, active: false, name: '', seed: SEED_SUPER.indexOf(email) >= 0 };
+  var out = { email: email, role: null, active: false, name: '', department: '', plant_codes: '', reports_to_email: '', seed: SEED_SUPER.indexOf(email) >= 0 };
   if (!email) return out;
   var ss = book_(false), u = null;
   if (ss) {
@@ -165,12 +170,12 @@ function resolveUser_(email) {
     if (c) { try { u = JSON.parse(c).u; } catch (e) {} }
     else {
       readAll_(ss, 'users').docs.forEach(function (d) {
-        try { var o = JSON.parse(d.json); if (String(o.email || '').toLowerCase() === email) u = { role: o.role, active: o.active !== false, name: o.name || '' }; } catch (e) {}
+        try { var o = JSON.parse(d.json); if (String(o.email || '').toLowerCase() === email) u = { role: o.role, active: o.active !== false, name: o.name || '', department: o.department || '', plant_codes: o.plant_codes || '', reports_to_email: o.reports_to_email || '' }; } catch (e) {}
       });
       cache.put(ck, JSON.stringify({ u: u }), 120);
     }
   }
-  if (u) { out.role = u.role; out.active = u.active; out.name = u.name; }
+  if (u) { out.role = u.role; out.active = u.active; out.name = u.name; out.department = u.department || ''; out.plant_codes = u.plant_codes || ''; out.reports_to_email = u.reports_to_email || ''; }
   if (out.seed) { out.role = 'Super admin'; out.active = true; } // seed admins cannot be locked out, as in the page
   return out;
 }
@@ -285,17 +290,18 @@ function endWrite_(cols) {
 function parseUsers_(ss) { return readAll_(ss, 'users').docs.map(function (d) { try { return JSON.parse(d.json); } catch (e) { return null; } }).filter(Boolean); }
 function plantsOf_(u) { return String(u && u.plant_codes || '').split(';').map(function (x) { return x.trim(); }).filter(Boolean); }
 function normD_(x) { return String(x || '').trim().toLowerCase(); }
-/* the page's own rules (canManage, canRespond, canVerify): who may change an existing action */
+/* the page's own rules (30-rules.js): canRespond = owner or canManage; canManage = Super admin, Management / HO, the assigner, the HOD of the action's department,
+ * the Branch / depot manager holding the action's plant; canVerify adds, for rule-made actions only, the owner's direct manager (reports-to). */
 function actionOk_(me, a, users) {
   if (!a) return false;
   if (me.role === 'Super admin' || me.role === 'Management / HO') return true;
   if (a.owner === me.email || a.assigner === me.email) return true;
-  var rule = String(a.assigner || '').indexOf('Desk rule') === 0;
-  if (me.role === 'HOD' && (normD_(a.department) === normD_(me.department) || rule)) return true;
+  if (me.role === 'HOD' && normD_(a.department) === normD_(me.department)) return true;
   if (me.role === 'Branch / depot manager' && a.plant && plantsOf_(me).indexOf(String(a.plant)) >= 0) return true;
-  var byEmail = Object.create(null); users.forEach(function (u) { byEmail[String(u.email || '').toLowerCase()] = u; });
-  var cur = byEmail[String(a.owner || '').toLowerCase()], hops = 0;      // the owner's reports-to chain
-  while (cur && cur.reports_to_email && hops++ < 12) { if (String(cur.reports_to_email).toLowerCase() === me.email) return true; cur = byEmail[String(cur.reports_to_email).toLowerCase()]; }
+  if (String(a.assigner || '').indexOf('Desk rule') === 0) {
+    var ow = null; users.forEach(function (u) { if (String(u.email || '').toLowerCase() === String(a.owner || '').toLowerCase()) ow = u; });
+    if (ow && String(ow.reports_to_email || '').toLowerCase() === me.email) return true;
+  }
   return false;
 }
 /* inside the lock, before anything is written: turn merges into full documents, check sizes and the row-level rules for actions and followups */
@@ -322,7 +328,7 @@ function prepare_(ss, who, final, order) {
       else { var nd = o.op === 'set' ? JSON.parse(o.json) : {}; ok = GLOBAL_ROLES.indexOf(who.role) >= 0 || nd.assigner === who.email; }
     } else {
       var f = ex || (o.op === 'set' ? JSON.parse(o.json) : {});
-      if (GLOBAL_ROLES.indexOf(who.role) >= 0 || String(f.to_email || '').toLowerCase() === who.email) ok = true;
+      if ((!ex && GLOBAL_ROLES.indexOf(who.role) >= 0) || String(f.to_email || '').toLowerCase() === who.email) ok = true; // the engine (global roles) creates drafts; changing an existing one follows the action
       else { var ar = f.action_id ? docsRaw_(colSheet_(ss, 'actions', false), [f.action_id])[f.action_id] : null; var ad = null; try { ad = ar ? JSON.parse(ar) : null; } catch (e) {} ok = !!ad && actionOk_(who, ad, getUsers()); }
     }
     if (!ok) fail_('permission_denied', 'You may not change ' + o.col + '/' + o.id + ': it is not yours, not in your reporting line, and you are not its HOD or Management.');

@@ -6250,7 +6250,9 @@ function bkDialogNote(uid){
  * (documents, characters and a CRC-32 per collection; bytes and CRC-32 per file). The files are built in this browser tab and saved to the
  * viewer's own computer; nothing is sent anywhere. Doc ids and contents are kept exactly as stored.
  * Checksum of a collection: the sum (mod 2^32, 8 hex digits) of the CRC-32 of id + "\n" + JSON.stringify(data) + "\n" over its documents, so it does not depend on document order.
- * Every read goes to the source database ({source:'server'}), never to a cached copy. After the export every collection is read AGAIN from the source and compared with the first read
+ * The claude.ai db contract (artifact-capabilities db.d.ts) gives get() no options, so a read cannot be told to bypass a cache. Instead a read counts only when its snapshot is server-definitive
+ * (metadata.fromCache is not true); otherwise it is retried, and after 6 tries the backup stops with an error rather than saving a possibly stale copy.
+ * After the export every collection is read AGAIN from the source and compared with the first read
  * (documents, characters and checksum); any difference, including an edit that changes no count, is flagged in the page and in the manifest (changedDuringExport).
  * Admin > Tools > "Store size" measures documents and characters per collection (a fresh read here; the Apps Script build asks its server instead). */
 var FB_COLS=['users','plants','periods','cells','mappings','uploads','transfers','potential','planlocks','audit','actions','followups','settings','phasing','roll','receivables','collections','backups','customers','creditnotes','stock','itemmeta','salesmaster','inv','items','rejects','log','orders','deliveries'];
@@ -6263,9 +6265,14 @@ function fbCrcOf(str){return fbHex(fbCrcAdd(0xFFFFFFFF,str))}
 function fbDocCrc(id,js){return (fbCrcAdd(0xFFFFFFFF,id+'\n'+js+'\n')^0xFFFFFFFF)>>>0}
 function fbSumHex(n){return ('0000000'+(n>>>0).toString(16)).slice(-8)}
 function fbOk(){return viewerRole()==='Super admin'&&!readOnly()}
+function fbDefinitive(snap){return !(snap&&snap.metadata&&snap.metadata.fromCache===true)}
 async function fbReadAll(col){
-  var q=S.db.collection(col);
-  var snap=q.get?await dbRetry(function(){return q.get({source:'server'})}):await new Promise(function(res,rej){var un=q.onSnapshot(function(s){try{un&&un()}catch(e){}res(s)},rej)});
+  var q=S.db.collection(col),snap=null;
+  for(var a=0;a<6&&!snap;a++){
+    var s1=q.get?await dbRetry(function(){return q.get()}):await new Promise(function(res,rej){var un=null,t=setTimeout(function(){try{un&&un()}catch(e){}res(null)},10000);un=q.onSnapshot(function(sn){if(!fbDefinitive(sn))return;clearTimeout(t);try{un&&un()}catch(e){}res(sn)},rej)});
+    if(s1&&fbDefinitive(s1))snap=s1;else await sleep(1000);
+  }
+  if(!snap)throw new Error('The database did not give a server-confirmed read of '+col+'. Nothing was saved. Try again in a minute.');
   return snap.docs.map(function(d){return {id:d.id,data:d.data()||{}}}).sort(function(a,b){return a.id<b.id?-1:a.id>b.id?1:0});
 }
 async function fbMake(){
