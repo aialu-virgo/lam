@@ -27,6 +27,11 @@ var SAP_RUN_STALE_MS = 480000;           // a run flag older than this belongs t
 var SAP_CHUNK_ROWS = 2500;
 var SAP_RETRIES = 3;
 var SAP_STAGE_COLS = ['Invoice Document Number', 'Invoice Document item', 'Invoice Date', 'Plant', 'Sold-to-Party Number', 'Sold-to-Party Description', 'Product Code', 'Invoice Qty', 'Total Amount (Item)', 'Billing Type', 'Product Type', 'Material Group 3', 'Material Group 4', 'Sales District', 'Reference Document', 'Sales Executive'];
+/* Billing read shape (mapping 1.1): A = header A_BillingDocument with $expand=to_Item; B = item set A_BillingDocumentItem carrying the header fields (how the group's existing connector reads).
+ * SAP_BILLING_SHAPE (Script Property) forces one; otherwise sapVerifyMetadata picks B only when A is incomplete and B is complete (saved as SAP_SHAPE); default A. */
+var SAP_ITEM_FIELDS = ['BillingDocument', 'BillingDocumentItem', 'Plant', 'Material', 'BillingQuantity', 'BillingQuantityUnit', 'NetAmount', 'TransactionCurrency', 'AdditionalMaterialGroup3', 'AdditionalMaterialGroup4', 'SalesDistrict', 'ReferenceSDDocument'];
+var SAP_HDR_FIELDS = ['BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate'];
+var SAP_META_B = [{ svc: 'billing', set: 'A_BillingDocumentItem', nav: [], props: SAP_ITEM_FIELDS.concat(SAP_HDR_FIELDS) }];
 var SAP_META = [
   { svc: 'billing', set: 'A_BillingDocument', nav: ['to_Item'], props: ['BillingDocument', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate', 'TransactionCurrency'] },
   { svc: 'billing', set: 'A_BillingDocumentItem', nav: [], props: ['BillingDocument', 'BillingDocumentItem', 'Plant', 'Material', 'BillingQuantity', 'BillingQuantityUnit', 'NetAmount', 'TransactionCurrency', 'AdditionalMaterialGroup3', 'AdditionalMaterialGroup4', 'SalesDistrict', 'ReferenceSDDocument'] },
@@ -55,7 +60,8 @@ function sapCfg_() {
   var cancel = String(p.getProperty('CANCEL_MODE') || '').trim().toLowerCase() || 'exclude';
   if (cancel !== 'exclude' && cancel !== 'mirror') fail_('sap_not_configured', 'CANCEL_MODE must be exclude or mirror. Nothing was read.');
   var user = String(p.getProperty('SAP_USER')), pass = String(p.getProperty('SAP_PASSWORD'));
-  return { base: base, company: company, cancel: cancel, auth: 'Basic ' + Utilities.base64Encode(user + ':' + pass), secrets: [user, pass, p.getProperty('SAP_BASE_URL')] };
+  var shape = String(p.getProperty('SAP_BILLING_SHAPE') || p.getProperty('SAP_SHAPE') || 'A').trim().toUpperCase() === 'B' ? 'B' : 'A';
+  return { base: base, company: company, cancel: cancel, shape: shape, auth: 'Basic ' + Utilities.base64Encode(user + ':' + pass), secrets: [user, pass, p.getProperty('SAP_BASE_URL')] };
 }
 function sapRedact_(cfg, s) {
   s = String(s == null ? '' : s);
@@ -84,9 +90,10 @@ function sapHttp_(cfg, service, path, params, accept) {
   var detail = '';
   try { var j = JSON.parse(text); var m = j && j.error && j.error.message; detail = typeof m === 'string' ? m : (m && m.value) || ''; } catch (e) { detail = ''; }
   detail = sapRedact_(cfg, detail);
-  if (code === 0) fail_('sap_unreachable', 'SAP could not be reached (' + (lastErr || 'no answer') + '). Nothing was changed.');
+  var ipNote = ' If the address and user are right, SAP may only accept calls from allow-listed IP addresses. Apps Script calls come from Google addresses that are not fixed, so ask the SAP team whether an IP allow-list is in force (open question Q31).';
+  if (code === 0) fail_('sap_unreachable', 'SAP could not be reached (' + (lastErr || 'no answer') + '). Check SAP_BASE_URL.' + ipNote + ' Nothing was changed.');
   if (code === 401) fail_('sap_auth', 'SAP refused the user name or password (HTTP 401). Check SAP_USER and SAP_PASSWORD. Nothing was changed.');
-  if (code === 403) fail_('sap_forbidden', 'The SAP user is not allowed to read this service (HTTP 403)' + (detail ? ': ' + detail : '') + '. Nothing was changed.');
+  if (code === 403) fail_('sap_forbidden', 'The SAP user is not allowed to read this service (HTTP 403)' + (detail ? ': ' + detail : '') + '. The user may lack the read role for this service, or an IP allow-list may be blocking the call.' + ipNote + ' Nothing was changed.');
   if (code === 404) fail_('sap_not_found', 'SAP does not know this service or entity (HTTP 404) in ' + service + '.' + (detail ? ' ' + detail : '') + ' Run sapVerifyMetadata. Nothing was changed.');
   fail_('sap_error', 'SAP answered HTTP ' + code + (detail ? ': ' + detail : '') + '. Nothing was changed.');
 }
@@ -232,9 +239,14 @@ function sapLookups_(cfg, ctx, entries) {
   }
   function fetchSet(svc, set, key, field, map, prefix, miss) {
     for (var i = 0; i < miss.length; i += SAP_LOOKUP_BATCH) {
-      var part = miss.slice(i, i + SAP_LOOKUP_BATCH), p = { '$filter': part.map(function (x) { return key + ' eq ' + sapQ_(x); }).join(' or '), '$select': key + ',' + field, '$top': String(part.length * 2) };
-      var r = sapJson_(cfg, sapHttp_(cfg, svc, set, p));
-      r.results.forEach(function (o) { map[String(o[key])] = String(o[field] == null ? '' : o[field]); });
+      var part = miss.slice(i, i + SAP_LOOKUP_BATCH), p = { '$filter': part.map(function (x) { return key + ' eq ' + sapQ_(x); }).join(' or '), '$select': key + ',' + field, '$top': String(part.length * 2), '$orderby': key + ' asc' }, got = 0, total = null;
+      for (;;) {   // a server may cap the page size: keep reading until the count is reached or a page is empty
+        p['$skip'] = String(got); if (got === 0) p['$inlinecount'] = 'allpages'; else delete p['$inlinecount'];
+        var r = sapJson_(cfg, sapHttp_(cfg, svc, set, p)); if (got === 0) total = r.count;
+        r.results.forEach(function (o) { map[String(o[key])] = String(o[field] == null ? '' : o[field]); });
+        got += r.results.length;
+        if (!r.results.length || (total !== null && got >= total)) break;
+      }
       part.forEach(function (x) { if (!(x in map)) map[x] = ''; try { cache.put(prefix + x, map[x], 21600); } catch (e) {} });
     }
   }
@@ -250,7 +262,28 @@ var SAP_HDR_SELECT = 'BillingDocument,BillingDocumentType,BillingDocumentDate,Co
 function sapMonthFilter_(cfg, ym, extra) {
   return 'CompanyCode eq ' + sapQ_(cfg.company) + ' and BillingDocumentDate ge ' + sapDtLit_(ym + '-01') + ' and BillingDocumentDate lt ' + sapDtLit_(sapNextYm_(ym) + '-01') + (extra ? ' and ' + extra : '');
 }
+var SAP_ITEM_SELECT = SAP_ITEM_FIELDS.concat(SAP_HDR_FIELDS).join(',');
+/* shape B: group a page of items into documents; unless this is the last page the trailing document is handed back (drop = its item count) and read again from its first item on the next page */
+function sapItemsToHeaders_(items, last) {
+  var out = [], cur = null;
+  items.forEach(function (it) {
+    if (!cur || cur.BillingDocument !== it.BillingDocument) {
+      cur = { BillingDocument: it.BillingDocument, BillingDocumentType: it.BillingDocumentType, BillingDocumentDate: it.BillingDocumentDate, CompanyCode: it.CompanyCode, SoldToParty: it.SoldToParty, BillingDocumentIsCancelled: it.BillingDocumentIsCancelled,
+        CancelledBillingDocument: it.CancelledBillingDocument, LastChangeDate: it.LastChangeDate, TransactionCurrency: it.TransactionCurrency, to_Item: { results: [] } };
+      out.push(cur);
+    }
+    cur.to_Item.results.push(it);
+  });
+  var drop = 0;
+  if (!last && out.length > 1) drop = out.pop().to_Item.results.length;
+  return { headers: out, drop: drop };
+}
 function sapReadPage_(cfg, ym, skip) {
+  if (cfg.shape === 'B') {
+    var pb = { '$filter': sapMonthFilter_(cfg, ym), '$select': SAP_ITEM_SELECT, '$orderby': 'BillingDocument asc,BillingDocumentItem asc', '$top': String(SAP_PAGE_TOP), '$skip': String(skip) };
+    if (skip === 0) pb['$inlinecount'] = 'allpages';
+    return sapJson_(cfg, sapHttp_(cfg, SAP_SVC.billing, 'A_BillingDocumentItem', pb));
+  }
   var p = { '$filter': sapMonthFilter_(cfg, ym), '$expand': 'to_Item', '$select': SAP_HDR_SELECT, '$orderby': 'BillingDocument asc', '$top': String(SAP_PAGE_TOP), '$skip': String(skip) };
   if (skip === 0) p['$inlinecount'] = 'allpages';
   return sapJson_(cfg, sapHttp_(cfg, SAP_SVC.billing, 'A_BillingDocument', p));
@@ -267,7 +300,7 @@ function sapPlanMonths_(cfg, ss) {
     var p = { '$filter': 'CompanyCode eq ' + sapQ_(cfg.company) + ' and BillingDocumentDate ge ' + sapDtLit_(SAP_FEED_FROM) + ' and LastChangeDate ge ' + sapDtLit_(sapAddDays_(wm, -1)), '$select': 'BillingDocument,BillingDocumentType,BillingDocumentDate,CancelledBillingDocument,LastChangeDate',
       '$orderby': 'BillingDocument asc', '$top': String(SAP_PAGE_TOP), '$inlinecount': 'allpages' }, skip = 0, cancelled = [], pages = 0, big = false;
     for (;;) {
-      p['$skip'] = String(skip); var r = sapJson_(cfg, sapHttp_(cfg, SAP_SVC.billing, 'A_BillingDocument', p)); pages++;
+      p['$skip'] = String(skip); var r = sapJson_(cfg, sapHttp_(cfg, SAP_SVC.billing, cfg.shape === 'B' ? 'A_BillingDocumentItem' : 'A_BillingDocument', p)); pages++;
       r.results.forEach(function (h) { add(sapYm_(sapDate_(h.BillingDocumentDate))); var c = String(h.CancelledBillingDocument || '').trim(); if (c && cancelled.indexOf(c) < 0 && cancelled.length < 400) cancelled.push(c); });
       skip += r.results.length;
       if (!r.results.length || (r.count !== null && skip >= r.count)) break;
@@ -275,7 +308,11 @@ function sapPlanMonths_(cfg, ss) {
     }
     if (big) full();
     else cancelled.forEach(function (id) {   // a cancellation also touches the month of the document it cancels
-      try { var d = sapJson_(cfg, sapHttp_(cfg, SAP_SVC.billing, "A_BillingDocument(" + sapQ_(id) + ")", { '$select': 'BillingDocumentDate' })).results[0]; if (d) add(sapYm_(sapDate_(d.BillingDocumentDate))); }
+      try {
+        var d = cfg.shape === 'B' ? sapJson_(cfg, sapHttp_(cfg, SAP_SVC.billing, 'A_BillingDocumentItem', { '$filter': 'BillingDocument eq ' + sapQ_(id), '$select': 'BillingDocument,BillingDocumentDate', '$top': '1' })).results[0]
+          : sapJson_(cfg, sapHttp_(cfg, SAP_SVC.billing, "A_BillingDocument(" + sapQ_(id) + ")", { '$select': 'BillingDocumentDate' })).results[0];
+        if (d) add(sapYm_(sapDate_(d.BillingDocumentDate)));
+      }
       catch (e) { if (e.deskCode !== 'sap_not_found') throw e; }
     });
   }
@@ -307,15 +344,16 @@ function sapRunJob_(cfg, job, t0, budget, handlers) {
       sapBeat_();
       var r = sapReadPage_(cfg, ym, job.skip);
       if (job.skip === 0) job.total = r.count;
-      var entries = [];
-      r.results.forEach(function (h) {
+      var entries = [], got = r.results.length, hdrs = r.results;
+      if (cfg.shape === 'B') { var g = sapItemsToHeaders_(r.results, got === 0 || (job.total !== null && job.skip + got >= job.total)); hdrs = g.headers; got = got - g.drop; }
+      hdrs.forEach(function (h) {
         var lc = sapDate_(h.LastChangeDate); if (lc && lc > job.maxChange) job.maxChange = lc;
         sapDocRows_(cfg, h, job.cnt).forEach(function (e) { entries.push(e); });
       });
       if (entries.length) sapLookups_(cfg, ctx, entries);
       handlers.rows(job, ym, entries);
       entries.forEach(function (e) { if (handlers.stage) buf.push(e.row); });
-      job.skip += r.results.length;
+      job.skip += got;
       if (handlers.stage ? buf.length >= SAP_CHUNK_ROWS : true) { flush(); sapSaveCursor_(job); }   // the cursor only ever points at a place whose rows are already staged
       if (!r.results.length || (job.total !== null && job.skip >= job.total)) break;
     }
@@ -330,6 +368,7 @@ function sapRunJob_(cfg, job, t0, budget, handlers) {
 
 /* ---------- sapSync ---------- */
 function sapSyncRun_(source) {
+  if (String(sapProps_().getProperty('SAP_SYNC_ENABLED') || '').trim().toLowerCase() !== 'yes') fail_('sap_sync_disabled', 'sapSync is switched off. It stays off until the Script Property SAP_SYNC_ENABLED is set to yes (after the shadow run is accepted). Nothing was read.');
   var cfg = sapCfg_(), st = sapStatusGet_();
   if (!st.shadow) fail_('sap_shadow_first', 'Run sapShadowRun first and have Vijay accept the October comparison. Nothing was read.');
   var ss = book_(true); sapAcquire_();
@@ -477,29 +516,39 @@ function sapParseMeta_(xml) {
   return sets;
 }
 function sapVerifyRun_() {
-  var cfg = sapCfg_(), rows = [], gaps = 0, seen = {}, sets = {};
-  try {
-    SAP_META.forEach(function (e) {
+  var cfg = sapCfg_(), rows = [], gaps = 0, seen = {}, sets = {}, forced = String(sapProps_().getProperty('SAP_BILLING_SHAPE') || '').trim().toUpperCase(), shape = forced === 'B' ? 'B' : 'A';
+  function check(list) {
+    var rr = [], g = 0;
+    list.forEach(function (e) {
       if (!(e.svc in seen)) { seen[e.svc] = sapParseMeta_(sapHttp_(cfg, SAP_SVC[e.svc], '$metadata', null, 'application/xml').text); }
       sets = seen[e.svc]; var t = sets[e.set];
       if (!t) {
-        gaps += 1 + e.nav.length + e.props.length; rows.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: '(entity set)', status: 'GAP' });
-        e.nav.forEach(function (n) { rows.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: n + ' (navigation)', status: 'GAP' }); });
-        e.props.forEach(function (p) { rows.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: p, status: 'GAP' }); });
+        g += 1 + e.nav.length + e.props.length; rr.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: '(entity set)', status: 'GAP' });
+        e.nav.forEach(function (n) { rr.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: n + ' (navigation)', status: 'GAP' }); });
+        e.props.forEach(function (p) { rr.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: p, status: 'GAP' }); });
         return;
       }
-      rows.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: '(entity set)', status: 'ok' });
-      e.nav.forEach(function (n) { var ok = !!t.navs[n]; if (!ok) gaps++; rows.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: n + ' (navigation)', status: ok ? 'ok' : 'GAP' }); });
-      e.props.forEach(function (p) { var ok = !!t.props[p]; if (!ok) gaps++; rows.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: p, status: ok ? 'ok' : 'GAP' }); });
+      rr.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: '(entity set)', status: 'ok' });
+      e.nav.forEach(function (n) { var ok = !!t.navs[n]; if (!ok) g++; rr.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: n + ' (navigation)', status: ok ? 'ok' : 'GAP' }); });
+      e.props.forEach(function (p) { var ok = !!t.props[p]; if (!ok) g++; rr.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: p, status: ok ? 'ok' : 'GAP' }); });
     });
+    return { rows: rr, gaps: g };
+  }
+  var others = SAP_META.filter(function (e) { return e.svc !== 'billing'; }), billA = SAP_META.filter(function (e) { return e.svc === 'billing'; });
+  try {
+    var chosen = check(shape === 'B' ? SAP_META_B : billA), picked = shape;
+    if (!forced && chosen.gaps) { var alt = check(SAP_META_B); if (!alt.gaps) { chosen = alt; picked = 'B'; } }
+    shape = picked; rows = chosen.rows; gaps = chosen.gaps;
+    var rest = check(others); rows = rows.concat(rest.rows); gaps += rest.gaps;
+    if (!forced) sapProps_().setProperty('SAP_SHAPE', shape);
   } catch (e) {
     sapErrPush_(cfg, e.message || e);
     sapStatusPatch_({ lastAt: new Date(Date.now()).toISOString(), lastKind: 'verify', lastOk: false, message: sapRedact_(cfg, e.message || e), conn: { ok: false, at: new Date(Date.now()).toISOString() } });
     throw e;
   }
   var now = new Date(Date.now()).toISOString();
-  sapStatusPatch_({ lastAt: now, lastKind: 'verify', lastOk: true, message: 'SAP names checked: ' + (rows.length - gaps) + ' ok, ' + gaps + ' GAP.', conn: { ok: true, at: now }, verify: { at: now, ok: gaps === 0, gaps: gaps, checked: rows.length } });
-  return { ok: true, allOk: gaps === 0, gaps: gaps, checked: rows.length, rows: rows, message: sapStatusGet_().message };
+  sapStatusPatch_({ lastAt: now, lastKind: 'verify', lastOk: true, message: 'SAP names checked: ' + (rows.length - gaps) + ' ok, ' + gaps + ' GAP.', conn: { ok: true, at: now }, verify: { at: now, ok: gaps === 0, gaps: gaps, checked: rows.length, shape: shape } });
+  return { ok: true, allOk: gaps === 0, gaps: gaps, shape: shape, checked: rows.length, rows: rows, message: sapStatusGet_().message };
 }
 
 /* ---------- public functions (owner or Super admin) ---------- */

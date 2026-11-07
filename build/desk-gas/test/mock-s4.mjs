@@ -40,7 +40,7 @@ export function synthDocs({ seed = 1, from = '2026-10-01', to = '2026-10-10', pl
 }
 const META = {
   API_BILLING_DOCUMENT_SRV: { A_BillingDocument: { type: 'A_BillingDocumentType', props: ['BillingDocument', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate', 'TransactionCurrency', 'SDDocumentCategory'], nav: ['to_Item'] },
-    A_BillingDocumentItem: { type: 'A_BillingDocumentItemType', props: ['BillingDocument', 'BillingDocumentItem', 'Plant', 'Material', 'BillingQuantity', 'BillingQuantityUnit', 'NetAmount', 'TransactionCurrency', 'AdditionalMaterialGroup3', 'AdditionalMaterialGroup4', 'SalesDistrict', 'ReferenceSDDocument', 'TaxAmount'], nav: [] } },
+    A_BillingDocumentItem: { type: 'A_BillingDocumentItemType', props: ['BillingDocument', 'BillingDocumentItem', 'Plant', 'Material', 'BillingQuantity', 'BillingQuantityUnit', 'NetAmount', 'TransactionCurrency', 'AdditionalMaterialGroup3', 'AdditionalMaterialGroup4', 'SalesDistrict', 'ReferenceSDDocument', 'TaxAmount', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate'], nav: [] } },
   API_PRODUCT_SRV: { A_Product: { type: 'A_ProductType', props: ['Product', 'ProductType', 'BaseUnit'], nav: [] } },
   API_BUSINESS_PARTNER: { A_Customer: { type: 'A_CustomerType', props: ['Customer', 'CustomerName'], nav: [] } } };
 export function makeS4(cfg = {}) {
@@ -88,6 +88,7 @@ export function makeS4(cfg = {}) {
     let mm;
     if (svc === 'API_BILLING_DOCUMENT_SRV') {
       if ((mm = /^A_BillingDocument\('([^']*)'\)$/.exec(rest))) { const d = S.docs.find(x => x.BillingDocument === mm[1]); return d ? res(200, { d: pick(d, q.get('$select')) }) : res(404, { error: { message: { value: 'Resource not found' } } }); }
+      if (rest === 'A_BillingDocumentItem') { const flat = []; S.docs.forEach(d => d.to_Item.results.forEach(it => flat.push(Object.assign({}, it, { BillingDocument: d.BillingDocument, BillingDocumentType: d.BillingDocumentType, BillingDocumentDate: d.BillingDocumentDate, CompanyCode: d.CompanyCode, SoldToParty: d.SoldToParty, BillingDocumentIsCancelled: d.BillingDocumentIsCancelled, CancelledBillingDocument: d.CancelledBillingDocument, LastChangeDate: d.LastChangeDate, TransactionCurrency: it.TransactionCurrency || d.TransactionCurrency })))); return res(200, list(flat, q, 'BillingDocument', null)); }
       if (rest === 'A_BillingDocument') return res(200, list(S.docs, q, 'BillingDocument', 'to_Item'));
     }
     if (svc === 'API_PRODUCT_SRV' && rest === 'A_Product') return res(200, list(Object.keys(S.products).map(k => ({ Product: k, ProductType: S.products[k].type, BaseUnit: 'PC' })).concat(Object.keys(S.products).map(k => ({ Product: pad(k, 18), ProductType: S.products[k].type, BaseUnit: 'PC' }))), q, 'Product'));

@@ -17,6 +17,7 @@ function build({ docs, s4opts = {}, props = true, plants = PLANTS } = {}) {
   env.call('deskWrite', [[set('users', 'u1', { email: SUPER, role: 'Super admin', active: true, name: 'Vijay' }), set('users', 'u2', { email: 'se@virgoasia.com', role: 'Sales executive', active: true, name: 'Se' }),
     ...plants.map(p => set('plants', p, { plant_code: p, plant_name: 'Depot ' + p, plant_type: 'Depot', zone: '', state: '', b1_bpl_name: 'Depot ' + p, business: 'laminates', active: true }))]]);
   if (props) Object.assign(env.props, { SAP_BASE_URL: S.host, SAP_USER: S.user, SAP_PASSWORD: S.password });
+  env.props.SAP_SYNC_ENABLED = 'yes'; // test only; the property is never set in the build
   env.setEmail(SUPER);
   return { S, env };
 }
@@ -62,6 +63,13 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   ok('trigger functions are not callable by google.script.run as a user (they only run as triggers, the public ones check the user)', typeof env.ctx.sapSyncTrigger === 'function' && env.state.triggers.length === 0);
 }
 
+{
+  const { S, env } = build(); delete env.props.SAP_SYNC_ENABLED; env.call('sapShadowRun'); const n0 = S.calls.length;
+  let r = env.call('sapSync'); ok('sapSync refuses unless SAP_SYNC_ENABLED is "yes": no SAP call, no write', r.code === 'sap_sync_disabled' && S.calls.length === n0 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/')), sj(r));
+  env.props.SAP_SYNC_ENABLED = 'no'; ok('"no" also refuses', env.call('sapSync').code === 'sap_sync_disabled');
+  env.setEmail(''); env.ctx.sapSyncTrigger(); ok('the time trigger path is refused too', S.calls.length === n0);
+  ok('the build never sets the property (not in the source or the settings file)', !/setProperty\('SAP_SYNC_ENABLED/.test(env.ctx.sapSyncRun_.toString()));
+}
 /* =============================== A2. settings: missing credentials give a clear error and no write =============================== */
 {
   const { S, env } = build({ props: false }); const before = sj(env.stored());
@@ -124,10 +132,30 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   ok('sapVerifyMetadata: every entity set and property ok', r.ok && r.allOk && r.gaps === 0 && r.rows.every(x => x.status === 'ok') && r.rows.length === 30, sj(r).slice(0, 300));
   ok('it reports per service, entity set and property', ['API_BILLING_DOCUMENT_SRV', 'API_PRODUCT_SRV', 'API_BUSINESS_PARTNER'].every(s => r.rows.some(x => x.service === s)) && r.rows.some(x => x.entitySet === 'A_BillingDocument' && x.property === 'LastChangeDate' && x.status === 'ok') && r.rows.some(x => x.property === 'to_Item (navigation)'));
   ok('only $metadata was read, with GET and the Basic header (and no password in any URL)', S.calls.length === 3 && S.calls.every(c => c.method === 'get' && /\$metadata$/.test(c.path) && /^Basic /.test(c.headers.Authorization) && !c.url.includes(S.password)));
-  ({ S, env } = build({ s4opts: { metaGaps: ['A_BillingDocument.LastChangeDate', 'API_PRODUCT_SRV.A_Product'] } })); r = env.call('sapVerifyMetadata');
+  ({ S, env } = build({ s4opts: { metaGaps: ['A_BillingDocument.LastChangeDate', 'API_PRODUCT_SRV.A_Product'] } })); env.props.SAP_BILLING_SHAPE = 'A'; r = env.call('sapVerifyMetadata');
   const gap = r.rows.filter(x => x.status === 'GAP');
   ok('a missing property and a missing entity set are reported as GAP', r.ok && r.allOk === false && r.gaps === 4 && gap.some(x => x.property === 'LastChangeDate') && gap.some(x => x.entitySet === 'A_Product' && x.property === '(entity set)'), sj(gap));
   ok('the status shows the gap count and the next step', env.call('sapStatus').status.verify.gaps === 4 && /4 gaps/.test(env.call('sapStatus').status.next));
+}
+
+/* =============================== A4b. shape B (item set carrying the header fields, as the group's existing connector reads) and the IP allow-list messages =============================== */
+{
+  const docs = synthDocs({ masters, from: '2026-10-01', to: '2026-10-12', perDayPerPlant: 3 });
+  let { S, env } = build({ docs, s4opts: { pageCap: 17 } }); env.call('sapVerifyMetadata'); env.call('sapShadowRun'); env.call('sapSync'); const A = stagedRows(env, '2026-10');
+  ok('shape A is the default and is recorded by the verify', env.props.SAP_SHAPE === 'A' && env.call('sapStatus').status.verify.shape === 'A');
+  ({ S, env } = build({ docs, s4opts: { pageCap: 17, metaGaps: ['API_BILLING_DOCUMENT_SRV.A_BillingDocument'] } }));
+  let r = env.call('sapVerifyMetadata');
+  ok('verify: when the header set is missing but the item set carries the header fields, shape B is chosen and every name is ok', r.ok && r.allOk && r.shape === 'B' && env.props.SAP_SHAPE === 'B' && r.rows.some(x => x.entitySet === 'A_BillingDocumentItem' && x.property === 'BillingDocumentDate' && x.status === 'ok'), sj(r.rows.filter(x => x.status !== 'ok')).slice(0, 300));
+  env.call('sapShadowRun'); const n0 = S.calls.length; r = env.call('sapSync'); const B = stagedRows(env, '2026-10');
+  ok('shape B reads only the item set (no A_BillingDocument request)', r.ok && S.calls.slice(n0).filter(c => /A_BillingDocument\?/.test(c.path + c.query) || /A_BillingDocument$/.test(c.path)).length === 0 && S.calls.slice(n0).some(c => /A_BillingDocumentItem$/.test(c.path)));
+  ok('shape B stages exactly the rows shape A stages (documents that straddle a page are not split or repeated)', B.rows.length === A.rows.length && sj(B.rows.map(x => x.join('|')).sort()) === sj(A.rows.map(x => x.join('|')).sort()) && B.man.countChecked === true && B.man.counts.headers === A.man.counts.headers, B.rows.length + ' vs ' + A.rows.length);
+  ok('shape B is forced by SAP_BILLING_SHAPE when set', (() => { env.props.SAP_BILLING_SHAPE = 'A'; const v = env.call('sapVerifyMetadata'); return v.shape === 'A' && v.allOk === false; })());
+  // allow-list wording
+  ({ S, env } = build({ docs })); S.failNext(/\$metadata/, 403, 9); r = env.call('sapVerifyMetadata');
+  ok('403 names a possible IP allow-list and the read role', r.code === 'sap_forbidden' && /IP allow-list/.test(r.message) && /read role/.test(r.message), r.message);
+  ({ S, env } = build({ docs })); S.failNext(/./, 0, 99, { throw: true }); r = env.call('sapVerifyMetadata');
+  ok('a refused connection names a possible IP allow-list', r.code === 'sap_unreachable' && /IP allow-list/.test(r.message) && !r.message.includes('mock-tenant'), r.message);
+  ok('the default company code is 1000', (() => { const e2 = build({ docs }); return e2.env.call('sapStatus').ok && /datetime/.test('') === false && (e2.env.call('sapVerifyMetadata'), e2.env.call('sapShadowRun'), e2.S.calls.some(c => /CompanyCode%20eq%20%271000%27/.test(c.query))); })());
 }
 
 /* =============================== A5. filters, cut-off, cancellation modes, other types =============================== */
