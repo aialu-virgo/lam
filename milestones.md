@@ -34,7 +34,7 @@ related:
 | Thu 5 Nov (after Undo) | Sales Apr 2025–Sep 2026 restored; credit notes loaded as credit notes and locked | Vijay + Delivery Lead | open |
 | Fri 6 Nov 09:00 (was Thu 23:30, Fri 01:00, Fri 06:00) | Desk on Google Apps Script (D66): backup download in claude.ai Desk, restore + Apps Script project in Vijay's Drive, QA passed, Drive link sent | Full-Stack Engineer + Engineering QA | QA passed pass 5 07:58; v44 + setup page published by 12:24 (D68; slipped past 09:00); waiting on Vijay to deploy and restore |
 | Sat 7 Nov 15:30 | "Targets & Potential" tab mock-up for approval (Vijay, 7 Nov) | Product Designer | published 14:05, approved (D70); built, QA passed round 3, desk-v45 published (D72); new GAS files sent |
-| Sun 8 Nov 13:00 | S/4 OData feed: mapping (Data Architect), then Apps Script connector on a mock SAP, QA passed (D73) | Data Architect + Full-Stack Engineer | mapping in progress; live run waits on SAP communication user |
+| Sun 8 Nov 13:00 | S/4 OData feed: mapping (Data Architect), then Apps Script connector on a mock SAP, QA passed (D73) | Data Architect + Full-Stack Engineer | mapping done; built on mock, fast QA passed, files sent 00:4x Sun (D74; Vijay moved deadline to 00:52); sync locked until dry run matches |
 
 ## Milestones
 **M0 Discovery**
