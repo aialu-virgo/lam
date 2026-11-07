@@ -9,7 +9,7 @@
  * SETTINGS (Script Properties only; never in code, the sheet, the backup, a log or the page):
  *   SAP_BASE_URL (https host, e.g. https://tenant-api.s4hana.cloud.sap), SAP_USER, SAP_PASSWORD, SAP_COMPANY_CODE (default SAP_DEFAULT_COMPANY), CANCEL_MODE (exclude | mirror, default exclude).
  * STATE (Script Properties): SAP_STATUS (what the card shows), SAP_CURSOR (resume point of a run cut at the time limit), SAP_WM (watermark), SAP_RUN (run flag), SAP_SHADOW (last shadow result).
- * ACCESS: every function below is refused unless the caller is the project owner or an active Super admin. The time trigger runs sapSyncTrigger / sapContinueTrigger as the owner.
+ * ACCESS: every function below is refused unless the caller is the project owner or an active Super admin. The time trigger runs sapSyncTrigger_ / sapContinueTrigger_ as the owner.
  * LOCKS: the script lock is taken here only for (a) the short run-flag test-and-set and (b) the staging write section, exactly as deskWrite does; never while it is held, never across a SAP call. */
 var SAP_FEED_FROM = '2026-10-01';        // billing documents dated before this are never read or written (data to 30 Sep 2026 stays as uploaded)
 var SAP_DEFAULT_COMPANY = '1000';        // Assumed laminates company code; replaced by the SAP_COMPANY_CODE property
@@ -133,7 +133,7 @@ function sapErrPush_(cfg, msg) {
   sapStatusPatch_({ errors: e.slice(0, 3) });
 }
 function sapMissing_() { var p = sapProps_(), m = []; ['SAP_BASE_URL', 'SAP_USER', 'SAP_PASSWORD'].forEach(function (k) { if (!String(p.getProperty(k) || '').trim()) m.push(k); }); return m; }
-function sapTriggerOn_() { return ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sapSyncTrigger'; }); }
+function sapTriggerOn_() { return ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sapSyncTrigger_'; }); }
 function sapNext_(s, missing, trig) {
   if (missing.length) return 'Set ' + missing.join(', ') + ' in the Apps Script project (Project Settings, Script properties). Then run sapVerifyMetadata.';
   if (s.resume) return 'The last run stopped at the 6-minute limit. Run sapSync again (the daily trigger also continues it).';
@@ -421,8 +421,8 @@ function sapSyncRun_(source) {
 }
 function sapContinueLater_() {
   try {
-    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapContinueTrigger') ScriptApp.deleteTrigger(t); });
-    ScriptApp.newTrigger('sapContinueTrigger').timeBased().after(60 * 1000).create();
+    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapContinueTrigger_') ScriptApp.deleteTrigger(t); });
+    ScriptApp.newTrigger('sapContinueTrigger_').timeBased().after(60 * 1000).create();
   } catch (e) { /* the daily trigger will continue it */ }
 }
 
@@ -561,15 +561,15 @@ function sapStatus() { return wrap_(function () { sapAuth_(); return { ok: true,
 function sapInstallDailyTrigger() {
   return wrap_(function () {
     sapAuth_();
-    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapSyncTrigger') ScriptApp.deleteTrigger(t); });
-    ScriptApp.newTrigger('sapSyncTrigger').timeBased().everyDays(1).atHour(2).nearMinute(30).create();
+    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapSyncTrigger_') ScriptApp.deleteTrigger(t); });
+    ScriptApp.newTrigger('sapSyncTrigger_').timeBased().everyDays(1).atHour(2).nearMinute(30).create();
     return { ok: true, message: 'One daily run is on (about 02:30 IST). Run sapRemoveDailyTrigger to switch it off.' };
   });
 }
 function sapRemoveDailyTrigger() {
   return wrap_(function () {
     sapAuth_(); var n = 0;
-    ScriptApp.getProjectTriggers().forEach(function (t) { var f = t.getHandlerFunction(); if (f === 'sapSyncTrigger' || f === 'sapContinueTrigger') { ScriptApp.deleteTrigger(t); n++; } });
+    ScriptApp.getProjectTriggers().forEach(function (t) { var f = t.getHandlerFunction(); if (f === 'sapSyncTrigger_' || f === 'sapContinueTrigger_') { ScriptApp.deleteTrigger(t); n++; } });
     return { ok: true, removed: n, message: n ? 'The daily run is off.' : 'No daily run was on.' };
   });
 }
@@ -588,9 +588,18 @@ function sapMarkLoaded(summary) {
     return { ok: true };
   });
 }
-/* time-driven entry points: they run as the project owner without a signed-in user */
-function sapSyncTrigger() { try { sapSyncRun_('trigger'); } catch (e) { Logger.log('sapSync failed: ' + sapRedact_(null, e && e.message || e)); } }
-function sapContinueTrigger() {
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapContinueTrigger') ScriptApp.deleteTrigger(t); });
-  sapSyncTrigger();
+/* time-driven entry points. The trailing underscore keeps them out of google.script.run. They run as the project owner without a signed-in user; if a user IS signed in, that user must be the owner or an active Super admin, else nothing happens. */
+function sapTriggerGate_() {
+  var email = activeEmail_(); if (!email) return true;
+  var eff = String(Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  return email === eff || isAdmin_(resolveUser_(email));
+}
+function sapSyncTrigger_() {
+  if (!sapTriggerGate_()) return;
+  try { sapSyncRun_('trigger'); } catch (e) { Logger.log('sapSync failed: ' + sapRedact_(null, e && e.message || e)); }
+}
+function sapContinueTrigger_() {
+  if (!sapTriggerGate_()) return;
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapContinueTrigger_') ScriptApp.deleteTrigger(t); });
+  sapSyncTrigger_();
 }

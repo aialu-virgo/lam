@@ -60,14 +60,20 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   env.setEmail(SUPER); const pl2 = env.call('deskPlan', ['sapstage']), rv2 = env.call('deskRevs');
   ok('staged collection: a Super admin reads it', pl2.ok && pl2.rows > 0 && 'sapstage' in rv2.revs, sj(pl2));
   ok('staged rows are not part of the restore check (deskStats)', !('sapstage' in env.call('deskStats').counts));
-  ok('trigger functions are not callable by google.script.run as a user (they only run as triggers, the public ones check the user)', typeof env.ctx.sapSyncTrigger === 'function' && env.state.triggers.length === 0);
+  ok('trigger entry points end in an underscore (private to google.script.run)', /_$/.test('sapSyncTrigger_') && typeof env.ctx.sapSyncTrigger_ === 'function' && typeof env.ctx.sapSyncTrigger === 'undefined' && typeof env.ctx.sapContinueTrigger === 'undefined');
+  // D2: a non-admin with the sync flag on, calling the trigger entry points directly: nothing fetched, nothing written
+  { const e2 = build(); e2.env.call('sapShadowRun'); const n0 = e2.S.calls.length, st0 = sj(e2.env.stored());
+    for (const who of ['se@virgoasia.com', 'stranger@virgoasia.com']) { e2.env.setEmail(who); e2.env.ctx.sapSyncTrigger_(); e2.env.ctx.sapContinueTrigger_(); }
+    ok('a non-admin (flag on) reaching the trigger entry points causes no SAP call and no write', e2.S.calls.length === n0 && sj(e2.env.stored()) === st0 && e2.env.state.triggers.length === 0, e2.S.calls.length - n0);
+    e2.env.setEmail(''); e2.env.ctx.sapSyncTrigger_(); ok('with no signed-in user (the real trigger) it runs', e2.S.calls.length > n0 && 'sapstage/man_2026-10' in e2.env.stored());
+    const e3 = build(); e3.env.call('sapShadowRun'); const m0 = e3.S.calls.length; e3.env.setEmail(SUPER); e3.env.ctx.sapSyncTrigger_(); ok('the owner / a Super admin passes the gate', e3.S.calls.length > m0); }
 }
 
 {
   const { S, env } = build(); delete env.props.SAP_SYNC_ENABLED; env.call('sapShadowRun'); const n0 = S.calls.length;
   let r = env.call('sapSync'); ok('sapSync refuses unless SAP_SYNC_ENABLED is "yes": no SAP call, no write', r.code === 'sap_sync_disabled' && S.calls.length === n0 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/')), sj(r));
   env.props.SAP_SYNC_ENABLED = 'no'; ok('"no" also refuses', env.call('sapSync').code === 'sap_sync_disabled');
-  env.setEmail(''); env.ctx.sapSyncTrigger(); ok('the time trigger path is refused too', S.calls.length === n0);
+  env.setEmail(''); env.ctx.sapSyncTrigger_(); ok('the time trigger path is refused too', S.calls.length === n0);
   ok('the build never sets the property (not in the source or the settings file)', !/setProperty\('SAP_SYNC_ENABLED/.test(env.ctx.sapSyncRun_.toString()));
 }
 /* =============================== A2. settings: missing credentials give a clear error and no write =============================== */
@@ -224,9 +230,9 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   ok('the cursor is cleared at the end and the status counts add up', env.call('sapStatus').status.resume === false && env.call('sapStatus').status.read.headers > 0);
   // trigger run: a continuation is scheduled
   ({ S, env } = build({ docs, s4opts: { pageCap: 20, msPerCall: 40000 } })); env.props.SAP_RUN_BUDGET_MS = '150000'; env.call('sapShadowRun'); let m = 0; while (!env.call('sapShadowRun').done && m++ < 40);
-  env.setEmail(''); env.ctx.sapSyncTrigger();
-  ok('a cut run started by the time trigger schedules one continuation trigger', env.state.triggers.filter(t => t.fn === 'sapContinueTrigger').length === 1 && env.state.triggers[0].kind === 'after');
-  const nt = env.state.triggers.length; env.ctx.sapContinueTrigger(); ok('the continuation removes itself before running (and may schedule the next)', env.state.triggers.filter(t => t.fn === 'sapContinueTrigger').length <= 1 && nt >= 1);
+  env.setEmail(''); env.ctx.sapSyncTrigger_();
+  ok('a cut run started by the time trigger schedules one continuation trigger', env.state.triggers.filter(t => t.fn === 'sapContinueTrigger_').length === 1 && env.state.triggers[0].kind === 'after');
+  const nt = env.state.triggers.length; env.ctx.sapContinueTrigger_(); ok('the continuation removes itself before running (and may schedule the next)', env.state.triggers.filter(t => t.fn === 'sapContinueTrigger_').length <= 1 && nt >= 1);
   // a run flag blocks a second run
   ({ S, env } = build({ docs })); env.call('sapShadowRun'); env.props.SAP_RUN = JSON.stringify({ at: Date.now() }); r = env.call('sapSync'); ok('a second run while one is in progress is refused (busy)', r.ok === false && /in progress/.test(r.message) && S.calls.filter(c => /A_BillingDocument\?/.test(c.path)).length === 0, sj(r));
   env.props.SAP_RUN = JSON.stringify({ at: Date.now() - 600000 }); ok('a run flag left by a crashed run (older than 8 minutes) is ignored', env.call('sapSync').ok === true);
@@ -277,7 +283,7 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   // trigger
   ok('no trigger exists until sapInstallDailyTrigger is called', env.state.triggers.length === 0 && env.call('sapStatus').status.trigger === false);
   r = env.call('sapInstallDailyTrigger'); r = env.call('sapInstallDailyTrigger');
-  ok('sapInstallDailyTrigger creates exactly one daily time trigger (calling it twice does not add a second)', r.ok && env.state.triggers.length === 1 && env.state.triggers[0].fn === 'sapSyncTrigger' && env.state.triggers[0].kind === 'daily' && env.call('sapStatus').status.trigger === true);
+  ok('sapInstallDailyTrigger creates exactly one daily time trigger (calling it twice does not add a second)', r.ok && env.state.triggers.length === 1 && env.state.triggers[0].fn === 'sapSyncTrigger_' && env.state.triggers[0].kind === 'daily' && env.call('sapStatus').status.trigger === true);
   r = env.call('sapRemoveDailyTrigger'); ok('sapRemoveDailyTrigger switches it off', r.ok && r.removed === 1 && env.state.triggers.length === 0);
   // secrets
   const blob = [sj(env.stored()), sj(Object.keys(env.props).filter(k => !/^SAP_(USER|PASSWORD|BASE_URL)$/.test(k)).map(k => env.props[k])), (env.state.logs || []).join('\n'), sj(env.call('sapStatus')), sj(env.call('sapVerifyMetadata'))].join('\n');
