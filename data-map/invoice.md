@@ -2,7 +2,7 @@
 title: Data map — Invoice
 summary: Invoice lines from B1 "Combine Sale" (41 columns, Sep 2026 only) and the S/4 sales register: columns, laminates filter, B1↔S4 parity, validation, coverage.
 status: draft
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -179,3 +179,4 @@ Script count by `doc_date` after the date fix. FY Apr–Mar; Q1 = Apr–Jun. Row
 - **Q-D2 (Vijay):** 11 history quarters and Jul–Aug 2026. Recommendation: one B1 query, doc date 1 Oct 2023 to 31 Aug 2026, in monthly files. Add `LineNum`, `SlpCode`, `WhsCode`, `BaseEntry`.
 - **Q-D3 (Vijay):** export `DocDate` as text `yyyy-mm-dd`; recommended.
 - **Q-D6 (Vijay):** what is the unnamed last column and the 12,301-row blank block? Recommendation: ignore the column.
+  - data-map/s4-odata-feed.md

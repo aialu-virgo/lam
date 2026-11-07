@@ -2,7 +2,7 @@
 title: Data map — Plant / branch master
 summary: Plant List (61 plants, codes 1001–1065): laminates scope 1001–1006, 1011, 1012–1049; template plant-master.csv; B1 branch and S/4 plant join.
 status: draft
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -64,3 +64,4 @@ This matches the default in the brief (factories 1001–1006, HO 1011, depots 10
 
 ## Coverage (12 quarters)
 Master, not a time series. One list as of 20 Oct 2026: loaded on upload. Plants opened or closed in the past 12 quarters are unknown (Q-D9: ask Vijay for open/close dates if any plant changed).
+  - data-map/s4-odata-feed.md

@@ -2,7 +2,7 @@
 title: Data map — Credit note
 summary: Credit-note intake built (D39): B1 ORIN/RIN1 lines and S/4 billing credit memos, by plant-month and product group; Net sales basis per D40.
 status: active
-updated: 2026-10-23
+updated: 2026-11-07
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -49,3 +49,4 @@ Base invoice should exist (warn if not); credit quantity ≤ invoiced quantity p
 - **Replace and undo:** a re-upload replaces the plant-months it covers; a thinner file for a held month waits for a confirm; Undo upload removes them.
 - **Net basis (D40):** once every month of a quarter (up to today) is covered for the plant, achievement and growth for that quarter use Net; a total over several plants uses Net only when every plant in scope is covered = invoiced − credit notes. Earlier quarters stay on invoiced, and each figure is labelled Invoiced or Net. QoQ compares Net with Net only when both quarters are covered, otherwise invoiced with invoiced (the tooltip says which). Not available per salesperson (credit notes carry no salesperson link).
 - Template: [credit-note-b1.csv](templates/credit-note-b1.csv).
+  - data-map/s4-odata-feed.md

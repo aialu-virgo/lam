@@ -2,7 +2,7 @@
 title: Open questions
 summary: Questions for the Principals, each addressed to its owner with a recommendation and the default if unanswered.
 status: active
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - .claude/rules/talking-to-principals.md
   - CLAUDE.md
@@ -48,3 +48,9 @@ If a question is unanswered by the time work needs it, the recommendation is use
 | Q26 | Vijay | Can you send the S/4 batch master (Material, Batch, Created on / last goods receipt date) and the B1 batch stock with InDate, so stock ageing can be shown? | Yes; until then ageing stays blank and R4 flags only stock high against sales. | |
 | Q27 | SP Sir | Once credit notes are loaded, should achievement against target use net sales (invoiced − credit notes) instead of invoiced sales? | Yes from the next full quarter with credit notes loaded; until then invoiced, with net shown beside it. | **Answered:** yes — interim Vijay (D40), confirmed "approved" relayed by Vijay 23 Oct 21:37 (D49). |
 | Q28 | Vijay | Which zone list should the Overview zone tiles use (sales-file ZONE 1–5, or North/West/South/East), and the zone of each plant? | ZONE 1–5 from the sales file; enter per plant in Admin › Plants or send plant code + zone. | |
+  - data-map/s4-odata-feed.md
+| Q29 | Vijay | S/4 live feed: who creates the communication user and arrangement for sales, product and business-partner reads, and which sign-in method will it use (Basic, OAuth, certificate)? It must be a new read-only user for this Desk, not another portal's user. | Your SAP sales support person creates one read-only user and one arrangement for billing, product and business-partner reads only; Basic over HTTPS to start. Default if unanswered: no feed work starts; uploads continue. | |
+| Q30 | Vijay | S/4 live feed: what is the API host of the Virgo S/4HANA Cloud tenant (the `-api` address, not the Fiori address)? | Send the host name only; keep the user and password out of chat and out of the repo (they go in Apps Script Script Properties). Default: none assumed; the connector setting stays empty. | |
+| Q31 | Vijay | S/4 live feed: does Virgo's S/4 restrict API calls by IP address? Apps Script calls come from Google addresses that are not fixed. | Ask the SAP partner; expected answer: no restriction. If one is required the feed cannot run from Apps Script without a fixed-address route, which costs money and needs a Principal's OK. Default: assume no restriction and test on the day. | |
+| Q32 | Vijay | S/4 live feed: are laminates on the same S/4 tenant as the sales register you export from, and what is the laminates company code (1000?) and are plants 1001–1049 all in it? | Same tenant, company code 1000 (Assumed from the group's other S/4 connector, unverified). Checked on the day from the billing data (checklist 12). Default: 1000, with the plant filter 1001–1049 as the safety net. | |
+| Q33 | Vijay | S/4 live feed: does the SAP partner confirm in writing that read-only OData calls by a communication user do not count against Virgo's licence (FUE or digital access)? | Ask the Adopt and Operate partner for a written yes. Default: the feed does not go live until it is in writing; reads are expected not to count, but that is unproven. | |

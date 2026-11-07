@@ -2,7 +2,7 @@
 title: S/4HANA switch notes
 summary: What changes when S/4HANA replaces B1: source detection, same canonical model, the OData endpoints card, and what S/4 does not carry.
 status: draft (go-live date and connector not decided)
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - handover/_index.md
   - handover/admin-guide.md
@@ -36,9 +36,10 @@ related:
 | Invoice / credit note | API_BILLING_DOCUMENT_SRV |
 | Receivable / collection | I_OperationalAcctgDocItem |
 | Stock | API_MATERIAL_STOCK_SRV |
-The connector is not built in v1.0 ([Architecture](../design/architecture.md)). It needs an approved read-only integration user ([SAP S/4HANA](../systems/sap-s4hana.md)).
+The connector is designed, not built or verified: [Data map — S/4HANA OData feed](../data-map/s4-odata-feed.md) ([Architecture](../design/architecture.md)). It needs an approved read-only integration user ([SAP S/4HANA](../systems/sap-s4hana.md)).
 
 ## Open before go-live
 - Go-live date, SAP partner, periods already live in S/4: open ([Open questions](../open-questions.md)).
 - Same-data check (acceptance check 4: a B1 and an S/4 file give identical numbers) cannot run on real data until one plant-period exists in both.
 - Whether the register shows credit memos.
+  - data-map/s4-odata-feed.md

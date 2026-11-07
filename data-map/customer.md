@@ -2,7 +2,7 @@
 title: Data map — Customer
 summary: Customer master intake built (D39): B1 OCRD and S/4 business partner in Admin; names, salesperson suggestion, credit limit and over-limit flag.
 status: active
-updated: 2026-10-23
+updated: 2026-11-07
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -51,3 +51,4 @@ Recommendation: send once now, then weekly.
 ## Intake in the Desk (D39, 23 Oct 2026)
 Admin › Customers. Each load replaces the whole master (like the item master). Layouts: B1 OCRD (`CardCode`, `CardName`, `CardType` C only, `GroupName`, `City`, `State`, `SlpName`, `CreditLine`, `Balance`, `PymntGroup`) and the S/4 business partner list (`Customer`, `Name`, `City`, `Region`, credit limit); other headers go through the mapping step. Non-customer partners are skipped and counted; duplicate codes are rejected.
 Uses: the customer name where only a code shows; the salesperson from the master as a suggestion only; credit limit and "over limit by" on the Receivables page (open receivable of the customer across the plants in scope against the limit). A display and a flag, no new automatic action. Template: [customer-b1.csv](templates/customer-b1.csv).
+  - data-map/s4-odata-feed.md

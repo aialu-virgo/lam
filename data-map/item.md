@@ -2,7 +2,7 @@
 title: Data map — Item
 summary: Item master (sheet FG, 23,490 items, as on 30 Sep 2026): columns, laminates filter, sq ft source, B1↔S4 gap (no S/4 material number).
 status: draft
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -94,3 +94,4 @@ Not a time series. One snapshot dated 30 Sep 2026 covers every sold B1 laminate 
 
 ## Brand and thickness kept per item (D55, 4 Nov 2026)
 The item chunks `items/c<i>` now carry `[code, group, sqft per sheet, thickness mm, uom, active, size, brand]` (field 8 is new; older chunks with 7 fields are still read). Brand is read from a column named `Brand`, `Brand Name`, `Item Brand` or `Make`; if the file has none the items load without a brand and the Admin check says so. A re-upload replaces the whole master and the item index refreshes. The template now ends with a `Brand` column.
+  - data-map/s4-odata-feed.md

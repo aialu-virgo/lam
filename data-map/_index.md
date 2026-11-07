@@ -2,7 +2,7 @@
 title: Index — data-map/
 summary: One file per SAP export or plan file the page takes. Upload templates are header-only and generated from these files.
 status: active
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - data-map/collection.md
   - data-map/credit-note.md
@@ -38,6 +38,7 @@ related:
 - [Data map — Receivable](receivable.md) — active — snapshot intake built (D39); four layouts
 - [Data map — Sales employee](sales-employee.md) — draft — employee master mapped; no SlpCode
 - [Data map — Sales order](sales-order.md) — not used (D31)
+- [Data map — S/4HANA OData feed](s4-odata-feed.md) — draft — read-only sales and credit-note feed from 1 Oct 2026; designed, not built
 - [Data map — Stock](stock.md) — active — snapshot intake built (D34); B1 OITW/batch and S/4 layouts
 - [Data map — Target phasing](target-phasing.md) — draft — template ready, no data
 - [Data map — User master](user-master.md) — draft — template ready; People List not received
@@ -45,3 +46,4 @@ related:
 
 ## Upload templates (header only)
 - [market-potential.csv](templates/market-potential.csv) · [user-master.csv](templates/user-master.csv) · [plant-master.csv](templates/plant-master.csv) · [target-phasing.csv](templates/target-phasing.csv)
+  - data-map/s4-odata-feed.md

@@ -2,7 +2,7 @@
 title: Data map — Invoice, S/4 sales register
 summary: The S/4HANA Public Cloud sales register export (60 columns, plant 1013, 4–19 Oct 2026): every column mapped or unused, fan-out defect, coverage.
 status: draft
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - handover/_index.md
   - design/canonical-data-model.md
@@ -109,3 +109,4 @@ Dates are 4–19 Oct 2026; by script, per FY quarter.
 ## Open items
 - **Q-D4 (Vijay):** export all plants (remove `Plant = 1013`), and confirm that credit memos appear in the Sales Register (billing types other than F2). Recommendation: one export per week, no plant filter, include credit memos.
 - **Q-D5 (Vijay):** `Sales Executive` is blank; where does S/4 hold the salesperson? Recommendation: add the sales-employee / partner-function column (VKGRP or partner SP) to the register, or export the customer's sales area.
+  - data-map/s4-odata-feed.md

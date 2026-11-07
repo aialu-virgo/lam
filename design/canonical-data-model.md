@@ -2,7 +2,7 @@
 title: Canonical data model
 summary: Entities, keys, fields and the source-reference columns every SAP row lands in; B1 and S/4 map to one model, derived from five real exports.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - data-map/customer.md
   - data-map/item.md
@@ -103,3 +103,4 @@ Owned by the Desk, entered by people, never from SAP. Fields in [Market potentia
 - Customer, item and employee cross-system keys are Assumed (GSTIN, description, name). Replace with exact codes when Vijay provides the S/4 material and customer masters.
 - `product_group` and `customer_segment` values are not yet defined (Q5, Q-D8 in [Data map — Market potential](../data-map/market-potential.md)).
 - Credit-note and S/4 salesperson sources decide whether net sales and salesperson targets can be exact.
+  - data-map/s4-odata-feed.md
