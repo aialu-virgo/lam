@@ -2,7 +2,7 @@
 title: Admin guide
 summary: Super admin routine: monthly uploads, coverage grid, rejected rows, closed-quarter reopen, users, market potential, rule settings, demo data.
 status: draft (to check against desk-v1.0 in the page)
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - handover/upload-issues.md
   - handover/_index.md
@@ -45,7 +45,7 @@ A closed quarter is locked. Reopening or reloading it is **Super admin only**, n
 Admin > Users: email, name, role (one of 8), department, plant codes (blank = all), reports-to email, WhatsApp (91 + 10 digits), Today cap (1 to 20), active, and sales employee code for Sales executives. The page identifies a viewer by **email** ([Role matrix](../design/role-matrix.md)). If it cannot read a viewer's email, their "Ask your admin for access" screen shows a **viewer ID**: paste it into that user's **Viewer ID** field in Admin > Users. Unknown or inactive email sees only "Ask your admin for access". Keep one active Super admin; a wrong reports-to breaks escalation L2.
 
 ## Market potential and revisions
-Admin > Market potential. Target = potential x share %. Each edit is a revision with a **reason** and **discussion date** (Draft, Discussed, Approved, Locked). The proposer cannot approve; SP Sir or a Management / HO user approves ([Target model](../design/target-model.md)). The sense-check shows the QoQ a target needs against the 12-quarter average; over 2x is flagged Stretch for discussion, never blocking.
+Potential and targets are filled in Plan > Targets & Potential; Admin > Market potential links there ([Target model](../design/target-model.md#who-edits-potential-and-targets)). Target = potential x share %. Each edit is a revision with a **reason** and **discussion date** (Draft, Discussed, Approved, Locked). The proposer cannot approve; SP Sir or a Management / HO user approves ([Target model](../design/target-model.md)). The sense-check shows the QoQ a target needs against the 12-quarter average; over 2x is flagged Stretch for discussion, never blocking.
 
 ## Rules and settings
 Admin > Rules & settings: every threshold (priority weights, which must total 100; QoQ decline; receivable days; TAT; stock age; escalation days 1 / 3 / 7; holidays; Today cap per role). Values marked Assumed are recommendations until a Principal answers. Changes are logged. There is no last-year comparison option.

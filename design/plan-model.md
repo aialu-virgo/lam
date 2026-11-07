@@ -2,7 +2,7 @@
 title: Plan model
 summary: Every plan type beyond the sales target (person split, collections, dispatch TAT, stock days, new customers, personal KPIs): grain, owner, entry route, actual source and approval.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-21
+updated: 2026-11-07
 related:
   - design/_index.md
   - data-map/market-potential.md
@@ -32,7 +32,7 @@ Plans are entered by people, never from SAP. Actuals come only from SAP uploads.
 
 | # | Plan | Grain | Owner (proposes) | Approver | Entry route | Actual source | Default if none |
 |---|---|---|---|---|---|---|---|
-| P1 | **Sales target** | quarter × plant or territory × product group × segment, phased by month | Branch manager (own plants) | SP Sir or Management / HO | Admin screen or [market-potential.csv](../data-map/templates/market-potential.csv) and [target-phasing.csv](../data-map/templates/target-phasing.csv) | Invoice aggregates (Sales) | Potential × default share, Draft ([Target model](target-model.md)) |
+| P1 | **Sales target** | quarter × plant or territory × product group × segment, phased by month | Branch manager (own plants); Management / HO and Super admin ([who edits](target-model.md#who-edits-potential-and-targets)) | SP Sir or Management / HO (not HOD) | Plan > Targets & Potential tab, or [market-potential.csv](../data-map/templates/market-potential.csv) and [target-phasing.csv](../data-map/templates/target-phasing.csv) | Invoice aggregates (Sales) | Potential × default share, Draft ([Target model](target-model.md)) |
 | P2 | **Person split** | P1 leaf × salesperson, `split_pct`, sums to 100 per leaf | Branch manager | Branch manager's HOD (it moves no ₹ between leaves) | Admin screen or upload | Aggregates by salesperson | Each person's share of the leaf's last-quarter actual, Draft |
 | P3 | **Collection plan** | month × plant (₹) | Accounts (plant scope) | Management / HO | Admin screen or upload | [Collection](../data-map/collection.md) receipts, summed by month and plant | Open receivables falling due in the month from the latest [Receivable](../data-map/receivable.md) export |
 | P4 | **Dispatch TAT plan** | plant × product group, standard working days from order date to dispatch date | Plant user, with HOD | HOD | Admin screen | [Sales order](../data-map/sales-order.md) date to [Delivery](../data-map/delivery.md) date, per order document | `tat_days` = 3 (**Assumed (new)**) |

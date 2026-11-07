@@ -2,7 +2,7 @@
 title: Target model
 summary: Target = market potential x share %, phased to months, with the revision workflow, approvers, original vs current target, and the Stretch flag, with a hand-calculable example for QA check 12.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-21
+updated: 2026-11-07
 related:
   - design/_index.md
   - data-map/target-phasing.md
@@ -40,7 +40,7 @@ Every change to a potential figure, share %, or phasing creates a **revision**: 
 
 | State | Meaning | Who can move it here | Counts for achievement? |
 |---|---|---|---|
-| **Draft** | Proposed or default; being worked on | Proposer: Branch manager (own plants), HOD (own department), Management / HO, Super admin | Shown as "Draft target" only if no approved one exists |
+| **Draft** | Proposed or default; being worked on | Proposer: Branch manager (own plants), Management / HO, Super admin. HOD is view only ([who edits](#who-edits-potential-and-targets)) | Shown as "Draft target" only if no approved one exists |
 | **Discussed** | Discussion held and recorded | The proposer, once reason, discussion date and participants are filled | No |
 | **Approved** | Accepted as the working target | **SP Sir or a Management / HO user. Never the proposer of that revision** | **Yes: the current approved target** |
 | **Locked** | Quarter frozen | Management / HO or Super admin, "Lock quarter" for all Approved revisions of the quarter | Yes, no edits |
@@ -50,6 +50,14 @@ Every change to a potential figure, share %, or phasing creates a **revision**: 
 - A new revision on an Approved key goes back to Draft; the current target stays the last approved until the new one is approved.
 - Potential edits carry the same flow. A change to potential re-computes the Draft target; it does not alter an Approved target (the Approved revision stores the potential and share it used).
 - Approval of mass changes: a batch (file upload) is one revision set, approved key by key or as a batch with one click that writes one revision per key.
+
+## Who edits potential and targets
+Home of this fact (D70, D71). Potential, share % and monthly phasing are filled in the **Plan > Targets & Potential** tab ([Wireframes](wireframes.md)); the non-admin Plans screen is replaced and Admin's Market potential links to the tab.
+- **Propose, edit or upload:** Branch manager (own plants only), Management / HO, Super admin. **HOD: view only.** **HOD does not approve P1** (target values). Others: no access.
+- **Approve target values:** SP Sir (or a Management / HO user who is not the proposer), as in the table above.
+- **Locked quarters are read-only** for everyone.
+- **UI label "Proposed" = stored status `Discussed`.** Submit needs reason, discussion date and participants.
+- **Server vs page:** monthly `phasing` is writable by any active user on the Apps Script server, the same as `potential`; the page enforces who may edit ([Decisions](../decisions.md) D71). The server is not the access control for these two collections.
 
 ## History as a sense-check
 Beside every target the page shows: last closed quarter's actual (`A_prev`), the quarter trend since history start (up to 12 quarters; D28) and the **required QoQ** = `target ÷ A_prev − 1`. Text: "Target needs +x% QoQ; average of the quarters loaded is +y%".

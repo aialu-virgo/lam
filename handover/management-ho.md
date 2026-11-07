@@ -2,7 +2,7 @@
 title: Management / HO guide
 summary: One-page guide for the Management / HO role: what you see, Today, responding to actions, drilling to the SAP document, follow-up drafts.
 status: draft (to check against desk-v1.0 in the page)
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - handover/_index.md
   - design/role-matrix.md
@@ -17,8 +17,8 @@ You see the whole business, approve plans, assign actions and verify closures. A
 ## What you see
 - All plants and departments; all pages except Admin settings. Data Intake is view only.
 - Landing page is Today.
-- You propose and approve plans and market-potential revisions, but never approve your own proposal (the Approve button is absent on it).
-- You can lock a quarter. You cannot reopen one (Super admin only).
+- You propose and approve plans and market-potential revisions in Plan > Targets & Potential ([Target model](../design/target-model.md#who-edits-potential-and-targets)), but never approve your own proposal (the Approve button is absent on it).
+- You can lock a quarter's targets. Nobody can unlock them in v1.0 (see [Target model](../design/target-model.md)); a correction needs SP Sir's instruction.
 Every table follows one layout: Potential, Target, Actual, Var, Ach %, Share %, Last Qtr, QoQ %, Trend, with a total row. Growth is quarter on quarter only; there is no last-year comparison. A quarter with partial history shows QoQ greyed with "incomplete history". Achievement is not shown for a target that is not approved.
 
 ## Your Today list

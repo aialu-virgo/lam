@@ -2,7 +2,7 @@
 title: Role matrix
 summary: Eight roles with the row-level scope filter applied before rendering, allowed actions, Today cap and one QA test case each, on a small demo fixture.
 status: approved (interim, Vijay, D13)
-updated: 2026-10-21
+updated: 2026-11-07
 related:
   - handover/_index.md
   - design/_index.md
@@ -53,7 +53,7 @@ Plants: "own" means `plant_code ∈ user.plant_codes`. "Sees" lists data scope; 
 |---|---|---|---|
 | **Super admin** | All rows, all plants, all users | All, including Data Intake and Admin | Users, roles, rules and settings, masters, plan and data upload; re-load a closed quarter (logged); lock quarter; view-as; every action of every role |
 | **Management / HO** | All plants and departments (`plant_codes` blank) | All except Admin settings and Data Intake (view only on Intake) | Propose and **approve** plans; assign and reassign any action; **verify** closures; see escalations; approve revisions (never own) |
-| **HOD** | All plants; department filter per the Department table; actions where `department` = own | Pages of own department; Action Center for own department | Assign and close department actions; propose department plans (P4, P5, P7); approve P2 and P4 and P5 |
+| **HOD** | All plants; department filter per the Department table; actions where `department` = own | Pages of own department; Action Center for own department | Assign and close department actions; propose department plans (P4, P5, P7); approve P2 and P4 and P5. **View only** in Plan > Targets & Potential; does not approve P1 ([Target model](target-model.md#who-edits-potential-and-targets)) |
 | **Branch / depot manager** | `plant_code ∈ plant_codes`; customers and persons of those plants; actions owned by or assigned within own plants | Overview, Sales, Dispatch, Receivables, Inventory (own plants), Action Center, Team & Scorecard (own team) | Propose branch plans (P1, P2, P3 view, P6, P7); assign within branch; respond; request reassign; verify closure of actions assigned by self |
 | **Sales executive** | Aggregate rows where `salesperson = sales_employee_code`, plus customers whose master salesperson is the user. Where the row has no salesperson (S/4 periods) the customer master's salesperson is used | Today, Sales (own customers), own scorecard, own actions | Respond to own actions and follow-ups: Acknowledge, Update, Mark done, Need help, Request reassign. Cannot assign or approve |
 | **Coordinator (sales / CRR)** | Plants in `plant_codes`; orders, dispatch, customers. Sales page shows customers and documents only (no target, potential or scorecard columns) | Orders & Dispatch, Sales (customer and document view), Action Center | Raise and track actions within scope; send follow-up drafts (copy, open mail, open WhatsApp, mark Sent) for own scope ([Escalation ladder](escalation-ladder.md)) |
@@ -71,14 +71,15 @@ Y = yes, own scope. P = propose only. A = approves. V = view only. — = no.
 | Assign / reassign | Y | Y | Y (dept) | Y (branch) | — | — | — | — |
 | Verify closure (assigner only) | Y | Y | Y | Y | — | Y | — | — |
 | Send follow-up drafts | Y | Y | Y | Y | — | Y | — | — |
-| Propose plan | Y | Y | P | P | — | — | P | P |
-| Approve plan (not own) | Y | A | A (P2, P4, P5) | — | — | — | — | — |
+| Propose plan (P1 potential and targets: see next row) | Y | Y | P | P | — | — | P | P |
+| Propose, edit, upload potential and targets (P1; Plan > Targets & Potential) | Y | Y | V | Y (own plants) | — | — | — | — |
+| Approve plan (not own; P1 target values by SP Sir) | Y | A | A (P2, P4, P5; not P1) | — | — | — | — | — |
 | Lock quarter | Y | Y | — | — | — | — | — | — |
 | Edit masters, users, settings | Y | — | — | — | — | — | — | — |
 | Upload SAP data / plans | Y | V | — | — | — | — | — | — |
 | Export action log CSV | Y | Y | Y (dept) | Y (branch) | — | — | — | — |
 
-SP Sir approves as a Super admin or Management user; his approval satisfies "SP Sir or a Management role" in [Target model](target-model.md).
+Who may edit potential and targets, locked quarters, and the server-versus-page rule: [Target model](target-model.md#who-edits-potential-and-targets). SP Sir approves as a Super admin or Management user; his approval satisfies "SP Sir or a Management role" in [Target model](target-model.md).
 
 ## D9 limits on scope
 - **Salesperson is not in the document index**, only in aggregates. For a Sales executive, the *figures* are exact (aggregates), but the *document list* behind a figure is filtered by customer and plant, so it can include a document sold under another salesperson. The list carries the note "Documents of your customers". **Cannot be exact at D9 grain.** Recommendation: add `salesperson` to the document index row (see the open item below).

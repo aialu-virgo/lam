@@ -2,7 +2,7 @@
 title: Branch manager guide
 summary: One-page guide for the Branch / depot manager role: what you see, Today, responding to actions, drilling to the SAP document, follow-up drafts.
 status: draft (to check against desk-v1.0 in the page)
-updated: 2026-10-20
+updated: 2026-11-07
 related:
   - handover/_index.md
   - design/role-matrix.md
@@ -17,7 +17,7 @@ You see your own plants and your team. Nothing from other plants ever appears. A
 ## What you see
 - Overview, Sales, Receivables, Inventory (own plants), Action Center, Team & Scorecard (own team).
 - Opening another plant by address shows "Ask your admin for access".
-- You propose branch plans (P1, P2, P3 view, P6, P7) and market-potential revisions for your plants.
+- You propose branch plans (P1, P2, P3 view, P6, P7) and market-potential revisions for your plants, in Plan > Targets & Potential ([Target model](../design/target-model.md#who-edits-potential-and-targets)).
 Every table follows one layout: Potential, Target, Actual, Var, Ach %, Share %, Last Qtr, QoQ %, Trend, with a total row. Growth is quarter on quarter only; there is no last-year comparison. A quarter with partial history shows QoQ greyed with "incomplete history". Achievement is not shown for a target that is not approved.
 
 ## Your Today list
