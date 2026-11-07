@@ -33,7 +33,7 @@ related:
 | Thu 5 Nov 13:00 | v41: credit-note files blocked in sales intake, CN lock, bulk Undo (D60) | Full-Stack Engineer | published 12:13; QA FAIL on undo integrity (D61); v42 12:37, QA passed (D63); Undo cleared |
 | Thu 5 Nov (after Undo) | Sales Apr 2025–Sep 2026 restored; credit notes loaded as credit notes and locked | Vijay + Delivery Lead | open |
 | Fri 6 Nov 09:00 (was Thu 23:30, Fri 01:00, Fri 06:00) | Desk on Google Apps Script (D66): backup download in claude.ai Desk, restore + Apps Script project in Vijay's Drive, QA passed, Drive link sent | Full-Stack Engineer + Engineering QA | QA passed pass 5 07:58; v44 + setup page published by 12:24 (D68; slipped past 09:00); waiting on Vijay to deploy and restore |
-| Sat 7 Nov 15:30 | "Targets & Potential" tab mock-up for approval (Vijay, 7 Nov) | Product Designer | published 14:05, approved (D70); build in progress |
+| Sat 7 Nov 15:30 | "Targets & Potential" tab mock-up for approval (Vijay, 7 Nov) | Product Designer | published 14:05, approved (D70); built, QA passed round 3, desk-v45 published (D72); new GAS files sent |
 
 ## Milestones
 **M0 Discovery**
