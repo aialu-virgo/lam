@@ -1068,7 +1068,7 @@ async function masterUpload(what,file,rowsIn){
     var hd=rows[0].map(function(x){return norm(x)}),idx=function(k){return hd.indexOf(k)},get=function(r,k){var i=idx(k);return i<0?'':String(r[i]==null?'':r[i]).trim()};
     var need=TEMPLATES[what].toLowerCase().split(',');var missingCols=need.filter(function(c){return c!=='sales_employee_code'&&c!=='user_id'&&c!=='territory'&&c!=='source_note'&&idx(c)<0&&!(what==='plants'&&(c==='zone'||c==='state'||c==='b1_bpl_name'))});
     if(missingCols.length){show('<div class="banner err">Missing columns: '+esc(missingCols.join(', '))+'. Download the template.</div>');return}
-    var bad=[],ok=[],seen={},fixN=0,blankN=0;
+    var bad=[],ok=[],seen={},fixN=0,blankN=0,unchN=0;
     rows.slice(1).forEach(function(r,i){
       var rn=i+2;
       if(what==='transfers'){
@@ -1116,11 +1116,14 @@ async function masterUpload(what,file,rowsIn){
       else if(what==='users'){var old0=o._self?S.users.find(function(x){return x._id===o._self}):null,did=old0?old0._id:slug(o.email),rec0=Object.assign({},old0||{},o);delete rec0._id;delete rec0._self;if(!o.user_id&&old0&&old0.user_id)rec0.user_id=old0.user_id;if(!rec0.user_id)delete rec0.user_id;if(isPH(rec0))rec0.placeholder=true;else delete rec0.placeholder;await dset('users/'+did,rec0)}
       else if(what==='plants'){var oldp=S.plants.find(function(x){return x.plant_code===o.plant_code});await dset('plants/'+o.plant_code,Object.assign({},oldp||{},o,{_id:undefined}))}
       else{var ex=S.potential.find(function(x){return x._id===o._key}),rev=(ex?ex.rev||1:0)+1;var k=o._key;delete o._key;
+        /* an unchanged row (same figures, source, note and owner as the current record) is skipped and keeps its status; a changed row onto a DEMO record becomes real (demo flag removed) */
+        if(ex&&(+ex.potential_value_inr||0)===o.potential_value_inr&&(+ex.potential_qty_sheets||0)===o.potential_qty_sheets&&(+ex.potential_qty_sqft||0)===o.potential_qty_sqft&&(ex.source_type||'')===o.source_type&&(ex.source_note||'')===o.source_note&&(ex.owner_email||'')===o.owner_email){unchN++;continue}
         var rv={n:rev,at:nowISO(),by:S.viewer.email,status:'Draft',reason:'Uploaded file '+file.name,discussion_date:'',participants:'',change:ex?'₹ '+fmtMoney(ex.potential_value_inr)+' to '+fmtMoney(o.potential_value_inr):'new figure'};
-        await dset('potential/'+k,Object.assign({share_pct:''},ex||{},o,{status:'Draft',rev:rev,revisions:((ex&&ex.revisions)||[]).concat([rv]).slice(-40),_id:undefined}))}
+        var nd=Object.assign({share_pct:''},ex||{},o,{status:'Draft',rev:rev,revisions:((ex&&ex.revisions)||[]).concat([rv]).slice(-40),_id:undefined});delete nd.demo;/* an uploaded row is real data */await dset('potential/'+k,nd)}
       saved++;
     }
-    var fxp=fixesPanel([{st:'info',t:'Rows read',n:rows.length-1,d:''},{st:fixN?'fixed':'info',t:'Codes and emails tidied (trimmed, case)',n:fixN,d:''},{st:bad.length?'need':'info',t:'Rows rejected',n:bad.length,d:bad.length?'Listed below. Fix them in the source file.':'None.'}].concat(what==='potential'?[{st:'info',t:'Template rows left blank (skipped)',n:blankN,d:''}]:[]),'Fixes applied');
+    var fxp=fixesPanel([{st:'info',t:'Rows read',n:rows.length-1,d:''},{st:fixN?'fixed':'info',t:'Codes and emails tidied (trimmed, case)',n:fixN,d:''},{st:bad.length?'need':'info',t:'Rows rejected',n:bad.length,d:bad.length?'Listed below. Fix them in the source file.':'None.'}].concat(what==='potential'?[{st:'info',t:'Template rows left blank (skipped)',n:blankN,d:''},{st:'info',t:'Rows unchanged (skipped, status kept)',n:unchN,d:''}]:[]),'Fixes applied');
+    toast((what==='potential'?'Upload: ':'Upload: ')+saved+' loaded'+(unchN?', '+unchN+' unchanged (skipped)':'')+(bad.length?', '+bad.length+' rejected':'')+'. Details below the grid.');
     show(fxp+(saved?'<div class="banner ok">Loaded '+saved+' row(s).'+(what==='potential'?' Each is a new revision in Draft.':'')+'</div>':'')+(bad.length?'<div class="banner err" style="display:block"><b>'+bad.length+' row(s) rejected.</b><div class="tw" style="margin-top:6px;max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Key</th><th>Reason</th></tr></thead><tbody>'+bad.slice(0,60).map(function(b){return '<tr><td class="num">'+b[0]+'</td><td class="break">'+esc(b[1])+'</td><td>'+esc(b[2])+'</td></tr>'}).join('')+'</tbody></table></div></div>':''));
   }catch(e){show('<div class="banner err">'+esc(dbErrText(e))+'</div>')}
 }
