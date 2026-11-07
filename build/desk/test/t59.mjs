@@ -268,7 +268,8 @@ let S2;
 
 /* ---------- F. QA regressions: unchanged re-upload keeps status; upload onto DEMO is real; result also as a toast ---------- */
 {
-  const {page}=await openAs('super@demo',store);
+  const real=clone(store);Object.keys(real).forEach(k=>{if(/^potential\//.test(k))delete real[k].demo});
+  const {page}=await openAs('super@demo',real);
   const before=await mock(page),st0=Object.keys(before).filter(k=>/^potential\/fy27_q3_/.test(k)).map(k=>[k,before[k].status,before[k].rev]);
   const csv=await page.evaluate(()=>window.__dbg.tpTemplateCsv('potential'));fs.writeFileSync(TMP+'t59-same.csv',csv);
   await page.setInputFiles('#up-pot',TMP+'t59-same.csv');await page.waitForTimeout(2500);
@@ -285,7 +286,7 @@ let S2;
   after=await mock(page);const ch=Object.keys(after).filter(k=>/^potential\/fy27_q3_/.test(k)&&after[k].status==='Draft');
   const d=after['potential/fy27_q3_1012_laminate_dealer'];
   ok('Changed row only becomes a new Draft revision (current approved target kept); the others keep their status',ch.length===st0.filter(x=>x[1]==='Draft').length+1&&ch.includes('potential/fy27_q3_1012_laminate_dealer')&&d.potential_value_inr===99000000&&!!d.approved&&d.rev===before['potential/fy27_q3_1012_laminate_dealer'].rev+1,JSON.stringify([ch,d.rev]));
-  ok('Uploaded row onto a DEMO record is real data (demo flag removed)',d.demo===undefined,JSON.stringify(d.demo));
+  ok('Changed row keeps no demo flag',d.demo===undefined,JSON.stringify(d.demo));
   await page.context().close();
   /* real sales for 1012 months of Q3: the uploaded row stays visible */
   const inj=clone(store);for(const ym of ['2026-10','2026-11','2026-12']){const k='cells/INV_'+ym;inj[k]=inj[k]||{entity:'INV',ym,plants:{}};inj[k].plants['1012']={sys:'B1',chunks:1,docs:1,lines:1,net:1000000,sheets:10,bytes:10,upload:'real-test',at:'2026-11-07T00:00:00Z'}}
@@ -295,6 +296,25 @@ let S2;
   const sh=await p2.evaluate(()=>{const e=document.getElementById('tp-pot-fy27_q3_1012_laminate_dealer');return e?e.value:null});
   ok('With real sales, an uploaded row onto a DEMO record is visible and real',sh==='5,00,00,000'&&(await mock(p2))['potential/fy27_q3_1012_laminate_dealer'].demo===undefined,String(sh));
   await p2.context().close();
+  /* E: a DEMO record re-uploaded with its own identical figures is not "unchanged": it becomes a real Draft */
+  {
+    const {page:p3}=await openAs('super@demo',store);
+    const csv3=await p3.evaluate(()=>window.__dbg.tpTemplateCsv('potential'));fs.writeFileSync(TMP+'t59-demo-same.csv',csv3);
+    const b3=await mock(p3),dk=Object.keys(b3).filter(k=>/^potential\/fy27_q3_/.test(k)&&b3[k].demo);
+    await p3.setInputFiles('#up-pot',TMP+'t59-demo-same.csv');await p3.waitForFunction(()=>/Loaded \d+ row/.test((document.querySelector('#up-msg')||{}).innerText||''),null,{timeout:60000});await p3.waitForTimeout(500);
+    const a3=await mock(p3);
+    ok('DEMO records re-uploaded with identical figures become real Draft revisions (never skipped as unchanged)',dk.length>10&&dk.every(k=>a3[k].demo===undefined&&a3[k].status==='Draft'&&a3[k].rev===b3[k].rev+1),JSON.stringify([dk.length,dk.filter(k=>!(a3[k].demo===undefined&&a3[k].status==='Draft'&&a3[k].rev===b3[k].rev+1)).map(k=>[k,a3[k].demo,a3[k].status,a3[k].rev,b3[k].rev])]));
+    await p3.context().close();
+    const inj3=clone(store);for(const ym of ['2026-10','2026-11','2026-12']){const k='cells/INV_'+ym;inj3[k]=inj3[k]||{entity:'INV',ym,plants:{}};inj3[k].plants['1012']={sys:'B1',chunks:1,docs:1,lines:1,net:1000000,sheets:10,bytes:10,upload:'real-test',at:'2026-11-07T00:00:00Z'}}
+    const {page:p4}=await openAs('super@demo',inj3);
+    const d0=inj3['potential/fy27_q3_1012_laminate_dealer'];
+    fs.writeFileSync(TMP+'t59-c7.csv','fy_quarter,plant_code,territory,product_group,customer_segment,potential_value_inr,potential_qty_sheets,potential_qty_sqft,source_type,source_note,owner_email\nFY27-Q3,1012,,Laminate,Dealer,'+d0.potential_value_inr+','+(d0.potential_qty_sheets||'')+','+(d0.potential_qty_sqft||'')+','+d0.source_type+','+(d0.source_note||'')+','+d0.owner_email+'\n');
+    await p4.setInputFiles('#up-pot',TMP+'t59-c7.csv');await p4.waitForTimeout(3000);
+    const v4=await p4.evaluate(()=>{const e=document.getElementById('tp-pot-fy27_q3_1012_laminate_dealer');return e?e.value:null});
+    const s4=(await mock(p4))['potential/fy27_q3_1012_laminate_dealer'];
+    ok('Real sales: an identical re-upload of a DEMO record makes it real and visible (case C7)',s4.demo===undefined&&s4.status==='Draft'&&v4!==null,JSON.stringify([s4.demo,s4.status,v4]));
+    await p4.context().close();
+  }
 }
 console.log(res.join('\n'));
 console.log('TOTAL',res.length,'PASS',res.filter(x=>x.startsWith('PASS')).length,'FAIL',res.filter(x=>x.startsWith('FAIL')).length);
