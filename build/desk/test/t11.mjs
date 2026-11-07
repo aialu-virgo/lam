@@ -25,7 +25,7 @@ const res=[];const ok=(n,c,d)=>{res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
  await page.context().close();}
 /* phasing upload */
 {const {page}=await open(browser,{store:JSON.parse(JSON.stringify(store)),viewer:{email:'data@virgoasia.com'}});await page.waitForTimeout(2500);
- await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(400);await page.click('[data-t="potential"]');await page.waitForTimeout(300);
+ await page.evaluate(()=>{location.hash='#/targets'});await page.waitForTimeout(900);
  const csv='fy_quarter,plant_code,product_group,customer_segment,month_in_quarter,phasing_pct\nFY27-Q3,1012,Laminate,Dealer,1,30\nFY27-Q3,1012,Laminate,Dealer,2,30\nFY27-Q3,1012,Laminate,Dealer,3,40\n';
  fs.writeFileSync(SP+'ph.csv',csv);
  await page.setInputFiles('#up-ph',SP+'ph.csv');await page.waitForTimeout(1200);

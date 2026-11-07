@@ -17,10 +17,11 @@ ok('seed Super admin can write users on an empty store (revision +2)', r.ok && r
 ok('one sheet per collection was created', !!E.sheets.c_users && !!E.sheets.info);
 E.setEmail('se@virgoasia.com');
 r = E.call('deskWrite', [[set('periods', 'FY27-Q2', { status: 'closed' })]]); ok('non-admin write to periods refused', !r.ok && r.code === 'permission_denied', JSON.stringify(r));
-const ADMIN = ['periods','audit','settings','users','plants','cells','inv','roll','mappings','transfers','uploads','rejects','items','itemmeta','salesmaster','phasing','orders','deliveries','receivables','collections','stock','backups','customers','creditnotes'];
+const ADMIN = ['periods','audit','settings','users','plants','cells','inv','roll','mappings','transfers','uploads','rejects','items','itemmeta','salesmaster','orders','deliveries','receivables','collections','stock','backups','customers','creditnotes'];
 let refused = 0; ADMIN.forEach(c => { const x = E.call('deskWrite', [[set(c, 'x', { a: 1 })]]); if (!x.ok && x.code === 'permission_denied') refused++; });
 ok('non-admin refused on all ' + ADMIN.length + ' admin collections', refused === ADMIN.length, refused);
-ok('the 21 named admin collections are all in the list', ['periods','audit','settings','users','plants','cells','inv','roll','mappings','transfers','uploads','rejects','items','itemmeta','salesmaster','phasing','orders','deliveries','receivables','collections','stock'].every(c => ADMIN.includes(c)));
+ok('phasing is a shared collection (D70): a non-admin active user may write it', E.call('deskWrite', [[set('phasing', 'ph1', { pct: [30, 30, 40] })]]).ok);
+ok('the 20 named admin collections are all in the list', ['periods','audit','settings','users','plants','cells','inv','roll','mappings','transfers','uploads','rejects','items','itemmeta','salesmaster','orders','deliveries','receivables','collections','stock'].every(c => ADMIN.includes(c)));
 r = E.call('deskWrite', [[set('log', 'l1', { t: 1 }), set('potential', 'p1', { v: 2 }), set('actions', 'a1', { assigner: 'se@virgoasia.com', owner: 'se@virgoasia.com' }), set('followups', 'f1', { to_email: 'se@virgoasia.com' })]]);
 ok('a registered user can write potential, log, and their own actions and followups', r.ok, JSON.stringify(r));
 ok('a Sales executive cannot write planlocks', E.call('deskWrite', [[set('planlocks', 'FY27-Q3', { x: 1 })]]).code === 'permission_denied');
