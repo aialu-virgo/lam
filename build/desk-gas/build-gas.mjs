@@ -17,7 +17,7 @@ if ((head + page).split('/*@@GAS_BOOT@@*/').length !== 2) throw new Error('boot 
 const outDir = path.join(here, 'out');
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, 'Desk-Index.txt'), head + page + '\n</html>\n');
-fs.writeFileSync(path.join(outDir, 'Desk-Code.gs.txt'), fs.readFileSync(path.join(here, 'src/Code.gs.js'), 'utf8'));
+fs.writeFileSync(path.join(outDir, 'Desk-Code.gs.txt'), fs.readFileSync(path.join(here, 'src/Code.gs.js'), 'utf8') + '\n' + fs.readFileSync(path.join(here, 'src/sap.gs.js'), 'utf8'));
 fs.writeFileSync(path.join(outDir, 'appsscript.json.txt'), fs.readFileSync(path.join(here, 'src/appsscript.json'), 'utf8'));
 fs.copyFileSync(path.join(here, 'README.md'), path.join(outDir, 'README.md'));
 for (const f of fs.readdirSync(outDir)) console.log(f, fs.statSync(path.join(outDir, f)).size, 'bytes');

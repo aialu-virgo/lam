@@ -168,9 +168,9 @@ async function cnLoad(){
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
   }catch(e){failed=e}
   var ms=Object.keys(r.months).sort();
-  var upl={at:nowISO(),by:by,sys:U.sys,entity:'CN',file:U.name,size:U.size,mode:'historic',periodLabel:r.covMonths.length?(ymLabel(r.covMonths[0])+(r.covMonths.length>1?' to '+ymLabel(r.covMonths[r.covMonths.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:r.covMonths,all_branches:!!U.allBranches,
+  var upl={at:nowISO(),by:by,sys:U.sys,entity:'CN',file:U.name,size:U.size,mode:'historic',source:U.source||undefined,periodLabel:r.covMonths.length?(ymLabel(r.covMonths[0])+(r.covMonths.length>1?' to '+ymLabel(r.covMonths[r.covMonths.length-1]):'')):'',read:r.read,loaded:failed?0:r.good,rejected:r.rejected,skipped:r.rejected,warned:0,status:failed?'Failed':'Loaded',demo:demo||undefined,plantMonths:done,months:r.covMonths,all_branches:!!U.allBranches,
     fixes:{other_rows:r.other.rows,acp_rows:r.acp.rows,repeated_lines:r.dup,amount_loaded:Math.round(r.value),sheets_loaded:Math.round(r.sheets)},error:failed?dbErrText(failed):undefined};
-  try{await dset('uploads/'+uid,upl);if(!failed){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+cnMapKey(U.sys,U.layout),{map:mp,sys:U.sys,entity:'CN',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
+  try{await dset('uploads/'+uid,upl);if(!failed&&!U.source){var mp={};Object.keys(U.map).forEach(function(k){mp[k]=U.map[k]>=0?U.headers[U.map[k]]:null});await dset('mappings/'+cnMapKey(U.sys,U.layout),{map:mp,sys:U.sys,entity:'CN',at:nowISO(),by:by})}}catch(e2){failed=failed||e2}
   U.stage='done';U.doneOk=!failed;
   U.doneMsg=failed?('Load stopped: '+dbErrText(failed)+' '+done+' of '+total+' plant-months were stored.'):('Loaded '+fmtN(r.good)+' credit-note lines ('+fmtMoney(r.value)+') into '+done+' plant-months; '+r.covMonths.length+' months are now covered.'+(r.rejected?' '+fmtN(r.rejected)+' rows were skipped; the list is in Upload history.':''));
   cnRender();

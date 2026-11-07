@@ -3,10 +3,11 @@
 import vm from 'vm';
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export function makeEnv(opts = {}) {
-  const CELL_LIMIT = 50000, state = { email: opts.email || 'data@virgoasia.com', locks: 0, calls: 0, lockFail: false, failAfterSetValues: null, held: 0, skew: 0, deleteCost: 0, onDelete: null };
+  const CELL_LIMIT = 50000, state = { email: opts.email || 'data@virgoasia.com', locks: 0, calls: 0, lockFail: false, failAfterSetValues: null, held: 0, skew: 0, deleteCost: 0, onDelete: null, triggers: [] };
   const stats = { gv: [], sv: 0, byFn: {} };
   const sheets = {}, props = {}, cache = {};
   function mkSheet(name) {
@@ -48,10 +49,16 @@ export function makeEnv(opts = {}) {
     SpreadsheetApp: { create() { ss.first = mkSheet('Sheet1'); return ss; }, openById(id) { if (id !== 'SHEET1') throw new Error('no such sheet'); return ss; } },
     LockService: { getScriptLock() { return { waitLock() { if (state.held > 0) throw new Error('Lock re-entered: the script lock is already held by this execution'); state.locks++; if (state.lockFail) throw new Error('Could not obtain lock after 30000 ms'); state.held++; }, releaseLock() { if (state.held > 0) state.held--; } }; } },
     CacheService: { getScriptCache() { return { get(k) { return k in cache ? cache[k] : null; }, put(k, v) { cache[k] = v; } }; } },
-    PropertiesService: { getScriptProperties() { return { getProperty(k) { return k in props ? props[k] : null; }, setProperty(k, v) { if (String(v).length > 9216) throw new Error('Property value too large'); props[k] = v; } }; } },
+    PropertiesService: { getScriptProperties() { return { getProperty(k) { return k in props ? props[k] : null; }, setProperty(k, v) { if (String(v).length > 9216) throw new Error('Property value too large'); props[k] = String(v); }, deleteProperty(k) { delete props[k]; } }; } },
     Session: { getActiveUser() { return { getEmail() { return state.email; } }; }, getEffectiveUser() { return { getEmail() { return state.effective || 'data@virgoasia.com'; } }; } },
-    ScriptApp: { getService() { return { getUrl() { return 'https://script.google.com/a/macros/virgoasia.com/s/XYZ/exec'; } }; } },
-    Utilities: { sleep() {} }, Logger: { log() {} },
+    ScriptApp: { getService() { return { getUrl() { return 'https://script.google.com/a/macros/virgoasia.com/s/XYZ/exec'; } }; },
+      getProjectTriggers() { return state.triggers.slice(); }, deleteTrigger(t) { state.triggers = state.triggers.filter(x => x !== t); },
+      newTrigger(fn) { const t = { fn, kind: null, getHandlerFunction() { return fn; } }; const b = { timeBased() { return b; }, everyDays(n) { t.kind = 'daily'; t.days = n; return b; }, atHour(h) { t.hour = h; return b; }, nearMinute(m) { t.minute = m; return b; }, after(ms) { t.kind = 'after'; t.ms = ms; return b; }, create() { state.triggers.push(t); return t; } }; return b; } },
+    Utilities: { sleep() { state.sleeps = (state.sleeps || 0) + 1; }, base64Encode(x) { return Buffer.from(typeof x === 'string' ? x : Buffer.from(x)).toString('base64'); }, base64Decode(s) { return Array.from(Buffer.from(s, 'base64')); },
+      newBlob(d) { const buf = typeof d === 'string' ? Buffer.from(d, 'utf8') : Buffer.from(d); return { getBytes() { return Array.from(buf); }, getDataAsString() { return buf.toString('utf8'); } }; },
+      gzip(b) { const z = zlib.gzipSync(Buffer.from(b.getBytes())); return { getBytes() { return Array.from(z); } }; }, ungzip(b) { const z = zlib.gunzipSync(Buffer.from(b.getBytes())); return { getDataAsString() { return z.toString('utf8'); } }; } },
+    Logger: { log(m) { (state.logs = state.logs || []).push(String(m)); } },
+    UrlFetchApp: { fetch(url, o) { if (!opts.fetch) throw new Error('UrlFetchApp is not available in this test'); const r = opts.fetch(url, o, state); return { getResponseCode() { return r.code; }, getContentText() { return r.body; }, getHeaders() { return r.headers || {}; } }; } },
     HtmlService: {
       XFrameOptionsMode: { DEFAULT: 'DEFAULT' },
       createHtmlOutputFromFile() { return { getContent() { return fs.readFileSync(opts.indexFile || path.join(here, '../out/Desk-Index.txt'), 'utf8'); } }; },
@@ -60,6 +67,7 @@ export function makeEnv(opts = {}) {
   };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(path.join(here, '../src/Code.gs.js'), 'utf8'), ctx, { filename: 'Code.gs' });
+  vm.runInContext(fs.readFileSync(path.join(here, '../src/sap.gs.js'), 'utf8'), ctx, { filename: 'sap.gs' });
   function storedAll() { // {col/id: json} using the same rule as the server: newest token with all parts
     const out = {};
     Object.keys(sheets).filter(n => n.startsWith('c_')).forEach(n => {
@@ -69,7 +77,7 @@ export function makeEnv(opts = {}) {
     });
     return out;
   }
-  return { ctx, state, sheets, stats, props, setEmail(e) { state.email = e; }, stored: storedAll,
+  return { ctx, state, sheets, stats, props, clearCache() { Object.keys(cache).forEach(k => delete cache[k]); }, setEmail(e) { state.email = e; }, stored: storedAll,
     callRaw(fn, args = []) { state.calls++; return JSON.parse(JSON.stringify(ctx[fn](...args))); },
     call(fn, args = []) { state.calls++; stats.byFn[fn] = (stats.byFn[fn] || 0) + 1; const r = JSON.parse(JSON.stringify(ctx[fn](...args)));
       /* deskWrite answers per operation; for convenience r.ok / r.code summarise the batch (ok only if every operation was applied), r.results keeps the detail */

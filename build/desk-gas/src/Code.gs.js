@@ -6,7 +6,7 @@
  * so the old complete version stays readable until the new one is complete. A reader takes the newest token whose parts are all present.
  * Revisions: Script Property DESK_REVS = {"revs":{collection:n},"wts":ms}. n is odd while a write to that collection is in progress and even otherwise; every write adds 2.
  * LOCKS: the script lock is taken in exactly two places and never while it is already held: database creation (ssId_, its own short lock) and the write section of
- * deskWrite / deskWipe. The database is created BEFORE any write lock is taken (setup(), doGet, or the first step of deskWrite).
+ * deskWrite / deskWipe. The SAP feed (sap.gs.js, joined to this file by build-gas.mjs) takes it only for its run flag and for its staging write section, the same way. The database is created BEFORE any write lock is taken (setup(), doGet, or the first step of deskWrite).
  * A read is accepted only when the revision was even and unchanged from before to after the read (sequence lock), so a page never mixes two versions. */
 var SEED_SUPER = ['data@virgoasia.com', 'spa@virgoasia.com', 'ai.acp@virgoasia.com'];
 var PART_CHARS = 45000;          // Google Sheets allows 50,000 characters per cell
@@ -14,7 +14,7 @@ var MAX_DOC_CHARS = 262144;      // 256 KiB per document, as the page assumes
 var PAGE_CHARS = 2500000;        // characters per page read (one getValues)
 var PAGE_ROWS = 4000;            // rows per page read
 var STALE_WRITE_MS = 150000;     // an odd revision whose heartbeat (wts) is older than this is a crashed write and is ignored; a live writer refreshes wts before every step
-var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes'];
+var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes', 'sapstage'];
 var SHARED_COLLECTIONS = ['potential', 'phasing', 'actions', 'followups', 'log', 'planlocks'];
 var HEADER = ['id', 'part', 'len', 'json', 'updatedAt', 'updatedBy'];
 
@@ -194,6 +194,9 @@ function knownCol_(col) { return ADMIN_COLLECTIONS.indexOf(col) >= 0 || SHARED_C
 function checkId_(id) { if (typeof id !== 'string' || !id || id.length > 300 || id.indexOf('/') >= 0) fail_('invalid_argument', 'Bad document id.'); }
 /* a registered, active user reads everything (no row filter, as on claude.ai; decision D66). Inactive and unknown emails read nothing. */
 function canRead_(who) { return !!(who.role && who.active); }
+/* staged SAP feed rows (collection sapstage) are Super-admin-only for reading too (D73) */
+var ADMIN_READ_ONLY = ['sapstage'];
+function needRead_(who, col) { if (ADMIN_READ_ONLY.indexOf(col) >= 0 && !isAdmin_(who)) fail_('permission_denied', 'Super admin only.'); }
 
 /* ---------- API called by the page ---------- */
 function deskBoot() {
@@ -204,13 +207,18 @@ function deskBoot() {
 }
 /* cheap poll: the revision map (one Script Property read) */
 function deskRevs() {
-  return wrap_(function () { requireUser_(); return { ok: true, revs: revsGet_().revs }; });
+  return wrap_(function () {
+    var who = requireUser_(), revs = revsGet_().revs;
+    if (!isAdmin_(who)) { revs = Object.assign({}, revs); ADMIN_READ_ONLY.forEach(function (c) { delete revs[c]; }); }
+    return { ok: true, revs: revs };
+  });
 }
 /* step 1 of reading a collection: its revision and the pages (row ranges of whole documents) to fetch with deskPage */
 function deskPlan(col) {
   return wrap_(function () {
     var who = requireUser_();
     if (!knownCol_(col)) fail_('invalid_argument', 'Unknown collection.');
+    needRead_(who, col);
     var ss = canRead_(who) ? book_(false) : null;
     return stable_(col, null, function (rev) {
       var pl = ss ? plan_(colSheet_(ss, col, false)) : { rows: 0, chars: 0, pages: [] };
@@ -223,6 +231,7 @@ function deskPage(col, r1, r2, rev) {
   return wrap_(function () {
     var who = requireUser_();
     if (!knownCol_(col) || !canRead_(who)) fail_('invalid_argument', 'Unknown collection.');
+    needRead_(who, col);
     var ss = book_(false), sh = ss && colSheet_(ss, col, false);
     return stable_(col, rev, function () { var r = readPage_(sh, r1, r2); return { ok: true, docs: r.docs, skipped: r.skipped }; });
   });
@@ -244,6 +253,7 @@ function deskGetMany(keys) { // keys: ["col/id", ...] -> docs:[{key,json|null}]
     keys.forEach(function (k) {
       var i = String(k).indexOf('/'), col = k.slice(0, i);
       if (!knownCol_(col)) fail_('invalid_argument', 'Unknown collection.');
+      needRead_(who, col);
       (byCol[col] = byCol[col] || []).push(k.slice(i + 1)); out[k] = null;
     });
     var ss = canRead_(who) ? book_(false) : null;
@@ -351,7 +361,7 @@ function deskStats() {
   return wrap_(function () {
     var who = requireUser_();
     if (!isAdmin_(who)) fail_('permission_denied', 'Super admin only.');
-    var ss = book_(false), counts = Object.create(null), allCols = ADMIN_COLLECTIONS.concat(SHARED_COLLECTIONS);
+    var ss = book_(false), counts = Object.create(null), allCols = ADMIN_COLLECTIONS.concat(SHARED_COLLECTIONS).filter(function (c) { return ADMIN_READ_ONLY.indexOf(c) < 0; }); // staged SAP rows are not part of a backup or restore
     if (ss) allCols.forEach(function (c) {
       var sh = colSheet_(ss, c, false), last = sh ? sh.getLastRow() : 0; if (last < 2) return;
       var v = sh.getRange(2, 1, last - 1, 1).getValues(), seen = Object.create(null), n = 0;
