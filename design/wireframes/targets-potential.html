@@ -1,0 +1,578 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wireframe Targets and Potential</title><style>/* Wireframe: Targets & Potential. Tokens copied from build/desk (brand red, warm neutrals, D25). Red is brand chrome; status uses text plus mark, never colour alone. Static markup; radios and details only, no script. */
+:root{--bg:#f5f3f1;--card:#fff;--line:#e8e4e0;--ink:#15161a;--ink2:#55524e;--ink3:#6f6a66;--brand:#e40000;--brand-ink:#b8000a;--brand-soft:#fdecec;--slate:#3f4654;--slate-soft:#eceef2;--green:#0a7a55;--green-soft:#e2f6ee;--orange:#8f5300;--orange-soft:#fdf1dc;--red:#9a0c20;--red-soft:#fbe4e8;--sky:#076a97;--sky-soft:#e3f3fa;--hatch:repeating-linear-gradient(45deg,#ece8e4 0 6px,#f5f3f1 6px 12px);--shadow:0 1px 2px rgba(40,28,20,.05),0 4px 14px rgba(40,28,20,.06);--font:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141211;--card:#1d1b1a;--line:#2e2b29;--ink:#f3efec;--ink2:#bdb7b2;--ink3:#9a948f;--brand-ink:#ff6b6b;--brand-soft:#3a1214;--slate:#b9bfcc;--slate-soft:#262a33;--green:#34d399;--green-soft:#12342a;--orange:#f5b544;--orange-soft:#3a2d12;--red:#ff8fa3;--red-soft:#3b1b22;--sky:#5cc0ee;--sky-soft:#12303f;--hatch:repeating-linear-gradient(45deg,#2c2926 0 6px,#1d1b1a 6px 12px);--shadow:0 1px 2px rgba(0,0,0,.35);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141211;--card:#1d1b1a;--line:#2e2b29;--ink:#f3efec;--ink2:#bdb7b2;--ink3:#9a948f;--brand-ink:#ff6b6b;--brand-soft:#3a1214;--slate:#b9bfcc;--slate-soft:#262a33;--green:#34d399;--green-soft:#12342a;--orange:#f5b544;--orange-soft:#3a2d12;--red:#ff8fa3;--red-soft:#3b1b22;--sky:#5cc0ee;--sky-soft:#12303f;--hatch:repeating-linear-gradient(45deg,#2c2926 0 6px,#1d1b1a 6px 12px);--shadow:0 1px 2px rgba(0,0,0,.35);color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--font)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}.mut{color:var(--ink3)}small{display:block;font-size:11px;color:var(--ink3)}
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+.side{background:var(--card);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800}.brand i{width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-style:normal}.brand small{font-weight:400}
+.navgrp{display:flex;flex-direction:column;gap:2px}.navgrp h6{margin:8px 10px 4px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.nav{padding:8px 10px;border-radius:10px;color:var(--ink2);text-decoration:none;font-size:13.5px;font-weight:500;border:1px solid transparent}
+.nav.on{background:var(--brand-soft);color:var(--brand-ink);font-weight:700;border-color:color-mix(in srgb,var(--brand) 25%,transparent)}
+.me{margin-top:auto;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:12px;display:flex;flex-direction:column;gap:4px}
+.demo{font:700 10.5px var(--mono);border:1px dashed var(--ink3);padding:1px 6px;border-radius:4px;color:var(--ink2);align-self:flex-start}
+main{padding:20px 24px 24px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.wfnote{background:var(--slate-soft);border:1px dashed var(--ink3);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--ink2)}
+.mock{border:1px dashed var(--ink3);border-radius:10px;padding:6px 12px 10px;margin:0;font-size:12.5px}.mock legend{font-size:11px;color:var(--ink3);padding:0 6px}.mrow{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-top:4px}.mrow label{display:inline-flex;gap:5px;align-items:center}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}.top h1{margin:0;font-size:22px;letter-spacing:-.01em}.top p{margin:2px 0 0;color:var(--ink3);font-size:12.5px}
+.tools{display:flex;flex-wrap:wrap;gap:10px}
+.note{font-size:12.5px;color:var(--ink2);border-left:3px solid var(--brand);padding:2px 10px}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink2);font-weight:600;min-width:0}
+.in{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font:inherit;font-size:12.5px;color:var(--ink);min-height:34px;width:100%;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+input.in::placeholder,textarea.in::placeholder{color:var(--ink3)}
+.in.sel{display:inline-flex;align-items:center;text-align:left;font-family:var(--font);font-weight:400;color:var(--ink2);width:auto;max-width:100%}
+.in.dflt{color:var(--ink3);font-style:italic;background:var(--hatch)}.in.sm{min-height:28px;padding:3px 6px;width:70px}
+.in.miss{border-color:var(--orange);background:var(--orange-soft)}
+.in.tgt,.in.share{border-style:dashed}
+.btn{border:1px solid var(--ink3);background:var(--card);border-radius:10px;padding:7px 13px;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink);min-height:36px;cursor:pointer}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn[disabled]{opacity:.45;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:14px 16px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.card>h3,.card .h h3{margin:0;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink2)}.h{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px}
+.guide ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}.guide p{margin:0;font-size:12.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;display:inline-block;border:1px solid var(--ink3);color:var(--ink2);white-space:nowrap}
+.p-ok{background:var(--green-soft);color:var(--green);border-color:var(--green)}.p-ok:before{content:"✓ "}
+.p-prop{background:var(--sky-soft);color:var(--sky);border-color:var(--sky)}.p-prop:before{content:"→ "}
+.p-draft{background:var(--slate-soft);color:var(--slate);border-color:var(--slate)}.p-draft:before{content:"✎ "}
+.p-lock{background:var(--slate);color:var(--card);border-color:var(--slate)}.p-lock:before{content:"⚿ "}
+.p-ns{border-style:dashed;color:var(--ink3)}
+.p-miss{background:var(--orange-soft);color:var(--orange);border-color:var(--orange)}.p-miss:before{content:"! "}
+.p-str{background:var(--orange-soft);color:var(--orange);border-color:var(--orange)}.p-str:before{content:"▲ "}
+.up{color:var(--green);font-weight:700}.dn{color:var(--red);font-weight:700}
+.strip{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px}
+.ck{display:inline-flex;gap:5px;align-items:center;font-size:11.5px;color:var(--ink2);min-height:24px}.ck input{width:16px;height:16px}
+.own{color:var(--orange)}
+/* grid */
+.gridwrap{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.g{display:grid;grid-template-columns:20px minmax(90px,1fr) minmax(112px,1.25fr) 78px minmax(112px,1.25fr) minmax(100px,1.05fr) minmax(100px,1.1fr) minmax(70px,.8fr) minmax(104px,1.2fr) minmax(112px,1.3fr);gap:8px;align-items:start;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px}
+.g>.c{display:flex;flex-direction:column;gap:3px;min-width:0}.c.n{text-align:right;align-items:flex-end}.c .pill{align-self:flex-start}.c.n .pill{align-self:flex-end}
+.c::before{content:attr(data-l);display:none;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.gh{background:var(--slate-soft);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink2);font-weight:700;align-items:end}.gh .n{text-align:right}
+.ph{padding:8px 12px;background:var(--brand-soft);color:var(--ink);font-size:12.5px;border-bottom:1px solid var(--line)}
+details.row>summary{list-style:none;cursor:pointer}details.row>summary::-webkit-details-marker{display:none}
+.chev{color:var(--ink3);font-size:12px;padding-top:8px;transition:transform .15s}details[open]>summary .chev{transform:rotate(90deg)}
+.more{display:none}
+details.row[open]>summary{background:color-mix(in srgb,var(--brand-soft) 45%,var(--card))}
+.child{background:var(--bg)}.child{display:none}.ind{color:var(--ink2);padding-top:8px}
+.tot{background:var(--slate-soft);font-weight:700;border-top:2px solid var(--slate)}.tot.all{background:var(--slate);color:var(--card)}.tot.all small,.tot.all .up,.tot.all .mut{color:var(--card)}
+.tot .cg{padding-top:8px}.tot .c{padding-top:2px}
+.dbody{padding:10px 14px 14px 34px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid var(--line);background:var(--card)}
+.dgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.dgrid .wide{grid-column:span 1}
+.dbody p{margin:0;font-size:12px}
+.phs{display:flex;flex-direction:column;gap:8px}.phh{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.seg2{display:inline-flex;gap:12px;flex-wrap:wrap;font-size:12.5px}.seg2 label{display:inline-flex;gap:5px;align-items:center}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}th{background:var(--slate-soft);text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2);padding:6px 10px;white-space:nowrap}td{padding:6px 10px;border-top:1px solid var(--line)}th.n,td.n{text-align:right}tr.tt td{font-weight:800;background:var(--slate-soft)}
+.tl{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.tl li{border-left:3px solid var(--brand);padding-left:10px;font-size:12px}
+.ret summary{cursor:pointer}.ret .rbtn{display:flex;gap:8px;justify-content:flex-end}.ret p{margin:0;font-size:12px}
+.sticky{position:sticky;bottom:0;z-index:5;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}.bl,.br{display:flex;flex-wrap:wrap;gap:8px}
+/* role and state switches: radios only */
+body:has(#v-bm:checked) [data-s]:not([data-s~="bm"]),body:has(#v-hod:checked) [data-s]:not([data-s~="hod"]),body:has(#v-se:checked) [data-s]:not([data-s~="se"]),body:has(#v-mg:checked) [data-s]:not([data-s~="mg"]),body:has(#v-sa:checked) [data-s]:not([data-s~="sa"]){display:none!important}
+body:has(#s-f:checked) [data-st="empty"],body:has(#s-e:checked) [data-st="filled"]{display:none!important}
+body:has(#v-hod:checked) .in,body:has(#v-se:checked) .in{pointer-events:none;border-color:transparent;background:transparent}
+body:has(#v-hod:checked) .in.sel:after,body:has(#v-se:checked) .in.sel:after{content:""}
+body:has(#seg:checked) .child{display:grid}
+body:has(#seg:checked) .par>summary .in{pointer-events:none;background:transparent;border-color:transparent}
+body:has(#seg:checked) .par>summary .cg small:after{content:" · sum of segments"}
+@media (max-width:1279px){
+ .app{grid-template-columns:1fr}
+ .side{position:static;height:auto;flex-direction:row;align-items:center;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:10px 16px;gap:10px}
+ .navgrp{flex-direction:row;gap:4px;align-items:center}.navgrp h6,.me{display:none}.nav{white-space:nowrap}.brand small{display:none}.brand{white-space:nowrap}
+ main{padding:16px}
+ .gh{display:none}
+ .g{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;padding:12px}
+ .g .chev{display:none}
+ .g>.c::before{display:block}.c[data-l=""]::before{display:none}.c:empty{display:none}
+ .g>.cg{grid-column:1/-1;flex-direction:row;align-items:baseline;gap:8px;font-size:14px}.g>.cg::before{display:none}
+ .g>.c:nth-last-child(1),.g>.c:nth-last-child(2){grid-column:auto}
+ .g>.c[data-l="Status"],.g>.c[data-l="Original vs current target"]{grid-column:1/-1}
+ .c.n{text-align:left;align-items:flex-start}.c.n .pill{align-self:flex-start}
+ .more{display:block;grid-column:1/-1;color:var(--brand-ink);font-weight:700;font-size:12px}.more:before{content:"▸ "}details[open] .more:before{content:"▾ "}
+ .dbody{padding:10px 12px 14px}.dgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.dgrid .wide{grid-column:1/-1}
+ .tot .c{padding-top:0}
+}
+@media (max-width:520px){main{padding:12px 16px 16px}.top h1{font-size:19px}.tools,.tools .fld{width:100%}.in.sel{width:100%}.sticky{position:static}.bar{flex-direction:column;align-items:stretch}.btn{flex:1 1 44%}.dgrid{grid-template-columns:1fr}.mrow label{width:100%}}
+</style></head><body><div class="app"><aside class="side"><div class="brand"><i>V</i><div>Virgo Laminates<small>Performance Desk</small></div></div>
+<div class="navgrp"><h6>Business</h6><a class="nav" href="overview.html">Overview</a><a class="nav" href="sales.html">Sales</a><a class="nav" href="receivables.html">Receivables</a><a class="nav" href="inventory.html">Inventory</a></div>
+<div class="navgrp"><h6>People</h6><a class="nav" href="action-center.html">Action Center</a><a class="nav" href="team-scorecard.html">Team &amp; Scorecard</a></div>
+<div class="navgrp"><h6>Plan</h6><a class="nav on" href="targets-potential.html" aria-current="page">Targets &amp; Potential</a></div>
+<div class="navgrp" data-s="sa"><h6>Admin</h6><a class="nav" href="v0.1-data-intake.html">Data Intake</a><a class="nav" href="v0.1-admin-masters.html">Admin</a></div>
+<div class="me"><b><span data-s="bm">Demo Branch Manager A</span><span data-s="hod">Demo HOD Sales</span><span data-s="se">Demo Sales Exec S1</span><span data-s="mg">Demo Management</span><span data-s="sa">Demo Super Admin</span></b><span class="mut"><span data-s="bm">Branch / depot manager</span><span data-s="hod">HOD</span><span data-s="se">Sales executive</span><span data-s="mg">Management / HO</span><span data-s="sa">Super admin</span></span><span class="demo">DEMO</span></div></aside><main><div class="wfnote">WIREFRAME · Targets &amp; Potential · DEMO values only · all plant names, people and figures are invented</div>
+<fieldset class="mock"><legend>Mock-up controls (not part of the page)</legend>
+<div class="mrow"><span class="mut">View as</span>
+<label><input type="radio" name="v" id="v-bm" checked> Branch manager (A, B)</label><label><input type="radio" name="v" id="v-hod"> HOD</label><label><input type="radio" name="v" id="v-se"> Sales executive (plant A)</label><label><input type="radio" name="v" id="v-mg"> Management / HO</label><label><input type="radio" name="v" id="v-sa"> Super admin</label></div>
+<div class="mrow"><span class="mut">Quarter</span><label><input type="radio" name="s" id="s-f" checked> Part filled</label><label><input type="radio" name="s" id="s-e"> Nothing entered</label>
+<span class="mut" style="margin-left:12px">Segments</span><label><input type="checkbox" id="seg"> Expand segment rows</label></div></fieldset>
+<div class="top"><div><h1>Targets &amp; Potential</h1><p>Fill the quarter's market potential and sales target in one place · Q3 FY27 (Oct–Dec 2026)</p></div>
+<div class="tools"><label class="fld sm1">Quarter<span class="in sel">Q3 FY27 · Oct–Dec 2026 ▾</span></label><label class="fld sm1">Plants<span class="in sel"><span data-s="bm">My plants (A, B) ▾</span><span data-s="se">Plant A ▾</span><span data-s="hod mg sa">All plants ▾</span></span></label></div></div>
+<div class="note"><span data-s="bm">You are the Branch manager for plants A and B. Edit Potential ₹ and either Share % or Target ₹, save a draft, then submit for approval.</span><span data-s="hod">View only. You see all plants; a Branch manager edits and Management approves.</span><span data-s="se">View only. You see the plant where your customers are.</span><span data-s="mg">You see all plants. You can propose and approve, but never approve a row you proposed.</span><span data-s="sa">You see all plants and can edit, approve and lock. Approval of a row you proposed still needs another approver.</span> Growth is shown quarter on quarter only: target against last quarter's actual. Edit Share % and Target ₹ moves the other; the last one you touch wins.</div>
+<div data-st="filled"><div class="strip" data-s="bm"><span class="pill p-ok">3 Approved</span><span class="pill p-draft">3 Draft</span><span class="pill p-prop">2 Proposed</span><span class="pill p-miss">0 Potential not set</span><span class="mut">8 rows · plants A, B</span></div>
+<div class="strip" data-s="se"><span class="pill p-ok">3 Approved</span><span class="pill p-draft">1 Draft</span><span class="mut">4 rows · plant A</span></div>
+<div class="strip" data-s="hod mg sa"><span class="pill p-ok">3 Approved</span><span class="pill p-draft">4 Draft</span><span class="pill p-prop">4 Proposed</span><span class="pill p-miss">1 Potential not set</span><span class="mut">12 rows · plants A, B, C</span></div></div><div data-st="empty"><div class="strip" data-s="bm hod se mg sa"><span class="pill p-ns">0 started</span><span class="mut">Q3 FY27 has no potential, share or target entered yet.</span></div></div>
+<div data-st="empty"><div class="card guide" data-s="bm mg sa"><h3>Q3 FY27 is empty. Three ways to start</h3>
+<ol><li><b>Copy from last quarter.</b> Takes last quarter's potential and share into this quarter as Draft. Edit what changed.</li>
+<li><b>Download template, fill, Upload.</b> The market-potential file and the monthly phasing file.</li>
+<li><b>Type it in.</b> Enter Potential ₹ per row. Share % is already filled with the default.</li></ol>
+<p class="mut"><b>Default.</b> Share % = last quarter's actual ÷ last quarter's potential for the same row, plus 2 points (setting in Admin). Example, Plant A Laminate: 2,50,00,000 ÷ 5,20,00,000 = 48.08%, plus 2 = <b>50.08%</b>. Target = potential × share, saved as a <span class="pill p-draft">Draft</span>. With no potential entered there is no target and the row says "Potential not set". The default share applies only where last quarter had a potential.</p></div>
+<div class="card guide" data-s="hod se"><h3>Q3 FY27 is empty</h3><p class="mut">No Branch manager has entered potential or targets yet. Rows below show last quarter's actuals for reference.</p></div></div>
+<div class="card gridcard"><div class="h"><h3>Q3 FY27 · plant × product group</h3><span class="mut">₹ net of GST · actuals from SAP · segment All unless expanded</span></div>
+<div class="gridwrap"><div class="g gh" aria-hidden="true"><span></span><div>Product group</div><div>Potential ₹</div><div>Share % ⇄</div><div>Target ₹ ⇄</div><div>Source</div><div class="n">Last quarter actual</div><div class="n">QoQ</div><div>Status</div><div>Original vs current</div></div>
+<div data-st="filled"><div class="ph" data-s="bm hod se mg sa"><b>Demo Plant A</b> <span class="mut">· plant 1001 · proposer bm.a@demo</span></div><details class="row par" data-s="bm hod se mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Laminate</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="5,40,00,000" placeholder="" aria-label="Potential ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="50.00" placeholder="" aria-label="Share % Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="2,70,00,000" placeholder="" aria-label="Target ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Dealer survey ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">2,50,00,000</span><small class="mut">Q2 FY27 · potential 5,20,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+8.00%</span> <span class="pill p-str" title="For discussion; never blocks approval">Stretch</span></div>
+<div class="c" data-l="Status"><span class="pill p-ok">Approved</span><small>approved by Demo Management</small></div>
+<div class="c" data-l="Original vs current target"><div><span class="mut">Original</span> <span class="mono">2,65,00,000</span><br><span class="mut">Current</span> <b class="mono">2,70,00,000</b></div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="30,000" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="9,60,000" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Dealer survey ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="Dealer survey up after Q2" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 2,50,00,000 ÷ 5,20,00,000 = 48.08% + 2 points = <b>50.08%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">90,00,000.00</td><td class="n">25</td><td class="n mono">90,00,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">90,00,000.00</td><td class="n">24</td><td class="n mono">86,40,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">90,00,000.00</td><td class="n">26</td><td class="n mono">93,60,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">2,70,00,000.00</td><td class="n">75</td><td class="n mono">2,70,00,000.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div><div><b>Revision trail</b><ul class="tl"><li>Rev 2 · Demo Management · 20 Oct 2026 · current target 2,65,00,000 → 2,70,00,000 · reason: "Dealer survey up after Q2"</li><li>Rev 1 · Demo Branch Manager A · approved original 2,65,00,000</li></ul></div></div></details><div class="row child g" data-s="bm hod se mg sa"><span class="chev" aria-hidden="true"></span>
+<div class="c cg" data-l="Segment"><span class="ind">↳ Laminate · <b>Dealer</b></span></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="3,24,00,000" placeholder="" aria-label="Potential Dealer" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="52.00" placeholder="" aria-label="Share Dealer" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="1,68,48,000" placeholder="" aria-label="Target Dealer" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Dealer survey ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,50,00,000</span></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+12.32%</span></div>
+<div class="c" data-l="Status"><span class="pill p-ok">Approved</span></div>
+<div class="c" data-l="Original vs current target"><span class="mut">Leaf of the plant total</span></div></div><div class="row child g" data-s="bm hod se mg sa"><span class="chev" aria-hidden="true"></span>
+<div class="c cg" data-l="Segment"><span class="ind">↳ Laminate · <b>Project</b></span></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="2,16,00,000" placeholder="" aria-label="Potential Project" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="47.00" placeholder="" aria-label="Share Project" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="1,01,52,000" placeholder="" aria-label="Target Project" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Dealer survey ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,00,00,000</span></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+1.52%</span></div>
+<div class="c" data-l="Status"><span class="pill p-ok">Approved</span></div>
+<div class="c" data-l="Original vs current target"><span class="mut">Leaf of the plant total</span></div></div><details class="row" data-s="bm hod se mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Door</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="3,10,00,000" placeholder="" aria-label="Potential ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="46.30" placeholder="" aria-label="Share % Door" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="1,43,53,000" placeholder="" aria-label="Target ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Branch estimate ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,38,00,000</span><small class="mut">Q2 FY27 · potential 3,00,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+4.01%</span></div>
+<div class="c" data-l="Status"><span class="pill p-ok">Approved</span><small>approved by Demo Management</small></div>
+<div class="c" data-l="Original vs current target"><div><span class="mut">Original = current</span><br><b class="mono">1,43,53,000</b></div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="17,222" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="5,51,104" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 1,38,00,000 ÷ 3,00,00,000 = 46.00% + 2 points = <b>48.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">47,84,333.33</td><td class="n">25</td><td class="n mono">47,84,333.33</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">47,84,333.33</td><td class="n">24</td><td class="n mono">45,92,960.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">47,84,333.34</td><td class="n">26</td><td class="n mono">49,75,706.67</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">1,43,53,000.00</td><td class="n">75</td><td class="n mono">1,43,53,000.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div></div></details><details class="row" data-s="bm hod se mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>PVC sheet</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="1,70,00,000" placeholder="" aria-label="Potential ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="42.80" placeholder="" aria-label="Share % PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="72,76,000" placeholder="" aria-label="Target ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Branch estimate ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">70,00,000</span><small class="mut">Q2 FY27 · potential 1,60,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+3.94%</span></div>
+<div class="c" data-l="Status"><span class="pill p-ok">Approved</span><small>approved by Demo Management</small></div>
+<div class="c" data-l="Original vs current target"><div><span class="mut">Original = current</span><br><b class="mono">72,76,000</b></div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="9,444" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="3,02,208" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 70,00,000 ÷ 1,60,00,000 = 43.75% + 2 points = <b>45.75%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">24,25,333.33</td><td class="n">25</td><td class="n mono">24,25,333.33</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">24,25,333.33</td><td class="n">24</td><td class="n mono">23,28,320.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">24,25,333.34</td><td class="n">26</td><td class="n mono">25,22,346.67</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">72,76,000.00</td><td class="n">75</td><td class="n mono">72,76,000.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div></div></details><details class="row" data-s="bm hod se mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Compact board</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="85,00,000" placeholder="" aria-label="Potential ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="36.50" placeholder="" aria-label="Share % Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="31,02,500" placeholder="" aria-label="Target ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Branch estimate ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">30,40,000</span><small class="mut">Q2 FY27 · potential 80,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+2.06%</span></div>
+<div class="c" data-l="Status"><span class="pill p-draft">Draft</span></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet. Draft is shown, not counted.</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="4,722" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="1,51,104" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 30,40,000 ÷ 80,00,000 = 38.00% + 2 points = <b>40.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">10,34,166.67</td><td class="n">25</td><td class="n mono">10,34,166.67</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">10,34,166.67</td><td class="n">24</td><td class="n mono">9,92,800.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">10,34,166.66</td><td class="n">26</td><td class="n mono">10,75,533.33</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">31,02,500.00</td><td class="n">75</td><td class="n mono">31,02,500.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div></div></details><div class="tot g" data-s="bm hod se mg sa"><span class="chev"></span><div class="c cg" data-l="">Demo Plant A total</div><div class="c" data-l="Potential ₹"><b class="mono">11,05,00,000</b></div><div class="c" data-l="Share %"><b class="mono">46.82</b><small>blended</small></div><div class="c" data-l="Target ₹"><b class="mono">5,17,31,500</b></div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">4,88,40,000</span></div><div class="c n" data-l="QoQ"><b class="mono up">+5.92%</b></div><div class="c" data-l="Status">3 of 4 approved<small>All rows have potential</small></div><div class="c"></div></div><div class="ph" data-s="bm hod mg sa"><b>Demo Plant B</b> <span class="mut">· plant 1011 · proposer bm.a@demo</span></div><details class="row" data-s="bm hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Laminate</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="4,20,00,000" placeholder="" aria-label="Potential ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="45.60" placeholder="" aria-label="Share % Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="1,91,52,000" placeholder="" aria-label="Target ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Industry data ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,84,00,000</span><small class="mut">Q2 FY27 · potential 4,00,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+4.09%</span></div>
+<div class="c" data-l="Status"><span class="pill p-draft">Draft</span></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet. Draft is shown, not counted.</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="23,333" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="7,46,656" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Industry data ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 1,84,00,000 ÷ 4,00,00,000 = 46.00% + 2 points = <b>48.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">63,84,000.00</td><td class="n">25</td><td class="n mono">63,84,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">63,84,000.00</td><td class="n">24</td><td class="n mono">61,28,640.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">63,84,000.00</td><td class="n">26</td><td class="n mono">66,39,360.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">1,91,52,000.00</td><td class="n">75</td><td class="n mono">1,91,52,000.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div></div></details><details class="row" data-s="bm hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Door</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="2,30,00,000" placeholder="" aria-label="Potential ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="46.00" placeholder="" aria-label="Share % Door" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="1,05,80,000" placeholder="" aria-label="Target ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Branch estimate ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,01,20,000</span><small class="mut">Q2 FY27 · potential 2,20,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+4.55%</span></div>
+<div class="c" data-l="Status"><span data-s="bm hod se"><span class="pill p-prop">Proposed</span><small>by bm.a@demo</small></span><span data-s="mg sa"><span class="pill p-prop">Proposed</span><small>by bm.a@demo</small><label class="ck"><input type="checkbox" aria-label="Select for approval"> select</label></span></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet. Draft is shown, not counted.</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="12,778" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="4,08,896" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 1,01,20,000 ÷ 2,20,00,000 = 46.00% + 2 points = <b>48.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">35,26,666.67</td><td class="n">25</td><td class="n mono">35,26,666.67</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">35,26,666.67</td><td class="n">24</td><td class="n mono">33,85,600.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">35,26,666.66</td><td class="n">26</td><td class="n mono">36,67,733.33</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">1,05,80,000.00</td><td class="n">75</td><td class="n mono">1,05,80,000.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div></div></details><details class="row" data-s="bm hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>PVC sheet</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="1,25,00,000" placeholder="" aria-label="Potential ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="44.40" placeholder="" aria-label="Share % PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="55,50,000" placeholder="" aria-label="Target ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Dealer survey ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">52,80,000</span><small class="mut">Q2 FY27 · potential 1,20,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+5.11%</span></div>
+<div class="c" data-l="Status"><span class="pill p-draft">Draft</span><small>revision of approved</small></div>
+<div class="c" data-l="Original vs current target"><div><span class="mut">Original = current</span><br><b class="mono">56,00,000</b></div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="6,944" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="2,22,208" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Dealer survey ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="Two new dealers" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 52,80,000 ÷ 1,20,00,000 = 44.00% + 2 points = <b>46.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">18,50,000.00</td><td class="n">25</td><td class="n mono">18,50,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">18,50,000.00</td><td class="n">24</td><td class="n mono">17,76,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">18,50,000.00</td><td class="n">26</td><td class="n mono">19,24,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">55,50,000.00</td><td class="n">75</td><td class="n mono">55,50,000.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div><div><b>Revision trail</b><ul class="tl"><li>Draft rev 2 · Demo Branch Manager A · not yet approved · reason required on submit</li><li>Rev 1 · approved 56,00,000 stays the current target until rev 2 is approved</li></ul></div></div></details><details class="row" data-s="bm hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Compact board</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="65,00,000" placeholder="" aria-label="Potential ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="36.50" placeholder="" aria-label="Share % Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="23,72,500" placeholder="" aria-label="Target ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Branch estimate ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">22,80,000</span><small class="mut">Q2 FY27 · potential 60,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+4.06%</span></div>
+<div class="c" data-l="Status"><span data-s="bm hod se"><span class="pill p-prop">Proposed</span><small>by mgmt@demo</small></span><span data-s="mg"><span class="pill p-prop">Proposed</span><small>by mgmt@demo</small><small class="own">You proposed this: another approver is needed</small></span><span data-s="sa"><span class="pill p-prop">Proposed</span><small>by mgmt@demo</small><label class="ck"><input type="checkbox" aria-label="Select for approval"> select</label></span></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet. Draft is shown, not counted.</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="3,611" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="1,15,552" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 22,80,000 ÷ 60,00,000 = 38.00% + 2 points = <b>40.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">7,90,833.33</td><td class="n">25</td><td class="n mono">7,90,833.33</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">7,90,833.33</td><td class="n">24</td><td class="n mono">7,59,200.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">7,90,833.34</td><td class="n">26</td><td class="n mono">8,22,466.67</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">23,72,500.00</td><td class="n">75</td><td class="n mono">23,72,500.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div></div></details><div class="tot g" data-s="bm hod mg sa"><span class="chev"></span><div class="c cg" data-l="">Demo Plant B total</div><div class="c" data-l="Potential ₹"><b class="mono">8,40,00,000</b></div><div class="c" data-l="Share %"><b class="mono">44.83</b><small>blended</small></div><div class="c" data-l="Target ₹"><b class="mono">3,76,54,500</b></div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">3,60,80,000</span></div><div class="c n" data-l="QoQ"><b class="mono up">+4.36%</b></div><div class="c" data-l="Status">0 of 4 approved<small>All rows have potential</small></div><div class="c"></div></div><div class="ph" data-s="hod mg sa"><b>Demo Plant C</b> <span class="mut">· plant 1012 · proposer bm.c@demo</span></div><details class="row" data-s="hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Laminate</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="4,80,00,000" placeholder="" aria-label="Potential ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="45.00" placeholder="" aria-label="Share % Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="2,16,00,000" placeholder="" aria-label="Target ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Industry data ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">2,07,00,000</span><small class="mut">Q2 FY27 · potential 4,60,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+4.35%</span></div>
+<div class="c" data-l="Status"><span data-s="bm hod se"><span class="pill p-prop">Proposed</span><small>by bm.c@demo</small></span><span data-s="mg sa"><span class="pill p-prop">Proposed</span><small>by bm.c@demo</small><label class="ck"><input type="checkbox" aria-label="Select for approval"> select</label></span></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet. Draft is shown, not counted.</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="26,667" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="8,53,344" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Industry data ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 2,07,00,000 ÷ 4,60,00,000 = 45.00% + 2 points = <b>47.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">72,00,000.00</td><td class="n">25</td><td class="n mono">72,00,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">72,00,000.00</td><td class="n">24</td><td class="n mono">69,12,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">72,00,000.00</td><td class="n">26</td><td class="n mono">74,88,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">2,16,00,000.00</td><td class="n">75</td><td class="n mono">2,16,00,000.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div></div></details><details class="row" data-s="hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Door</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="2,70,00,000" placeholder="" aria-label="Potential ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="47.00" placeholder="" aria-label="Share % Door" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="1,26,90,000" placeholder="" aria-label="Target ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Branch estimate ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,17,00,000</span><small class="mut">Q2 FY27 · potential 2,60,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+8.46%</span> <span class="pill p-str" title="For discussion; never blocks approval">Stretch</span></div>
+<div class="c" data-l="Status"><span data-s="bm hod se"><span class="pill p-prop">Proposed</span><small>by bm.c@demo</small></span><span data-s="mg sa"><span class="pill p-prop">Proposed</span><small>by bm.c@demo</small><label class="ck"><input type="checkbox" aria-label="Select for approval"> select</label></span></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet. Draft is shown, not counted.</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="15,000" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="4,80,000" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 1,17,00,000 ÷ 2,60,00,000 = 45.00% + 2 points = <b>47.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">42,30,000.00</td><td class="n">25</td><td class="n mono">42,30,000.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">42,30,000.00</td><td class="n">24</td><td class="n mono">40,60,800.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">42,30,000.00</td><td class="n">26</td><td class="n mono">43,99,200.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">1,26,90,000.00</td><td class="n">75</td><td class="n mono">1,26,90,000.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div></div></details><details class="row" data-s="hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>PVC sheet</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="1,45,00,000" placeholder="" aria-label="Potential ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share" value="43.50" placeholder="" aria-label="Share % PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="63,07,500" placeholder="" aria-label="Target ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Branch estimate ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">60,20,000</span><small class="mut">Q2 FY27 · potential 1,40,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mono up">+4.78%</span></div>
+<div class="c" data-l="Status"><span class="pill p-draft">Draft</span></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet. Draft is shown, not counted.</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="8,056" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="2,57,792" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 60,20,000 ÷ 1,40,00,000 = 43.00% + 2 points = <b>45.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><div class="phh"><b>Monthly phasing</b>
+<span class="seg2" role="radiogroup" aria-label="Phasing method"><label><input type="radio" name="ph" checked> Equal split</label><label><input type="radio" name="ph"> Working days</label><label><input type="radio" name="ph"> Custom %</label></span></div>
+<div class="tw"><table><thead><tr><th>Month</th><th class="n">Equal split ₹</th><th class="n">Working days</th><th class="n">By working days ₹</th><th class="n">Custom %</th></tr></thead><tbody><tr><td>Oct 2026</td><td class="n mono">21,02,500.00</td><td class="n">25</td><td class="n mono">21,02,500.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Oct 2026"></td></tr><tr><td>Nov 2026</td><td class="n mono">21,02,500.00</td><td class="n">24</td><td class="n mono">20,18,400.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Nov 2026"></td></tr><tr><td>Dec 2026</td><td class="n mono">21,02,500.00</td><td class="n">26</td><td class="n mono">21,86,600.00</td><td class="n"><input class="in sm" value="" placeholder="%" aria-label="Custom % Dec 2026"></td></tr>
+<tr class="tt"><td>Quarter</td><td class="n mono">63,07,500.00</td><td class="n">75</td><td class="n mono">63,07,500.00</td><td class="n mono">100</td></tr></tbody></table></div>
+<p class="mut">Months 1 and 2 are rounded to 2 decimals; month 3 takes the remainder, so months always add up to the quarter. Working days: DEMO calendar, Mon to Sat less demo holidays. A change is saved as a revision.</p></div></div></details><details class="row" data-s="hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Compact board</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot miss" value="" placeholder="Enter ₹" aria-label="Potential ₹ Compact board" inputmode="decimal"><span class="pill p-miss">Potential not set</span></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="38.00" placeholder="" aria-label="Share % Compact board" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="No target" aria-label="Target ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">25,20,000</span><small class="mut">Q2 FY27 · potential 70,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">no target</span></div>
+<div class="c" data-l="Status"><span class="pill p-draft">Draft</span><small>no potential yet</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 25,20,000 ÷ 70,00,000 = 36.00% + 2 points = <b>38.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><div class="tot g" data-s="hod mg sa"><span class="chev"></span><div class="c cg" data-l="">Demo Plant C total</div><div class="c" data-l="Potential ₹"><b class="mono">8,95,00,000</b></div><div class="c" data-l="Share %"><b class="mono">45.36</b><small>blended</small></div><div class="c" data-l="Target ₹"><b class="mono">4,05,97,500</b></div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">3,84,20,000</span></div><div class="c n" data-l="QoQ"><b class="mono up">+5.67%</b></div><div class="c" data-l="Status">0 of 4 approved<small>Excludes 1 row without potential</small></div><div class="c"></div></div><div class="tot all g" data-s="se"><span class="chev"></span><div class="c cg" data-l="">Total, your plant</div><div class="c" data-l="Potential ₹"><b class="mono">11,05,00,000</b></div><div class="c" data-l="Share %"><b class="mono">46.82</b><small>blended</small></div><div class="c" data-l="Target ₹"><b class="mono">5,17,31,500</b></div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">4,88,40,000</span></div><div class="c n" data-l="QoQ"><b class="mono up">+5.92%</b></div><div class="c" data-l="Status">3 of 4 approved<small>All rows have potential</small></div><div class="c"></div></div><div class="tot all g" data-s="bm"><span class="chev"></span><div class="c cg" data-l="">Total, your plants (A, B)</div><div class="c" data-l="Potential ₹"><b class="mono">19,45,00,000</b></div><div class="c" data-l="Share %"><b class="mono">45.96</b><small>blended</small></div><div class="c" data-l="Target ₹"><b class="mono">8,93,86,000</b></div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">8,49,20,000</span></div><div class="c n" data-l="QoQ"><b class="mono up">+5.26%</b></div><div class="c" data-l="Status">3 of 8 approved<small>All rows have potential</small></div><div class="c"></div></div><div class="tot all g" data-s="hod mg sa"><span class="chev"></span><div class="c cg" data-l="">Total, all plants</div><div class="c" data-l="Potential ₹"><b class="mono">28,40,00,000</b></div><div class="c" data-l="Share %"><b class="mono">45.77</b><small>blended</small></div><div class="c" data-l="Target ₹"><b class="mono">12,99,83,500</b></div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">12,33,40,000</span></div><div class="c n" data-l="QoQ"><b class="mono up">+5.39%</b></div><div class="c" data-l="Status">3 of 12 approved<small>Excludes 1 row without potential</small></div><div class="c"></div></div></div><div data-st="empty"><div class="ph" data-s="bm hod se mg sa"><b>Demo Plant A</b> <span class="mut">· plant 1001 · proposer bm.a@demo</span></div><details class="row" data-s="bm hod se mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Laminate</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="50.08" placeholder="" aria-label="Share % Laminate" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">2,50,00,000</span><small class="mut">Q2 FY27 · potential 5,20,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="30,000" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="9,60,000" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Dealer survey ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 2,50,00,000 ÷ 5,20,00,000 = 48.08% + 2 points = <b>50.08%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><details class="row" data-s="bm hod se mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Door</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="48.00" placeholder="" aria-label="Share % Door" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,38,00,000</span><small class="mut">Q2 FY27 · potential 3,00,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="17,222" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="5,51,104" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 1,38,00,000 ÷ 3,00,00,000 = 46.00% + 2 points = <b>48.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><details class="row" data-s="bm hod se mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>PVC sheet</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="45.75" placeholder="" aria-label="Share % PVC sheet" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">70,00,000</span><small class="mut">Q2 FY27 · potential 1,60,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="9,444" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="3,02,208" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 70,00,000 ÷ 1,60,00,000 = 43.75% + 2 points = <b>45.75%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><details class="row" data-s="bm hod se mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Compact board</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="40.00" placeholder="" aria-label="Share % Compact board" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">30,40,000</span><small class="mut">Q2 FY27 · potential 80,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="4,722" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="1,51,104" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 30,40,000 ÷ 80,00,000 = 38.00% + 2 points = <b>40.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><div class="tot g" data-s="bm hod se mg sa"><span class="chev"></span><div class="c cg" data-l="">Demo Plant A total</div><div class="c" data-l="Potential ₹"><span class="pill p-miss">Potential not set</span></div><div class="c" data-l="Share %">—</div><div class="c" data-l="Target ₹">—</div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">4,88,40,000</span></div><div class="c n" data-l="QoQ">—</div><div class="c" data-l="Status">0 of 4 started</div><div class="c"></div></div><div class="ph" data-s="bm hod mg sa"><b>Demo Plant B</b> <span class="mut">· plant 1011 · proposer bm.a@demo</span></div><details class="row" data-s="bm hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Laminate</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="48.00" placeholder="" aria-label="Share % Laminate" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,84,00,000</span><small class="mut">Q2 FY27 · potential 4,00,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="23,333" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="7,46,656" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Industry data ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 1,84,00,000 ÷ 4,00,00,000 = 46.00% + 2 points = <b>48.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><details class="row" data-s="bm hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Door</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="48.00" placeholder="" aria-label="Share % Door" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,01,20,000</span><small class="mut">Q2 FY27 · potential 2,20,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="12,778" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="4,08,896" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 1,01,20,000 ÷ 2,20,00,000 = 46.00% + 2 points = <b>48.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><details class="row" data-s="bm hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>PVC sheet</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="46.00" placeholder="" aria-label="Share % PVC sheet" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">52,80,000</span><small class="mut">Q2 FY27 · potential 1,20,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="6,944" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="2,22,208" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Dealer survey ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 52,80,000 ÷ 1,20,00,000 = 44.00% + 2 points = <b>46.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><details class="row" data-s="bm hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Compact board</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="40.00" placeholder="" aria-label="Share % Compact board" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">22,80,000</span><small class="mut">Q2 FY27 · potential 60,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="3,611" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="1,15,552" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 22,80,000 ÷ 60,00,000 = 38.00% + 2 points = <b>40.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><div class="tot g" data-s="bm hod mg sa"><span class="chev"></span><div class="c cg" data-l="">Demo Plant B total</div><div class="c" data-l="Potential ₹"><span class="pill p-miss">Potential not set</span></div><div class="c" data-l="Share %">—</div><div class="c" data-l="Target ₹">—</div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">3,60,80,000</span></div><div class="c n" data-l="QoQ">—</div><div class="c" data-l="Status">0 of 4 started</div><div class="c"></div></div><div class="ph" data-s="hod mg sa"><b>Demo Plant C</b> <span class="mut">· plant 1012 · proposer bm.c@demo</span></div><details class="row" data-s="hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Laminate</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="47.00" placeholder="" aria-label="Share % Laminate" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ Laminate" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">2,07,00,000</span><small class="mut">Q2 FY27 · potential 4,60,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="26,667" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="8,53,344" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Industry data ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 2,07,00,000 ÷ 4,60,00,000 = 45.00% + 2 points = <b>47.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><details class="row" data-s="hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Door</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="47.00" placeholder="" aria-label="Share % Door" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ Door" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">1,17,00,000</span><small class="mut">Q2 FY27 · potential 2,60,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="15,000" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="4,80,000" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 1,17,00,000 ÷ 2,60,00,000 = 45.00% + 2 points = <b>47.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><details class="row" data-s="hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>PVC sheet</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="45.00" placeholder="" aria-label="Share % PVC sheet" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ PVC sheet" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">60,20,000</span><small class="mut">Q2 FY27 · potential 1,40,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="8,056" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="2,57,792" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 60,20,000 ÷ 1,40,00,000 = 43.00% + 2 points = <b>45.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><details class="row" data-s="hod mg sa"><summary class="g"><span class="chev" aria-hidden="true">▸</span><div class="c cg" data-l="Product group"><b>Compact board</b><small class="mut">Segment: All</small></div>
+<div class="c" data-l="Potential ₹"><input class="in pot" value="" placeholder="Enter ₹" aria-label="Potential ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Share %"><input class="in share dflt" value="38.00" placeholder="" aria-label="Share % Compact board" inputmode="decimal"><small class="mut">default</small></div>
+<div class="c" data-l="Target ₹"><input class="in tgt" value="" placeholder="—" aria-label="Target ₹ Compact board" inputmode="decimal"></div>
+<div class="c" data-l="Source"><span class="in sel">Source ▾</span></div>
+<div class="c n" data-l="Last quarter actual"><span class="mono">25,20,000</span><small class="mut">Q2 FY27 · potential 70,00,000</small></div>
+<div class="c n" data-l="QoQ vs last quarter"><span class="mut">enter potential</span></div>
+<div class="c" data-l="Status"><span class="pill p-ns">Not started</span><small>nothing entered</small></div>
+<div class="c" data-l="Original vs current target"><div class="mut">No approved target yet</div></div><span class="more">Phasing, sheets, sq ft, note</span></summary><div class="dbody">
+<div class="dgrid">
+<label class="fld">Potential, sheets (optional)<input class="in" value="" placeholder="Sheets" inputmode="numeric"></label>
+<label class="fld">Potential, sq ft (optional)<input class="in" value="" placeholder="Sq ft" inputmode="numeric"></label>
+<label class="fld">Source of potential<span class="in sel">Branch estimate ▾</span></label>
+<label class="fld wide">Note on potential<input class="in" value="" placeholder="Where does this figure come from?" style="text-align:left;font-family:var(--font)"></label>
+</div>
+<p class="mut">Default share for this row: last quarter 25,20,000 ÷ 70,00,000 = 36.00% + 2 points = <b>38.00%</b>. Used only when no share is entered; saved as Draft.</p>
+<div class="phs"><b>Monthly phasing</b><p class="mut">Appears once a target exists. Default: equal split.</p></div></div></details><div class="tot g" data-s="hod mg sa"><span class="chev"></span><div class="c cg" data-l="">Demo Plant C total</div><div class="c" data-l="Potential ₹"><span class="pill p-miss">Potential not set</span></div><div class="c" data-l="Share %">—</div><div class="c" data-l="Target ₹">—</div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">4,09,40,000</span></div><div class="c n" data-l="QoQ">—</div><div class="c" data-l="Status">0 of 4 started</div><div class="c"></div></div><div class="tot all g" data-s="se"><span class="chev"></span><div class="c cg" data-l="">Total, your plant</div><div class="c" data-l="Potential ₹"><span class="pill p-miss">Potential not set</span></div><div class="c" data-l="Share %">—</div><div class="c" data-l="Target ₹">—</div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">4,88,40,000</span></div><div class="c n" data-l="QoQ">—</div><div class="c" data-l="Status">0 of 4 started</div><div class="c"></div></div><div class="tot all g" data-s="bm"><span class="chev"></span><div class="c cg" data-l="">Total, your plants (A, B)</div><div class="c" data-l="Potential ₹"><span class="pill p-miss">Potential not set</span></div><div class="c" data-l="Share %">—</div><div class="c" data-l="Target ₹">—</div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">8,49,20,000</span></div><div class="c n" data-l="QoQ">—</div><div class="c" data-l="Status">0 of 8 started</div><div class="c"></div></div><div class="tot all g" data-s="hod mg sa"><span class="chev"></span><div class="c cg" data-l="">Total, all plants</div><div class="c" data-l="Potential ₹"><span class="pill p-miss">Potential not set</span></div><div class="c" data-l="Share %">—</div><div class="c" data-l="Target ₹">—</div><div class="c"></div><div class="c n" data-l="Last quarter actual"><span class="mono">12,58,60,000</span></div><div class="c n" data-l="QoQ">—</div><div class="c" data-l="Status">0 of 12 started</div><div class="c"></div></div></div></div></div>
+<div data-st="filled"><details class="card ret" data-s="mg sa" open><summary><b>Return with a reason</b> <span class="mut">· 2 rows ticked: Plant C Laminate, Plant C Door</span></summary>
+<label class="fld">Reason (required, shown to the proposer)<textarea class="in" rows="2" style="font-family:var(--font);text-align:left">Door potential looks high against the last two quarters. Please add the dealer survey note.</textarea></label>
+<div class="rbtn"><button class="btn">Cancel</button><button class="btn pri">Return 2 rows to Draft</button></div>
+<p class="mut">The approver can never be the proposer of that revision. Rows you proposed show "another approver needed". Returned rows go back to the Branch manager as a Draft with the reason on the revision trail and an action on their Today list.</p></details></div>
+<div class="sticky"><div data-st="filled"><div class="bar" data-s="bm"><div class="bl"><button class="btn ">Copy from last quarter</button><button class="btn">Download template</button><button class="btn">Upload</button></div><div class="br"><button class="btn">Save draft</button><button class="btn pri">Submit 3 Draft rows for approval</button></div></div>
+<div class="bar" data-s="mg"><div class="bl"><button class="btn ">Copy from last quarter</button><button class="btn">Download template</button><button class="btn">Upload</button></div><div class="br"><button class="btn">Save draft</button><button class="btn">Return with reason</button><button class="btn pri">Approve 3 selected</button></div></div>
+<div class="bar" data-s="sa"><div class="bl"><button class="btn ">Copy from last quarter</button><button class="btn">Download template</button><button class="btn">Upload</button></div><div class="br"><button class="btn">Save draft</button><button class="btn">Return with reason</button><button class="btn pri">Approve 4 selected</button></div></div>
+<div class="bar" data-s="hod se"><span class="mut">View only. You see the figures; a Branch manager edits and Management approves.</span></div></div><div data-st="empty"><div class="bar" data-s="bm mg sa"><div class="bl"><button class="btn pri">Copy from last quarter</button><button class="btn">Download template</button><button class="btn">Upload</button></div><div class="br"><button class="btn">Save draft</button><button class="btn" disabled>Submit for approval</button></div></div>
+<div class="bar" data-s="hod se"><span class="mut">View only. Nothing to show until a Branch manager starts the quarter.</span></div></div></div>
+<div class="note">Locked quarters (for example Q2 FY27 once locked) open read-only for everyone, including Super admin. A status of Locked replaces the editable cells with plain figures. Sheets and sq ft never change a target; ₹ is the basis.</div></main></div></body></html>

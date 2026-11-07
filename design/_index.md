@@ -37,3 +37,4 @@ related:
 - [Role matrix](role-matrix.md) — draft, approval not submitted
 - [Target model](target-model.md) — draft, approval not submitted
 - [Wireframes](wireframes.md) — ready for approval; every page drawn, approval not submitted
+  - [Targets & Potential mock-up](wireframes/targets-potential.html) — draft, awaiting Vijay's approval (7 Nov 2026)

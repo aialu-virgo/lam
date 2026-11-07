@@ -39,6 +39,7 @@ Static greyscale HTML, shared kit [wf.css](wireframes/wf.css); start at [index.h
 | Action thread: status ladder, responses, follow-up drafts | [action-thread.html](wireframes/action-thread.html) | desk-v0.9 | ready for approval |
 | Data Intake: upload, mapping, validation, rejected rows, coverage grid, history, S/4 card | [v0.1-data-intake.html](wireframes/v0.1-data-intake.html) | desk-v0.1 (built) | ready for approval |
 | Admin: users, plants, market potential, revision trail, original vs current target, Stretch | [v0.1-admin-masters.html](wireframes/v0.1-admin-masters.html) | desk-v0.1 (built) | ready for approval |
+| Targets & Potential (new top-level tab, asked by Vijay 7 Nov 2026): quarter grid of plant × product group, Potential ₹, Share % or Target ₹, source, last quarter actual and QoQ, status, original vs current, segment and monthly phasing expand, totals, empty and Potential-not-set states, role views, approve / return | [targets-potential.html](wireframes/targets-potential.html) | proposed, not yet built | draft, awaiting Vijay |
 | Page states: unknown viewer, empty, new entity, partial history, locked quarter, view as role, draft target | [states.html](wireframes/states.html) | desk-v0.9 | ready for approval |
 | Login: sign in, first-login change password, forgot (admin reset), locked account | [login.html](wireframes/login.html) | [Hosting on Virgo Google Cloud](hosting-gcp.md) | draft |
 | Notification texts: reminder, L1, L2, L3 | [Notification templates](notification-templates.md) | desk-v0.9 | ready for approval |
