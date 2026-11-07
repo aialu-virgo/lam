@@ -141,6 +141,7 @@ function sapNext_(s, missing, trig) {
   if (!s.shadow) return 'Run sapShadowRun (October 2026, writes nothing) and show Vijay the differences. The first real run needs his OK.';
   if (s.unresolved && s.unresolved.rows) return 'Credit memos for ' + s.unresolved.months.join(', ') + ' are not loaded: ' + s.unresolved.rows + ' lines use product codes that are not in the item master. Load the item master with the S/4 codes (Q18). Credit coverage stays off until this is zero.';
   var pend = Object.keys(s.staged || {}).filter(function (k) { return s.staged[k].status !== 'loaded'; });
+  if (String(sapProps_().getProperty('SAP_SYNC_ENABLED') || '').trim().toLowerCase() !== 'yes') return 'sapSync is off. After Vijay accepts the shadow run, the Delivery Lead tells you when to set the Script Property SAP_SYNC_ENABLED to yes.';
   if (!s.lastSync) return 'Run sapSync to fetch the SAP rows. They wait here until a Super admin clicks Load SAP feed.';
   if (pend.length) return 'Click Load SAP feed to put ' + pend.join(', ') + ' into the Desk.';
   return trig ? 'Up to date. The daily run keeps it so.' : 'Up to date. Run sapInstallDailyTrigger to switch on the daily run.';
