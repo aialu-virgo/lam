@@ -227,11 +227,22 @@ let S2;
   ok('Admin › Geography shows how many customers were placed by GSTIN',/Customers placed by GSTIN\s*2/i.test(await page.innerText('#pg')),'');
   const b1g=await page.evaluate(async()=>{const D=window.__dbg;await D.custFeedLoad({sys:'B1',headers:['CardCode','CardName','CardType','State','LicTradNum'],rows:[['VRGLCU000101','B1 A','C','','24ABCDE1234F1Z5'],['VRGLCU000102','B1 B','C','Maharashtra','24ABCDE1234F1Z5']],name:'b1g'});await new Promise(r=>setTimeout(r,2500));return [D.custGeo('VRGLCU000101',''),D.custGeo('VRGLCU000102','')]});
   ok('B1 file customers: blank state + GSTIN (LicTradNum) → Gujarat; the master\'s own state wins over the GSTIN',b1g[0].st==='24'&&b1g[0].how==='gstin'&&b1g[1].st==='27'&&b1g[1].how==='master',JSON.stringify(b1g));
+  /* C6: SAP region matches the bare code and SAP:<code>; an explicit SAP: alias wins over a bare match; numeric regions never match GST codes */
+  const c6=await page.evaluate(async()=>{const D=window.__dbg,o={};
+    await D.geoUpload('state','state_code,state_name,aliases,default_plant_code,active\n27,Maharashtra,MH|SAP:13,1012,Y\n29,Karnataka,KA|KAR,,Y\n');await new Promise(r=>setTimeout(r,800));
+    o.bare=D.stateCode('SAP:MH');o.bareKar=D.stateCode('SAP:KAR');o.sap13=D.stateCode('SAP:13');o.num24=D.stateCode('SAP:24');o.plain=D.stateCode('MH');
+    await D.geoUpload('state','state_code,state_name,aliases,default_plant_code,active\n24,Gujarat,GJ|SAP:MH,1013,Y\n');await new Promise(r=>setTimeout(r,800));
+    o.coll=D.stateCode('SAP:MH');o.collPlain=D.stateCode('MH');
+    await D.custFeedLoad({sys:'S4',headers:['Customer','Name','Region'],rows:[['50003000','R1','KAR'],['50003001','R2','MH']],name:'c6'});await new Promise(r=>setTimeout(r,2500));
+    o.cust1=D.custGeo('50003000','');o.cust2=D.custGeo('50003001','');o.raw=D.custInfo('50003000')[4];return o});
+  ok('C6: S/4 region matches the bare code ("SAP:MH" via alias MH → Maharashtra; "SAP:KAR" via alias KAR → Karnataka) and the explicit "SAP:13" alias',c6.bare==='27'&&c6.bareKar==='29'&&c6.sap13==='27'&&c6.raw==='SAP:KAR'&&c6.cust1.st==='29'&&c6.cust1.how==='region',JSON.stringify(c6));
+  ok('C6: a numeric SAP region never matches a GST code by accident ("SAP:24" is not Gujarat without an explicit alias)',c6.num24==='',JSON.stringify(c6));
+  ok('C6 collision: Gujarat\'s explicit "SAP:MH" alias wins over Maharashtra\'s bare "MH"; a plain (non-SAP) "MH" still means Maharashtra',c6.coll==='24'&&c6.cust2.st==='24'&&c6.collPlain==='27'&&c6.plain==='27',JSON.stringify(c6));
   await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(800);
   /* reverse: a B1 load leaves S/4 customers alone */
   const r3=await page.evaluate(async()=>{const D=window.__dbg;const r=await D.custFeedLoad({sys:'B1',headers:['CardCode','CardName','CardType','State','ZipCode'],rows:[['VRGLCU000001','B1 Customer','C','Maharashtra','411001']],name:'b1'});return r});
   await page.waitForTimeout(2500);
-  const r4=await page.evaluate(()=>{const D=window.__dbg;return {s4:!!D.custInfo('50002000'),b1new:D.custInfo('VRGLCU000001'),oldB1:[...D.S.custIdx.keys()].filter(k=>/^DEMO/.test(k)).length}});
+  const r4=await page.evaluate(()=>{const D=window.__dbg;return {s4:!!D.custInfo('50003000'),b1new:D.custInfo('VRGLCU000001'),oldB1:[...D.S.custIdx.keys()].filter(k=>/^DEMO/.test(k)).length}});
   ok('B1 load replaces only B1 customers: S/4 customers survive, the old B1 set is replaced',r3.ok&&r4.s4&&r4.b1new&&r4.b1new[9]==='411001'&&r4.oldB1===0,JSON.stringify(r4));
   await page.context().close();
 }

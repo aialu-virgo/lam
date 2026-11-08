@@ -5026,21 +5026,26 @@ async function demoClearExtras(){
      pin_main + pin_c<i> {kind:'pinmeta'|'pins', z: gz [[pin,state_code,district_id,source,multi]]}
    The built-in GST state list below is public reference data (not Virgo data); a stored state record always wins over it. */
 var GST_STATES=[['01','Jammu and Kashmir','JK|J&K'],['02','Himachal Pradesh','HP'],['03','Punjab','PB'],['04','Chandigarh','CH'],['05','Uttarakhand','UK|Uttaranchal'],['06','Haryana','HR'],['07','Delhi','DL|New Delhi|NCT of Delhi'],['08','Rajasthan','RJ'],['09','Uttar Pradesh','UP'],['10','Bihar','BR'],['11','Sikkim','SK'],['12','Arunachal Pradesh','AR'],['13','Nagaland','NL'],['14','Manipur','MN'],['15','Mizoram','MZ'],['16','Tripura','TR'],['17','Meghalaya','ML'],['18','Assam','AS'],['19','West Bengal','WB'],['20','Jharkhand','JH'],['21','Odisha','OD|Orissa'],['22','Chhattisgarh','CG|Chattisgarh'],['23','Madhya Pradesh','MP'],['24','Gujarat','GJ'],['25','Daman and Diu','DD'],['26','Dadra and Nagar Haveli and Daman and Diu','DN|DNH'],['27','Maharashtra','MH'],['29','Karnataka','KA'],['30','Goa','GA'],['31','Lakshadweep','LD'],['32','Kerala','KL'],['33','Tamil Nadu','TN'],['34','Puducherry','PY|Pondicherry'],['35','Andaman and Nicobar Islands','AN'],['36','Telangana','TS|TG'],['37','Andhra Pradesh','AP'],['38','Ladakh','LA'],['97','Other Territory','OT']];
-S.geoRaw=[];var GEO={states:{},districts:{},alias:new Map(),dname:new Map(),pins:new Map(),pinKey:'',ver:0,stored:0};
+S.geoRaw=[];var GEO={states:{},districts:{},alias:new Map(),aliasTxt:new Map(),dname:new Map(),pins:new Map(),pinKey:'',ver:0,stored:0};
 function geoNorm(s){return String(s==null?'':s).toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').replace(/\b(district|dist|city|urban|rural)\b/g,' ').replace(/\s+/g,' ').trim()}
 function geoIngest(){
   var st={},alias=new Map(),di={},dn=new Map(),stored=0;
   GST_STATES.forEach(function(s){st[s[0]]={state_code:s[0],state_name:s[1],aliases:s[2],default_plant_code:'',active:true,builtin:true}});
   S.geoRaw.forEach(function(x){if(x.kind==='state'&&/^\d\d$/.test(x.state_code||'')){st[x.state_code]=Object.assign({},x);stored++}});
-  Object.keys(st).forEach(function(c){var s=st[c];alias.set(c,c);alias.set(String(+c),c);alias.set(geoNorm(s.state_name),c);String(s.aliases||'').split('|').forEach(function(a){var k=geoNorm(a);if(k)alias.set(k,c)})});
+  var aliasTxt=new Map(),own={};
+  /* stored aliases win over the built-in list: built-ins first, then stored states overwrite */
+  Object.keys(st).sort(function(a,b){return (st[a].builtin?0:1)-(st[b].builtin?0:1)}).forEach(function(c){var s=st[c];alias.set(c,c);alias.set(String(+c),c);[s.state_name].concat(String(s.aliases||'').split('|')).forEach(function(a){var k=geoNorm(a);if(!k)return;alias.set(k,c);if(!/^sap /.test(k))aliasTxt.set(k,c)})});
   S.geoRaw.forEach(function(x){if(x.kind==='district'&&x.district_id){di[x.district_id]=Object.assign({},x);dn.set(x.state_code+'|'+geoNorm(x.district_name),x.district_id)}});
-  GEO.states=st;GEO.alias=alias;GEO.districts=di;GEO.dname=dn;GEO.stored=stored;GEO.ver++;DS.cache={};if(typeof schedule==='function'&&S.loaded){S.lastHtml='';schedule()}
+  GEO.states=st;GEO.alias=alias;GEO.aliasTxt=aliasTxt;GEO.districts=di;GEO.dname=dn;GEO.stored=stored;GEO.ver++;DS.cache={};if(typeof schedule==='function'&&S.loaded){S.lastHtml='';schedule()}
   var meta=S.geoRaw.find(function(x){return x._id==='pin_main'}),key=meta?(meta.at||'')+'|'+(meta.chunks||0):'';
   if(key!==GEO.pinKey){GEO.pinKey=key;if(!meta){GEO.pins=new Map()}else{var dm={};S.geoRaw.forEach(function(x){dm[x._id]=x});(async function(){var m=new Map();for(var i=0;i<(meta.chunks||0);i++){var d=dm['pin_c'+i];if(!d)continue;try{JSON.parse(await ungz(d.z)).forEach(function(r){m.set(String(r[0]),r)})}catch(e){}}if(key===GEO.pinKey){GEO.pins=m;GEO.ver++;DS.cache={};S.lastHtml='';schedule()}})()}}
 }
 geoIngest();
 function stateCode(raw){
   if(raw==null)return '';var t=String(raw).trim();if(!t)return '';
+  /* S/4 region (C6): an explicit "SAP:<code>" alias wins; else the bare code against state names and aliases only, never against GST numeric codes (SAP region numbers are not GST codes) */
+  var sm=/^SAP:\s*(.+)$/i.exec(t);
+  if(sm){var ex=GEO.alias.get(geoNorm('SAP:'+sm[1]));if(ex)return ex;return GEO.aliasTxt.get(geoNorm(sm[1]))||''}
   if(/^\d{1,2}$/.test(t)){var c=('0'+t).slice(-2);return GEO.states[c]?c:''}
   return GEO.alias.get(geoNorm(t))||'';
 }
