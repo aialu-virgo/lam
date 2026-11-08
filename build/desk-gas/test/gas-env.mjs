@@ -44,6 +44,7 @@ export function makeEnv(opts = {}) {
     sheets[name] = s; return s.api;
   }
   const ss = { first: null, getSheets() { return [ss.first]; }, getSheetByName(n) { return sheets[n] ? sheets[n].api : null; }, insertSheet(n) { return mkSheet(n); }, getId() { return 'SHEET1'; } };
+  const htmlFile = name => { if (opts.htmlFiles) { if (!(name in opts.htmlFiles)) throw new Error('Unknown file: ' + name); return opts.htmlFiles[name]; } const f = path.join(here, '../out/Desk-' + name + '.txt'); if (!fs.existsSync(f)) throw new Error('Unknown file: ' + name); return fs.readFileSync(f, 'utf8'); };
   const ctx = {
     console, Math, Date: class extends Date { static now() { return Date.now() + state.skew; } }, JSON, Object, Array, String, Number, Error,
     SpreadsheetApp: { create() { ss.first = mkSheet('Sheet1'); return ss; }, openById(id) { if (id !== 'SHEET1') throw new Error('no such sheet'); return ss; } },
@@ -61,9 +62,11 @@ export function makeEnv(opts = {}) {
     UrlFetchApp: { fetch(url, o) { if (!opts.fetch) throw new Error('UrlFetchApp is not available in this test'); const r = opts.fetch(url, o, state); return { getResponseCode() { return r.code; }, getContentText() { return r.body; }, getHeaders() { return r.headers || {}; } }; } },
     HtmlService: {
       XFrameOptionsMode: { DEFAULT: 'DEFAULT' },
-      createHtmlOutputFromFile(name) { return { getContent() { // opts.htmlFiles = { Index: text, Index2: text ... } overrides the built parts; a missing name throws like Apps Script
-        if (opts.htmlFiles) { if (!(name in opts.htmlFiles)) throw new Error('Unknown file: ' + name); return opts.htmlFiles[name]; }
-        const f = path.join(here, '../out/Desk-' + name + '.txt'); if (!fs.existsSync(f)) throw new Error('Unknown file: ' + name); return fs.readFileSync(f, 'utf8'); } }; },
+      // Real behaviour on the tenant (8 Nov 2026): createHtmlOutputFromFile(name).getContent() parses the file as HTML and refuses a fragment ("Malformed HTML content"; Index2 to Index4 are middle chunks);
+      // createTemplateFromFile(name).getRawContent() returns the exact text. The mimic accepts only a file that starts a document (<!DOCTYPE or <html), as Index does.
+      // opts.htmlFiles = { Index: text, Index2: text ... } overrides the built parts; a missing name throws.
+      createHtmlOutputFromFile(name) { return { getContent() { const t = htmlFile(name); if (!/^\s*<(!doctype|html)/i.test(t)) throw new Error('Malformed HTML content'); return t; } }; },
+      createTemplateFromFile(name) { const t = htmlFile(name); return { getRawContent() { return t; } }; },
       createHtmlOutput(h) { const o = { html: h, title: null, meta: [], setTitle(t) { o.title = t; return o; }, addMetaTag(a, b) { o.meta.push([a, b]); return o; }, setXFrameOptionsMode() { return o; } }; return o; },
     },
   };

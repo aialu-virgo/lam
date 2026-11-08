@@ -14,7 +14,7 @@ var MAX_DOC_CHARS = 262144;      // 256 KiB per document, as the page assumes
 var PAGE_CHARS = 2500000;        // characters per page read (one getValues)
 var PAGE_ROWS = 4000;            // rows per page read
 var STALE_WRITE_MS = 150000;     // an odd revision whose heartbeat (wts) is older than this is a crashed write and is ignored; a live writer refreshes wts before every step
-var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes', 'sapstage', 'geography', 'dashroles'];
+var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes', 'sapstage', 'geography', 'dashroles', 'jobs'];
 var SHARED_COLLECTIONS = ['potential', 'phasing', 'actions', 'followups', 'log', 'planlocks', 'dashlayouts'];
 var HEADER = ['id', 'part', 'len', 'json', 'updatedAt', 'updatedBy'];
 
@@ -55,16 +55,18 @@ function doGet(e) {
 var INDEX_MANIFEST = /*@@INDEX_MANIFEST@@*/null;
 function indexSum_(str) { var h = 0x811c9dc5; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16); }
 function indexPad_(s) { return ('00000000' + s).slice(-8); }
+/* Project HTML files are read RAW (exact text). createHtmlOutputFromFile(name).getContent() parses the file as HTML and refuses a fragment ("Malformed HTML content"), which Index2 to Index4 are. */
+function indexRaw_(name) { return HtmlService.createTemplateFromFile(name).getRawContent(); }
 function indexPartName_(i) { return i === 0 ? 'Index' : 'Index' + (i + 1); }
 function loadIndex_() {
   var out = [], i, text;
   if (!INDEX_MANIFEST) {
-    for (i = 0; i < 50; i++) { try { text = HtmlService.createHtmlOutputFromFile(indexPartName_(i)).getContent(); } catch (err) { if (i === 0) return { error: { file: 'Index', problem: 'is missing' } }; break; } out.push(text); }
+    for (i = 0; i < 50; i++) { try { text = indexRaw_(indexPartName_(i)); } catch (err) { if (i === 0) return { error: { file: 'Index', problem: 'is missing' } }; break; } out.push(text); }
     return { html: out.join('') };
   }
   for (i = 0; i < INDEX_MANIFEST.length; i++) {
     var m = INDEX_MANIFEST[i];
-    try { text = HtmlService.createHtmlOutputFromFile(m.name).getContent(); }
+    try { text = indexRaw_(m.name); }
     catch (err) { return { error: { file: m.name, problem: 'is missing (the Desk has ' + INDEX_MANIFEST.length + ' page files, Index to ' + indexPartName_(INDEX_MANIFEST.length - 1) + ')' } }; }
     if (text.length !== m.chars) return { error: { file: m.name, problem: 'is incomplete or out of date: it has ' + text.length + ' characters, it must have ' + m.chars + (text.length < m.chars ? ' (it was cut short when saved, or an older version is still there)' : ' (it is from another Desk version, or has extra text)') } };
     if (indexPad_(indexSum_(text)) !== m.sum) return { error: { file: m.name, problem: 'has the right length but different content (checksum ' + indexPad_(indexSum_(text)) + ', expected ' + m.sum + '): it is from another Desk version or was edited' } };

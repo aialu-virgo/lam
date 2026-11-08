@@ -51,5 +51,16 @@ ok('blank part is rejected (no blank page)', r.html.includes('<b>Index</b>') && 
 ok('error page never contains the page body', !r.html.includes('window.claude'));
 ok('JS checksum in Code.gs equals the build checksum', env.ctx.indexSum_(texts.Index2).padStart(8, '0') === indexSum(texts.Index2) && env.ctx.INDEX_MANIFEST.length === files.length);
 ok('manifest lengths and sums match the written files', env.ctx.INDEX_MANIFEST.every((m, i) => m.chars === texts[names[i]].length && m.sum === indexSum(texts[names[i]])));
+// fragments: the old HTML-parsing call fails, the raw call is exact, doGet serves all parts
+{ const E2 = makeEnv(); const hs = E2.ctx.HtmlService;
+  ok('OLD call createHtmlOutputFromFile().getContent() fails on every fragment with "Malformed HTML content"', names.slice(1).every(n => { try { hs.createHtmlOutputFromFile(n).getContent(); return false; } catch (e) { return /Malformed HTML content/.test(e.message); } }));
+  ok('createTemplateFromFile().getRawContent() returns every part exactly', names.every(n => hs.createTemplateFromFile(n).getRawContent() === texts[n]));
+  ok('doGet serves all parts (not part 1 only)', E2.ctx.doGet({ parameter: {} }).html.length > Object.values(texts).join('').length - 200 && !/Desk setup problem/.test(E2.ctx.doGet({ parameter: {} }).title || '')); }
+// every collection the built page reads is known to the server (an unknown one made /exec fail with invalid_argument)
+{ const pageSrc = fs.readFileSync(path.join(here, '../../desk/dist/index.html'), 'utf8'); const used = new Set([...pageSrc.matchAll(/collection\('([a-z_]+)'/g)].map(m => m[1]).concat([...pageSrc.matchAll(/db\.doc\('([a-z_]+)\//g)].map(m => m[1])));
+  const E3 = makeEnv(); const known = new Set([...E3.ctx.ADMIN_COLLECTIONS, ...E3.ctx.SHARED_COLLECTIONS]);
+  const unknown = [...used].filter(c => !known.has(c));
+  ok('every collection the page reads or writes is known to Code.gs (unknown: ' + unknown.join(',') + ')', used.size > 20 && unknown.length === 0);
+  ok('jobs is an admin collection: an active user can read it, only a Super admin can write it', E3.ctx.ADMIN_COLLECTIONS.includes('jobs') && !E3.ctx.SHARED_COLLECTIONS.includes('jobs')); }
 console.log('gas-split: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
