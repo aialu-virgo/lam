@@ -18,7 +18,12 @@
       runner[fn].apply(runner, args);
     });
   }
+  window.__gasInflight = 0; /* server calls waiting or running; the activity indicator shows it */
   async function call(fn, args) {
+    window.__gasInflight++;
+    try { return await call1(fn, args); } finally { window.__gasInflight--; }
+  }
+  async function call1(fn, args) {
     await slot();
     try {
       for (var i = 0; ; i++) {

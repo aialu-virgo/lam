@@ -223,14 +223,20 @@ var U=null; /* current upload */
 var cancelFlag=false;
 
 /* ================= store ================= */
-async function dbRetry(fn){
-  for(var i=0;;i++){
-    try{return await fn()}
-    catch(e){var c=e&&e.code;if((c==='unavailable'||c==='resource_exhausted')&&i<5){await sleep(500*Math.pow(2,i)+Math.random()*300);continue}throw e}
-  }
+/* activity indicator feed (src/89-activity.js reads it): database calls in flight by kind, the last database failure, the collections subscribed */
+var ACT={w:0,r:0,err:null,errSeen:0,subs:{}};
+async function dbRetry(fn,kind){
+  kind=kind||'r';ACT[kind]++;
+  try{
+    for(var i=0;;i++){
+      try{return await fn()}
+      catch(e){var c=e&&e.code;if((c==='unavailable'||c==='resource_exhausted')&&i<5){await sleep(500*Math.pow(2,i)+Math.random()*300);continue}throw e}
+    }
+  }catch(e2){ACT.err={msg:(e2&&e2.message)||String(e2),at:Date.now(),kind:kind};throw e2}
+  finally{ACT[kind]--}
 }
-function dset(path,data){return dbRetry(function(){return S.db.doc(path).set(data)})}
-function ddel(path){return dbRetry(function(){return S.db.doc(path).delete()})}
+function dset(path,data){return dbRetry(function(){return S.db.doc(path).set(data)},'w')}
+function ddel(path){return dbRetry(function(){return S.db.doc(path).delete()},'w')}
 /* audit trail of lock and closed-quarter changes: written by Super admin only (database rule: admin write), read back by the integrity check */
 var AUD={};
 function whoAmI(){var v=S.viewer;if(!v)return 'unknown';if(v.email)return v.email;if(v.id)return 'uid:'+v.id;if(v.owner)return 'owner';return 'unknown'}
@@ -252,6 +258,7 @@ function dget(path){return dbRetry(function(){return S.db.doc(path).get()})}
 function thaw(v){try{return typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v))}catch(e){return JSON.parse(JSON.stringify(v))}}
 function dataOf(snap){return snap.docs.map(function(d){var x=thaw(d.data()||{});x._id=d.id;return x})}
 function subscribe(name,q,assign){
+  ACT.subs[name]=1;
   q.onSnapshot(function(snap){try{assign(dataOf(snap))}catch(e){S.errs[name]='could not decode ('+((e&&e.message)||e)+')';S.err=(S.err||'')+'Could not read '+name+': '+S.errs[name]+' ';schedule();return}S.loaded[name]=true;delete S.errs[name];schedule()},function(e){var c=(e&&e.code)||(e&&e.message)||'error';S.errs[name]=c;S.err=(S.err||'')+'Could not read '+name+': '+c+' ';schedule()});
 }
 function dbErrText(e){
