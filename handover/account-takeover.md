@@ -18,6 +18,11 @@ related:
 
 Written 8 Nov 2026, 20:40 IST, for a Claude session running under **another claude.ai account**. Start with [CLAUDE.md](../CLAUDE.md); it loads the identity, Principals, rules and milestones. This file adds what changes when the account changes, and where everything stands.
 
+## 0. Takeover accounts (Vijay, 8 Nov 2026)
+- New Claude accounts: **ai@virgoasia.com** and **ai.lam@virgoasia.com**. Vijay approved giving them edit access to the claude.ai Desk; he shares it himself from the artifact's Share menu (Claude cannot change sharing).
+- Desk sign-in: ai.lam@virgoasia.com is already a Super admin in the claude.ai Desk users, so it arrives on `/exec` with the restore. ai@virgoasia.com is not a Desk user; Vijay adds it at Admin › Users if that account needs to open the Desk.
+- Both are virgoasia.com accounts, so the `/exec` link (domain access) opens for them once they are Desk users.
+
 ## 1. Where the work lives
 | What | Where | Notes |
 |---|---|---|
