@@ -18,20 +18,19 @@ const outDir = path.join(here, 'out');
 fs.mkdirSync(outDir, { recursive: true });
 // ---- split the page into numbered part files, each <= MAX_PART_BYTES UTF-8 bytes (Apps Script editor save limit, see README) ----
 import { execSync } from 'child_process';
-import { MAX_PART_BYTES, indexSum, splitAtBoundaries, addSentinels } from './split-lib.mjs';
+import { MAX_PART_BYTES, indexSum, splitAtBoundaries } from './split-lib.mjs';
 const full = head + page + '\n</html>\n';
-const buildId = indexSum(full);
-const partTexts = addSentinels(splitAtBoundaries(full, MAX_PART_BYTES), buildId);
+const partTexts = splitAtBoundaries(full, MAX_PART_BYTES);
 const partName = i => i === 0 ? 'Index' : 'Index' + (i + 1);
 const fileName = i => 'Desk-' + partName(i) + '.txt';
 for (const f of fs.readdirSync(outDir)) if (/^Desk-Index\d*\.txt$/.test(f)) fs.unlinkSync(path.join(outDir, f)); // no stale parts from an earlier build
-const manifest = partTexts.map((t, i) => ({ name: partName(i), file: fileName(i), bytes: Buffer.byteLength(t, 'utf8'), tail: t.replace(/\s+$/, '').split('\n').pop().slice(-70) }));
+const manifest = partTexts.map((t, i) => ({ name: partName(i), file: fileName(i), bytes: Buffer.byteLength(t, 'utf8'), chars: t.length, sum: indexSum(t), tail: t.replace(/\s+$/, '').split('\n').pop().slice(-70) }));
 if (manifest.some(m => m.bytes > MAX_PART_BYTES)) throw new Error('a part is over ' + MAX_PART_BYTES + ' bytes');
 partTexts.forEach((t, i) => fs.writeFileSync(path.join(outDir, fileName(i)), t));
 let code = fs.readFileSync(path.join(here, 'src/Code.gs.js'), 'utf8');
 const MARK = '/*@@INDEX_MANIFEST@@*/null';
 if (code.split(MARK).length !== 2) throw new Error('Code.gs needs exactly one ' + MARK);
-code = code.replace(MARK, () => JSON.stringify({ parts: manifest.length, id: buildId }));
+code = code.replace(MARK, () => JSON.stringify(manifest.map(m => ({ name: m.name, chars: m.chars, sum: m.sum }))));
 fs.writeFileSync(path.join(outDir, 'Desk-Code.gs.txt'), code + '\n' + fs.readFileSync(path.join(here, 'src/sap.gs.js'), 'utf8'));
 fs.writeFileSync(path.join(outDir, 'appsscript.json.txt'), fs.readFileSync(path.join(here, 'src/appsscript.json'), 'utf8'));
 const table = ['| Create this HTML file in the editor | Paste this file | Size | Must end with (last line with text) |', '|---|---|---|---|']
@@ -42,6 +41,7 @@ const apiMatch = /var DESK_API = (\d+);/.exec(code); if (!apiMatch) throw new Er
 let gitHash = 'nogit'; try { gitHash = execSync('git rev-parse --short HEAD', { cwd: here, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (e) {}
 const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 12); // yyyymmddhhmm UTC: first, so names sort oldest to newest
 const pageBuild = process.env.PAGE_BUILD || stamp + '-' + gitHash;
+if (!/^\d{12}-[0-9a-z]+$/.test(pageBuild)) throw new Error('PAGE_BUILD must be yyyymmddhhmm-<hash> (fixed-width UTC time first), got ' + pageBuild);
 for (const f of fs.readdirSync(outDir)) if (/^desk-page-.*\.html$/.test(f)) fs.unlinkSync(path.join(outDir, f));
 const pageFile = 'desk-page-' + pageBuild + '.html';
 fs.writeFileSync(path.join(outDir, pageFile), '<!--DESK-PAGE build=' + pageBuild + ' api=' + apiMatch[1] + ' chars=' + full.length + ' sum=' + indexSum(full) + '-->\n' + full);

@@ -6,19 +6,13 @@ import path from 'path';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-/* What the real HtmlService hands back is NOT what was pasted (tenant, 8 Nov 2026: Index came back 31,837 characters shorter; block comments are the suspected cause, unproven).
- * Default mimic: block comments are removed (except the /*@@ ... marker comments, which the real tenant kept: version 11 booted) and trailing whitespace is trimmed.
- * mode 'none' = hand back the text unchanged. */
-export function htmlProcess(t, mode = 'strip-comments') {
-  if (mode === 'none') return t;
-  return t.replace(/\/\*(?!@@)[\s\S]*?\*\//g, '').replace(/\s+$/, '');
-}
 export function makeEnv(opts = {}) {
   const CELL_LIMIT = 50000, state = { email: opts.email || 'data@virgoasia.com', locks: 0, calls: 0, lockFail: false, failAfterSetValues: null, held: 0, skew: 0, deleteCost: 0, onDelete: null, triggers: [] };
   const stats = { gv: [], sv: 0, byFn: {} };
   const sheets = {}, props = {}, cache = {};
   const drv = opts.drive || { folders: {}, files: {} }; drv.reads = 0; drv.listings = 0; // DriveApp mock: folders { id: [file] }, files { id: file }; file = { id, name, updated (ms), content }
   const mkFile = f => ({ getId() { return f.id; }, getName() { return f.name; }, getLastUpdated() { return new Date(f.updated); }, getBlob() { return { getDataAsString(enc) { if (enc !== 'UTF-8') throw new Error('expected UTF-8'); if (f.readError) throw new Error(f.readError); drv.reads++; return f.content; } }; } });
+  const htmlFile = name => { if (opts.htmlFiles) { if (!(name in opts.htmlFiles)) throw new Error('Unknown file: ' + name); return opts.htmlFiles[name]; } const f = path.join(here, '../out/Desk-' + name + '.txt'); if (!fs.existsSync(f)) throw new Error('Unknown file: ' + name); return fs.readFileSync(f, 'utf8'); };
   const cacheStats = { puts: 0, gets: 0, maxBytes: 0 };
   function mkSheet(name) {
     const s = { name, rows: [], maxRows: 1000, maxCols: 26 };
@@ -76,11 +70,11 @@ export function makeEnv(opts = {}) {
         const out = reqs.map(q => { state.skew = base; const r = opts.fetch(q.url, q, state); mx = Math.max(mx, state.skew - base); return { getResponseCode() { return r.code; }, getContentText() { return r.body; }, getHeaders() { return r.headers || {}; } }; }); state.skew = base + mx; return out; } },
     HtmlService: {
       XFrameOptionsMode: { DEFAULT: 'DEFAULT' },
-      createHtmlOutputFromFile(name) { return { getContent() { // opts.htmlFiles = { Index: text, Index2: text ... } overrides the built parts; a missing name throws like Apps Script
-        let t;
-        if (opts.htmlFiles) { if (!(name in opts.htmlFiles)) throw new Error('Unknown file: ' + name); t = opts.htmlFiles[name]; }
-        else { const f = path.join(here, '../out/Desk-' + name + '.txt'); if (!fs.existsSync(f)) throw new Error('Unknown file: ' + name); t = fs.readFileSync(f, 'utf8'); }
-        return htmlProcess(t, opts.htmlProcess); } }; },
+      // Real behaviour seen on the tenant (8 Nov 2026): createHtmlOutputFromFile(name).getContent() parses the file as HTML and refuses a fragment ("Malformed HTML content"; Index2 to Index4 are middle chunks);
+      // createTemplateFromFile(name).getRawContent() returns the exact text. The mimic accepts only a file that starts a document (<!DOCTYPE or <html), as Index does.
+      // opts.htmlFiles = { Index: text, Index2: text ... } overrides the built parts; a missing name throws.
+      createHtmlOutputFromFile(name) { return { getContent() { const t = htmlFile(name); if (!/^\s*<(!doctype|html)/i.test(t)) throw new Error('Malformed HTML content'); return t; } }; },
+      createTemplateFromFile(name) { const t = htmlFile(name); return { getRawContent() { return t; } }; },
       createHtmlOutput(h) { const o = { html: h, title: null, meta: [], setTitle(t) { o.title = t; return o; }, addMetaTag(a, b) { o.meta.push([a, b]); return o; }, setXFrameOptionsMode() { return o; } }; return o; },
     },
   };

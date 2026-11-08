@@ -1,10 +1,10 @@
 # Performance Desk on Google Apps Script
 
-Files: `Desk-Code.gs.txt` (server), `appsscript.json.txt` (settings) and the page, which is cut into numbered parts `Desk-Index.txt`, `Desk-Index2.txt`, `Desk-Index3.txt` ... (the Apps Script editor cuts a single file off at about 1 MB when saving, so no part is over 700 KB).
-The server joins the parts in order. Only the page parts change between Desk versions (Code.gs changes too whenever the number of parts or a checksum changes, so paste it every time).
+Files: `Desk-Code.gs.txt` (server), `appsscript.json.txt` (settings) and the page, as `desk-page-<build>.html` (for Drive, preferred) and as numbered parts `Desk-Index.txt`, `Desk-Index2.txt` ... (fallback; the editor cuts a single file off at about 1 MB when saving, so no part is over 700 KB).
+Build id: `<yyyymmddhhmm>-<git hash>`, a fixed-width UTC time first, so file names sort in release order. Only the page changes between Desk versions; `Code.gs` changes only when server functions do (with the Index fallback it also changes whenever a part's length or checksum does).
 
 ### How the page is served: from Google Drive (preferred)
-The page is not pasted into the editor at all. The Delivery Lead uploads each release to a Drive folder named **Virgo Desk page (do not edit)** as `desk-page-<build>.html` (plain text, no conversion; old files stay). `Code.gs` reads the newest one with DriveApp, checks its header (length, checksum, server version) and serves it. A file that fails a check is never served; the Web app shows an error page that names the file and the reason.
+The page is not pasted into the editor at all. The Delivery Lead uploads each release to a Drive folder named **Virgo Desk page (do not edit)** as `desk-page-<yyyymmddhhmm>-<hash>.html` (plain text, no conversion; old files stay; a `desk-page-*.html` file with any other name is refused with an error naming it). `Code.gs` reads the newest one with DriveApp, checks its header (length, checksum, server version) and serves it. A file that fails a check is never served; the Web app shows an error page that names the file and the reason.
 
 **One-time setup (Vijay, as data@virgoasia.com)**
 1. Paste the new `Desk-Code.gs.txt` into `Code.gs` and `appsscript.json.txt` into `appsscript.json` (it adds the Drive read-only permission).
@@ -12,17 +12,17 @@ The page is not pasted into the editor at all. The Delivery Lead uploads each re
 3. Project Settings > Script properties > add `DESK_PAGE_FOLDER_ID` = the folder id the Delivery Lead gives you (the part of the folder link after `/folders/`).
 4. Run **pageDiag**, open Execution log: it must say `Check: passed`. Then Deploy > Manage deployments > New version.
 
-**Every later release:** the Delivery Lead uploads the new `desk-page-<build>.html` to the folder. Within 10 minutes (the page is cached that long) everyone gets it. Vijay does nothing, unless `Code.gs` changed (then paste it and make a New version; the error page says so when the page needs a newer `Code.gs`).
-**Rollback:** set Script property `DESK_PAGE_FILE_ID` to the id of an older `desk-page-*.html` (it pins that exact file); delete the property to go back to "newest". **Check anything:** run **pageDiag** (folder, chosen file, build, length, check result, server version).
+**Every later release:** the Delivery Lead uploads the new `desk-page-<yyyymmddhhmm>-<hash>.html` to the folder. The server looks up the newest file on every request (one Drive listing) and caches only its content for 10 minutes, so a new upload, good or bad, takes effect at once; a bad one shows its error page. Users do a **hard reload** (Ctrl+Shift+R) to drop the old page from the browser. Vijay does nothing, unless `Code.gs` changed (then paste it and make a New version; the error page says so when the page needs a newer `Code.gs`).
+**Rollback:** set Script property `DESK_PAGE_FILE_ID` to the id of an older `desk-page-*.html` (it pins that exact file); delete the property to go back to "newest". **Check anything:** run **pageDiag** from the editor (folder, chosen file, build, length, check result, server version; owner or Super admin only). Keep the folder tidy: every request reads each file name in it.
 The Index files below are the fallback: they are used only while `DESK_PAGE_FOLDER_ID` and `DESK_PAGE_FILE_ID` are both unset.
 
 ## Fallback: the page as Index files in the editor
 ### The page files (this build)
-Create one **HTML** file in the editor for each row, named exactly as shown (no `.html`), select all, paste the matching `.txt`, **Save**. Then check each file: click in it, press Ctrl+End, and the last line with text (ignore an empty line at the very end) must be the text in the last column. If it is not, the save cut it off: select all, delete, paste again.
+Create one **HTML** file in the editor (the server reads each with `createTemplateFromFile(name).getRawContent()`, which returns the text exactly; the older `createHtmlOutputFromFile` call refuses a fragment with "Malformed HTML content" and must not be used) for each row, named exactly as shown (no `.html`), select all, paste the matching `.txt`, **Save**. Then check each file: click in it, press Ctrl+End, and the last line with text (ignore an empty line at the very end) must be the text in the last column. If it is not, the save cut it off: select all, delete, paste again.
 <!--@@PARTS_TABLE@@-->
 If a part is missing, cut short or from another version, the Web app shows "The Desk page is not fully installed" and names the file, instead of a blank page.
-**If the page still fails:** in the editor pick the function **indexDiag**, press **Run**, then **Execution log** (or View > Logs) and send the lines to the Delivery Lead. They show, per file, what the server received (length, first and last 80 characters, whether the marker was found).
-Stopgap while a check is being fixed: in `Code.gs` set `var INDEX_MANIFEST = null;` (the page then loads without checks), and make a New version.
+**If the page still fails:** in the editor pick the function **indexDiag**, press **Run**, then **Execution log** (or View > Logs) and send the lines to the Delivery Lead. They show, per file, the exact length and checksum against the expected values, the first and last 80 characters, and what the old HTML-parsing call does.
+Stopgap while a check is being fixed: in `Code.gs` set `var INDEX_MANIFEST = null;` (the page then loads without length or checksum checks), and make a New version.
 Split size: `MAX_PART_BYTES=500000 node build-gas.mjs` builds smaller parts (default 700000).
 
 ## First time (as data@virgoasia.com)
@@ -46,6 +46,7 @@ Split size: `MAX_PART_BYTES=500000 node build-gas.mjs` builds smaller parts (def
 3. **Keep the tab open** until the table shows every collection "ok". If it stops partway the page says "Restore incomplete": tick "Replace everything" and run Restore again (a re-run clears first, so it is safe).
 
 ## Good to know
+- The admin job queue (undo, clear demo, set zones) uses a server-side lease per job (`deskLease`, Script Property `DESK_LEASES`): one open tab runs a job, a second is refused until the lease expires (at most 10 minutes). Super admin only.
 - Access is by the Users list in Admin. Anyone else in the domain sees "Ask your admin for access" and receives no data.
 - Only a Super admin can write the admin collections (periods, users, plants, cells, inv, roll, uploads ... ); the server refuses everyone else. `planlocks` and the `geography` master (states, districts, PIN list; Admin › Geography, D80) are Super admin or Management / HO only. Unknown and inactive users cannot read or write.
 - **Action and follow-up permissions are enforced by the page, as on claude.ai.** The server lets any active user write `actions`, `followups`, `potential`, `phasing` and `log`; the page decides who may respond to, assign, verify or draft for an action. Not enforced on the server either: field-level changes, approver differs from proposer, closed and locked quarters, and the audit trail (written by the page).
@@ -82,4 +83,4 @@ Not checked on the real tenant: SAP's own limit on page size and on `$top` with 
 If SAP answers 403 or refuses the connection the message says an IP allow-list may be the cause (Apps Script uses Google addresses that are not fixed).
 
 ## Live deployment
-- Web app (virgoasia.com sign-in; since D106 the page is served from the parts Index, Index2 …): https://script.google.com/a/macros/virgoasia.com/s/AKfycbydN1i3bDYOE1BOaqSat4BvRIfDAJu30qWAXfCKc-QwQ1E58Z9x0OiWaRAFziW9FX5GLw/exec (deployed 8 Nov 2026, D76)
+- Web app (virgoasia.com sign-in; the page is served from the Drive folder "Virgo Desk page (do not edit)" once DESK_PAGE_FOLDER_ID is set, otherwise from the Index parts Index, Index2 …, each read raw): https://script.google.com/a/macros/virgoasia.com/s/AKfycbydN1i3bDYOE1BOaqSat4BvRIfDAJu30qWAXfCKc-QwQ1E58Z9x0OiWaRAFziW9FX5GLw/exec (deployed 8 Nov 2026, D76)
