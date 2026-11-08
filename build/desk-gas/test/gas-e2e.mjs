@@ -154,7 +154,7 @@ ok('with "Replace everything" it overwrites and again matches exactly', bad2 ===
 
 /* ---- validation happens before anything is wiped ---- */
 await R.page.waitForTimeout(3000);
-const dataBefore = Object.keys(env2.stored()).length;
+const dataBefore = Object.keys(env2.stored()).length, keysBefore = new Set(Object.keys(env2.stored()));
 const forged1 = forgeBackup(tmp, path.join(tmp + '-f1'), parts => { const f = Object.values(parts).find(p => p.docs.some(d => d[0] === 'log')); f.docs.find(d => d[0] === 'log')[1] = 'bad/id'; });
 await pick(R.page, forged1); await R.page.waitForFunction(() => ['verified', 'error'].includes(window.__gasRestoreState().stage), null, { timeout: 120000 });
 let fs1 = await R.page.evaluate(() => window.__gasRestoreState());
@@ -167,7 +167,7 @@ const forged3 = forgeBackup(tmp, path.join(tmp + '-f3'), parts => { const f = Ob
 await pick(R.page, forged3); await R.page.waitForFunction(() => ['verified', 'error'].includes(window.__gasRestoreState().stage), null, { timeout: 120000 });
 fs1 = await R.page.evaluate(() => window.__gasRestoreState());
 ok('a backup with a duplicate id is refused before any write', fs1.stage === 'error' && /Duplicate/.test(fs1.err), fs1.err);
-ok('the database was not touched by any refused restore (replace was never ticked or reached)', Object.keys(env2.stored()).length === dataBefore);
+ok('the database was not touched by any refused restore (replace was never ticked or reached)', Object.keys(env2.stored()).length === dataBefore, 'changed: ' + JSON.stringify(Object.keys(env2.stored()).filter(k => !keysBefore.has(k)).slice(0, 8)) + ' / gone: ' + JSON.stringify([...keysBefore].filter(k => !(k in env2.stored())).slice(0, 8)));
 /* ---- a restore that stops half way: clear incomplete state, safe re-run ---- */
 await pick(R.page, files); await R.page.waitForFunction(() => window.__gasRestoreState().stage === 'verified', null, { timeout: 120000 });
 await R.page.check('#gr-replace');
