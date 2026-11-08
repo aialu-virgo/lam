@@ -39,13 +39,45 @@ function doGet(e) {
   var email = activeEmail_();
   var boot = { email: email, url: ScriptApp.getService().getUrl(), h: (e && e.parameter && e.parameter.h) || '', owner: false, name: '' };
   try { var who = resolveUser_(email); boot.owner = who.role === 'Super admin'; boot.name = who.name || ''; } catch (err) { boot.err = String(err && err.message || err); }
-  var html = HtmlService.createHtmlOutputFromFile('Index').getContent();
+  var loaded = loadIndex_();
+  if (loaded.error) return indexErrorPage_(loaded.error);
+  var html = loaded.html;
   var json = JSON.stringify(boot).replace(/</g, '\\u003c');
   html = html.split('/*@@GAS_BOOT@@*/').join('window.__GAS_BOOT=' + json + ';');
   return HtmlService.createHtmlOutput(html)
     .setTitle('Virgo Laminates Performance Desk')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+}
+
+/* ---------- page parts: HTML files Index, Index2, Index3 ... (each saved under the editor's size limit), joined in order ----------
+ * INDEX_MANIFEST is written by build-gas.mjs: [{name, chars, sum}] per part. null (unbuilt source) = join until the first missing file, unchecked. */
+var INDEX_MANIFEST = /*@@INDEX_MANIFEST@@*/null;
+function indexSum_(str) { var h = 0x811c9dc5; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16); }
+function indexPad_(s) { return ('00000000' + s).slice(-8); }
+function indexPartName_(i) { return i === 0 ? 'Index' : 'Index' + (i + 1); }
+function loadIndex_() {
+  var out = [], i, text;
+  if (!INDEX_MANIFEST) {
+    for (i = 0; i < 50; i++) { try { text = HtmlService.createHtmlOutputFromFile(indexPartName_(i)).getContent(); } catch (err) { if (i === 0) return { error: { file: 'Index', problem: 'is missing' } }; break; } out.push(text); }
+    return { html: out.join('') };
+  }
+  for (i = 0; i < INDEX_MANIFEST.length; i++) {
+    var m = INDEX_MANIFEST[i];
+    try { text = HtmlService.createHtmlOutputFromFile(m.name).getContent(); }
+    catch (err) { return { error: { file: m.name, problem: 'is missing (the Desk has ' + INDEX_MANIFEST.length + ' page files, Index to ' + indexPartName_(INDEX_MANIFEST.length - 1) + ')' } }; }
+    if (text.length !== m.chars) return { error: { file: m.name, problem: 'is incomplete or out of date: it has ' + text.length + ' characters, it must have ' + m.chars + (text.length < m.chars ? ' (it was cut short when saved, or an older version is still there)' : ' (it is from another Desk version, or has extra text)') } };
+    if (indexPad_(indexSum_(text)) !== m.sum) return { error: { file: m.name, problem: 'has the right length but different content (checksum ' + indexPad_(indexSum_(text)) + ', expected ' + m.sum + '): it is from another Desk version or was edited' } };
+    out.push(text);
+  }
+  return { html: out.join('') };
+}
+function indexErrorPage_(e) {
+  var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  return HtmlService.createHtmlOutput('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Desk setup problem</title></head><body style="font-family:sans-serif;max-width:640px;margin:48px auto;padding:0 16px">'
+    + '<h2>The Desk page is not fully installed</h2><p>The HTML file <b>' + esc(e.file) + '</b> ' + esc(e.problem) + '.</p>'
+    + '<p>Admin: open the Apps Script project, open <b>' + esc(e.file) + '</b>, select all, paste the matching Desk-' + esc(e.file) + '.txt, save, check its last line (see README), then Deploy &gt; Manage deployments &gt; New version.</p></body></html>')
+    .setTitle('Desk setup problem');
 }
 
 /* ---------- envelope: every client call returns {ok:true,...} or {ok:false,code,message} ---------- */
