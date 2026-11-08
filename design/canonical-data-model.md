@@ -2,8 +2,9 @@
 title: Canonical data model
 summary: Entities, keys, fields and the source-reference columns every SAP row lands in; B1 and S/4 map to one model, derived from five real exports.
 status: approved (interim, Vijay, D13)
-updated: 2026-11-07
+updated: 2026-11-08
 related:
+  - data-map/geography.md
   - data-map/customer.md
   - data-map/item.md
   - data-map/sales-employee.md
@@ -47,11 +48,14 @@ related:
 ## Master entities
 | Entity | Key | Fields | Sources and gaps |
 |---|---|---|---|
-| `plant` | `plant_code` (4 digits) | `plant_name`, `plant_type` (factory, HO, depot), `zone`, `state`, `b1_bpl_name`, `active`, `business` (laminates, ACP) | [Plant master](../data-map/plant-master.md). Laminates: 1001–1006, 1011, 1012–1049. B1 branch (`BPLName`) joins by name; S/4 `Plant` is the code. |
+| `plant` | `plant_code` (4 digits) | `plant_name`, `plant_type` (factory, HO, depot), `zone`, `state` (where the plant sits; not a planning key since D77), `b1_bpl_name`, `active`, `business` (laminates, ACP) | [Plant master](../data-map/plant-master.md). Laminates: 1001–1006, 1011, 1012–1049. B1 branch (`BPLName`) joins by name; S/4 `Plant` is the code. |
 | `warehouse` | `warehouse_code` | `plant_code`, `name`, `active` | [Warehouse](../data-map/warehouse.md). Not exported; defaults to one warehouse per plant (Assumed). |
+| `state` | `state_code` (GST code, 2 digits) | `state_name`, `aliases[]` (B1 spellings), `default_plant_code`, `active` | [Geography](../data-map/geography.md). `00` = "State not known". |
+| `district` | `district_id` (LGD district code, text) | `state_code`, `district_name`, `responsible_plant_code` (exactly one), `active` | [Geography](../data-map/geography.md). Exactly one plant per district (D77). |
+| `pin_district` | `pin` (6 digits) | `state_code`, `district_id`, `source`, `multi_district` flag | [Geography](../data-map/geography.md). One district per PIN; a PIN whose state differs from the customer's state is not used. |
 | `item` | `item_code` (B1 `FG#####`) | `description`, `item_category`, `product_group`, `brand`, `thickness_mm`, `size_ft`, `sqft_per_sheet`, `finish`, `design_no`, `base_uom`, `active`, `is_laminate` | [Item](../data-map/item.md). |
 | `item_xref` | (`source_system`, `source_item_code`) | `item_code` | S/4 `Product Code` → B1 code. No S/4 code in the item master yet (join by description, Assumed). |
-| `customer` | `customer_code` (B1 `CardCode`, `VRGLCU` + 6 digits) | `name`, `gstin`, `city`, `state`, `zone`, `customer_group`, `segment`, `sales_employee_code`, `class_abc` (derived) | [Customer](../data-map/customer.md). Today only inside invoice lines; no OCRD export. |
+| `customer` | `customer_code` (B1 `CardCode`, `VRGLCU` + 6 digits) | `name`, `gstin`, `city`, `state`, `state_code` (via the geography alias table), `pin` (6 digits, default bill-to), `zone`, `customer_group`, `segment`, `sales_employee_code`, `class_abc` (derived) | [Customer](../data-map/customer.md). Today only inside invoice lines; no OCRD export. |
 | `customer_xref` | (`source_system`, `source_customer_code`) | `customer_code`, `gstin` | S/4 `Sold-to-Party Number` ↔ B1 by `gstin` (Assumed). |
 | `sales_employee` | `sales_employee_code` (B1 `SlpCode`) | `name`, `employee_code` (HR code `E-…`), `designation`, `zone`, `plant_code`, `active` | [Sales employee](../data-map/sales-employee.md). B1 sales lines carry only a name; S/4 has none. |
 | `user` | `email` | `name`, `role`, `department`, `plant_codes[]`, `reports_to_email`, `whatsapp_number`, `today_cap`, `active`, `sales_employee_code` | [User master](../data-map/user-master.md). Roles per [Role matrix](role-matrix.md). |
@@ -91,10 +95,20 @@ Fields listed are the minimum the Desk needs; B1/S4 columns in each data-map fil
 Owned by the Desk, entered by people, never from SAP. Fields in [Market potential](../data-map/market-potential.md), [Target phasing](../data-map/target-phasing.md); revision and approval flow in [Target model](target-model.md) and [Plan model](plan-model.md).
 | Entity | Key | Notes |
 |---|---|---|
-| `market_potential` | `fy_quarter`, `plant_code` or `territory`, `product_group`, `customer_segment` | ₹, sheets, sq ft; `source_type`, `owner_email`; every change is a revision |
-| `target_share` | same key or a coarser level | `share_pct`; revision |
-| `target_phasing` | key + `month_in_quarter` | `phasing_pct`, 3 rows sum 100; default equal |
+| `market_potential` | `fy_quarter`, `state_code`, `district_id` or `_state`, `product_group`, `customer_segment` | D77. ₹, sheets, sq ft; `source_type`, `owner_email`; every change is a revision. `_state` = state total; districts are slices; **unallocated = state − Σ districts, derived, never stored** ([Target model](target-model.md#geography-basis-d77)). Legacy records keyed by `plant_code` or `territory` have no `state_code`: see Migration below. |
+| `target_share` | same key or a coarser level | `share_pct`; revision. On `_state` it applies to the unallocated slice only |
+| `target_phasing` | (`fy_quarter`, `state_code`, `district_id` or `_state`, `product_group`) + `month_in_quarter` | `phasing_pct`, 3 rows sum 100; default equal; district overrides `_state` overrides all |
 | `revision` | `revision_id` | old → new, reason, discussion date, participants, status (Draft, Discussed, Approved, Locked) |
+
+## Geography attribution (D77)
+Actuals have no district in SAP. Each Sales line reaches a (state, district) through its **customer**: customer master `state_code` and `pin` → `pin_district` (accepted only when the PIN's state equals the customer's state) → `district_id` → `responsible_plant_code`. Fallbacks: no district → "<State> – unassigned"; no state → `00` "State not known". Rules and the lock-time snapshot: [Target model](target-model.md#how-actuals-reach-a-district). The invoice line keeps its invoicing `plant_code` unchanged; `responsible_plant_code` is derived at read time and never written onto the SAP row.
+
+## Migration of plant-keyed potential (D77, recommendation)
+Existing `market_potential`, `target_share` and `target_phasing` records are keyed by `plant_code` (or blank-plant `territory`). A plant is not one state, and the plant master has no state filled in, so a plant total cannot be turned into a state total without inventing a split.
+- **Recommended: freeze, do not convert.** Leave every plant-keyed record exactly as it is (no rewrite, no delete), marked legacy by the absence of `state_code`. The Targets & Potential tab shows geography records only; legacy records stay readable in a read-only "Plant basis (legacy)" view and in the revision trail. Approved and Locked plant targets keep scoring the quarters they were approved for; the geography basis starts at an **effective quarter**: the current open quarter if it has no Approved or Locked plant record, otherwise the next quarter. Branch managers and Management re-enter potential by state, then district.
+- **Before it runs:** count legacy records. [Market potential](../data-map/market-potential.md) lists none loaded and D75 (8 Nov) found no demo records; whether any real plant-keyed potential exists is **not verified** against the live Desk. If the count is zero the migration is a no-op.
+- **Trade-off:** no wrong number is created and nothing needs approval again to be trusted, but the first geography quarters have no last-quarter potential, so share of potential, the +2-point default share and Stretch have no prior base until one geography quarter is entered; actual-based QoQ is unaffected (actuals re-attribute from the aggregates).
+- **Rejected: auto-convert** plant potential to state `_state` records through plant → state. Fast, keeps the trend, but wrong wherever a plant serves several states, and a converted record would need fresh approval anyway (the proposer cannot approve).
 
 ## System entities
 `upload` (`upload_id`, file name, `source_system`, entity, period range, row counts: read / loaded / rejected / warned, uploader, `loaded_at`, confirmed column mapping), `upload_reject` (row, rule, message), `coverage` (entity × `fy_quarter` → loaded | partial | missing, computed from `upload` and row counts). Actions, threads, follow-ups: [Architecture](architecture.md).

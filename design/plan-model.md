@@ -2,8 +2,9 @@
 title: Plan model
 summary: Every plan type beyond the sales target (person split, collections, dispatch TAT, stock days, new customers, personal KPIs): grain, owner, entry route, actual source and approval.
 status: approved (interim, Vijay, D13)
-updated: 2026-11-07
+updated: 2026-11-08
 related:
+  - data-map/geography.md
   - design/_index.md
   - data-map/market-potential.md
   - design/canonical-data-model.md
@@ -32,8 +33,8 @@ Plans are entered by people, never from SAP. Actuals come only from SAP uploads.
 
 | # | Plan | Grain | Owner (proposes) | Approver | Entry route | Actual source | Default if none |
 |---|---|---|---|---|---|---|---|
-| P1 | **Sales target** | quarter × plant or territory × product group × segment, phased by month | Branch manager (own plants); Management / HO and Super admin ([who edits](target-model.md#who-edits-potential-and-targets)) | SP Sir or Management / HO (not HOD) | Plan > Targets & Potential tab, or [market-potential.csv](../data-map/templates/market-potential.csv) and [target-phasing.csv](../data-map/templates/target-phasing.csv) | Invoice aggregates (Sales) | Potential × default share, Draft ([Target model](target-model.md)) |
-| P2 | **Person split** | P1 leaf × salesperson, `split_pct`, sums to 100 per leaf | Branch manager | Branch manager's HOD (it moves no ₹ between leaves) | Admin screen or upload | Aggregates by salesperson | Each person's share of the leaf's last-quarter actual, Draft |
+| P1 | **Sales target** | quarter × state × district (or `_state`) × product group × segment, phased by month (D77; was plant or territory) | Branch manager (own districts: those whose responsible plant is theirs); Management / HO and Super admin ([who edits](target-model.md#who-edits-potential-and-targets)) | SP Sir or Management / HO (not HOD) | Plan > Targets & Potential tab, or [market-potential.csv](../data-map/templates/market-potential.csv) and [target-phasing.csv](../data-map/templates/target-phasing.csv) | Invoice aggregates (Sales), attributed to a district through the customer ([Target model](target-model.md#how-actuals-reach-a-district)) | Potential × default share, Draft ([Target model](target-model.md)) |
+| P2 | **Person split** | P1 leaf (state × district × group × segment) × salesperson, `split_pct`, sums to 100 per leaf | Branch manager | Branch manager's HOD (it moves no ₹ between leaves) | Admin screen or upload | Aggregates by salesperson | Each person's share of the leaf's last-quarter actual, Draft |
 | P3 | **Collection plan** | month × plant (₹) | Accounts (plant scope) | Management / HO | Admin screen or upload | [Collection](../data-map/collection.md) receipts, summed by month and plant | Open receivables falling due in the month from the latest [Receivable](../data-map/receivable.md) export |
 | P4 | **Dispatch TAT plan** | plant × product group, standard working days from order date to dispatch date | Plant user, with HOD | HOD | Admin screen | [Sales order](../data-map/sales-order.md) date to [Delivery](../data-map/delivery.md) date, per order document | `tat_days` = 3 (**Assumed (new)**) |
 | P5 | **Stock plan** | plant × product group, target stock days | Plant user, with HOD | HOD | Admin screen | [Stock](../data-map/stock.md) on hand ÷ average daily sales sheets | `stock_days_target` = 30 (**Assumed (new)**) |
@@ -41,6 +42,7 @@ Plans are entered by people, never from SAP. Actuals come only from SAP uploads.
 | P7 | **Personal KPI plan** | quarter × person × KPI (value) | HOD or Branch manager | Management / HO | Role defaults in Admin; per-person override | Desk's own tables (actions, uploads) | Role default in [KRA / KPI set](kra-kpi.md) |
 
 ## Rules per plan
+- **D77 geography.** P1 is set State first (macro), then District (micro); district values add up to the state, the gap shows as "Unallocated to districts" ([Target model](target-model.md#geography-basis-d77); master in [Geography](../data-map/geography.md)). Each district has exactly one responsible plant; plant totals for P1 are roll-ups of districts. **P3 (collection plan), P5 (stock plan) and P6 (new-customer plan) stay plant-based**: D77 changes the target and potential model only. Flagged for the Principals: a new-customer or collection target by plant will not equal a roll-up of district targets, and nothing here makes them equal.
 - **P1 and P2 sum rules.** P2 per leaf sums to 100 ± 0.01. Person target = leaf target × split %, person potential = leaf potential × split % (so share of potential exists for persons). Person targets are rounded to 2 decimals and the last person takes the remainder, so the leaf is exactly reproduced.
 - **P3 collection plan** is ₹ received in the month. Achievement = receipts ÷ plan. Month grain, so no day pro-rating is needed for completed months; open month uses working-day pro-rating.
 - **P4 TAT** is measured per order document: working days from `order doc_date` to the first delivery date for the line; late if more than `tat_days`. Order-line grain is open-order data, held outside the D9 invoice store (open orders only, small).
@@ -63,7 +65,7 @@ Quarter plans lock with the quarter ([Target model](target-model.md)). Past-quar
 | `collection_plan_default` | due-in-month | Assumed (new) |
 
 ## D9 effects
-P1, P2, P6 read the aggregates (plant × month × customer × salesperson × product group) and work. P3 to P5 use their own stores, not the invoice aggregates. **Cannot be done at D9 grain:** item- or line-level plans, per-item stock days, per-SKU TAT. S/4 rows have no salesperson, so P2 actuals for S/4-loaded periods use the customer master's salesperson (**Assumed (new)**).
+P1, P2, P6 read the aggregates (plant × month × customer × salesperson × product group) and work; for P1 and P2 under D77 the plant in the aggregate is the invoicing plant and the district comes from the customer master, so the read crosses all plants' chunks for the customers of a state. P2: a person's actual in a district uses the same attribution; a salesperson whose customers sit in several districts has a split per district leaf. P3 to P5 use their own stores, not the invoice aggregates. **Cannot be done at D9 grain:** item- or line-level plans, per-item stock days, per-SKU TAT. S/4 rows have no salesperson, so P2 actuals for S/4-loaded periods use the customer master's salesperson (**Assumed (new)**).
 
 
 > **D34 (Vijay, 21 Oct 2026):** P5 stock days now use the last 90 days to the stock snapshot's as-on date (not the last three completed months). Stock comes from snapshots: [Stock](../data-map/stock.md).
