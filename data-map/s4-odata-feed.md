@@ -53,7 +53,7 @@ The connector does not compute figures. It builds rows that carry the **register
 | 3 | H `BillingDocumentDate` | `Invoice Date` | `doc_date` | Take the UTC date of the `/Date(ms)/` value, never shift to IST | candidate — verify against $metadata |
 | 4 | I `Plant` | `Plant` | `plant_code` | 4 characters, equals Plant List code | candidate — verify against $metadata |
 | 5 | H `SoldToParty` | `Sold-to-Party Number` | `customer_code` | Trim leading zeros if the register has none | candidate — verify against $metadata |
-| 6 | customer read (1.3) `CustomerName` | `Sold-to-Party Description` | `customer_name` | First 60 characters kept by the Desk | candidate — verify against $metadata |
+| 6 | customer read (1.3) `CustomerName` (**optional**, see 1.1a) | `Sold-to-Party Description` | `customer_name` | First 60 characters kept by the Desk | candidate — verify against $metadata |
 | 7 | I `Material` | `Product Code` | `s4_material_no` | Trim leading zeros | candidate — verify against $metadata |
 | 8 | product read (1.3) `ProductType` | `Product Type` | `item_type` → product group | ZABLAM, ZCRLAM, ZCBPVC; others counted as "other", not stored | candidate — verify against $metadata |
 | 9 | I `AdditionalMaterialGroup3` (or product sales view `ThirdSalesSpecProductGroup`) | `Material Group 3` | `thickness_type` | Text such as DOOR, LAM, COMPACT; if SAP returns a code, a text lookup is needed | candidate — verify against $metadata |
@@ -61,13 +61,17 @@ The connector does not compute figures. It builds rows that carry the **register
 | 11 | I `BillingQuantity` | `Invoice Qty` | `qty_sheets` | Unit `BillingQuantityUnit` must be the sheet unit (PC); else flag, do not convert silently | candidate — verify against $metadata |
 | 12 | I `NetAmount` | `Total Amount (Item)` | `net_value_inr` | Net of GST; currency `TransactionCurrency` must be INR | candidate — verify against $metadata |
 | 13 | H `BillingDocumentType` | `Billing Type` | `source_doc_type` | See Filters | candidate — verify against $metadata |
-| 14 | I `SalesDistrict` or customer sales area `SalesDistrict` | `Sales District` | `zone` (via table) | Optional; Desk uses it for zone counts only | candidate — verify against $metadata |
+| 14 | **not read** (real tenant 8 Nov: `SalesDistrict` is not a property of `A_BillingDocumentItem`, HTTP 404) | `Sales District` | `zone` (via table) | Column staged blank. The page uses it only for zone-spelling counts in the intake report (the B1 transfer flag reads the B1 `Zone` only); district and geography come from the customer master read (section 1.4, row 10) | **checked on the real tenant: absent** |
 | 15 | — (not read) | `Sales Executive` | `sales_employee_code` | Sent blank, as the register is (Q-D5 open; if answered, customer sales area `SalesGroup` is the candidate) | candidate — verify against $metadata |
 | 16 | H `CustomerGroup` | `Customer Group` | `customer_group_code` | Optional; segment meaning open (Q5) | candidate — verify against $metadata |
 | 17 | H `DocumentReferenceID` | `ODN` | `official_invoice_no` | Optional; GST invoice number, field location unknown | candidate — verify against $metadata |
 | 18 | I `TaxAmount`; pricing elements (India GST conditions, candidate `JOCG`, `JOSG`, `JOIG`) | `CGST Amount`, `SGST Amount`, `IGST Amount` | `cgst_inr`, `sgst_inr`, `igst_inr` | **Not read in v1.** The intake stores net only. Read `TaxAmount` later as a check if wanted | candidate — verify against $metadata |
 
 Columns not read: `Order Creation Date`, `GSTIN`, `State`, `City`, `Price Group(Item)`, plant address columns, `HSN`, licence columns, `Unit Price`, `Total Invoice Amount`, `invqty`, `totinvamt`, `totnetamt`, `Tax Amount` (all unused or duplicates per [Data map — S/4 register](invoice-s4-register.md)).
+
+
+#### 1.1a Optional properties and the verify rule (first real-SAP finding, 8 Nov)
+`sapVerifyMetadata` marks each name required or optional. **Optional** (not needed for net sales, sheets or sq ft): `A_BillingDocumentItem.ReferenceSDDocument` (Reference Document) and `A_Customer.CustomerName` (row 6). An optional name missing on the tenant is a GAP with a warning; `ok` stays true, the name is left out of every later read and the list is kept in the Script Property `SAP_OPT_SKIP` (cleared by the next clean verify). A **required** name that is a GAP makes `ok` false, and the shadow run and sync refuse to read until it is fixed. Every public SAP function writes one summary line to the execution log (no credentials, user or address).
 
 ### 1.2 Credit notes
 Same service, same read as 1.1; credit memos are billing documents of other types. The mapping differs only here:
