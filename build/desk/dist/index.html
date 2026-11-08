@@ -221,8 +221,8 @@ a.btn{text-decoration:none;display:inline-block}
 .ox-ans q{quotes:none;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);font-weight:800}
 .ox-ans b{font-size:19px;line-height:1.2;overflow-wrap:anywhere}.ox-ans span{font-size:12.5px;color:var(--ink2)}
 .ox-tiles{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}
-.ox-hero-c{grid-column:span 12}.ox-sm{grid-column:span 3}.ox-t6{grid-column:span 7}.ox-t5{grid-column:span 5}
-@media(max-width:1100px){.ox-sm{grid-column:span 6}.ox-t6,.ox-t5{grid-column:span 12}}
+.ox-h{grid-column:span 6}.ox-t12{grid-column:span 12}.ox-hero-c{grid-column:span 12}.ox-sm{grid-column:span 3}.ox-t6{grid-column:span 7}.ox-t5{grid-column:span 5}
+@media(max-width:1100px){.ox-sm{grid-column:span 6}.ox-t6,.ox-t5,.ox-h{grid-column:span 12}}
 @media(max-width:620px){.ox-sm{grid-column:span 12}}
 .ox-card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:16px 18px;min-width:0;display:flex;flex-direction:column;gap:12px}
 .ox-card h2{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink2);margin:0;font-weight:800;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
@@ -341,6 +341,16 @@ details.tp-row[open]>summary{background:color-mix(in srgb,var(--brand-soft) 45%,
  .tp-tot .tp-c{padding-top:0}
 }
 @media (max-width:520px){.tp-tools,.tp-tools .fld{width:100%}.tp-tools select{width:100%}.tp-sticky{position:static}.tp-bar{flex-direction:column;align-items:stretch}.tp-bar .btn{flex:1 1 44%}.tp-dgrid{grid-template-columns:1fr}.tp-pop{position:static}}
+
+/* v44: thickness and brand splits, branch rating (mock-up v3, D64) */
+.ox-sp{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}.ox-sp .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.ox-sp .h b:first-child{overflow-wrap:anywhere}.ox-sp .m{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 8px;font-size:12px;color:var(--ink2);align-items:center}
+.ox-bul.share .f{background:var(--act)}
+.ox-brk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 28px}@media(max-width:900px){.ox-brk{grid-template-columns:minmax(0,1fr)}}
+.ox-br{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}.ox-br .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.ox-stars{font-size:16px;letter-spacing:1px;white-space:nowrap}
+.ox-chip.sm{font-size:11px;padding:2px 8px;font-weight:600}
+.ox-sub3{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);font-weight:800;margin:6px 0 0}
+.ox-zone .ox-chip{white-space:normal}
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -1035,6 +1045,7 @@ async function runValidation(){
   function rej(i,doc,line,field,reason,val){res.rejected++;res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,doc,line,field,reason,val==null?'':val])}
   var catSp={},zoneSp={},own=ownNames(),hxp=headerIndex(U.headers),cPos=('place of supply' in hxp)?hxp['place of supply']:-1,linker=null;
   if(sys==='S4'){var blank0=0,cset=new Set();for(var bi=0;bi<n;bi++){if(cSp<0||!String(rows[bi][cSp]==null?'':rows[bi][cSp]).trim()){blank0++;cset.add(String(rows[bi][cCust]).trim())}}if(blank0>0){U.progressMsg='Linking S/4 customers to B1 salespeople...';renderUpload();await tick();linker=await buildB1Linker(cset);res.af.link=linker}}
+  var IIDX=null;try{IIDX=await loadItemIdx()}catch(e){IIDX=null}/* v44 (D55, D65): item thickness and brand come from the item master; the line's zone is kept for the zone rule */
   var T0=Date.now();
   for(i=0;i<n;i++){
     if(Date.now()-T0>40){T0=Date.now();U.progress=Math.round(i/n*100);U.progressMsg='Checking row '+fmtN(i)+' of '+fmtN(n);var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%';var pm=$('#i-upload .bar+.note');if(pm)pm.textContent=U.progressMsg;await tick()}
@@ -1111,7 +1122,7 @@ async function runValidation(){
     if(!xf){G.rows++;G.value+=val;G.sheets+=qty}
     var qk=fyOf(dt.y,dt.m).key,Q=res.quarters[qk]||(res.quarters[qk]={rows:0,plants:new Set(),months:new Set()});Q.rows++;Q.plants.add(pl.plant_code);Q.months.add(ym);
     var pk=pl.plant_code+'|'+ym,P=res.pm.get(pk);
-    if(!P){P={plant:pl.plant_code,ym:ym,agg:new Map(),docs:new Map()};res.pm.set(pk,P)}
+    if(!P){P={plant:pl.plant_code,ym:ym,agg:new Map(),docs:new Map(),dim:new Map()};res.pm.set(pk,P)}
     var cust=String(r[cCust]).trim(),cn=cName>=0?String(r[cName]==null?'':r[cName]).trim().slice(0,60):'',sp=cSp>=0?String(r[cSp]==null?'':r[cSp]).trim().slice(0,50):'';
     if(sys==='S4'&&!sp){res.af.blankSp++;if(linker){var lkp=linker.map.get(cust);if(lkp){sp=String(lkp).slice(0,50);res.af.spFilled++}else res.af.spUnlinked++}}
     if(!xf&&sys==='B1'&&own.length){var cnu=cn.toUpperCase();if(own.some(function(o){return cnu.indexOf(o)>=0})){var xo=res.af.xferSuggest[cust]||(res.af.xferSuggest[cust]={name:cn,rows:0,value:0});xo.rows++;xo.value+=val}}
@@ -1119,6 +1130,7 @@ async function runValidation(){
     var ak=cust+'|'+sp+'|'+grp+'|'+(xf?1:0),A=P.agg.get(ak);
     if(!A){A=[cust,cn,sp,grp,xf?1:0,0,0,0,0,0];P.agg.set(ak,A)}
     A[6]++;A[7]+=qty;A[8]+=sq;A[9]+=val;
+    if(!xf){var dk2=dimKeyOf(IIDX,cItem>=0?r[cItem]:'',grp,zr.z),DA=P.dim.get(dk2.k);if(!DA){DA=[dk2.a,dk2.b,grp,dk2.z,0,0,0,0];P.dim.set(dk2.k,DA)}DA[4]++;DA[5]+=qty;DA[6]+=sq;DA[7]+=val}
     var D=P.docs.get(doc);
     if(!D){D={h:[doc,dt.d,cust,0,0,0,xf?1:0,0,sp,'INV'],ks:[]};P.docs.set(doc,D)}
     D.h[3]++;D.h[4]+=qty;D.h[5]+=val;D.h[7]+=sq;
@@ -1142,6 +1154,11 @@ async function writeRoll(plant,ym,sys,rows,src,demo){
   if(demo){var ex=S.rollDocs&&S.rollDocs[plant+'-'+ym],cp=S.cells['INV_'+ym]&&S.cells['INV_'+ym].plants&&S.cells['INV_'+ym].plants[plant];if((ex&&!ex.demo)||(cp&&!cp.demo))throw new Error('Demo roll write refused: '+plant+' '+ym)}
   await dset('roll/'+plant+'-'+ym,{plant:plant,ym:ym,sys:sys,n:rows.length,z:await gz(JSON.stringify(rows)),src:src,at:nowISO(),demo:demo||undefined});
 }
+/* v44: item thickness and brand label for the Overview splits (D55); zone digit 1-5 for the zone rule (D65) */
+function dimKeyOf(idx,code,grp,zone){
+  var it=idx&&code!=null?idx.get(String(code).trim().toUpperCase()):null,thk=it&&it[3]!=null&&it[3]>0?(Math.round(it[3]*100)/100).toFixed(2)+' MM':'Unknown',br=it&&it[4]?String(it[4]).trim().slice(0,30):'No brand',zm=/^ZONE([1-5])$/.exec(zone||''),z=zm?zm[1]:'';
+  return {a:thk,b:br||'No brand',z:z,k:thk+'\u0001'+br+'\u0001'+grp+'\u0001'+z};
+}
 async function packChunks(sys,P){
   var agg=[];P.agg.forEach(function(a){agg.push([a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7],Math.round(a[8]*10)/10,Math.round(a[9]*100)/100])});
   var hdr=[];if(U.keepDocs!==false)P.docs.forEach(function(d){var h=d.h;hdr.push([h[0],h[1],h[2],h[3],h[4],Math.round(h[5]*100)/100,h[6],Math.round(h[7]*10)/10,h[8]||'',h[9]||'INV'])});
@@ -1154,7 +1171,15 @@ async function packChunks(sys,P){
     }else out.push({z:z,na:a.length,nh:h.length});
   }
   await fit(agg,hdr);
-  return out.map(function(c,i){return {id:sys+'-'+P.plant+'-'+P.ym+'-'+i,doc:{z:c.z,na:c.na,nh:c.nh,sys:sys,plant:P.plant,ym:P.ym,i:i,fmt:'gz-json v1: a=[cust,name,salesperson,group,transfer,docs,lines,sheets,sqft,net] h=[doc,day,cust,lines,sheets,net,transfer,sqft,salesperson (v0.9, D10), doc type INV (v0.9); older chunks have 8 fields]'}}});
+  /* v44: thickness / brand / zone detail rides in extra chunks at the end ({a:[],h:[],d:rows}, doc flag dim:true); every older reader ignores them */
+  var dimRows=P.dim?Array.from(P.dim.values()).map(function(d){return [d[0],d[1],d[2],d[3],d[4],d[5],Math.round(d[6]*10)/10,Math.round(d[7]*100)/100]}):[];
+  async function fitD(d){
+    var z=await gz(JSON.stringify({a:[],h:[],d:d}));
+    if(z.length>CHUNK_LIM&&d.length>1){var m=Math.ceil(d.length/2);await fitD(d.slice(0,m));await fitD(d.slice(m))}
+    else out.push({z:z,na:0,nh:0,dim:true,nd:d.length});
+  }
+  if(dimRows.length)await fitD(dimRows);
+  return out.map(function(c,i){return {id:sys+'-'+P.plant+'-'+P.ym+'-'+i,dim:!!c.dim,doc:Object.assign({z:c.z,na:c.na,nh:c.nh,sys:sys,plant:P.plant,ym:P.ym,i:i,fmt:'gz-json v1: a=[cust,name,salesperson,group,transfer,docs,lines,sheets,sqft,net] h=[doc,day,cust,lines,sheets,net,transfer,sqft,salesperson (v0.9, D10), doc type INV (v0.9); older chunks have 8 fields]'},c.dim?{dim:true,dfmt:'[thickness label, brand, group, zone digit or empty, lines, sheets, sqft, net] (v44, external lines only); a and h are empty'}:{})}});
 }
 async function runLoad(opts){
   var r=U.res,sys=U.sys,demo=!!opts.demo,by=whoAmI();
@@ -1192,7 +1217,7 @@ async function runLoad(opts){
         await Promise.all([0,1,2].map(async function(){while(q.length){var c=q.shift();await dset('inv/'+c.id,Object.assign({demo:demo||undefined,upload:uid},c.doc));cb+=c.doc.z.length;docsW++}}));
         if(old){for(var oi=chunks.length;oi<(old.chunks||0);oi++)stale.push('inv/'+(old.sys||sys)+'-'+P.plant+'-'+ym+'-'+oi);if(old.sys&&old.sys!==sys){for(var oj=0;oj<Math.min(old.chunks||0,chunks.length);oj++)stale.push('inv/'+old.sys+'-'+P.plant+'-'+ym+'-'+oj)}}
         var atNow=nowISO();
-        cell.plants[P.plant]={sys:sys,chunks:chunks.length,docs:docsN,lines:lines,net:Math.round(net),sheets:sheets,bytes:cb,upload:uid,at:atNow,demo:demo||undefined};
+        var dimAt=chunks.findIndex(function(c){return c.dim});cell.plants[P.plant]={sys:sys,chunks:chunks.length,docs:docsN,lines:lines,net:Math.round(net),sheets:sheets,bytes:cb,upload:uid,at:atNow,demo:demo||undefined,dimFrom:dimAt>=0?dimAt:undefined};
         await writeRoll(P.plant,ym,sys,rollRowsOf(P.agg),atNow,demo);
         bytes+=cb;loadedLines+=lines;done++;
       }
@@ -1299,7 +1324,7 @@ function usersHtml(){
 function plantsHtml(){
   var rows=S.plants.slice().sort(function(a,b){return a.plant_code<b.plant_code?-1:1});
   var nameless=rows.filter(function(p){return !p.plant_name&&!p.b1_bpl_name}).length;
-  return '<section class="card"><div class="hd"><h2>Plants and branches &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="plant-add">Add plant</button><label class="btn sm" for="up-plants" style="cursor:pointer">Upload plant list (CSV)</label><input id="up-plants" data-file="plants" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="plants">Download template</button><button class="btn sm" data-act="plant-reset">Add missing default codes</button></div></div>'
+  return '<section class="card"><div class="hd"><h2>Plants and branches &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="plant-add">Add plant</button><label class="btn sm" for="up-plants" style="cursor:pointer">Upload plant list (CSV)</label><input id="up-plants" data-file="plants" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="plants">Download template</button><button class="btn sm" data-act="plant-reset">Add missing default codes</button><button class="btn sm" data-act="zones-set" title="Zone = the zone on most of a plant sales lines in its last 12 loaded months (D65)">Set zones from sales</button></div></div>'
   +(nameless?'<div class="banner warn">'+nameless+' plant(s) have no name yet. B1 files carry the branch name only, so upload the Plant List (code and name) before loading B1 history. Or give names in the intake step.</div>':'')
   +'<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Zone</th><th>State</th><th>B1 branch name</th><th>Business</th><th>Active</th><th></th></tr></thead><tbody>'
   +rows.map(function(p){return '<tr><td class="mono">'+esc(p.plant_code)+'</td><td>'+esc(p.plant_name||'-')+(p.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(p.plant_type)+'</td><td>'+esc(p.zone||'-')+'</td><td>'+esc(p.state||'-')+'</td><td class="break">'+esc(p.b1_bpl_name||'-')+'</td><td>'+esc(p.business||'laminates')+'</td><td>'+(p.active===false?'<span class="pill mute">Off</span>':'<span class="pill ok">On</span>')+'</td><td><button class="btn sm" data-act="plant-edit" data-id="'+esc(p._id)+'">Edit</button></td></tr>'}).join('')+'</tbody></table></div>'
@@ -2803,6 +2828,7 @@ async function loadDocs(ctx,ym,cust,plant,key,spF){
     for(var i=0;i<ps.length;i++){var info=c.plants[ps[i]];
       for(var k=0;k<(info.chunks||0);k++){
         var snap=await dget('inv/'+info.sys+'-'+ps[i]+'-'+ym+'-'+k);if(!snap.exists)continue;var o=JSON.parse(await ungz(snap.data().z));
+        if(snap.data().dim)continue;/* v44 thickness/brand detail chunk: no documents */
         if(!snap.data().nh)noIndex=true;
         o.h.forEach(function(h){
           if(h[6])return;if(cust&&h[2]!==cust)return;
@@ -2985,7 +3011,8 @@ function pageOverview(){
   var totSh=groups.reduce(function(a,x){return a+x.o.sh},0)||1;
   /* zones and plants */
   var plantsIn=distinct('plant').filter(function(p){return plantInScope(sc,p)&&(!ctx.f.plant||p===ctx.f.plant)});
-  var zoneOf=function(p){var r=S.plants.find(function(x){return x.plant_code===p});return r&&r.zone?r.zone:''};
+  var zoneOf=function(p){return zoneOfPlant(p).z};/* D65: plant master, else the zone on most of the plant's sales lines in its last 12 loaded months */
+  dimKick(ctx,plantsIn.some(function(p){return !zoneMasterOf(p)}));
   var zoneMap={};plantsIn.forEach(function(p){var z=zoneOf(p);if(z)(zoneMap[z]=zoneMap[z]||[]).push(p)});
   var zones=Object.keys(zoneMap).sort().map(function(z){var ps=new Set(zoneMap[z]),o=figs({plants:ps},ctx,{noTrend:true}),pq=planQtyF(Object.assign({},f0,{plants:ps}),res.cur);return {z:z,o:o,pq:pq,ach:oxAchV(o.sh,pq.tgt),ck:oxAchCk(o.sh,pq.tgt),q:shQoq(o,res)}});
   var plants=plantsIn.map(function(p){var o=figs({plant:p,plants:undefined},ctx,{noTrend:true}),pq=planQtyF(Object.assign({},f0,{plants:undefined,plant:p}),res.cur);return {p:p,o:o,pq:pq,ach:oxAchV(o.sh,pq.tgt),ck:oxAchCk(o.sh,pq.tgt),v:pq.tgt>0&&!oxAchCk(o.sh,pq.tgt)?o.sh-pq.tgt:null}});
@@ -3035,7 +3062,7 @@ function pageOverview(){
     h+='<section class="ox-card ox-sm"'+oxTip('Collected '+colLabel+' '+fmtMoney(colRec)+(ratio!=null?' · collected ÷ invoiced '+ratio.toFixed(1)+'%':'')+' · collection plan '+(colPlanHave?fmtMoney(colPlan):'not loaded')+(lastCollYm?' · data to '+ymLabel(lastCollYm):''))+'><h2>K9 · Collections'+oxDrill('coll')+'</h2><div class="ox-tile-big">'+fmtMoney(colRec)+' <span class="ox-unit">'+esc(colLabel)+'</span></div>'
      +(colPlanHave&&colPlan>0?oxBul({act:colRec,tgt:colPlan,pot:colPlan,band:oxBand(colRec/colPlan*100)})+'<p class="note" style="margin:6px 0 0">'+OX_MARK[oxBand(colRec/colPlan*100)]+' '+OX_LBL[oxBand(colRec/colPlan*100)]+' · '+oxPct(colRec/colPlan*100)+'% of plan '+fmtMoney(colPlan)+'</p>'
        :'<div class="ox-bul nl"><div class="f" style="width:'+(ratio!=null?Math.min(ratio,100):0)+'%;opacity:.55;background:var(--act)"></div></div><p class="note" style="margin:0">Bar = collected ÷ invoiced'+(ratio!=null?' ('+ratio.toFixed(1)+'%), a ratio, not an achievement':'')+'. Collection plan: <span class="ox-nl">not loaded</span>.'+(colNote?' '+colNote:'')+'</p>')
-     +'<div class="ox-row">'+oxQoqChip(colQ)+oxSpark(cser.map(function(s){return s.A}))+'</div></section>';
+     +'<div class="ox-row">'+oxQoqChip(colQ)+'</div>'+oxCollBars(cser)+'<p class="note" style="margin:0">₹ crore collected per quarter, value on each bar; * quarter to date; n/l = receipts not loaded. Collections stay in ₹.</p></section>';
   }
   /* stock tile */
   var inv=invSummary(ctx);
@@ -3070,22 +3097,27 @@ function pageOverview(){
      return '<div class="ox-grp"'+oxTip(tip)+'><div class="h"><span><i class="sw" style="background:var(--g'+(i+1)+')"></i><b>'+esc(x.g)+'</b> <span class="mono">'+oxLakh(o.sh)+' lakh</span></span><span class="ox-row">'+oxAchChip(x)+oxQoqChip(x.q)+'</span></div>'
      +oxBul({act:o.sh,tgt:x.pq.tgt,pot:x.pq.pot,last:lastG,band:x.ach!=null?oxBand(x.ach):null,aria:x.g+' '+oxLakh(o.sh)+' lakh sheets'})+'</div>'}).join('')
    +'<p class="note" style="margin:0">Sheets. Bar length = lakh sheets against group potential (grey track); colour = Ach band; tick = target; dashed = Last Qtr.</p></section>';
+  /* thickness and brand splits (D55, D64) */
+  h+=oxSplitCard('thk',ctx)+oxSplitCard('brand',ctx);
   /* zones and plants */
   var withTgt=plants.filter(function(x){return x.v!=null}).sort(function(a,b){return a.v-b.v}),rk=[];
   if(withTgt.length){var behindL=withTgt.filter(function(x){return x.v<0}).slice(0,4),aheadL=withTgt.filter(function(x){return x.v>=0}).slice(-4);rk=behindL.concat(aheadL)}/* each plant at most once */
   var mxv=Math.max.apply(null,rk.map(function(x){return Math.abs(x.v)}).concat([1]));
   h+='<section class="ox-card ox-t6"><h2>Zones and plants'+oxDrill('branchsh')+'</h2>'
    +(zones.length?'<div class="ox-zones">'+zones.map(function(x){var lastZ=res.prior?(x.o.bothNet?x.o.Psh:x.o.Psh0):null;return '<div class="ox-zone"'+oxTip(x.z+' (lakh sheets) · Target '+(x.pq.tgt>0?oxLakh(x.pq.tgt):'not loaded')+' · Actual '+oxLakh(x.o.sh)+(x.ach!=null?' · Ach '+oxPct(x.ach)+'%':'')+(lastZ!=null?' · Last Qtr '+oxLakh(lastZ):''))+'><small>'+esc(x.z)+'</small>'+(x.ach!=null?'<b>'+oxPct(x.ach,0)+'%</b>':'<b class="ox-nl" style="font-size:13px">Ach: not loaded</b>')+'<div class="ox-bul">'+'<div class="f '+(x.ach!=null?'b'+oxBand(x.ach):'')+'" style="width:'+(x.ach!=null?Math.min(x.ach,100):Math.min(100,x.o.sh/(Math.max.apply(null,zones.map(function(z){return z.o.sh}))||1)*100))+'%;'+(x.ach!=null?'':'background:var(--act)')+'"></div></div>'+(x.ach!=null?oxBandChip(x.ach):'<span class="ox-chip nl">'+oxLakh(x.o.sh)+' lakh</span>')+oxQoqChip(x.q)+'</div>'}).join('')+'</div>'
-     :'<div class="ox-empty sm"><span class="ox-nl">Zones not set in Admin › Plants</span><span class="note">Zone tiles appear once plants carry a zone.</span></div>')
+     :'<div class="ox-empty sm"><span class="ox-nl">Zones not set</span><span class="note">Zone tiles appear once plants carry a zone: Admin › Plants › Set zones from sales (needs sales loaded with v44 or later), or type the zone in the plant master.</span></div>')
    +'<h2 style="margin-top:4px">Furthest behind and ahead (variance, thousand sheets)</h2>'
    +(rk.length?rk.map(function(x){var neg=x.v<0,w=Math.abs(x.v)/mxv*50,b=oxBand(x.ach);return '<div class="ox-rk"'+oxTip(plantShort(x.p)+' (thousand sheets) · Target '+oxK(x.pq.tgt)+' · Actual '+oxK(x.o.sh)+' · Var '+oxSgn(x.v,oxK(Math.abs(x.v)))+' · Ach '+oxPct(x.ach)+'%')+'><span class="nm">'+esc(plantShort(x.p))+'</span><div class="ox-div"><i style="'+(neg?'right:50%':'left:50%')+';width:'+w.toFixed(1)+'%;background:var(--b'+b+');border:2px solid var(--b'+b+'d)"></i></div><span class="v">'+(neg?'▼ −':'▲ +')+oxK(Math.abs(x.v))+' · '+oxPct(x.ach,0)+'%</span></div>'}).join('')
      :'<div class="ox-empty"><b>Ranking needs targets</b><span>Without a sheet target there is no variance to rank. Until then, the Branch table lists plants by ₹ actual and QoQ %.</span></div>')
-   +'<p class="note" style="margin:0">'+(rk.length?'Showing '+rk.length+' of '+plants.length+' plants. ':plants.length+' plants. ')+'Bar colour = Ach band.</p></section>';
+   +'<p class="note" style="margin:0">'+(rk.length?'Showing '+rk.length+' of '+plants.length+' plants. ':plants.length+' plants. ')+'Bar colour = Ach band.'+(function(){var ns=plantsIn.filter(function(p){return zoneOfPlant(p).src==='sales'}).length;return ns?' '+ns+' plant'+(ns===1?'':'s')+' take the zone from their sales lines (last 12 loaded months); Admin › Plants › Set zones from sales writes it to the plant master.':''})()+'</p></section>';
   /* Today */
   h+='<section class="ox-card ox-t5"><h2>Today · top '+topAct.length+' of cap '+cap+'<a class="ox-drill" href="#/today">All in Today ›</a></h2>'
    +(topAct.length?topAct.map(function(x){var a=x.a,pl=prioLabel(x.s.score);return '<a class="ox-act" href="#/action/'+esc(a.id)+'"><div><span class="ox-pri '+({High:'bad',Medium:'warn',Low:'ok'}[pl])+'">'+({High:'▲ High',Medium:'● Medium',Low:'▽ Low'}[pl])+'</span><b>'+esc(a.title)+'</b></div><span>Next step: '+esc(a.next_step)+'</span><span class="m">Owner '+esc(a.owner===u.email?'you':who(a.owner))+' · '+esc(dueTxt(a,today))+' ('+esc(fmtDate(a.due))+') · why ranked: '+esc(whyLine(1,x.s))+'</span></a>'}).join('')
      :'<div class="ox-empty sm"><b>Nothing due.</b> You are clear for today.</div>')
    +'<p class="note" style="margin:0">Each action: one owner, one due date, one next step. Responses happen in the page. Alerts are listed in Today.</p></section>';
+  /* branch rating (D55, D64): sales 50 / collections 30 / stock days 20, informational only */
+  var colW=col.have?res.cur:(showQ?wins(qMonths(showQ.q)):null),RT=ratingRows(plants,res,colW,inv);
+  h+=oxRatingCard(RT,res,colW?(col.have?res.label:qLabel(showQ.q)):'');
   h+='</div>';
   /* detail tables behind the Table links: columns unchanged */
   var gr=distinct('group').map(function(g){return {label:'<b>'+esc(g)+'</b> ›',o:figs({group:g},ctx),attrs:' data-act="ov-group" data-v="'+esc(g)+'"'}});
@@ -3099,12 +3131,15 @@ function pageOverview(){
   var groupSh='<div class="tw"><table class="std"><thead><tr><th>Product group</th><th class="num">Potential</th><th class="num">Target</th><th class="num">Actual</th><th class="num">Var</th><th class="num">Ach %</th><th class="num">Share %</th><th class="num">Last Qtr</th><th class="num">QoQ %</th></tr></thead><tbody>'+gRows+gTot+'</tbody></table></div><p class="note">Lakh sheets. '+(cur&&cur.net?'Net of credit notes.':'Invoiced.')+'</p>';
   var pRow=function(label,o,pq,a,v){var l=res.prior?(o.bothNet?o.Psh:o.Psh0):null;return '<tr><td><b>'+esc(label)+'</b></td>'+cell(pq.tgt>0?pq.tgt:null,lk)+'<td class="num">'+lk(o.sh)+'</td>'+cell(v,function(x){return oxSgn(x,lk(Math.abs(x)))})+cell(a,function(x){return oxPct(x)+'%'})+cell(l,lk)+vq(shQoq(o,res))+'</tr>'};
   var branchSh='<div class="tw"><table class="std"><thead><tr><th>Zone / plant</th><th class="num">Target</th><th class="num">Actual</th><th class="num">Var</th><th class="num">Ach %</th><th class="num">Last Qtr</th><th class="num">QoQ %</th></tr></thead><tbody>'
-    +zones.map(function(x){return pRow('Zone '+x.z,x.o,x.pq,x.ach,x.pq.tgt>0?x.o.sh-x.pq.tgt:null)}).join('')+plants.slice().sort(function(a,b){return b.o.sh-a.o.sh}).map(function(x){return pRow(plantShort(x.p),x.o,x.pq,x.ach,x.v)}).join('')+'</tbody></table></div><p class="note">Lakh sheets.</p>';
+    +zones.map(function(x){return pRow(/^zone/i.test(x.z)?x.z:'Zone '+x.z,x.o,x.pq,x.ach,x.pq.tgt>0?x.o.sh-x.pq.tgt:null)}).join('')+plants.slice().sort(function(a,b){return b.o.sh-a.o.sh}).map(function(x){return pRow(plantShort(x.p),x.o,x.pq,x.ach,x.v)}).join('')+'</tbody></table></div><p class="note">Lakh sheets.</p>';
   var tRows=ser.map(function(s0,i){var qq=oxQoqAt(ser,i),t=s0.isCur?s0.tgtTo:s0.tgt,v=s0.H;return '<tr><td><b>'+esc(s0.label)+'</b>'+(s0.isCur?' <span class="note">to date</span>':'')+(s0.partial?' <span class="note">partial</span>':'')+'</td>'+cell(t,lk)+(v==null?'<td class="num"><span class="ox-nl">not loaded</span></td>':'<td class="num">'+lk(v)+'</td>')+cell(t!=null&&v!=null?v-t:null,function(x){return oxSgn(x,lk(Math.abs(x)))})+cell(t!=null&&v!=null?v/t*100:null,function(x){return oxPct(x)+'%'})+(qq.v!=null?'<td class="num"><span class="'+(qq.v>=0?'up':'dn')+'">'+fmtPct(qq.v,true)+'</span></td>':'<td class="num note">'+esc(qq.txt||'—')+'</td>')+'</tr>'}).join('');
   var trendSh='<div class="tw"><table class="std"><thead><tr><th>Quarter</th><th class="num">Target</th><th class="num">Actual</th><th class="num">Var</th><th class="num">Ach %</th><th class="num">QoQ %</th></tr></thead><tbody>'+tRows+'</tbody></table></div><p class="note">Lakh sheets, from '+esc(qLabel(histStart()))+'. Quarters with credit notes loaded for every plant are Net; others are invoiced (D40, D45).</p>';
   h+=det('groupsh','Product group, lakh sheets',groupSh);
   h+=det('branchsh','Zones and plants, lakh sheets',branchSh);
   h+=det('trendsh','Quarterly trend, lakh sheets',trendSh);
+  h+=det('thk','Thickness split, '+res.label,oxSplitTable('thk',ctx));
+  h+=det('brand','Brand split, '+res.label,oxSplitTable('brand',ctx));
+  h+=det('rating','Branch rating, all branches',oxRatingTable(RT));
   h+=det('group','Product group · '+res.label+' vs '+(res.priorLabel||''),stdTable('Product group',gr.filter(matchSearch),tot)+tableNote(ctx));
   h+=det('branch','Branch · '+res.label,stdTable('Branch',br.filter(matchSearch),tot)+tableNote(ctx,'Drill-down stops at the SAP document (decision D9).'));
   h+=det('trendrs','Quarterly trend in rupees, with drill',trendCard('Quarters since '+qLabel(histStart())+' · Sales',{},ctx,undefined,'ov')+drillPanel(ctx));
@@ -3129,6 +3164,270 @@ Object.assign(handlers,{
   function show(e){var t=e.target&&e.target.closest?e.target.closest('[data-tip]'):null,d=el();if(!t){d.style.display='none';return}d.textContent=t.getAttribute('data-tip');d.style.display='block';var r=t.getBoundingClientRect();d.style.left=Math.max(8,Math.min(innerWidth-270,r.left))+'px';d.style.top=Math.max(8,r.top-d.offsetHeight-8)+'px'}
   document.addEventListener('pointerover',show);document.addEventListener('focusin',show);document.addEventListener('click',show);document.addEventListener('focusout',function(){if(tip)tip.style.display='none'});
 })();
+
+/* ---- src/53-splits.js ---- */
+/* ================= Overview v44: thickness and brand splits, collections bars, branch rating, zones (D55, D64, D65; built 8 Nov 2026) =================
+ * Thickness, brand and zone come from "detail chunks" written at sales upload (index.src.html: dimKeyOf, packChunks). A detail chunk sits after the
+ * normal chunks of a plant-month ({a:[],h:[],d:rows}, doc flag dim:true; the cell records dimFrom = index of the first one). Months loaded before v44 have none:
+ * the cards then say "not loaded" and name the fix (reload the month), never a zero. Rows: [thickness label, brand, group, zone digit, lines, sheets, sqft, net].
+ * Splits are invoiced (credit notes carry no item), external lines only. Rules and templates only, no AI. */
+DS.dim=DS.dim||{};DS.dimVer=0;DS.dimBusy=false;DS.zoneCache={ver:-1,map:{}};
+var DIM_TOPTHK=6,DIM_TOPBR=8;
+function zoneCanon(raw){var m=/^\s*zone\s*0*([1-5])\s*$/i.exec(String(raw==null?'':raw));return m?'ZONE '+m[1]:''}
+function zoneMasterOf(p){var r=S.plants.find(function(x){return x.plant_code===p});var raw=r&&r.zone?String(r.zone).trim():'';return zoneCanon(raw)||raw}
+
+/* ---- read the detail chunks of the given months for the plants in scope (cached per plant-month and upload time) ---- */
+async function loadDim(plants,yms){
+  var sc=SC(),jobs=[];
+  yms.forEach(function(ym){var c=S.cells['INV_'+ym];if(!c)return;Object.keys(c.plants||{}).forEach(function(p){
+    if(!plantInScope(sc,p)||(plants&&plants.size&&!plants.has(p)))return;
+    var info=c.plants[p];if(info.dimFrom==null)return;
+    var k=p+SEP+ym,cur=DS.dim[k];if(cur&&cur.at===info.at)return;if((DS.dimPend||{})[k])return;
+    jobs.push({p:p,ym:ym,k:k,info:info})})});
+  if(!jobs.length)return 0;
+  DS.dimPend=DS.dimPend||{};jobs.forEach(function(j){DS.dimPend[j.k]=1});
+  var q=jobs.slice(),n=0;
+  async function worker(){
+    while(q.length){
+      var j=q.shift();
+      try{
+        var rows=[];
+        for(var i=j.info.dimFrom;i<(j.info.chunks||0);i++){
+          var snap=await dget('inv/'+j.info.sys+'-'+j.p+'-'+j.ym+'-'+i);if(!snap.exists)continue;
+          var d=snap.data();if(!d.dim)continue;var o=JSON.parse(await ungz(d.z));(o.d||[]).forEach(function(r){rows.push(r)});
+        }
+        DS.dim[j.k]={at:j.info.at,rows:rows};n++;
+      }catch(e){S.err=(S.err||'')+'item detail '+j.k+': '+((e&&e.message)||e)+' '}
+      delete DS.dimPend[j.k];
+    }
+  }
+  await Promise.all([worker(),worker(),worker(),worker()]);
+  DS.dimVer++;return n;
+}
+/* the plant-months of a window and how many carry detail / have it read */
+function dimState(plants,w){
+  var sc=SC(),total=0,have=0,loaded=0;
+  wins(w).forEach(function(x){if(!(x.frac>0))return;var c=S.cells['INV_'+x.ym];if(!c)return;
+    Object.keys(c.plants||{}).forEach(function(p){if(!plantInScope(sc,p)||(plants&&plants.size&&!plants.has(p)))return;total++;var info=c.plants[p];
+      if(info.dimFrom!=null){have++;var d=DS.dim[p+SEP+x.ym];if(d&&d.at===info.at)loaded++}})});
+  return {total:total,have:have,loaded:loaded,complete:total>0&&have===total,ready:loaded===have};
+}
+/* totals per label (idx 0 thickness, 1 brand) over a window; months scaled by their fraction, like sumF */
+function dimAgg(plants,w,idx){
+  var sc=SC(),m=new Map();
+  wins(w).forEach(function(x){if(!(x.frac>0))return;var c=S.cells['INV_'+x.ym];if(!c)return;
+    Object.keys(c.plants||{}).forEach(function(p){if(!plantInScope(sc,p)||(plants&&plants.size&&!plants.has(p)))return;
+      var d=DS.dim[p+SEP+x.ym];if(!d||d.at!==c.plants[p].at)return;
+      d.rows.forEach(function(r){var k=r[idx],o=m.get(k);if(!o){o={k:k,sh:0,n:0,sq:0};m.set(k,o)}o.sh+=r[5]*x.frac;o.sq+=r[6]*x.frac;o.n+=r[7]*x.frac})})});
+  return m;
+}
+function dimMonthsNeeded(res){var s={};res.cur.forEach(function(x){if(x.frac>0)s[x.ym]=1});(res.prior||[]).forEach(function(x){if(x.frac>0)s[x.ym]=1});return Object.keys(s)}
+/* the 12 latest months of one plant that carry zone detail */
+function zoneMonthsOf(p){
+  var l=[];Object.keys(S.cells).forEach(function(k){var c=S.cells[k];if(c.entity!=='INV'||!c.plants||!c.plants[p]||c.plants[p].dimFrom==null)return;l.push(c.ym)});
+  return l.sort().reverse().slice(0,12);
+}
+/* zone of a plant from its sales lines: the zone on most lines in its last 12 loaded months (D65). ambiguous on a tie; null when no line carries a zone */
+function zoneFromLines(p){
+  var cnt={},tot=0;
+  zoneMonthsOf(p).forEach(function(ym){var d=DS.dim[p+SEP+ym];if(!d)return;d.rows.forEach(function(r){if(!r[3])return;cnt[r[3]]=(cnt[r[3]]||0)+r[4];tot+=r[4]})});
+  var ks=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a]||(a<b?-1:1)});
+  if(!ks.length)return null;
+  var tie=ks.length>1&&cnt[ks[1]]===cnt[ks[0]];
+  return {zone:tie?null:'ZONE '+ks[0],ambiguous:tie,lines:cnt[ks[0]],total:tot,share:cnt[ks[0]]/tot*100,months:zoneMonthsOf(p).length,counts:cnt};
+}
+/* a plant's zone for display: the plant master, else the sales-line majority (cached until detail is read again) */
+function zoneOfPlant(p){
+  var m=zoneMasterOf(p);if(m)return {z:m,src:'master'};
+  if(DS.zoneCache.ver!==DS.dimVer){DS.zoneCache={ver:DS.dimVer,map:{}}}
+  var c=DS.zoneCache.map[p];if(c===undefined){var r=zoneFromLines(p);c=DS.zoneCache.map[p]=r&&r.zone?r.zone:'';}
+  return c?{z:c,src:'sales'}:{z:'',src:''};
+}
+/* detail for the cards and, when a plant has no zone in the master, for the zone rule */
+function dimKick(ctx,needZones){
+  if(DS.dimBusy)return;
+  var ms=dimMonthsNeeded(ctx.res);
+  if(needZones){var zs={};ms.forEach(function(m){zs[m]=1});distinct('plant').forEach(function(p){zoneMonthsOf(p).forEach(function(m){zs[m]=1})});ms=Object.keys(zs)}
+  DS.dimBusy=true;
+  loadDim(ctx.plants,ms).then(function(n){DS.dimBusy=false;if(n){S.lastHtml='';schedule()}}).catch(function(e){DS.dimBusy=false;S.err=(S.err||'')+'item detail: '+((e&&e.message)||e)+' '});
+}
+
+/* ---- Admin: set zones from sales (D65) ---- */
+async function zonesFromSales(){
+  var codes=S.plants.filter(function(p){return p.active!==false}).map(function(p){return p.plant_code}),s={};
+  codes.forEach(function(p){zoneMonthsOf(p).forEach(function(m){s[m]=1})});
+  if(!Object.keys(s).length)return {list:[],loadedAny:false};
+  await loadDim(null,Object.keys(s));
+  var list=[];codes.forEach(function(p){var r=zoneFromLines(p);if(r)list.push(Object.assign({plant:p},r))});
+  return {list:list,loadedAny:list.length>0};
+}
+async function setZonesFromSales(){
+  var z=await zonesFromSales();
+  if(!z.loadedAny)throw new Error('no sales line with a zone is loaded: sales months loaded before v44 carry no zone. Reload the months (Data Intake › Sales), then run this again');
+  var set=[],keep=[],amb=[],differ=[];
+  for(var i=0;i<z.list.length;i++){
+    var r=z.list[i],pl=S.plants.find(function(x){return x.plant_code===r.plant});if(!pl)continue;
+    if(!r.zone){amb.push(r.plant);continue}
+    var cur=zoneMasterOf(r.plant);
+    if(cur){if(zoneCanon(cur)!==r.zone)differ.push(r.plant+' ('+cur+' in master, '+r.zone+' on sales)');else keep.push(r.plant);continue}
+    await dset('plants/'+r.plant,Object.assign({},pl,{_id:undefined,zone:r.zone,zone_src:'sales',zone_set_at:nowISO(),zone_set_by:whoAmI(),zone_lines:r.lines,zone_lines_total:r.total}));
+    set.push({plant:r.plant,zone:r.zone,lines:r.lines,total:r.total});
+  }
+  DS.zoneCache={ver:-1,map:{}};S.lastHtml='';
+  var text='zones written to the plant master: '+set.length+(set.length?' ('+set.map(function(x){return x.plant+' '+x.zone}).join(', ')+')':'')+'; already in master: '+keep.length+(differ.length?'; master differs from sales, left unchanged: '+differ.join(', '):'')+(amb.length?'; tied between zones, not set: '+amb.join(', '):'');
+  try{await auditW('zones set from sales','',{written:set.length,plants:set.slice(0,60).map(function(x){return x.plant+':'+x.zone}),differ:differ.length,tied:amb.length})}catch(e){}
+  return {text:text,set:set,keep:keep,differ:differ,amb:amb};
+}
+function zonesPreviewHtml(z){
+  var rows=z.list.slice().sort(function(a,b){return a.plant<b.plant?-1:1});
+  return '<div class="tw" style="max-height:300px;overflow:auto"><table class="std"><thead><tr><th>Plant</th><th>In master</th><th>From sales</th><th class="num">Lines</th><th class="num">Share</th><th class="num">Months</th></tr></thead><tbody>'
+   +rows.map(function(r){var cur=zoneMasterOf(r.plant);return '<tr><td>'+esc(plantName(r.plant))+'</td><td>'+(cur?esc(cur):'<span class="note">blank</span>')+'</td><td>'+(r.zone?'<b>'+esc(r.zone)+'</b>':'<span class="note">tie, not set</span>')+'</td><td class="num">'+fmtN(r.lines)+' of '+fmtN(r.total)+'</td><td class="num">'+r.share.toFixed(0)+'%</td><td class="num">'+r.months+'</td></tr>'}).join('')+'</tbody></table></div>';
+}
+Object.assign(handlers,{
+ 'zones-set':async function(){
+  if(!superOnly('set zones from sales'))return;
+  toast('Reading the zone on sales lines...');
+  try{
+    var z=await zonesFromSales();
+    if(!z.loadedAny){openDlg('<h3>Set zones from sales</h3><div class="banner warn" style="display:block"><b>No sales line with a zone is loaded.</b> Sales months loaded before v44 carry no zone. Reload the months in Data Intake › Sales (it replaces them), then run this again.</div><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>');return}
+    var blank=z.list.filter(function(r){return r.zone&&!zoneMasterOf(r.plant)}).length;
+    openDlg('<h3>Set zones from sales</h3><p class="note" style="margin:0">A plant\'s zone is the zone on most of its sales lines in its last 12 loaded months (D65). Only plants with a blank zone in the master are written; a zone already in the master is never changed. Ties are left blank.</p>'+zonesPreviewHtml(z)+'<div class="row"><button class="btn pri" data-act="zones-go"'+(blank?'':' disabled')+'>Write '+blank+' zone'+(blank===1?'':'s')+' to the plant master</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');
+  }catch(e){toast('Zones: '+dbErrText(e))}
+ },
+ 'zones-go':async function(){
+  if(!superOnly('set zones from sales'))return;
+  try{var r=await setZonesFromSales();closeDlg();toast('Zones: '+r.set.length+' written');S.upMsg='<div class="banner ok">Set zones from sales: '+esc(r.text)+'.</div>';S.lastHtml='';schedule()}catch(e){var el=$('#d-err');if(el)el.innerHTML='<div class="banner err">'+esc(dbErrText(e))+'</div>'}
+ }
+});
+
+/* ---- branch rating: weighted percentile rank, sales 50 / collections 30 / stock days 20 (D55, D64). Informational only. ---- */
+var RATING_W={sk:50,col:30,stk:20};
+function ratingStars(sc){return sc>=80?5:sc>=60?4:sc>=40?3:sc>=20?2:1}
+/* percentile of each row among rows that have the measure: (below + half of ties) / (n-1) x 100; hi = higher is better. Fewer than 2 rows: no percentile. */
+function ratingPct(list,key,hi){
+  var a=list.filter(function(b){return b[key]!=null&&!isNaN(b[key])});
+  a.forEach(function(b){
+    if(a.length<2){b['p_'+key]=null;return}
+    var w=0,t=0;a.forEach(function(o){if(o===b)return;if(hi?o[key]<b[key]:o[key]>b[key])w++;else if(o[key]===b[key])t++});
+    b['p_'+key]=(w+.5*t)/(a.length-1)*100;
+  });
+  list.forEach(function(b){if(!(b[key]!=null&&!isNaN(b[key])))b['p_'+key]=null});
+}
+/* rows: {id, sk (Ach % in sheets, or QoQ % when no target), col (collected ÷ invoiced %), stk (stock days, lower is better)}; a missing measure is dropped and the others reweighted */
+function ratingCalc(list){
+  ratingPct(list,'sk',true);ratingPct(list,'col',true);ratingPct(list,'stk',false);
+  list.forEach(function(b){
+    var parts=['sk','col','stk'].filter(function(k){return b['p_'+k]!=null}),W=parts.reduce(function(a,k){return a+RATING_W[k]},0);
+    b.n3=parts.length;
+    if(!parts.length){b.score=null;b.st=null;b.W='';return}
+    b.score=parts.reduce(function(a,k){return a+b['p_'+k]*RATING_W[k]},0)/W;b.st=ratingStars(b.score);
+    b.W=parts.map(function(k){return {sk:'sales',col:'collections',stk:'stock days'}[k]+' '+Math.round(RATING_W[k]/W*100)+'%'}).join(', ');
+  });
+  return list;
+}
+/* sales measure: Ach % in sheets when most branches have a valid one (target set, not above 300%), else QoQ % in sheets for all (D55) */
+function ratingBasis(rows){
+  var nAch=rows.filter(function(r){return r.ach!=null}).length;
+  return nAch>=2&&nAch*2>=rows.length?'ach':'qoq';
+}
+function ratingRows(plants,res,colW,inv){
+  var days={};if(inv&&inv.L){var acc={};inv.L.forEach(function(x){if(x.days==null)return;var a=acc[x.plant]||(acc[x.plant]={n:0,d:0});a.n+=x.days*x.sheets;a.d+=x.sheets});Object.keys(acc).forEach(function(p){if(acc[p].d>0)days[p]=acc[p].n/acc[p].d})}
+  var rows=plants.filter(function(x){return x.o.sh>0}).map(function(x){
+    var q=shQoq(x.o,res),ps=new Set([x.p]),col=null,invd=null;
+    if(colW){var c=collMonths(ps,colW),iv=sumF({plants:ps},colW).n;if(c.have&&iv>0){col=c.rec/iv*100;invd=iv}}
+    return {id:x.p,name:plantShort(x.p),sh:x.o.sh,ach:x.ach,ck:x.ck,qoq:q.state==='ok'?q.v:null,col:col,stk:days[x.p]!=null?days[x.p]:null};
+  });
+  var basis=ratingBasis(rows);
+  rows.forEach(function(r){r.sk=basis==='ach'?r.ach:r.qoq});
+  ratingCalc(rows);
+  return {rows:rows,basis:basis};
+}
+function oxStars(st){return '<span class="ox-stars" role="img" aria-label="'+st+' of 5 stars"><span aria-hidden="true">'+'★'.repeat(st)+'☆'.repeat(5-st)+'</span></span>'}
+function oxRatingRow(b,rk,basis){
+  var chip=function(l,v,p){return v==null?'<span class="ox-chip sm nl">'+l+': n/a</span>':'<span class="ox-chip sm">'+l+' '+v+' · P'+Math.round(p)+'</span>'};
+  var sTxt=b.sk==null?null:(basis==='ach'?Math.floor(b.sk)+'%':(b.sk>=0?'+':'−')+Math.abs(b.sk).toFixed(0)+'% QoQ');
+  var tip=b.id+' '+b.name+' · score '+b.score.toFixed(0)+' → '+b.st+' of 5 stars · Sales '+(b.sk==null?'n/a':(basis==='ach'?'Ach '+b.sk.toFixed(1)+'% in sheets':'QoQ '+b.sk.toFixed(1)+'% in sheets (no target)')+' P'+Math.round(b.p_sk)+' (50%)')+' · Collection '+(b.col==null?'n/a':b.col.toFixed(1)+'% collected ÷ invoiced P'+Math.round(b.p_col)+' (30%)')+' · Stock days '+(b.stk==null?'n/a':b.stk.toFixed(0)+' days P'+Math.round(b.p_stk)+' (20%, lower is better)')+' · weights used: '+b.W;
+  return '<div class="ox-br"'+oxTip(tip)+'><div class="h"><span><b class="mono">#'+rk+'</b> <b>'+esc(b.name)+'</b> <span class="note mono">'+esc(b.id)+'</span></span><span>'+oxStars(b.st)+' <span class="mono" style="font-size:12px">'+b.score.toFixed(0)+'</span></span></div><div class="ox-row">'
+   +chip('Sales',sTxt,b.p_sk)+chip('Coll.',b.col==null?null:Math.floor(b.col)+'%',b.p_col)+chip('Stock',b.stk==null?null:Math.round(b.stk)+'d',b.p_stk)+'</div>'+(b.n3<3?'<span class="note">based on '+b.n3+' of 3 measures, others reweighted</span>':'')+(b.ck?'<span class="note">Sales: Check target (above '+ACH_MAX+'%)</span>':'')+'</div>';
+}
+function oxRatingCard(R,res,colLabel){
+  var rated=R.rows.filter(function(b){return b.score!=null}).sort(function(a,b){return b.score-a.score||b.sh-a.sh});
+  var note='<div class="ox-callout note" style="border-left:4px solid var(--ink3)"><b>Informational only.</b> The rating is a rule-based reading of three measures. It is not for incentives or disciplinary action; those are SP Sir\'s decision alone. Stars: 80+ = 5, 60 to under 80 = 4, 40 to under 60 = 3, 20 to under 40 = 2, under 20 = 1.</div>';
+  if(rated.length<2)return '<section class="ox-card ox-t12"><h2>Branch rating</h2><div class="ox-empty"><b>Needs at least 2 branches with sales in scope</b><span>The rating ranks branches against each other, so a single branch has no percentile. Shown as not rated, never as a star.</span></div>'+note+'</section>';
+  var top=rated.length<=10?rated:rated.slice(0,5),bot=rated.length<=10?[]:rated.slice(-5);
+  var rule='Score = weighted percentile rank among '+rated.length+' in-scope branch'+(rated.length===1?'':'es')+': sales 50% ('+(R.basis==='ach'?'Ach % in sheets':'QoQ % in sheets, because targets are not loaded for most branches')+'), collection efficiency 30% (collected ÷ invoiced ₹'+(colLabel?', '+esc(colLabel):'')+'), stock days 20% (lower is better). P = percentile. A missing measure is dropped and the rest reweighted.';
+  return '<section class="ox-card ox-t12" id="ox-ratingcard"><h2>Branch rating'+(rated.length<=10?'':', top 5 and bottom 5')+oxDrill('rating','All branches ›')+'</h2><p class="note" style="margin:0">'+rule+'</p>'
+   +'<div class="ox-brk"><div><p class="ox-sub3">'+(bot.length?'Top 5':'Branches')+'</p>'+top.map(function(b,i){return oxRatingRow(b,i+1,R.basis)}).join('')+'</div>'+(bot.length?'<div><p class="ox-sub3">Bottom 5</p>'+bot.map(function(b,i){return oxRatingRow(b,rated.length-bot.length+1+i,R.basis)}).join('')+'</div>':'')+'</div>'+note+'</section>';
+}
+function oxRatingTable(R){
+  var rated=R.rows.filter(function(b){return b.score!=null}).sort(function(a,b){return b.score-a.score||b.sh-a.sh}),un=R.rows.filter(function(b){return b.score==null});
+  var f1=function(v,s){return v==null?'<td class="num"><span class="ox-nl">n/a</span></td>':'<td class="num">'+s+'</td>'};
+  return '<div class="tw"><table class="std"><thead><tr><th>#</th><th>Branch</th><th>Zone</th><th>Stars</th><th class="num">Score</th><th class="num">Sales ('+(R.basis==='ach'?'Ach %':'QoQ %')+')</th><th class="num">Collected ÷ invoiced</th><th class="num">Stock days</th><th>Measures used</th></tr></thead><tbody>'
+   +rated.map(function(b,i){var zz=zoneOfPlant(b.id).z;return '<tr><td>'+(i+1)+'</td><td><b>'+esc(b.name)+'</b> <span class="note mono">'+esc(b.id)+'</span></td><td>'+(zz?esc(zz):'—')+'</td><td>'+oxStars(b.st)+'</td><td class="num">'+b.score.toFixed(0)+'</td>'+f1(b.sk,(R.basis==='ach'?b.sk.toFixed(1)+'%':(b.sk>=0?'+':'−')+Math.abs(b.sk||0).toFixed(1)+'%'))+f1(b.col,(b.col||0).toFixed(1)+'%')+f1(b.stk,Math.round(b.stk||0))+'<td class="note">'+esc(b.W)+'</td></tr>'}).join('')
+   +un.map(function(b){return '<tr><td>—</td><td><b>'+esc(b.name)+'</b> <span class="note mono">'+esc(b.id)+'</span></td><td colspan="7" class="note">not rated: no measure could be ranked</td></tr>'}).join('')+'</tbody></table></div><p class="note">Informational only. Percentile rank among the branches listed; a missing measure is dropped and the weights of the others rescaled.</p>';
+}
+
+/* ---- thickness and brand split cards ---- */
+function oxSplitData(kind,ctx){
+  var res=ctx.res,idx=kind==='thk'?0:1,topN=kind==='thk'?DIM_TOPTHK:DIM_TOPBR,plants=ctx.plants;
+  var stC=dimState(plants,res.cur),stP=res.prior?dimState(plants,res.prior):null;
+  var out={st:stC,stP:stP,rows:[],total:0,totalN:0,idx:idx};
+  if(!stC.have)return out;
+  var A=dimAgg(plants,res.cur,idx),P=res.prior?dimAgg(plants,res.prior,idx):new Map();
+  var arr=Array.from(A.values()).sort(function(a,b){return b.sh-a.sh});
+  out.total=arr.reduce(function(a,x){return a+x.sh},0);out.totalN=arr.reduce(function(a,x){return a+x.n},0);
+  var top=arr.slice(0,topN),rest=arr.slice(topN);
+  var inc=!res.curMonths.length||!monthsLoaded(res.curMonths,plants)||(res.prior?!monthsLoaded(res.priorMonths,plants):false);/* the coverage grid decides whether QoQ may be trusted (D28) */
+  var priorOk=!!(res.prior&&!inc&&stP&&stP.complete&&stP.ready&&stC.complete&&stC.ready&&!preHist(res.priorMonths||[]));
+  var mk=function(label,a,p,extra){var q=priorOk?qoqOf(a.sh,p,{}):{v:null,state:'incomplete',txt:!res.prior?'n/a':(stP&&stP.have?'partial':'no prior detail')};return {label:label,sh:a.sh,n:a.n,P:p,q:q,share:out.total>0?a.sh/out.total*100:0,extra:extra||''}};
+  top.forEach(function(a){var pv=P.get(a.k);out.rows.push(mk(a.k,a,pv?pv.sh:0))});
+  if(rest.length){var ra={sh:0,n:0};var rp=0;rest.forEach(function(a){ra.sh+=a.sh;ra.n+=a.n;var pv=P.get(a.k);if(pv)rp+=pv.sh});out.rows.push(mk('Other ('+rest.length+' '+(kind==='thk'?'values':'brands')+')',ra,rp,'other'))}
+  return out;
+}
+function oxSplitCard(kind,ctx){
+  var title=kind==='thk'?'Thickness split (top '+DIM_TOPTHK+' + Other)':'Brand split (top '+DIM_TOPBR+' + Other)',res=ctx.res,tk=kind==='thk'?'thk':'brand';
+  var head='<section class="ox-card ox-h"><h2>'+title+oxDrill(tk)+'</h2>';
+  if(kind==='brand'&&!S.itemMeta)return head+'<div class="ox-empty"><b>Item master not loaded</b><span>Brand and thickness come from the item master (Data Intake › Item master). Shown as not loaded, never as zero.</span></div></section>';
+  var D=oxSplitData(kind,ctx),st=D.st;
+  if(!st.have)return head+'<div class="ox-empty"><b>No thickness or brand detail for '+esc(res.label)+'</b><span>'+(st.total?'Sales loaded before v44 carry no item detail ('+st.total+' plant-month'+(st.total===1?'':'s')+' in this period). Reload these months in Data Intake › Sales; the replace keeps the old data until the new file is checked.':'No sales are loaded for this period.')+' Shown as not loaded, never as zero.</span></div></section>';
+  var h=head;
+  if(!st.ready)h+='<div class="ox-row"><span class="ox-chip nl">Reading item detail… '+st.loaded+' of '+st.have+'</span></div>';
+  else if(!st.complete)h+='<div class="ox-row"><span class="ox-chip warn">Partial: '+st.have+' of '+st.total+' plant-months carry item detail</span></div>';
+  if(st.ready||D.rows.length){
+    var mx=Math.max.apply(null,D.rows.map(function(r){return r.sh}).concat([1]));
+    h+=D.rows.map(function(r){
+      var q=r.q,tip=r.label+' · '+oxLakh(r.sh)+' lakh sheets · '+r.share.toFixed(1)+'% of sheets · '+fmtMoney(r.n)+' invoiced'+(q.state==='ok'?' · Last Qtr '+oxLakh(r.P)+' · QoQ '+oxSgn(q.v,Math.abs(q.v).toFixed(1))+'%':' · QoQ '+(q.txt||'—'))+' · no target (targets are set by plant and product group)';
+      return '<div class="ox-sp"'+oxTip(tip)+'><div class="h"><b>'+esc(r.label)+'</b><span class="mono"><b>'+oxLakh(r.sh)+'</b> lakh</span></div><div class="ox-bul share"><div class="f" style="width:'+(r.sh/mx*100).toFixed(1)+'%"></div></div>'
+       +'<div class="m"><span>'+r.share.toFixed(1)+'% share · '+esc(fmtMoney(r.n))+'</span><span class="ox-row"><span class="ox-chip sm nl">no target</span>'+oxQoqChip(q)+'</span></div></div>';
+    }).join('');
+  }
+  h+='<p class="note" style="margin:0">Sheets first, then share and ₹, '+esc(res.label)+'. Invoiced external lines (credit notes carry no item). Bar = share of sheets, scaled to the largest row. Targets are set by plant and product group, so no Ach % here.'+(kind==='thk'?' Thickness is read from the item master and rounded to 2 decimals; items without one are "Unknown".':' Items without a brand are "No brand".')+'</p></section>';
+  return h;
+}
+function oxSplitTable(kind,ctx){
+  var D=oxSplitData(kind,ctx),res=ctx.res;
+  if(!D.st.have)return '<p class="note">Not loaded for '+esc(res.label)+'.</p>';
+  var all=Array.from(dimAgg(ctx.plants,res.cur,D.idx).values()).sort(function(a,b){return b.sh-a.sh}),P=res.prior?dimAgg(ctx.plants,res.prior,D.idx):new Map(),tot=D.total||1;
+  return '<div class="tw"><table class="std"><thead><tr><th>'+(kind==='thk'?'Thickness':'Brand')+'</th><th class="num">Lakh sheets</th><th class="num">Share %</th><th class="num">₹ invoiced</th><th class="num">Last Qtr</th><th class="num">QoQ %</th></tr></thead><tbody>'
+   +all.map(function(a){var pv=P.get(a.k),pOk=D.stP&&D.stP.complete&&D.stP.ready&&D.st.complete&&D.st.ready,q=pOk?qoqOf(a.sh,pv?pv.sh:0,{}):null;return '<tr><td><b>'+esc(a.k)+'</b></td><td class="num">'+oxLakh(a.sh)+'</td><td class="num">'+(a.sh/tot*100).toFixed(1)+'%</td><td class="num">'+esc(fmtMoney(a.n))+'</td><td class="num">'+(pOk&&pv?oxLakh(pv.sh):'<span class="ox-nl">not loaded</span>')+'</td><td class="num">'+(q&&q.state==='ok'?fmtPct(q.v,true):'<span class="note">'+esc(q?q.txt:'partial')+'</span>')+'</td></tr>'}).join('')
+   +'<tr class="tot"><td>Total</td><td class="num">'+oxLakh(D.total)+'</td><td class="num">100%</td><td class="num">'+esc(fmtMoney(D.totalN))+'</td><td></td><td></td></tr></tbody></table></div><p class="note">Invoiced external lines; '+D.st.have+' of '+D.st.total+' plant-months carry item detail.</p>';
+}
+
+/* ---- collections: six quarters and the current one as bars, ₹ crore on each bar (mock-up v3) ---- */
+function oxCollBars(cser){
+  var s=cser.slice(-7),n=s.length;if(n<2)return '';
+  var W=240,H=88,sl=W/n,vals=s.map(function(x){return x.A}).filter(function(v){return v!=null}),mx=Math.max.apply(null,vals.concat([1]));
+  var out='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Collected by quarter in rupees crore: '+esc(s.map(function(x){return x.label+' '+(x.A==null?'not loaded':(x.A/1e7).toFixed(0))}).join(', '))+'">';
+  s.forEach(function(x,i){
+    var bx=i*sl+7,w=sl-14,prev=i?s[i-1]:null,tip=x.label+(x.isCur?' to date':'')+' · '+(x.A==null?'receipts not loaded':'collected '+fmtMoney(x.A));
+    if(x.A!=null&&prev&&prev.A!=null&&prev.A>0&&!x.isCur)tip+=' · QoQ '+oxSgn(x.A-prev.A,Math.abs((x.A-prev.A)/prev.A*100).toFixed(1))+'%';
+    out+='<g'+oxTip(tip)+'>';
+    if(x.A==null)out+='<rect x="'+bx.toFixed(1)+'" y="30" width="'+w.toFixed(1)+'" height="38" rx="3" fill="none" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+(bx+w/2).toFixed(1)+'" y="52" text-anchor="middle" style="font-size:8px">n/l</text>';
+    else{var h=Math.max(1,x.A/mx*54);out+='<rect x="'+bx.toFixed(1)+'" y="'+(68-h).toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="'+(x.isCur?'url(#oxh)':'var(--act)')+'"/><text x="'+(bx+w/2).toFixed(1)+'" y="'+(64-h).toFixed(1)+'" text-anchor="middle" style="font-size:9px;font-weight:700;fill:var(--ink)">'+Math.round(x.A/1e7)+'</text>'}
+    out+='<text x="'+(bx+w/2).toFixed(1)+'" y="82" text-anchor="middle" class="st" style="font-size:9px">'+esc(x.label.replace(' FY',' ·')+(x.isCur?'*':''))+'</text></g>';
+  });
+  return out+'</svg>';
+}
 
 /* ---- src/55-sales-team.js ---- */
 /* ================= v0.9 Sales, Team & Scorecard ================= */
@@ -4942,9 +5241,9 @@ async function demoMasters(){
   }
   if(!S.itemMeta){
     var items=[],sizes=[['8X4',32],['7X3',21],['6X4',24]],g=0;
-    for(var i=1;i<=24;i++){var z=sizes[i%3];items.push(['DEMOFG'+pad(i,5),i%6===0?1:0,z[1],i%2?1:0.8,'Pcs',true,z[0]])}
+    for(var i=1;i<=24;i++){var z=sizes[i%3];items.push(['DEMOFG'+pad(i,5),i%6===0?1:0,z[1],i%2?1:0.8,'Pcs',true,z[0],'DEMO Brand '+'ABCD'[i%4]])}
     var uid2='udemoi'+Date.now().toString(36);
-    await dset('items/c0',{z:await gz(JSON.stringify(items)),n:items.length,i:0,at:now,by:by,fmt:'gz-json v1: [code,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sqft per sheet,thickness mm,uom,active,size]',demo:true});
+    await dset('items/c0',{z:await gz(JSON.stringify(items)),n:items.length,i:0,at:now,by:by,fmt:'gz-json v1: [code,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sqft per sheet,thickness mm,uom,active,size,brand]',demo:true});
     await dset('itemmeta/main',{at:now,by:by,file:'DEMO items (synthetic)',sheet:'DEMO',read:items.length,loaded:items.length,out_of_scope:0,rejected:0,warned:0,by_group:{Laminate:20,Door:4},chunks:1,upload:uid2,demo:true});
     await dset('uploads/'+uid2,{at:now,by:by,sys:'B1',entity:'IT',file:'DEMO items (synthetic)',size:0,mode:'master',periodLabel:'Item master snapshot',read:items.length,loaded:items.length,rejected:0,warned:0,status:'Loaded',demo:true});
   }
@@ -6989,13 +7288,14 @@ async function runJobs(holder,opts){
   return ran;
 }
 Object.assign(handlers,{'job-dismiss':function(){S.jobBanner='';S.lastHtml='';schedule()}});
-/* set_zones arrives with the zone work (v44); a queued job of that type fails cleanly until then */
-if(typeof setZonesFromSales==='undefined'){var setZonesFromSales=async function(){throw new Error('set_zones is not available in this version')}}
+/* set_zones (D65) is setZonesFromSales in src/53-splits.js: fills blank zones in the plant master from the zone on most sales lines (last 12 loaded months); it fails the job, with the reason, when no sales line carries a zone */
 
 /* ---- src/99-expose.js ---- */
 /* test hooks (read-only helpers for the self-test; no data) */
 window.__dbg={loadItemIdx:loadItemIdx,stockDays:stockDays,dailySheets:dailySheets,demoLoad:demoLoad,demoClear:demoClear,hasRealData:hasRealData,S:S,DS:DS,CFG:CFG,sumF:sumF,quarterSeries:quarterSeries,trendStats:trendStats,stretchOf:stretchOf,planQ:planQ,planW:planW,resolvePeriod:resolvePeriod,qoqOf:qoqOf,walk:walk,WD:WD,wdBetween:wdBetween,scoreOf:scoreOf,rankSort:rankSort,TODAY:TODAY,qMonths:qMonths,monthsLoaded:monthsLoaded,viewCtx:viewCtx,figs:figs,priorMonth:priorMonth,closedQuarters:closedQuarters,curQuarterKey:curQuarterKey,effUser:effUser,buildDraft:buildDraft,custAgg:custAgg,loadCust:loadCust,classMap:classMap,todayCandidates:todayCandidates,capFor:capFor,scopeOf:scopeOf,fillTpl:fillTpl,addDays:addDays,addWD:addWD,hashRef:hashRef,runLadder:runLadder,runEngine:runEngine,kpiCompute:kpiCompute,itemsHtml:itemsHtml,sempHtml:sempHtml,spMatch:spMatch,spCanon:spCanon,SM:SM,matchStats:matchStats,unmatchedSp:unmatchedSp,nameKey:nameKey,validateUser:validateUser,scopedUsers:scopedUsers,isPH:isPH,viewerRole:viewerRole,usersOfRole:usersOfRole};
 Object.assign(window.__dbg,{tpModel:tpModel,tpTemplateCsv:tpTemplateCsv,tpSave:tpSave,advanceDoc:advanceDoc,proposerOf:proposerOf,planGuard:planGuard,phasingFor:phasingFor,leafTgt:leafTgt,masterUpload:masterUpload,pagesFor:pagesFor,isPlanLocked:isPlanLocked});
+Object.assign(window.__dbg,{loadDim:loadDim,dimAgg:dimAgg,dimState:dimState,dimKeyOf:dimKeyOf,ratingCalc:ratingCalc,ratingRows:ratingRows,ratingBasis:ratingBasis,ratingStars:ratingStars,zoneFromLines:zoneFromLines,zoneOfPlant:zoneOfPlant,zoneCanon:zoneCanon,zonesFromSales:zonesFromSales,setZonesFromSales:setZonesFromSales,oxSplitData:oxSplitData});
+Object.assign(window.__dbg,{oxRatingCard:oxRatingCard,oxRatingRow:oxRatingRow,oxCollBars:oxCollBars,oxSplitCard:oxSplitCard,zonesPreviewHtml:zonesPreviewHtml,zoneMonthsOf:zoneMonthsOf,dimKick:dimKick});
 
 
 /* ================= boot ================= */

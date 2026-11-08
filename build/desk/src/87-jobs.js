@@ -42,5 +42,4 @@ async function runJobs(holder,opts){
   return ran;
 }
 Object.assign(handlers,{'job-dismiss':function(){S.jobBanner='';S.lastHtml='';schedule()}});
-/* set_zones arrives with the zone work (v44); a queued job of that type fails cleanly until then */
-if(typeof setZonesFromSales==='undefined'){var setZonesFromSales=async function(){throw new Error('set_zones is not available in this version')}}
+/* set_zones (D65) is setZonesFromSales in src/53-splits.js: fills blank zones in the plant master from the zone on most sales lines (last 12 loaded months); it fails the job, with the reason, when no sales line carries a zone */
