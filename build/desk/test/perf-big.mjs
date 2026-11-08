@@ -20,4 +20,7 @@ await page.waitForTimeout(1500);
 const lt = await page.evaluate(() => window.__lt || []);
 const rt = await page.evaluate(() => new Promise(r => { const t = performance.now(); setTimeout(() => r(Math.round(performance.now() - t)), 0) }));
 console.log(JSON.stringify({ hash, firstCardMs: tFirst, dsReadyMs: tReady, atFirstCard: st, longestLongTaskMs: Math.max(0, ...lt), longTasksOver500: lt.filter(x => x > 500).length, timerLatencyAfterMs: rt, longTasksAtMs: await page.evaluate(() => window.__ltAt || []), pageErrors: errs.filter(e => /PAGEERROR/.test(e)).length }));
+const first10 = tFirst < 10000;
+console.log((first10 ? 'PASS' : 'FAIL') + ' | first Overview card under 10 s | ' + tFirst + ' ms');
+console.log((Math.max(0, ...lt) < 2000 ? 'PASS' : 'FAIL') + ' | no main-thread stall over 2 s | ' + Math.max(0, ...lt) + ' ms');
 await browser.close();
