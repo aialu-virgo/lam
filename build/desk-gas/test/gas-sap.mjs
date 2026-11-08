@@ -385,7 +385,7 @@ function sapJsonOf(env, k) { try { return JSON.parse(env.props[k] || '{}'); } ca
   ok('paging: the count check passed and is recorded', got.man.countChecked === true);
   // count mismatch
   ({ S, env } = build({ docs, s4opts: { miscount: 0 } })); env.call('sapShadowRun'); S.miscount = 3; r = env.call('sapSync');
-  ok('a count that does not match what was read is a warning with both numbers: the month IS staged, nothing thrown away', r.ok && r.done && 'sapstage/man_2026-10' in env.stored() && env.call('sapStatus').status.warnings.some(w => /read \d+ but SAP counted \d+/.test(w.msg)), sj(r).slice(0, 300));
+  ok('a count that does not match what was read is a warning with both numbers: the month IS staged, nothing thrown away', r.ok && r.done && 'sapstage/man_2026-10' in env.stored() && env.call('sapStatus').status.warnings.some(w => /SAP counted \d+ when the month was started.*read \d+\./.test(w.msg)), sj(r).slice(0, 300));
   ok('and the cursor is not left behind to restart from', env.call('sapStatus').status.resume === false);
   // no inlinecount support
   ({ S, env } = build({ docs, s4opts: { noCount: true } })); env.call('sapShadowRun'); r = env.call('sapSync'); const g3 = stagedRows(env, '2026-10');

@@ -6,10 +6,10 @@ const pad = (n, w) => String(n).padStart(w, '0');
 const msOf = (iso) => Date.parse(iso + 'T00:00:00Z');
 const odDate = (iso) => '/Date(' + msOf(iso) + ')/';
 export const PRODUCT_TYPES = ['ZABLAM', 'ZCRLAM', 'ZCBPVC', 'ZOTHER'];
-export function synthMasters(seed = 7) {
+export function synthMasters(seed = 7, nProducts = 60, nCustomers = 25) {
   const r = rng(seed), products = {}, customers = {};
-  for (let i = 0; i < 60; i++) { const code = String(32000100 + i), t = PRODUCT_TYPES[i % 4 === 3 ? 3 : (i % 7 === 0 ? 2 : i % 2)]; products[code] = { type: t, mg3: ['LAM', 'DOOR', 'COMPACT', 'MICA'][i % 4], mg4: i % 5 === 0 ? '7X3' : '8X4' }; }
-  for (let i = 0; i < 25; i++) customers[String(50001000 + i)] = 'Synthetic Customer ' + (i + 1) + ' Traders';
+  for (let i = 0; i < nProducts; i++) { const code = String(32000100 + i), t = PRODUCT_TYPES[i % 4 === 3 ? 3 : (i % 7 === 0 ? 2 : i % 2)]; products[code] = { type: t, mg3: ['LAM', 'DOOR', 'COMPACT', 'MICA'][i % 4], mg4: i % 5 === 0 ? '7X3' : '8X4' }; }
+  for (let i = 0; i < nCustomers; i++) customers[String(50001000 + i)] = 'Synthetic Customer ' + (i + 1) + ' Traders';
   return { products, customers };
 }
 /* docs for each day in [from, to] at the given plants; ids are 10-digit padded as OData returns them; items numbered 000010, 000020 ... */

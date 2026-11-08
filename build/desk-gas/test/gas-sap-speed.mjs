@@ -110,7 +110,7 @@ for (const [name, props, s4] of [['defaults (page 500, 4 at once)', {}, {}], ['p
 
 /* ---------- 5. progress ---------- */
 {
-  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '120000' } }); const r1 = t.env.call('sapShadowRun');
+  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); const r1 = t.env.call('sapShadowRun');
   ok('a run that stops at the limit reports months done, lines read so far and the runs still needed', r1.ok && r1.done === false && r1.progress && /0 of 1 month\(s\) done; [\d,]+ of about [\d,]+ lines read \(\d+%\); run 1; about \d+ more runs? \(estimate\)/.test(r1.progress.text) && r1.progress.runsLeft >= 1, sj(r1.progress));
   const st = t.env.call('sapStatus').status;
   ok('sapStatus shows the same progress text', st.progress && st.progress.text === r1.progress.text && /part-way/.test(st.next), sj(st.progress) + st.next);
@@ -123,7 +123,7 @@ function iso(d) { return new Date(+/\((\d+)\)/.exec(d.BillingDocumentDate)[1]).t
 
 /* ---------- 6. automatic continuation ---------- */
 {
-  const mk = (extra = {}, props = {}) => build({ docs: docs0(), s4opts: Object.assign({ msPerCall: 20000, pageCap: 25 }, extra), props: Object.assign({ SAP_RUN_BUDGET_MS: '120000' }, props) });
+  const mk = (extra = {}, props = {}) => build({ docs: docs0(), s4opts: Object.assign({ msPerCall: 20000, pageCap: 25 }, extra), props: Object.assign({ SAP_RUN_BUDGET_MS: '170000' }, props) });
   const ours = (env) => env.state.triggers.filter(x => x.fn === 'sapShadowAutoTrigger_');
   const fire = (env, max = 60) => { let n = 0; env.setEmail(''); while (ours(env).length && n++ < max) { env.ctx.sapShadowAutoTrigger_(); } env.setEmail(SUPER); return n; };
   { const t = mk(); const before = sj(t.env.stored()); const r = t.env.call('sapShadowRunAuto');
@@ -174,7 +174,7 @@ function iso(d) { return new Date(+/\((\d+)\)/.exec(d.BillingDocumentDate)[1]).t
 /* ---------- 7. paging that survives documents changing between runs ---------- */
 {
   for (const conc of ['1', '4']) {
-    const docs = docs0(); const { S, env } = build({ docs, s4opts: { pageCap: 20, msPerCall: 20000 }, props: { SAP_RUN_BUDGET_MS: '100000', SAP_CONCURRENCY: conc } });
+    const docs = docs0(); const { S, env } = build({ docs, s4opts: { pageCap: 20, msPerCall: 20000 }, props: { SAP_RUN_BUDGET_MS: '170000', SAP_CONCURRENCY: conc } });
     runAll(env, 'sapShadowRun');
     const oct = docs.filter(d => iso(d) === '2026-10' && d.BillingDocumentType === 'F2' && !d.BillingDocumentIsCancelled && d.CompanyCode === '1000');
     const keep = new Set(oct.filter(d => d.to_Item.results.some(it => +it.Plant <= 1049 && it.BillingQuantityUnit === 'PC')).filter((d, i) => i % 5 !== 1 && i % 7 !== 2).map(d => d.BillingDocument));      // documents that stay untouched the whole time
@@ -197,20 +197,20 @@ function iso(d) { return new Date(+/\((\d+)\)/.exec(d.BillingDocumentDate)[1]).t
     const lost = [...keep].filter(id => !have.has(id.replace(/^0+/, '')));
     ok('  ...every document that stayed untouched was read (none skipped by the changes)', lost.length === 0, lost.length + ' missing, e.g. ' + lost.slice(0, 3));
     const w = env.call('sapStatus').status.warnings;
-    ok('  ...if the count moved, it is a warning with both numbers, not an error', (w || []).length === 0 || /read \d+ but SAP counted \d+/.test(w[w.length - 1].msg), sj(w));
+    ok('  ...if the count moved, it is a warning with both numbers, not an error', (w || []).length === 0 || /SAP counted \d+ when the month was started.*read \d+\./.test(w[w.length - 1].msg), sj(w));
     // the released reader on the same scenario, for the record (not asserted to fail: it depends on where the cuts fall)
-    const d2 = docs0(); const o = build({ docs: d2, old: true, s4opts: { pageCap: 20, msPerCall: 20000 }, props: { SAP_RUN_BUDGET_MS: '100000' } }); runAll(o.env, 'sapShadowRun');
+    const d2 = docs0(); const o = build({ docs: d2, old: true, s4opts: { pageCap: 20, msPerCall: 20000 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); runAll(o.env, 'sapShadowRun');
     let ro = o.env.call('sapSync'), k = 0; while (ro.ok && ro.done === false && k++ < 40) { const low = d2.findIndex(d => iso(d) === '2026-10' && !keep.has(d.BillingDocument) && d.BillingDocumentType === 'F2' && !d.BillingDocumentIsCancelled); if (low >= 0 && k % 2) d2.splice(low, 1); ro = o.env.call('sapSync'); }
     console.log('INFO | released reader, same removals: ok=' + ro.ok + ' code=' + (ro.code || '') + (ro.message ? ' msg=' + String(ro.message).slice(0, 110) : ''));
   }
   { // a count mismatch alone (documents appear while a month is read) never wipes the cursor of a shadow run
-    const docs = docs0(); const { env } = build({ docs, s4opts: { pageCap: 20, msPerCall: 20000 }, props: { SAP_RUN_BUDGET_MS: '100000' } }); let r = env.call('sapShadowRun'); const cur0 = env.props.SAP_CURSOR_SHADOW;
+    const docs = docs0(); const { env } = build({ docs, s4opts: { pageCap: 20, msPerCall: 20000 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); let r = env.call('sapShadowRun'); const cur0 = env.props.SAP_CURSOR_SHADOW;
     ok('a stopped shadow run keeps a cursor', r.done === false && !!cur0);
     docs.splice(0, 40); r = env.call('sapShadowRun'); ok('documents removed in between: the cursor is still used (resumed), not cleared', r.ok && (r.resumed === true || r.done === false), sj(r).slice(0, 200));
     let n = 0; while (r.ok && !r.done && n++ < 40) r = env.call('sapShadowRun'); ok('...and it finishes with a warning, not an error', r.ok && r.done);
   }
   { // a read position saved by the older $skip paging cannot be continued by key: the month starts again with clean counts (no double counting)
-    const docs = docs0(); const o = build({ docs, old: true, s4opts: { pageCap: 20, msPerCall: 20000 }, props: { SAP_RUN_BUDGET_MS: '100000' } }); const r0 = o.env.call('sapShadowRun'); const legacy = o.env.props.SAP_CURSOR_SHADOW;
+    const docs = docs0(); const o = build({ docs, old: true, s4opts: { pageCap: 20, msPerCall: 20000 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); const r0 = o.env.call('sapShadowRun'); const legacy = o.env.props.SAP_CURSOR_SHADOW;
     const { env } = build({ docs: docs0(), props: {} }); env.props.SAP_CURSOR_SHADOW = legacy; const r = runAll(env, 'sapShadowRun');
     ok('an older cursor (skip paging, partial tally) is not continued: same totals as a clean read, no double counting', r0.done === false && JSON.parse(legacy).skip > 0 && r.ok && r.done && feedOf(r) === base.feed, feedOf(r).slice(0, 120));
   }
@@ -235,7 +235,7 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
   ok('product lookups that return nothing: shown as "(no product type)"', r.done && r.dropExamples.noProductGroup && r.dropExamples.noProductGroup['(no product type)'] > 1000, sj(r.dropExamples));
   t = build({ docs: docs0() }); const lines0 = (() => { const rr = t.env.call('sapShadowRun'); return rr; })();
   ok('a normal run: counted lines match the register rows and nothing unexplained is left out', lines0.drops.counted > 3000 && !lines0.dropExamples.plantNotInStore && !/WARNING/.test(lines0.message), sj(lines0.drops));
-  ok('the cursor of a stopped run holds the drop counts so far', (() => { const q = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '100000' } }); q.env.call('sapShadowRun'); const c = JSON.parse(q.env.props.SAP_CURSOR_SHADOW); return c.drops && c.drops.counted > 0 && c.sl && c.sl.length >= 1 && q.env.props.SAP_CURSOR_SHADOW.length < 3000; })());
+  ok('the cursor of a stopped run holds the drop counts so far', (() => { const q = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); q.env.call('sapShadowRun'); const c = JSON.parse(q.env.props.SAP_CURSOR_SHADOW); return c.drops && c.drops.counted > 0 && c.sl && c.sl.length >= 1 && q.env.props.SAP_CURSOR_SHADOW.length < 3000; })());
 }
 
 /* ---------- 9. lookups: cache in bulk, parallel batches ---------- */
@@ -249,7 +249,7 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
 
 /* ---------- 10. a read position can never be lost without a word ---------- */
 {
-  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '100000' } });
+  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } });
   const rs = []; for (let i = 0; i < 4; i++) rs.push(t.env.call('sapShadowRun'));
   const lines = (t.env.state.logs || []).filter(l => /^SAP \{"fn":"sapShadowRun"/.test(l)).map(l => JSON.parse(l.slice(4)));
   ok('every run line says resumed true/false with skip, total and run number', lines.length === 4 && lines.every(l => typeof l.resumed === 'boolean' && 'skip' in l && 'total' in l && typeof l.run === 'number'), sj(lines.slice(0, 2)));
@@ -259,7 +259,7 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
   ok('the progress log line also states resumed and the range', (t.env.state.logs || []).some(l => /^SAP-PROGRESS .* resumed=true \(continuing the saved position\) from \d+ to \d+ of \d+ units/.test(l)));
 }
 {
-  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '100000' } }); t.env.call('sapShadowRun'); const cur = t.env.props.SAP_CURSOR_SHADOW;
+  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); t.env.call('sapShadowRun'); const cur = t.env.props.SAP_CURSOR_SHADOW;
   t.env.props.SAP_CURSOR_SHADOW = cur.slice(0, 120); const c0 = t.S.calls.length; const r = t.env.call('sapShadowRun');
   ok('an unreadable saved position is an error that keeps it, never a silent fresh start', r.ok === false && /cannot be read/.test(r.message) && t.env.props.SAP_CURSOR_SHADOW === cur.slice(0, 120) && t.S.calls.length === c0, sj(r).slice(0, 250));
   ok('...the same for the sync position', (() => { const u = build({ docs: docs0() }); runAll(u.env, 'sapShadowRun'); u.env.props.SAP_CURSOR = '{oops'; const x = u.env.call('sapSync'); return x.ok === false && /cannot be read/.test(x.message) && u.env.props.SAP_CURSOR === '{oops'; })());
@@ -268,14 +268,76 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
   t.env.setEmail('se@virgoasia.com'); ok('sapResetCursors is refused for a non-admin', t.env.call('sapResetCursors').ok === false);
 }
 {
-  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '100000' } }); t.env.call('sapShadowRun');
+  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); t.env.call('sapShadowRun');
   const r = t.env.call('sapShadowRun'); ok('sapShadowRun() with no month resumes the saved month', r.resume.resumed === true);
   const r3 = t.env.call('sapShadowRun', ['2026-11']); ok('asking for a different month starts that month and says the saved position was for another', r3.ok && r3.resume.resumed === false && /different month was asked for \(2026-11; the saved position was for 2026-10\)/.test(r3.resume.reason), sj(r3.resume));
 }
 { // errors never touch the saved position
-  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '100000' } }); t.env.call('sapShadowRun'); const cur = t.env.props.SAP_CURSOR_SHADOW;
+  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); t.env.call('sapShadowRun'); const cur = t.env.props.SAP_CURSOR_SHADOW;
   for (const [code, thr] of [[500, false], [401, false], [403, false], [404, false], [0, true]]) { t.S.fails = []; t.S.failNext(/BillingDocument/, code, 9999, thr ? { throw: true } : {}); const r = t.env.call('sapShadowRun'); ok('a failed run (' + (thr ? 'timeout' : 'HTTP ' + code) + ') leaves the saved position exactly as it was', r.ok === false && t.env.props.SAP_CURSOR_SHADOW === cur, r.code); }
   t.S.fails = []; const r = t.env.call('sapShadowRun'); ok('and the next run resumes from it', r.ok && r.resume.resumed === true && r.resume.skip === JSON.parse(cur).skip);
+}
+
+/* ---------- 11. QA round: lookups respect the run budget; watchdog; shape B whole-document page; documents behind the cursor; few-lines warning ---------- */
+{ // 11a. realistic masters (800 products, 3,000 customers), 25 s per call: no run goes near Google's 6 minutes, every run makes progress, totals match the released reader
+  const big = synthMasters(7, 800, 3000);
+  const dBig = synthDocs({ masters: big, from: '2026-10-01', to: '2026-10-31', perDayPerPlant: 90, extras: true });
+  const mk = (old, extra = {}) => { const S = makeS4(Object.assign({ docs: dBig, products: big.products, customers: big.customers }, extra)); const env = makeEnv({ fetch: (u, o, st) => S.fetch(u, o, st), sapFile: old ? OLD : undefined });
+    env.call('deskWrite', [[set('users', 'u1', { email: SUPER, role: 'Super admin', active: true, name: 'V' }), ...PLANTS.map(p => set('plants', p, { plant_code: p, plant_name: 'D', plant_type: 'Depot', zone: '', state: '', b1_bpl_name: 'D', business: 'laminates', active: true }))]]);
+    Object.assign(env.props, { SAP_BASE_URL: S.host, SAP_USER: S.user, SAP_PASSWORD: S.password, SAP_SYNC_ENABLED: 'yes' }); env.props.SAP_STATUS = JSON.stringify({ verify: { at: '2026-11-08T06:00:00.000Z', ok: true, failed: false, gaps: 0, optionalGaps: 0, checked: 29, shape: 'A' } }); env.setEmail(SUPER); return { S, env }; };
+  const n = mk(false, { msPerCall: 25000 }), secs = []; let r, k = 0;
+  do { const s0 = n.env.state.skew; r = n.env.call('sapShadowRun'); secs.push(Math.round((n.env.state.skew - s0) / 1000)); k++; } while (r.ok && !r.done && k < 40);
+  ok('25 s per call, 800 products, 3,000 customers: finishes, and no run is longer than 330 s (Google ends a run at 360 s)', r.ok && r.done && Math.max(...secs) <= 330 && k >= 2, sj(secs));
+  ok('...every run before the last stopped with the read position saved (lookups cached across runs)', secs.length > 1 && n.env.state.cachePutAll > 5);
+  const o = mk(true); const ro = runAll(o.env, 'sapShadowRun', [], 60);
+  ok('...and the totals equal the released reader on the same data', ro.ok && ro.done && feedOf(r) === feedOf(ro), feedOf(r).slice(0, 100));
+  console.log('INFO | 25 s per call, realistic masters, one month of ' + dBig.length + ' documents: ' + k + ' runs, seconds per run ' + secs.join('+'));
+  // a round whose lookups cannot be finished is put back whole: counts not half added
+  const q = mk(false, { msPerCall: 25000 }); q.env.props.SAP_RUN_BUDGET_MS = '60000'; let rr = q.env.call('sapShadowRun'); const c1 = JSON.parse(q.env.props.SAP_CURSOR_SHADOW);
+  ok('a run whose first round needs more lookups than the budget allows saves a clean position (no half-counted round) and says not done', rr.ok && rr.done === false && c1.cnt.headers === 0 && c1.skip === 0 && (c1.sl || []).every(s => s.n === 0 && !s.last), sj(c1).slice(0, 300));
+  q.env.props.SAP_RUN_BUDGET_MS = '300000'; let j = 0; while (rr.ok && !rr.done && j++ < 60) rr = q.env.call('sapShadowRun'); ok('...and later runs finish it with the same totals', rr.ok && rr.done && feedOf(rr) === feedOf(r), j);
+}
+{ // 11b. watchdog and stale auto state
+  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); let during = null; const orig = t.S.fetch;
+  t.S.fetch = (u, o, e) => { if (!during) during = t.env.state.triggers.filter(x => x.fn === 'sapShadowAutoTrigger_').map(x => x.ms); return orig(u, o, e); };
+  const r = t.env.call('sapShadowRunAuto');
+  ok('while a run is going, a watchdog trigger is already waiting (after the run flag would have gone stale), so a run killed by Google is continued', sj(during) === sj([510000]), sj(during));
+  ok('when the run ends normally the watchdog is replaced by the 60 s trigger', r.done === false && t.env.state.triggers.filter(x => x.fn === 'sapShadowAutoTrigger_').length === 1 && t.env.state.triggers[0].ms === 60000);
+  // simulate a kill: the trigger fired (removed) and the run never finished
+  t.env.state.triggers = []; const st = t.env.call('sapStatus').status;
+  ok('a SAP_AUTO left with no trigger and no run is reported as stale, with what to do', st.auto && st.auto.stale === true && /sapShadowRunAuto/.test(st.next), sj(st.auto) + st.next);
+  const r2 = t.env.call('sapShadowRunAuto'); ok('sapShadowRunAuto then carries on from the saved position', r2.ok && r2.resume.resumed === true, sj(r2.resume));
+  // sync watchdog
+  const u = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); runAll(u.env, 'sapShadowRun'); let dur2 = null; const o2 = u.S.fetch;
+  u.S.fetch = (url, o, e) => { if (!dur2) dur2 = u.env.state.triggers.filter(x => x.fn === 'sapContinueTrigger_').map(x => x.ms); return o2(url, o, e); };
+  u.env.call('sapSyncAuto'); ok('sapSyncAuto also has a watchdog while it runs', sj(dur2) === sj([510000]), sj(dur2));
+  u.S.fails = []; const v = build({ docs: docs0(), props: {} }); runAll(v.env, 'sapShadowRun'); v.S.failNext(/BillingDocument/, 500, 9999); v.env.call('sapSyncAuto');
+  ok('an error in the sync chain removes the watchdog too', !v.env.state.triggers.some(x => x.fn === 'sapContinueTrigger_'));
+}
+{ // 11c. shape B: a page that is one whole document is read completely
+  const d = docs0(); const bigDoc = JSON.parse(JSON.stringify(d.find(x => x.CompanyCode === '1000' && x.BillingDocumentType === 'F2' && !x.BillingDocumentIsCancelled && iso(x) === '2026-10')));
+  bigDoc.BillingDocument = '0090900001'; const it0 = bigDoc.to_Item.results[0]; bigDoc.to_Item.results = Array.from({ length: 35 }, (_, i) => Object.assign({}, it0, { BillingDocumentItem: String((i + 1) * 10).padStart(6, '0') }));
+  const exact = JSON.parse(JSON.stringify(bigDoc)); exact.BillingDocument = '0090900002'; exact.to_Item.results = exact.to_Item.results.slice(0, 10);
+  d.push(bigDoc, exact);
+  const A = build({ docs: d, props: {} }); const ra = runAll(A.env, 'sapShadowRun');
+  for (const [name, props, s4] of [['page 10', { SAP_PAGE_TOP: '10', SAP_CONCURRENCY: '1' }, {}], ['page 10, 4 at once', { SAP_PAGE_TOP: '10' }, {}], ['page 10, server cap 7', { SAP_PAGE_TOP: '10' }, { pageCap: 7 }]]) {
+    const B = build({ docs: d, props: Object.assign({ SAP_BILLING_SHAPE: 'B' }, props), s4opts: s4 }); const rb = runAll(B.env, 'sapShadowRun');
+    ok('shape B, a 35-item document and a 10-item one on pages of 10 (' + name + '): same totals as shape A, no item skipped', rb.ok && rb.done && feedOf(rb) === feedOf(ra), feedOf(rb).slice(0, 100) + ' vs ' + feedOf(ra).slice(0, 100));
+  }
+}
+{ // 11d. a document numbered behind the cursor while a month takes several runs
+  const docs = docs0(); const { env } = build({ docs, s4opts: { pageCap: 20, msPerCall: 20000 }, props: { SAP_RUN_BUDGET_MS: '170000', SAP_CONCURRENCY: '1' } });
+  runAll(env, 'sapShadowRun'); env.call('sapShadowRun'); let r = env.call('sapShadowRun');
+  const late = JSON.parse(JSON.stringify(docs.find(x => x.CompanyCode === '1000' && x.BillingDocumentType === 'F2' && !x.BillingDocumentIsCancelled && iso(x) === '2026-10'))); late.BillingDocument = '0010000007'; docs.push(late);   // lower than everything read so far
+  let n = 0; while (r.ok && !r.done && n++ < 40) r = env.call('sapShadowRun');
+  const w = env.call('sapStatus').status.warnings;
+  ok('a document numbered behind the read position is not read, and the month-end check warns with the counts (SAP counts N, read N-1)', r.ok && r.done && w.length >= 1 && /Differs in numbers first to last: SAP counts (\d+), read (\d+)/.test(w[w.length - 1].msg) && (() => { const m = /SAP counts (\d+), read (\d+)/.exec(w[w.length - 1].msg); return +m[1] === +m[2] + 1; })(), sj(w));
+}
+{ // 11e. very few lines counted also warns
+  const m = synthMasters(7); const d5 = synthDocs({ masters: m, from: '2026-10-01', to: '2026-10-31', plants: ['1001', '1002', '1003', '1004', '1005'], perDayPerPlant: 8 });
+  const t = build({ docs: d5, plants: ['1001'] }); const r = t.env.call('sapShadowRun');
+  ok('under a quarter of the lines counted: WARNING with both numbers (not only when zero)', r.done && /WARNING: only \d+ of the \d+ lines SAP sent were counted/.test(r.message), r.message.slice(0, 400));
+  const t2 = build({ docs: docs0() }); ok('...and a normal run does not warn', !/WARNING/.test(t2.env.call('sapShadowRun').message));
 }
 
 console.log('TOTAL ' + res.filter(l => l.startsWith('PASS')).length + ' PASS ' + res.filter(l => l.startsWith('FAIL')).length + ' FAIL');

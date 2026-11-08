@@ -26,7 +26,7 @@ var SAP_PAGE_MIN = 50;                   // the page never falls back below this
 var SAP_PAGE_MAX = 5000;
 var SAP_CONCURRENCY = 4;                 // pages fetched at once (UrlFetchApp.fetchAll); Script Property SAP_CONCURRENCY (1 to 10)
 var SAP_CONCURRENCY_MAX = 10;
-var SAP_LOOKUP_BATCH = 20;               // keys per product / customer lookup call; Script Property SAP_LOOKUP_BATCH (5 to 40)
+var SAP_LOOKUP_BATCH = 40;               // keys per product / customer lookup call; Script Property SAP_LOOKUP_BATCH (5 to 40); halved automatically if SAP refuses the long address
 var SAP_AUTO_DELAY_MS = 60000;           // sapShadowRunAuto / sapSyncAuto: the next run starts about this long after one stops
 var SAP_AUTO_MAX_RUNS = 8;               // an automatic chain stops after this many runs (Script Property SAP_AUTO_MAX_RUNS, 1 to 30)
 var SAP_AUTO_BUSY_MAX = 6;               // an automatic run that finds another run in progress waits and tries again this many times
@@ -155,7 +155,7 @@ function sapIntProp_(key, lo, hi, dflt) {
 function sapPager_() {
   var want = sapIntProp_('SAP_PAGE_TOP', 10, SAP_PAGE_MAX, SAP_PAGE_TOP), eff = sapGetJson_('SAP_PAGE_EFF', null), top = want;
   if (eff && eff.want === want && eff.top >= 1 && eff.top < want) top = eff.top;
-  return { want: want, top: top, min: Math.min(SAP_PAGE_MIN, want), conc: sapIntProp_('SAP_CONCURRENCY', 1, SAP_CONCURRENCY_MAX, SAP_CONCURRENCY), notes: [] };
+  return { want: want, top: top, min: Math.min(SAP_PAGE_MIN, want), conc: sapIntProp_('SAP_CONCURRENCY', 1, SAP_CONCURRENCY_MAX, SAP_CONCURRENCY), notes: [], lb: sapIntProp_('SAP_LOOKUP_BATCH', 5, 40, SAP_LOOKUP_BATCH), lg: 0, groupMs: 0 };
 }
 function sapPageLearn_(pg, top, why) {
   pg.top = top; pg.notes.push(why + ': page size now ' + top);
@@ -249,6 +249,11 @@ function sapNext_(s, missing, trig) {
   if (pend.length) return 'Click Load SAP feed to put ' + pend.join(', ') + ' into the Desk.';
   return trig ? 'Up to date. The daily run keeps it so.' : 'Up to date. Run sapInstallDailyTrigger to switch on the daily run.';
 }
+function sapAutoView_() {
+  var a = sapGetJson_('SAP_AUTO', null); if (!a) return null;
+  try { var waiting = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sapShadowAutoTrigger_'; }); a.waiting = waiting; a.stale = !waiting && !sapRunBusy_(); if (a.stale) a.note = 'An automatic run was cut off and no trigger is waiting. Run sapShadowRunAuto to carry on from the saved position.'; } catch (e) {}
+  return a;
+}
 function sapPagingView_() {
   var pg = sapPager_(); return { pageTop: pg.top, pageTopSet: pg.want, concurrency: pg.conc, lookupBatch: sapIntProp_('SAP_LOOKUP_BATCH', 5, 40, SAP_LOOKUP_BATCH), learned: pg.top < pg.want };
 }
@@ -261,8 +266,8 @@ function sapStatusView_() {
     read: s.read || { headers: 0, lines: 0 }, staged: s.staged || {}, stagedRows: s.stagedRows || 0, loaded: s.loaded || { rows: 0, at: '' },
     errors: s.errors || [], shadow: s.shadow || null, verify: s.verify || null, unresolved: s.unresolved || null, skippedMonths: s.skippedMonths || [], resume: s.resume,
     feedFrom: SAP_FEED_FROM, cancelMode: String(sapProps_().getProperty('CANCEL_MODE') || 'exclude').toLowerCase() === 'mirror' ? 'mirror' : 'exclude',
-    cust: s.cust || null, progress: s.progress || null, runLog: s.runLog || [], warnings: s.warnings || [], paging: sapPagingView_(), auto: sapGetJson_('SAP_AUTO', null),
-    next: (shCur && s.progress && s.progress.kind === 'shadow' && !s.progress.done ? 'The shadow run is part-way (' + s.progress.text + ') Run sapShadowRunAuto to finish it without more clicks. ' : '') + sapNext_(s, miss, trig) + (s.cust && s.cust.status === 'staged' ? ' Customer master: ' + (s.cust.rows || 0) + ' customers are staged; click Load SAP feed to put them into the Desk.' : '') };
+    cust: s.cust || null, progress: s.progress || null, runLog: s.runLog || [], warnings: s.warnings || [], paging: sapPagingView_(), auto: sapAutoView_(),
+    next: ((sapAutoView_() || {}).stale ? sapAutoView_().note + ' ' : '') + (shCur && s.progress && s.progress.kind === 'shadow' && !s.progress.done ? 'The shadow run is part-way (' + s.progress.text + ') Run sapShadowRunAuto to finish it without more clicks. ' : '') + sapNext_(s, miss, trig) + (s.cust && s.cust.status === 'staged' ? ' Customer master: ' + (s.cust.rows || 0) + ' customers are staged; click Load SAP feed to put them into the Desk.' : '') };
 }
 
 /* ---------- run flag ---------- */
@@ -337,9 +342,10 @@ function sapDocRows_(cfg, h, cnt) {
   });
   return out;
 }
-/* product type and customer name: read by key in batches (parallel, SAP_LOOKUP_BATCH keys per call), cached for the run and in the script cache */
-function sapLookups_(cfg, ctx, entries, pg) {
-  var cache = CacheService.getScriptCache(), bsz = sapIntProp_('SAP_LOOKUP_BATCH', 5, 40, SAP_LOOKUP_BATCH), conc = pg ? pg.conc : 1;
+/* product type and customer name: read by key in batches (parallel, pg.lb keys per call), cached for the run and in the script cache (in bulk, after every group, so a run stopped by the time budget keeps what it has fetched). `stop()` says the run budget cannot take another group: the function then throws a stop signal, never before one group has been fetched in this run (so every run makes progress). */
+function sapStopSignal_() { var e = new Error('run budget used'); e.deskCode = 'sap_budget_stop'; e.sapStop = true; return e; }
+function sapLookups_(cfg, ctx, entries, pg, stop) {
+  var cache = CacheService.getScriptCache(), conc = pg ? pg.conc : 1;
   function cacheGet(prefix, ids) {   // one call for up to 100 keys (a call per key costs tens of milliseconds each)
     var out = {};
     if (typeof cache.getAll === 'function') { for (var i = 0; i < ids.length; i += 100) { try { var g = cache.getAll(ids.slice(i, i + 100).map(function (x) { return prefix + x; })) || {}; Object.keys(g).forEach(function (k) { if (g[k] !== null && g[k] !== undefined) out[k.slice(prefix.length)] = g[k]; }); } catch (e) {} } return out; }
@@ -355,27 +361,36 @@ function sapLookups_(cfg, ctx, entries, pg) {
     return miss;
   }
   function fetchSet(svc, set, key, field, map, prefix, miss) {
-    var parts = [], i;
-    for (i = 0; i < miss.length; i += bsz) parts.push(miss.slice(i, i + bsz));
+    var queue = miss.slice();
     function params(part, skip) {
       var p = { '$filter': part.map(function (x) { return key + ' eq ' + sapQ_(x); }).join(' or '), '$select': key + ',' + field, '$top': String(part.length * 2), '$orderby': key + ' asc' };
       p['$skip'] = String(skip); if (skip === 0) p['$inlinecount'] = 'allpages'; return p;
     }
-    for (var g = 0; g < parts.length; g += conc) {
-      var grp = parts.slice(g, g + conc), ents = grp.length > 1 ? sapFetchMany_(cfg, grp.map(function (part) { return { svc: svc, path: set, params: params(part, 0) }; })) : null;
+    while (queue.length) {
+      if (stop && pg.lg > 0 && stop()) throw sapStopSignal_();
+      var grp = [], gi, tg = Date.now(), back = [];
+      for (gi = 0; gi < conc && queue.length; gi++) grp.push(queue.splice(0, pg.lb));
+      var ents = grp.length > 1 ? sapFetchMany_(cfg, grp.map(function (part) { return { svc: svc, path: set, params: params(part, 0) }; })) : null;
       grp.forEach(function (part, jx) {
         var r = null;
-        if (ents) r = sapEntJson_(cfg, svc, ents[jx]);
-        if (!r) r = sapJson_(cfg, sapHttp_(cfg, svc, set, params(part, 0)));   // a single call: full retries and the same messages
-        var got = 0, total = r.count;
-        for (;;) {   // a server may cap the page size: keep reading until the count is reached or a page is empty
-          r.results.forEach(function (o) { map[String(o[key])] = String(o[field] == null ? '' : o[field]); });
-          got += r.results.length;
-          if (!r.results.length || (total !== null && got >= total)) break;
-          r = sapJson_(cfg, sapHttp_(cfg, svc, set, params(part, got)));
+        try {
+          if (ents) r = sapEntJson_(cfg, svc, ents[jx]);
+          if (!r) r = sapJson_(cfg, sapHttp_(cfg, svc, set, params(part, 0), null, pg.lb > 5 ? 1 : SAP_RETRIES));   // a single call: retries and the same messages
+          var got = 0, total = r.count;
+          for (;;) {   // a server may cap the page size: keep reading until the count is reached or a page is empty
+            r.results.forEach(function (o) { map[String(o[key])] = String(o[field] == null ? '' : o[field]); });
+            got += r.results.length;
+            if (!r.results.length || (total !== null && got >= total)) break;
+            r = sapJson_(cfg, sapHttp_(cfg, svc, set, params(part, got)));
+          }
+        } catch (e) {
+          if (e.sapShrink && pg.lb > 5) { pg.lb = Math.max(5, Math.floor(pg.lb / 2)); pg.notes.push('a lookup call was refused: ' + pg.lb + ' keys per call now'); back = back.concat(part); return; }   // a long address may be the cause: smaller batches, same keys
+          throw e;
         }
         part.forEach(function (x) { if (!(x in map)) map[x] = ''; }); cachePut(prefix, map, part);
       });
+      if (back.length) queue = back.concat(queue);
+      pg.lg++; pg.groupMs = Math.max(pg.groupMs, Date.now() - tg);
     }
   }
   var mats = [], custs = [], seenM = Object.create(null), seenC = Object.create(null);
@@ -414,13 +429,15 @@ function sapMonthSpec_(cfg, ym) {
   var path, sel, ord;
   if (cfg.shape === 'B') { path = 'A_BillingDocumentItem'; sel = sapItemSelect_(cfg); ord = 'BillingDocument asc,BillingDocumentItem asc'; }
   else { path = 'A_BillingDocument'; sel = sapHdrSelect_(cfg); ord = 'BillingDocument asc'; }
-  function filt(sl) {
+  function filt(sl, noLast) {
     var x = [];
-    if (sl) { if (sl.last) x.push('BillingDocument gt ' + sapQ_(sl.last)); else if (sl.lo) x.push('BillingDocument ge ' + sapQ_(sl.lo)); if (sl.hi) x.push('BillingDocument lt ' + sapQ_(sl.hi)); }
+    if (sl) { if (sl.last && !noLast) x.push('BillingDocument gt ' + sapQ_(sl.last)); else if (sl.lo) x.push('BillingDocument ge ' + sapQ_(sl.lo)); if (sl.hi) x.push('BillingDocument lt ' + sapQ_(sl.hi)); }
     return sapMonthFilter_(cfg, ym, x.join(' and '));
   }
   return { path: path,
     mk: function (sl, top) { var p = { '$filter': filt(sl) }; if (cfg.shape !== 'B') p['$expand'] = 'to_Item'; p['$select'] = sel; p['$orderby'] = ord; p['$top'] = String(top); return p; },
+    count: function (sl) { return { '$filter': filt(sl, true), '$select': 'BillingDocument', '$orderby': 'BillingDocument asc', '$top': '1', '$inlinecount': 'allpages' }; },
+    doc: function (id, skip, top) { return { '$filter': sapMonthFilter_(cfg, ym, 'BillingDocument eq ' + sapQ_(id)), '$select': sel, '$orderby': ord, '$top': String(top), '$skip': String(skip) }; },
     plan: function (order, withCount) { var p = { '$filter': filt(null), '$select': 'BillingDocument', '$orderby': 'BillingDocument ' + order, '$top': '1' }; if (withCount) p['$inlinecount'] = 'allpages'; return p; } };
 }
 /* the slices of a month: the count and the first and last document number come from two one-row calls (together); when the month needs more than one page it is cut into up to pg.conc equal ranges of document numbers (the first has no lower bound and the last no upper bound, so nothing can fall outside) */
@@ -441,6 +458,30 @@ function sapPlanSlices_(cfg, pg, spec, job) {
     for (var q = 0; q < n; q++) sl.push({ lo: q === 0 ? '' : edges[q - 1], hi: q === n - 1 ? '' : edges[q], last: '', n: 0, done: false });
   } else sl.push({ lo: '', hi: '', last: '', n: 0, done: false });
   job.sl = sl;
+}
+/* shape B: all the items of one document (a full page that was one document: the rest of its items cannot be reached by "after this document") */
+function sapDocItems_(cfg, pg, spec, id) {
+  var out = [], skip = 0, top = Math.max(pg.top, 200), r;
+  for (;;) {
+    r = sapJson_(cfg, sapHttp_(cfg, SAP_SVC.billing, spec.path, spec.doc(id, skip, top)));
+    r.results.forEach(function (x) { out.push(x); }); skip += r.results.length;
+    if (!r.results.length || (r.results.length < top && !r.next)) break;
+  }
+  return out;
+}
+/* at the end of a month: what SAP counts now in each range, against what was read. Documents numbered behind the read position (or removed) while a month took several runs are not re-read; this finds them by count and says so, with both numbers. Never throws. */
+function sapMonthEndCheck_(cfg, pg, spec, job) {
+  try {
+    var reqs = job.sl.map(function (sl) { return { svc: SAP_SVC.billing, path: spec.path, params: spec.count(sl) }; }), ents = reqs.length > 1 ? sapFetchMany_(cfg, reqs) : null, diffs = [], live = 0, known = true;
+    reqs.forEach(function (rq, k) {
+      var r = null; if (ents) r = sapEntJson_(cfg, rq.svc, ents[k]);
+      if (!r) r = sapJson_(cfg, sapHttp_(cfg, rq.svc, rq.path, rq.params));
+      if (r.count === null) { known = false; return; }
+      live += r.count; var sl = job.sl[k];
+      if (r.count !== sl.n) diffs.push('numbers ' + (sl.lo || 'first') + ' to ' + (sl.hi || 'last') + ': SAP counts ' + r.count + ', read ' + sl.n);
+    });
+    return { known: known, live: live, diffs: diffs };
+  } catch (e) { return null; }
 }
 /* one page for each slice in `pass`, together when there is more than one; a slice whose page failed is read again on its own (full retries, then smaller pages). Returns [{res, top}] in the order of pass. */
 function sapRound_(cfg, pg, spec, pass) {
@@ -533,13 +574,19 @@ function sapRunJob_(cfg, job, t0, budget, handlers) {
       if (!active.length) break;
       if (Date.now() - t0 + slowest * 1.25 > budget) { flush(); sapSaveCursor_(job); sapProgress_(job, t0, budget, u0, false, pg); return { done: false }; }   // not when the slowest round so far would not fit: a run killed at 6 minutes leaves its run flag set for 8 minutes
       sapBeat_(); var tb = Date.now();
+      var bak = JSON.stringify({ sl: job.sl, cnt: job.cnt, mc: job.maxChange });   // the state before this round: a stop in the lookups puts it back, so nothing is half counted
       var pass = active.slice(0, pg.conc), rr = sapRound_(cfg, pg, spec, pass), hdrs = [], newRead = 0;
+      pg.groupMs = Math.max(pg.groupMs, Date.now() - tb);
       rr.forEach(function (x, k) {
         var sl = pass[k], items = x.res.results;
         if (!items.length) { sl.done = true; return; }
         if (items.length < x.top && x.res.next) sapCap_(pg, items.length);   // the server caps its pages
         var hs = items, got = items.length;
-        if (cfg.shape === 'B') { var g = sapItemsToHeaders_(items, items.length < x.top && !x.res.next); hs = g.headers; got = items.length - g.drop; }
+        if (cfg.shape === 'B') {
+          var one = (items.length >= x.top || !!x.res.next) && items.every(function (it) { return it.BillingDocument === items[0].BillingDocument; });
+          if (one) { items = sapDocItems_(cfg, pg, spec, items[0].BillingDocument); got = items.length; hs = sapItemsToHeaders_(items, true).headers; }   // a page that is one whole document and full: its other items are read by document number, never skipped
+          else { var g = sapItemsToHeaders_(items, items.length < x.top && !x.res.next); hs = g.headers; got = items.length - g.drop; }
+        }
         var lastDoc = String(hs[hs.length - 1].BillingDocument);
         if (sl.last && lastDoc <= sl.last) fail_('sap_error', 'SAP paging by document number did not move forward in ' + ym + ' (stuck at ' + sl.last + '). Nothing was staged for the month.');
         sl.last = lastDoc; sl.n += got; newRead += got; hs.forEach(function (h) { hdrs.push(h); });
@@ -549,7 +596,14 @@ function sapRunJob_(cfg, job, t0, budget, handlers) {
         var lc = sapDate_(h.LastChangeDate); if (lc && lc > job.maxChange) job.maxChange = lc;
         sapDocRows_(cfg, h, job.cnt).forEach(function (e) { entries.push(e); });
       });
-      if (entries.length) sapLookups_(cfg, ctx, entries, pg);
+      if (entries.length) {
+        try { sapLookups_(cfg, ctx, entries, pg, function () { return Date.now() - t0 + pg.groupMs * 1.25 > budget; }); }
+        catch (e) {
+          if (!e.sapStop) throw e;
+          var b0 = JSON.parse(bak); job.sl = b0.sl; job.cnt = b0.cnt; job.maxChange = b0.mc;   // put the round back; what the lookups fetched is already in the cache for the next run
+          flush(); sapSaveCursor_(job); sapProgress_(job, t0, budget, u0, false, pg); return { done: false };
+        }
+      }
       handlers.rows(job, ym, entries);
       entries.forEach(function (e) { if (handlers.stage) buf.push(e.row); });
       job.skip += newRead;
@@ -557,10 +611,11 @@ function sapRunJob_(cfg, job, t0, budget, handlers) {
       slowest = Math.max(slowest, Date.now() - tb);
     }
     flush();
-    if (job.total !== null && job.skip !== job.total) {   // documents were added or cancelled while the month was being read: a warning with both numbers, never a reason to throw the reading away
-      var w = 'Month ' + ym + ': read ' + job.skip + ' but SAP counted ' + job.total + ' when the month was started (documents changed while it was read). Kept; the next daily read re-checks changed documents.';
+    var mc = sapMonthEndCheck_(cfg, pg, spec, job), moved = job.total !== null && job.skip !== job.total;
+    if ((mc && mc.diffs.length) || moved) {   // documents were added, cancelled or numbered behind the read position while the month was read: a warning with the numbers, never a reason to throw the reading away
+      var w = 'Month ' + ym + ': SAP counted ' + (job.total === null ? '?' : job.total) + ' when the month was started' + (mc && mc.known ? ' and counts ' + mc.live + ' now' : '') + '; read ' + job.skip + '.' + (mc && mc.diffs.length ? ' Differs in ' + mc.diffs.slice(0, 4).join('; ') + '.' : '') + ' Kept as read. A document numbered behind the read position is not re-read in this run; the next daily read re-checks changed documents.';
       job.warns = (job.warns || []).concat([w]).slice(-3);
-      var sw = sapStatusGet_(); sapStatusPatch_({ warnings: ((sw.warnings || []).concat([{ at: new Date(Date.now()).toISOString(), msg: w }])).slice(-3) });
+      var sw = sapStatusGet_(); sapStatusPatch_({ warnings: ((sw.warnings || []).concat([{ at: new Date(Date.now()).toISOString(), msg: w.slice(0, 600) }])).slice(-3) });
     }
     handlers.month(job, ym);
     job.lines0 += job.cnt.lines; job.hdrs0 = (job.hdrs0 || 0) + job.cnt.headers; job.units0 += job.skip;
@@ -596,6 +651,8 @@ function sapSyncRun_(source) {
   sapVerifyGate_('sales');
   if (!st.shadow) fail_('sap_shadow_first', 'Run sapShadowRun first and have Vijay accept the October comparison. Nothing was read.');
   var ss = book_(true); sapAcquire_();
+  var contOff = function () { try { ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapContinueTrigger_') ScriptApp.deleteTrigger(t); }); } catch (e) {} };
+  if (source === 'trigger') sapContinueLater_(SAP_RUN_STALE_MS + 30000);   // a watchdog: if Google kills this run, this trigger (after the run flag has gone stale) carries on from the saved position
   var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, job = null, resumed = false, res = null, info = null;
   try {
     var cur = sapCursorGet_('SAP_CURSOR'); job = cur.job;
@@ -626,6 +683,7 @@ function sapSyncRun_(source) {
     res = sapRunJob_(cfg, job, t0, budget, handlers);
     var tot = job.totals;
     if (res.done) {
+      contOff();
       if (job.maxChange && job.maxChange > (sapProps_().getProperty('SAP_WM') || '')) sapProps_().setProperty('SAP_WM', job.maxChange);
       sapProps_().setProperty('SAP_CURSOR', '');
       var stg = sapStatusGet_(), n = 0; Object.keys(stg.staged || {}).forEach(function (k) { n += stg.staged[k].rows; });
@@ -641,13 +699,14 @@ function sapSyncRun_(source) {
     var patch = { lastAt: new Date(Date.now()).toISOString(), lastKind: 'sync', lastOk: false, message: sapRedact_(cfg, e.message || e) };
     if (conn) patch.conn = { ok: false, at: new Date(Date.now()).toISOString() };
     sapStatusPatch_(patch);
+    if (source === 'trigger') contOff();   // an error ends the chain
     throw e;
   } finally { sapRelease_(); }
 }
-function sapContinueLater_() {
+function sapContinueLater_(delayMs) {
   try {
     ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapContinueTrigger_') ScriptApp.deleteTrigger(t); });
-    ScriptApp.newTrigger('sapContinueTrigger_').timeBased().after(60 * 1000).create();
+    ScriptApp.newTrigger('sapContinueTrigger_').timeBased().after(delayMs || 60 * 1000).create();
   } catch (e) { /* the daily trigger will continue it */ }
 }
 
@@ -709,11 +768,11 @@ function sapShadowRun_(ymArg) {
       sapStatusPatch_({ lastAt: new Date(Date.now()).toISOString(), lastKind: 'shadow', message: 'The shadow run stopped at the run time limit; run sapShadowRun again (or sapShadowRunAuto once) to continue. ' + ((sapStatusGet_().progress || {}).text || ''), conn: { ok: true, at: new Date(Date.now()).toISOString() } });
       return { ok: true, done: false, resumed: resumed, resume: info, message: 'Stopped at the run time limit. Run sapShadowRun again to continue; nothing was written. ' + ((sapStatusGet_().progress || {}).text || '') + ' ' + sapDropText_(job), drops: job.drops || {}, progress: sapStatusGet_().progress || null };
     }
-    var diffs = sapCompare_(ss, ym, job.tally), dropTxt = sapDropText_(job), noneCounted = !(job.drops && job.drops.counted) && job.lines0 > 0;
+    var diffs = sapCompare_(ss, ym, job.tally), dropTxt = sapDropText_(job), noneCounted = job.lines0 > 0 && ((job.drops && job.drops.counted) || 0) * 4 < job.lines0;
     sapProps_().setProperty('SAP_CURSOR_SHADOW', '');
     var bad = diffs.filter(function (d) { return !d.equal; }), now = new Date(Date.now()).toISOString();
     sapSetJson_('SAP_SHADOW', { at: now, ym: ym, rows: bad.slice(0, 40) });
-    sapStatusPatch_({ lastAt: now, lastKind: 'shadow', lastOk: true, message: 'Shadow run for ' + ym + ': ' + diffs.length + ' plant-months compared, ' + bad.length + ' differ. Nothing was written. ' + dropTxt + (noneCounted ? ' WARNING: no line was counted although SAP sent ' + job.lines0 + '; the comparison is empty, read the reasons above.' : ''), conn: { ok: true, at: now },
+    sapStatusPatch_({ lastAt: now, lastKind: 'shadow', lastOk: true, message: 'Shadow run for ' + ym + ': ' + diffs.length + ' plant-months compared, ' + bad.length + ' differ. Nothing was written. ' + dropTxt + (noneCounted ? ' WARNING: only ' + ((job.drops && job.drops.counted) || 0) + ' of the ' + job.lines0 + ' lines SAP sent were counted (less than a quarter); the comparison is not valid, read the reasons above.' : ''), conn: { ok: true, at: now },
       shadow: { at: now, ym: ym, plantMonths: diffs.length, differ: bad.length, clean: bad.length === 0 }, read: { headers: job.hdrs0 || 0, lines: job.lines0 || 0 } });
     return { ok: true, done: true, resume: info, drops: job.drops || {}, dropExamples: job.dropEx || {}, ym: ym, resumed: resumed, progress: sapStatusGet_().progress || null, plantMonths: diffs.length, differ: bad.length, clean: bad.length === 0, differences: diffs, message: sapStatusGet_().message };
   } catch (e) {
@@ -938,10 +997,10 @@ function sapSync() { return sapPub_('sapSync', function () { return sapSyncRun_(
 /* sapShadowRunAuto(ym): runs the shadow read; if the run limit stops it, installs ONE one-off trigger that continues it about a minute later, and so on until it is finished. The trigger is removed when the run is done, on any error, when another run holds the run flag too often, or after SAP_AUTO_MAX_RUNS runs. Nothing is written to the Desk store. A time trigger cannot call sapShadowRun(ym) directly (it passes an event object), so the trigger calls sapShadowAutoTrigger_, which reads the month from SAP_AUTO. */
 function sapAutoTriggers_() { return ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'sapShadowAutoTrigger_'; }); }
 function sapAutoClear_() { try { sapAutoTriggers_().forEach(function (t) { ScriptApp.deleteTrigger(t); }); } catch (e) {} try { sapProps_().deleteProperty ? sapProps_().deleteProperty('SAP_AUTO') : sapProps_().setProperty('SAP_AUTO', ''); } catch (e2) {} }
-function sapAutoSchedule_(st) {
+function sapAutoSchedule_(st, delayMs) {
   sapAutoTriggers_().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('sapShadowAutoTrigger_').timeBased().after(SAP_AUTO_DELAY_MS).create();
-  sapSetJson_('SAP_AUTO', st);
+  ScriptApp.newTrigger('sapShadowAutoTrigger_').timeBased().after(delayMs || SAP_AUTO_DELAY_MS).create();
+  st.at = new Date(Date.now()).toISOString(); sapSetJson_('SAP_AUTO', st);
 }
 function sapRunBusy_() { var r = sapGetJson_('SAP_RUN', null); return !!(r && Date.now() - (r.at || 0) < SAP_RUN_STALE_MS); }
 function sapAutoStep_(ymArg, first) {
@@ -954,6 +1013,7 @@ function sapAutoStep_(ymArg, first) {
     sapAutoTriggers_().forEach(function (t) { ScriptApp.deleteTrigger(t); });   // this trigger has fired; a new one is made only if more is needed
     ym = st.ym || undefined;
   }
+  sapAutoSchedule_(st, SAP_RUN_STALE_MS + 30000);   // a watchdog: if Google kills this run at 6 minutes nothing below runs, and this trigger (after the run flag has gone stale) carries on from the saved position
   var r;
   try { r = sapShadowRun_(ym || undefined); }
   catch (e) {
