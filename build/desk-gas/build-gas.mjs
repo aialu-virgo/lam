@@ -31,7 +31,7 @@ if (code.split(MARK).length !== 2) throw new Error('Code.gs needs exactly one ' 
 code = code.replace(MARK, () => JSON.stringify(manifest.map(m => ({ name: m.name, chars: m.chars, sum: m.sum }))));
 fs.writeFileSync(path.join(outDir, 'Desk-Code.gs.txt'), code + '\n' + fs.readFileSync(path.join(here, 'src/sap.gs.js'), 'utf8'));
 fs.writeFileSync(path.join(outDir, 'appsscript.json.txt'), fs.readFileSync(path.join(here, 'src/appsscript.json'), 'utf8'));
-const table = ['| Create this HTML file in the editor | Paste this file | Size | Must end with (last line) |', '|---|---|---|---|']
+const table = ['| Create this HTML file in the editor | Paste this file | Size | Must end with (last line with text) |', '|---|---|---|---|']
   .concat(manifest.map(m => '| `' + m.name + '` | `' + m.file + '` | ' + Math.round(m.bytes / 1024) + ' KB | `' + m.tail.replace(/`/g, "'") + '` |')).join('\n');
 fs.writeFileSync(path.join(outDir, 'README.md'), fs.readFileSync(path.join(here, 'README.md'), 'utf8').replace('<!--@@PARTS_TABLE@@-->', table));
 for (const f of fs.readdirSync(outDir).sort()) console.log(f, fs.statSync(path.join(outDir, f)).size, 'bytes');

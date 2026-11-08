@@ -4,7 +4,7 @@ Files: `Desk-Code.gs.txt` (server), `appsscript.json.txt` (settings) and the pag
 The server joins the parts in order. Only the page parts change between Desk versions (Code.gs changes too whenever the number of parts or a checksum changes, so paste it every time).
 
 ### The page files (this build)
-Create one **HTML** file in the editor for each row, named exactly as shown (no `.html`), select all, paste the matching `.txt`, **Save**. Then check each file: click in it, press Ctrl+End, and the last line must be the text in the last column. If it is not, the save cut it off: select all, delete, paste again.
+Create one **HTML** file in the editor for each row, named exactly as shown (no `.html`), select all, paste the matching `.txt`, **Save**. Then check each file: click in it, press Ctrl+End, and the last line with text (ignore an empty line at the very end) must be the text in the last column. If it is not, the save cut it off: select all, delete, paste again.
 <!--@@PARTS_TABLE@@-->
 If a part is missing, cut short or from another version, the Web app shows "The Desk page is not fully installed" and names the file, instead of a blank page.
 
@@ -20,6 +20,7 @@ If a part is missing, cut short or from another version, the Web app shows "The 
 ## Every later Desk version (same link)
 1. Open the project. Paste the new `Desk-Code.gs.txt` into `Code.gs`, and each `Desk-Index*.txt` into its file (`Index`, `Index2` ...; add a new HTML file if there are more parts than before; delete extra files if there are fewer). Save each and check its last line (table above).
 2. **Deploy > Manage deployments > pencil > Version: New version > Deploy.** The `/exec` URL does not change.
+3. Open the `/exec` link and hard reload (Ctrl+Shift+R; Cmd+Shift+R on Mac), so the browser does not keep the old page.
 
 ## Moving the data from claude.ai (once, on your own computer)
 **Cutover rule: no uploads and no edits on the claude.ai Desk between Download and Restore.** Anything changed after the download is not in the backup. Tell the team to stay out until the restore is verified.
@@ -51,4 +52,4 @@ Super admin or project owner only. Functions are run from the editor toolbar (pi
 If SAP answers 403 or refuses the connection the message says an IP allow-list may be the cause (Apps Script uses Google addresses that are not fixed).
 
 ## Live deployment
-- Web app (virgoasia.com sign-in): https://script.google.com/a/macros/virgoasia.com/s/AKfycbydN1i3bDYOE1BOaqSat4BvRIfDAJu30qWAXfCKc-QwQ1E58Z9x0OiWaRAFziW9FX5GLw/exec (deployed 8 Nov 2026, D76)
+- Web app (virgoasia.com sign-in; since D106 the page is served from the parts Index, Index2 …): https://script.google.com/a/macros/virgoasia.com/s/AKfycbydN1i3bDYOE1BOaqSat4BvRIfDAJu30qWAXfCKc-QwQ1E58Z9x0OiWaRAFziW9FX5GLw/exec (deployed 8 Nov 2026, D76)
