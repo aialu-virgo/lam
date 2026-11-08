@@ -96,7 +96,7 @@ function missingRolls(){
   return out;
 }
 async function ensureRolls(force){
-  if(S.rbBusy||readOnly()||!S.rollLoaded||!S.loaded.cells)return;var u=effUser();if(!u||u.role!=='Super admin')return;
+  if(S.rbBusy||S.engBlock||readOnly()||!S.rollLoaded||!S.loaded.cells)return;var u=effUser();if(!u||u.role!=='Super admin')return;
   var miss=missingRolls();if(!miss.length)return;if(!force&&S.rbSig===miss.length+'|'+Object.keys(S.rollDocs).length)return;
   S.rbBusy=true;S.rbSig=null;var n=0;
   try{
