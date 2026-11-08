@@ -10,6 +10,7 @@ related:
   - open-questions.md
   - data-map/s4-odata-feed.md
   - design/target-model.md
+  - handover/account-takeover.md
 ---
 
 # Session takeover — 8 Nov 2026, 15:31 IST

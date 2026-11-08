@@ -30,3 +30,4 @@ Drafted 20 Oct for M7; each is checked against the page at the acceptance walk-t
 
 **Session takeover**
 - [Desk data load and v44, 8 Nov](session-takeover-2026-11-08-desk-load.md) — active
+- [Account takeover](account-takeover.md) — everything another claude.ai account needs to take over, 8 Nov 20:40 IST — active
