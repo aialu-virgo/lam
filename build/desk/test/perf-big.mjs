@@ -8,7 +8,7 @@ const store = JSON.parse(fs.readFileSync(process.env.BIGSTORE));
 const hash = process.argv[2] || '#/overview';
 const browser = await chromium.launch();
 const t0 = Date.now();
-const init = () => { window.__t0 = performance.now(); window.__tCard = null; const mo = new MutationObserver(() => { if (window.__tCard == null && document.querySelector('.ox-card, .dsh-card')) window.__tCard = performance.now() - window.__t0 }); document.addEventListener('DOMContentLoaded', () => mo.observe(document.documentElement, { childList: true, subtree: true })); window.__lt = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => window.__lt.push(Math.round(e.duration)))).observe({ entryTypes: ['longtask'] }) } catch (e) { } };
+const init = () => { window.__t0 = performance.now(); window.__tCard = null; const mo = new MutationObserver(() => { if (window.__tCard == null && document.querySelector('.ox-card, .dsh-card')) window.__tCard = performance.now() - window.__t0 }); document.addEventListener('DOMContentLoaded', () => mo.observe(document.documentElement, { childList: true, subtree: true })); window.__lt = []; try { new PerformanceObserver(l => l.getEntries().forEach(e => { window.__lt.push(Math.round(e.duration)); (window.__ltAt = window.__ltAt || []).push([Math.round(e.startTime - window.__t0), Math.round(e.duration)]) })).observe({ entryTypes: ['longtask'] }) } catch (e) { } };
 const { page, errs } = await open(browser, { store, today: '2026-10-23', init });
 await page.evaluate(h => { location.hash = h }, hash);
 const first = await page.waitForSelector('.ox-card, .dsh-card', { timeout: 300000 });
@@ -19,5 +19,5 @@ const tReady = Math.round(await page.evaluate(() => performance.now() - window._
 await page.waitForTimeout(1500);
 const lt = await page.evaluate(() => window.__lt || []);
 const rt = await page.evaluate(() => new Promise(r => { const t = performance.now(); setTimeout(() => r(Math.round(performance.now() - t)), 0) }));
-console.log(JSON.stringify({ hash, firstCardMs: tFirst, dsReadyMs: tReady, atFirstCard: st, longestLongTaskMs: Math.max(0, ...lt), longTasksOver500: lt.filter(x => x > 500).length, timerLatencyAfterMs: rt, pageErrors: errs.filter(e => /PAGEERROR/.test(e)).length }));
+console.log(JSON.stringify({ hash, firstCardMs: tFirst, dsReadyMs: tReady, atFirstCard: st, longestLongTaskMs: Math.max(0, ...lt), longTasksOver500: lt.filter(x => x > 500).length, timerLatencyAfterMs: rt, longTasksAtMs: await page.evaluate(() => window.__ltAt || []), pageErrors: errs.filter(e => /PAGEERROR/.test(e)).length }));
 await browser.close();

@@ -1877,8 +1877,15 @@ function canPage(u,pg){return pagesFor(u).indexOf(pg)>=0}
 function isCust(u){return u&&u.role==='Coordinator (sales / CRR)'}
 
 /* ---- roll-up store: plant x month, decoded in scope only ---- */
-var DS={raw:{},sig:'',ver:0,pg:{},spk:{},spIdx:{},xf:{},busy:false,again:false,status:'idle',cust:{},custVer:0,custJobs:0,custDone:0,cache:{},plants:[],months:[]};
+var DS={raw:{},sig:'',ver:0,pg:{},spk:{},spIdx:{},xf:{},busy:false,again:false,status:'idle',cust:{},custVer:0,custJobs:0,custDone:0,cache:{},plants:[],months:[],spReady:true,gen:0};
 function T0(){return {n:0,sh:0,sq:0,d:0,l:0}}
+/* perf (large stores): reading the history is staged. Stage 1 builds plant x product group x month totals (everything the Overview, Receivables,
+   Inventory and Targets pages read) and the page paints; stage 2 builds the per-salesperson maps in short slices (Sales, Team, My Dashboard, the rules
+   engine wait for it: DS.spReady). Both stages add rows in the same order as the one-pass build, so every figure is identical. Below STAGE_ROWS rows
+   (and for a Sales executive's own rows) everything is built in one pass, exactly as before. */
+var STAGE_ROWS=(typeof window!=='undefined'&&window.__STAGE_ROWS!=null)?window.__STAGE_ROWS:150000;
+var SLICE_MS=40;
+function rawRowCount(){var n=0;for(var k in DS.raw)n+=DS.raw[k].rows.length;return n}
 async function ingestRoll(){
   if(!S.rollLoaded||!S.smReady)return;
   if(DS.busy){DS.again=true;return}
@@ -1901,30 +1908,67 @@ async function ingestRoll(){
         if(sc.sp){/* an executive's own share of a plant needs the plant total; only the number is kept, never other people's rows */
           tot={};rows.forEach(function(r){if(!r[2])tot[r[0]]=(tot[r[0]]||0)+r[7]});rows=rows.filter(function(r){return spOk(sc,r[1])})}
         DS.raw[ids[i]]={at:d.at,plant:d.plant,ym:d.ym,rows:rows,tot:tot};changed=true;
-        if(Date.now()-T>120){T=Date.now();DS.status='Reading history '+(i+1)+' of '+ids.length;schedule();await tick()}
+        if(Date.now()-T>SLICE_MS){T=Date.now();DS.status='Reading history '+(i+1)+' of '+ids.length;schedule();await tick()}
       }
-      if(changed||DS.ver===0){rebuildMaps();DS.ver++;DS.cache={}}
+      if(changed||DS.ver===0||!DS.spReady){
+        if(!sc.sp&&rawRowCount()>STAGE_ROWS){
+          var g=++DS.gen;DS.spReady=false;
+          if(await rebuildMapsA(g)){DS.ver++;DS.cache={};DS.ready=true;DS.status='Reading salesperson detail';S.lastHtml='';schedule();
+            if(await rebuildMapsB(g)){DS.spReady=true;DS.ver++;DS.cache={};S.lastHtml='';S.engSig=null}}
+          if(DS.again)continue;
+        }else{rebuildMaps();DS.ver++;DS.cache={}}
+      }
       DS.status='ready';
     }while(DS.again);
-  }catch(e){DS.status='error: '+((e&&e.message)||e)}
+  }catch(e){DS.status='error: '+((e&&e.message)||e);DS.spReady=true}
   DS.busy=false;DS.ready=true;schedule();afterData();
 }
+/* one pass, synchronous: small stores, and callers that need the maps right now (a master change) */
 function rebuildMaps(){
-  DS.pg={};DS.spk={};DS.spIdx={};DS.xf={};DS.spRaw={};DS.ptot={};var plants={},months={};
-  Object.keys(DS.raw).forEach(function(id){
-    var o=DS.raw[id];plants[o.plant]=1;months[o.ym]=1;
-    if(o.tot)Object.keys(o.tot).forEach(function(g){var kk=o.plant+SEP+g,m=DS.ptot[kk]||(DS.ptot[kk]={});m[o.ym]=(m[o.ym]||0)+o.tot[g]});
-    o.rows.forEach(function(r){
-      /* r = [group, salesperson, transfer, docs, lines, sheets, sqft, net] */
-      if(r[2]){DS.xf[o.ym]=(DS.xf[o.ym]||0)+r[7];return}
-      var spc=spCanon(r[1]);DS.spRaw[r[1]]=(DS.spRaw[r[1]]||0)+r[4];
-      var k1=o.plant+SEP+r[0],m1=DS.pg[k1]||(DS.pg[k1]={}),a=m1[o.ym]||(m1[o.ym]=T0());
-      a.n+=r[7];a.sh+=r[5];a.sq+=r[6];a.d+=r[3];a.l+=r[4];
-      var k2=spc+SEP+o.plant+SEP+r[0],m2=DS.spk[k2];if(!m2){m2=DS.spk[k2]={};(DS.spIdx[spc]=DS.spIdx[spc]||[]).push(k2)}
-      var b=m2[o.ym]||(m2[o.ym]=T0());b.n+=r[7];b.sh+=r[5];b.sq+=r[6];b.d+=r[3];b.l+=r[4];
-    });
-  });
-  DS.plants=Object.keys(plants).sort();DS.months=Object.keys(months).sort();
+  DS.gen++;DS.spReady=true;rollReset();
+  var ids=Object.keys(DS.raw);ids.forEach(rollAdd);rollLists(ids);
+  ids.forEach(function(id){rollB(DS.raw[id])});
+}
+function rollReset(){DS.pg={};DS.spk={};DS.spIdx={};DS.xf={};DS.spRaw={};DS.ptot={}}
+function rollLists(ids){var pl={},mo={};ids.forEach(function(id){pl[DS.raw[id].plant]=1;mo[DS.raw[id].ym]=1});DS.plants=Object.keys(pl).sort();DS.months=Object.keys(mo).sort()}
+/* stage 1 for one doc: plant x group x month totals, transfers, plant totals for an executive, raw name counts */
+function rollAdd(id){
+  var o=DS.raw[id];
+  if(o.tot)Object.keys(o.tot).forEach(function(g){var kk=o.plant+SEP+g,m=DS.ptot[kk]||(DS.ptot[kk]={});m[o.ym]=(m[o.ym]||0)+o.tot[g]});
+  var rows=o.rows;
+  for(var i=0;i<rows.length;i++){var r=rows[i];
+    /* r = [group, salesperson, transfer, docs, lines, sheets, sqft, net] */
+    if(r[2]){DS.xf[o.ym]=(DS.xf[o.ym]||0)+r[7];continue}
+    DS.spRaw[r[1]]=(DS.spRaw[r[1]]||0)+r[4];
+    var k1=o.plant+SEP+r[0],m1=DS.pg[k1]||(DS.pg[k1]={}),a=m1[o.ym]||(m1[o.ym]=T0());
+    a.n+=r[7];a.sh+=r[5];a.sq+=r[6];a.d+=r[3];a.l+=r[4];
+  }
+}
+/* stage 2 for one doc: salesperson x plant x group x month */
+function rollB(o){
+  var rows=o.rows;
+  for(var i=0;i<rows.length;i++){var r=rows[i];if(r[2])continue;
+    var spc=spCanon(r[1]),k2=spc+SEP+o.plant+SEP+r[0],m2=DS.spk[k2];if(!m2){m2=DS.spk[k2]={};(DS.spIdx[spc]=DS.spIdx[spc]||[]).push(k2)}
+    var b=m2[o.ym]||(m2[o.ym]=T0());b.n+=r[7];b.sh+=r[5];b.sq+=r[6];b.d+=r[3];b.l+=r[4];
+  }
+}
+/* staged builds in short slices; false when superseded (a newer read started or a master changed) */
+async function rebuildMapsA(g){
+  rollReset();var ids=Object.keys(DS.raw),T=Date.now();
+  for(var i=0;i<ids.length;i++){
+    rollAdd(ids[i]);
+    if(Date.now()-T>SLICE_MS){T=Date.now();await tick();if(g!==DS.gen)return false}
+  }
+  rollLists(ids);
+  return g===DS.gen;
+}
+async function rebuildMapsB(g){
+  var ids=Object.keys(DS.raw),T=Date.now(),T2=T;
+  for(var i=0;i<ids.length;i++){
+    rollB(DS.raw[ids[i]]);
+    if(Date.now()-T>SLICE_MS){T=Date.now();if(T-T2>600){T2=T;DS.status='Reading salesperson detail '+(i+1)+' of '+ids.length;schedule()}await tick();if(g!==DS.gen||DS.again)return false}
+  }
+  return g===DS.gen;
 }
 function wins(ms){return ms.map(function(x){return typeof x==='string'?{ym:x,frac:1}:x})}
 /* f: {plants:Set|null, plant, group, sp}; w: [{ym,frac}] or [ym] */
@@ -2387,7 +2431,7 @@ async function evalR7(){
 }
 async function runEngine(){
   var u=effUser();if(!u||GLOBAL_ROLES.indexOf(u.role)<0||readOnly()||S.engBlock)return;
-  if(!S.loaded.actions||!S.loaded.uploads||!S.loaded.potential||!S.loaded.settings||!DS.ready)return;
+  if(!S.loaded.actions||!S.loaded.uploads||!S.loaded.potential||!S.loaded.settings||!DS.ready||!DS.spReady)return;/* the rules read per-person totals: wait for stage 2 of a large history */
   var sig=[DS.ver,DS.custVer,S.potVer,S.uploads.length,TODAY(),S.recv.length,S.stock.length,S.users.length].join('|');
   if(S.engSig===sig||S.engBusy)return;
   S.engBusy=true;S.engSig=sig;S.engStatus='Checking rules...';
@@ -8080,6 +8124,8 @@ function ctrlBar(pg){
 }
 function pageHtml(u){
   var pg=S.tab;
+  /* large history: pages that read per-salesperson totals wait for stage 2 (a few seconds); the rest are already complete */
+  if(!DS.spReady&&(pg==='sales'||pg==='team'||pg==='dashboard'||(pg==='overview'&&S.f.sp)))return '<section class="card" role="status"><h2>Reading salesperson history</h2><p class="note">The totals by branch are ready on Overview. This page needs the detail by salesperson, which is still being read.</p></section>';
   if(pg==='today')return pageToday();
   if(pg==='targets')return pageTargets();
   if(pg==='dashboard')return pageDash();

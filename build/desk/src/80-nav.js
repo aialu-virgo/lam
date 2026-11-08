@@ -118,6 +118,8 @@ function ctrlBar(pg){
 }
 function pageHtml(u){
   var pg=S.tab;
+  /* large history: pages that read per-salesperson totals wait for stage 2 (a few seconds); the rest are already complete */
+  if(!DS.spReady&&(pg==='sales'||pg==='team'||pg==='dashboard'||(pg==='overview'&&S.f.sp)))return '<section class="card" role="status"><h2>Reading salesperson history</h2><p class="note">The totals by branch are ready on Overview. This page needs the detail by salesperson, which is still being read.</p></section>';
   if(pg==='today')return pageToday();
   if(pg==='targets')return pageTargets();
   if(pg==='dashboard')return pageDash();
