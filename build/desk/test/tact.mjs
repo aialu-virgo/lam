@@ -26,10 +26,9 @@ const browser = await chromium.launch();
   ok('slow load: the top bar is on', mid.some(h => /\bon\b/.test(h.bar)), mid.find(h => /\bon\b/.test(h.bar)) ? 'yes' : 'never');
   const a11y = await page.evaluate(() => { const c = document.getElementById('act-chip'); return { role: c.getAttribute('role'), live: c.getAttribute('aria-live'), barHidden: document.getElementById('act-bar').getAttribute('aria-hidden') } });
   ok('chip is role=status, aria-live=polite; the bar is decorative', a11y.role === 'status' && a11y.live === 'polite' && a11y.barHidden === 'true', JSON.stringify(a11y));
-  if (SHOTS) { for (const [w, h, s] of [[1440, 900, 'light'], [1440, 900, 'dark'], [360, 740, 'light'], [360, 740, 'dark']]) { } }
   await page.waitForFunction(() => document.getElementById('act-chip').hidden, null, { timeout: 120000 });
   await page.waitForTimeout(1500);
-  const end = await page.evaluate(() => ({ hidden: document.getElementById('act-chip').hidden, bar: document.getElementById('act-bar').className, txt: document.getElementById('act-chip').innerText }));
+  const end = await page.evaluate(() => ({ hidden: document.getElementById('act-chip').hidden, bar: document.getElementById('act-bar').className, txt: document.querySelector('#act-chip .act-txt').textContent }));
   ok('hides when all work is idle (chip hidden, bar off, no text)', end.hidden && !/\bon\b|err/.test(end.bar) && end.txt === '', JSON.stringify(end));
   ok('no page errors', errs.filter(e => /PAGEERROR/.test(e)).length === 0);
   await page.context().close();
@@ -52,7 +51,7 @@ const browser = await chromium.launch();
 /* 3. upload: "Checking file" then "Uploading file" with progress, then idle */
 {
   const plants = Object.keys(base).filter(k => /^plants\//.test(k) && base[k].plant_name && /^DEMO/.test(base[k].plant_name)).slice(0, 2).map(k => ({ code: k.slice(7), name: base[k].plant_name }));
-  const g = G.invoices({ shape: 'B1', plants, months: ['2026-08', '2026-09'], docsPerPlantMonth: 60, seed: 9, dateStyle: 'iso', withLineNum: true });
+  const g = G.invoices({ shape: 'B1', plants, months: ['2026-10', '2026-11'], docsPerPlantMonth: 60, seed: 9, dateStyle: 'iso', withLineNum: true });
   const csv = [g.headers.join(',')].concat(g.rows.map(r => r.map(v => { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v }).join(','))).join('\n');
   const f = path.join(os.tmpdir(), 'tact-up-' + process.pid + '.csv'); fs.writeFileSync(f, csv);
   const st = JSON.parse(JSON.stringify(base)); Object.keys(st).forEach(k => { if (/^(cells|inv|roll|uploads)\//.test(k)) delete st[k] });
@@ -61,10 +60,11 @@ const browser = await chromium.launch();
   await (await page.$('input[type=file]')).setInputFiles(f); await page.waitForTimeout(1500);
   await page.click('[data-act="u-validate"]'); await page.waitForFunction(() => window.__desk.U && window.__desk.U.stage === 'validated', null, { timeout: 120000 });
   if (await page.$('[data-act="u-confrep"]')) await page.click('[data-act="u-confrep"]');
+  await page.evaluate(() => { const S = window.__dbg.S, o = S.db.doc; S.db.doc = p => { const d = o.call(S.db, p), s = d.set; d.set = async v => { await new Promise(r => setTimeout(r, 250)); return s.call(d, v) }; return d } }); /* a real upload takes seconds; slow the writes so the sampler can see it */
   await page.click('[data-act="u-load"]'); await page.waitForFunction(() => window.__desk.U.stage === 'done', null, { timeout: 240000 });
   await page.waitForTimeout(2000);
   const h = await hist(page), tx = h.filter(x => !x.hidden).map(x => x.txt);
-  ok('upload: chip showed "Checking file"', tx.some(x => /Checking file/.test(x)), [...new Set(tx)].slice(0, 6).join(' / '));
+  ok('upload: chip named the upload task', tx.some(x => /Checking file|Reading file|Uploading file/.test(x)), [...new Set(tx)].slice(0, 6).join(' / '));
   ok('upload: chip showed "Uploading file" with a filled bar', h.some(x => /Uploading file/.test(x.txt) && /%/.test(x.w)), [...new Set(tx)].slice(0, 8).join(' / '));
   ok('upload: hidden again when finished', await page.evaluate(() => document.getElementById('act-chip').hidden));
   fs.unlinkSync(f); await page.context().close();

@@ -129,8 +129,13 @@ ok('a tampered part file is refused (size or checksum), nothing written', tv.sta
 await pick(R.page, files); await R.page.waitForFunction(() => ['verified', 'error'].includes(window.__gasRestoreState().stage), null, { timeout: 120000 });
 const vr = await R.page.evaluate(() => { const s = window.__gasRestoreState(); return { stage: s.stage, err: s.err, rows: s.rows && s.rows.length }; });
 ok('manifest and checksums verified in the browser', vr.stage === 'verified' && vr.rows === 32, JSON.stringify(vr));
+await R.page.evaluate(() => { window.__ah = []; setInterval(() => { const c = document.getElementById('act-chip'); if (c) window.__ah.push({ hidden: c.hidden, txt: c.querySelector('.act-txt').textContent, w: document.getElementById('act-bar').firstChild.style.width }); }, 50); });
 await R.page.click('[data-gr="run"]'); await R.page.waitForFunction(() => ['done', 'verified', 'error'].includes(window.__gasRestoreState().stage) && window.__gasRestoreState().stage !== 'working', null, { timeout: 600000 });
+await R.page.waitForTimeout(1500);
+const actH = await R.page.evaluate(() => window.__ah);
 const rr = await R.page.evaluate(() => window.__gasRestoreState());
+ok('activity chip showed "Restoring N of 32 collections" with a filled bar during the restore', actH.some(h => !h.hidden && /Restoring \d+ of 32 collections/.test(h.txt) && /%/.test(h.w)), JSON.stringify([...new Set(actH.filter(h => !h.hidden).map(h => h.txt))].slice(0, 6)));
+ok('activity chip is hidden again after the restore', await R.page.evaluate(() => document.getElementById('act-chip').hidden), '');
 ok('restore finished and every collection matches its manifest count and checksum', rr.stage === 'done' && rr.report.every(r => r.ok), JSON.stringify(rr.err || rr.report.filter(r => !r.ok)));
 ok('report lists counts for all 32 collections (geography added, D80; dashboard layouts and role defaults added, M8)', rr.report && rr.report.length === 32);
 const got = env2.stored(); let bad = 0, miss = 0, extra = 0;
