@@ -83,6 +83,7 @@ function bannersHtml(){
   if(lsGet('desk-today'))h+='<div class="banner info"><span>Test clock: today is set to <b>'+esc(fmtDate(TODAY()))+'</b> for this browser only (Admin › Settings).</span><button class="btn sm" data-act="clock-reset">Use the real date</button></div>';
   if(DS.custJobs>0)h+='<div class="banner info">Reading customer detail '+DS.custDone+' of '+DS.custJobs+'...</div>';
   if(DS.status&&DS.status!=='ready'&&DS.status!=='idle')h+='<div class="banner info">'+esc(DS.status)+'</div>';
+  if(S.jobBanner)h+='<div class="banner '+(S.jobBannerOk?'ok':'err')+'"><span>'+esc(S.jobBanner)+'</span><button class="btn sm" data-act="job-dismiss">Dismiss</button></div>';
   if(S.err)h+='<div class="banner err">Database message: '+esc(S.err)+'</div>';
   return h;
 }
