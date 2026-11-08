@@ -70,7 +70,7 @@ export function synthBP(masters = synthMasters()) {
 }
 export function makeS4(cfg = {}) {
   const S = { user: 'svc_reader', password: 'S3cret-pw-9', host: 'https://mock-tenant-api.s4hana.test', docs: cfg.docs || [], products: cfg.products || synthMasters().products, customers: cfg.customers || synthMasters().customers,
-    bp: cfg.bp || synthBP(cfg.customers ? { products: {}, customers: cfg.customers } : synthMasters()), pageCap: cfg.pageCap || null, msPerCall: cfg.msPerCall || 0, calls: [], fails: [], metaGaps: cfg.metaGaps || [], noCount: !!cfg.noCount, miscount: 0, leak: !!cfg.leak };
+    bp: cfg.bp || synthBP(cfg.customers ? { products: {}, customers: cfg.customers } : synthMasters()), pageCap: cfg.pageCap || null, msPerCall: cfg.msPerCall || 0, msPerItem: cfg.msPerItem || 0, items: 0, calls: [], fails: [], metaGaps: cfg.metaGaps || [], noCount: !!cfg.noCount, miscount: 0, leak: !!cfg.leak };
   const res = (code, body, headers) => ({ code, body: typeof body === 'string' ? body : JSON.stringify(body), headers: headers || {} });
   const strip = (s) => String(s).replace(/^0+/, '');
   function lit(v) { v = v.trim(); let m; if ((m = /^datetime'([^']+)'$/.exec(v))) return { t: 'd', v: Date.parse(m[1] + 'Z') }; if ((m = /^'(.*)'$/.exec(v))) return { t: 's', v: m[1].replace(/''/g, "'") }; if (v === 'true' || v === 'false') return { t: 'b', v: v === 'true' }; return { t: 'n', v: +v }; }
@@ -85,10 +85,10 @@ export function makeS4(cfg = {}) {
     if (nav && o[nav]) { const ip = want.filter(w => w.startsWith(nav + '/')).map(w => w.slice(nav.length + 1)); out[nav] = { results: o[nav].results.map(it => { const x = {}; ip.forEach(p => { if (p in it) x[p] = it[p]; }); return x; }) }; } return out; }
   function list(rows, q, key, nav, selDefault) {
     let r = filt(rows, q.get('$filter'));
-    const ob = q.get('$orderby'); if (ob) { const f = ob.split(' ')[0]; r = r.slice().sort((a, b) => (a[f] < b[f] ? -1 : a[f] > b[f] ? 1 : 0)); }
+    const ob = q.get('$orderby'); if (ob) { const f = ob.split(' ')[0], dir = /\bdesc$/i.test(ob.split(',')[0].trim()) ? -1 : 1; r = r.slice().sort((a, b) => dir * (a[f] < b[f] ? -1 : a[f] > b[f] ? 1 : 0)); }
     const total = r.length, skip = +(q.get('$skip') || 0); let top = q.get('$top') != null ? +q.get('$top') : total, capped = false;
     if (S.pageCap && top > S.pageCap) { top = S.pageCap; capped = true; }
-    const page = r.slice(skip, skip + top).map(o => pick(o, q.get('$select'), q.get('$expand') === nav ? nav : null));
+    const page = r.slice(skip, skip + top).map(o => pick(o, q.get('$select'), q.get('$expand') === nav ? nav : null)); S.items += page.reduce((n, o) => n + (nav && o[nav] ? o[nav].results.length : 1), 0);
     const d = { results: page }; if (q.get('$inlinecount') === 'allpages' && !S.noCount) d.__count = String(total + S.miscount);
     if (capped && skip + top < total) d.__next = S.host + '/next?skip=' + (skip + top);
     return { d };
@@ -103,6 +103,7 @@ export function makeS4(cfg = {}) {
   S.fetch = (url, o, env) => {
     const method = (o && o.method) || 'get', u = new URL(url); S.calls.push({ method: method.toLowerCase(), url, path: u.pathname, query: u.search, headers: Object.assign({}, o && o.headers) });
     if (env && S.msPerCall) env.skew += S.msPerCall;
+    S.items = 0;
     if (u.origin !== S.host) throw new Error('getaddrinfo ENOTFOUND ' + u.host);
     const f = S.fails.find(x => x.times > 0 && x.when.test(u.pathname + u.search)); if (f) { f.times--; if (f.throw) throw new Error('Exception: Timeout: ' + url); return res(f.code, f.body || { error: { message: { value: f.msg || 'injected failure' } } }); }
     const auth = (o && o.headers && o.headers.Authorization) || '', want = 'Basic ' + Buffer.from(S.user + ':' + S.password).toString('base64');
@@ -129,6 +130,7 @@ export function makeS4(cfg = {}) {
     if (svc === 'API_BUSINESS_PARTNER') { const set = { A_Customer: S.bp.customers, A_CustomerCompany: S.bp.company, A_CustomerSalesArea: S.bp.salesAreas, A_BusinessPartnerAddress: S.bp.addresses, A_BusinessPartnerTax: S.bp.taxes }[rest]; if (set) return res(200, list(set, q, 'Customer')); }
     return res(404, { error: { message: { value: 'Entity set not found' } } });
   };
+  { const inner = S.fetch; S.fetch = (url, o, env) => { const r = inner(url, o, env); if (env && S.msPerItem) env.skew += S.msPerItem * S.items; return r; }; }   // optional cost per row returned (bigger pages take longer)
   S.failNext = (when, code, times = 1, extra = {}) => S.fails.push(Object.assign({ when, code, times }, extra));
   S.strip = strip;
   return S;

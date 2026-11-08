@@ -48,7 +48,7 @@ export function makeEnv(opts = {}) {
     console, Math, Date: class extends Date { static now() { return Date.now() + state.skew; } }, JSON, Object, Array, String, Number, Error,
     SpreadsheetApp: { create() { ss.first = mkSheet('Sheet1'); return ss; }, openById(id) { if (id !== 'SHEET1') throw new Error('no such sheet'); return ss; } },
     LockService: { getScriptLock() { return { waitLock() { if (state.held > 0) throw new Error('Lock re-entered: the script lock is already held by this execution'); state.locks++; if (state.lockFail) throw new Error('Could not obtain lock after 30000 ms'); state.held++; }, releaseLock() { if (state.held > 0) state.held--; } }; } },
-    CacheService: { getScriptCache() { return { get(k) { return k in cache ? cache[k] : null; }, put(k, v) { cache[k] = v; } }; } },
+    CacheService: { getScriptCache() { return { get(k) { return k in cache ? cache[k] : null; }, put(k, v) { cache[k] = v; }, getAll(ks) { state.cacheGetAll = (state.cacheGetAll || 0) + 1; if (ks.length > 100) throw new Error('getAll: at most 100 keys'); const o = {}; ks.forEach(k => { if (k in cache) o[k] = cache[k]; }); return o; }, putAll(o) { state.cachePutAll = (state.cachePutAll || 0) + 1; if (Object.keys(o).length > 100) throw new Error('putAll: at most 100 keys'); Object.assign(cache, o); } }; } },
     PropertiesService: { getScriptProperties() { return { getProperty(k) { return k in props ? props[k] : null; }, setProperty(k, v) { if (String(v).length > 9216) throw new Error('Property value too large'); props[k] = String(v); }, deleteProperty(k) { delete props[k]; } }; } },
     Session: { getActiveUser() { return { getEmail() { return state.email; } }; }, getEffectiveUser() { return { getEmail() { return state.effective || 'data@virgoasia.com'; } }; } },
     ScriptApp: { getService() { return { getUrl() { return 'https://script.google.com/a/macros/virgoasia.com/s/XYZ/exec'; } }; },
@@ -58,7 +58,10 @@ export function makeEnv(opts = {}) {
       newBlob(d) { const buf = typeof d === 'string' ? Buffer.from(d, 'utf8') : Buffer.from(d); return { getBytes() { return Array.from(buf); }, getDataAsString() { return buf.toString('utf8'); } }; },
       gzip(b) { const z = zlib.gzipSync(Buffer.from(b.getBytes())); return { getBytes() { return Array.from(z); } }; }, ungzip(b) { const z = zlib.gunzipSync(Buffer.from(b.getBytes())); return { getDataAsString() { return z.toString('utf8'); } }; } },
     Logger: { log(m) { (state.logs = state.logs || []).push(String(m)); } },
-    UrlFetchApp: { fetch(url, o) { if (!opts.fetch) throw new Error('UrlFetchApp is not available in this test'); const r = opts.fetch(url, o, state); return { getResponseCode() { return r.code; }, getContentText() { return r.body; }, getHeaders() { return r.headers || {}; } }; } },
+    UrlFetchApp: { fetch(url, o) { if (!opts.fetch) throw new Error('UrlFetchApp is not available in this test'); const r = opts.fetch(url, o, state); return { getResponseCode() { return r.code; }, getContentText() { return r.body; }, getHeaders() { return r.headers || {}; } }; },
+      /* like the real one: all requests go out together (virtual time advances by the slowest), and an exception in any request fails the whole call */
+      fetchAll(reqs) { if (!opts.fetch) throw new Error('UrlFetchApp is not available in this test'); state.fetchAllCalls = (state.fetchAllCalls || 0) + 1; state.fetchAllMax = Math.max(state.fetchAllMax || 0, reqs.length); const base = state.skew; let mx = 0;
+        const out = reqs.map(q => { state.skew = base; const r = opts.fetch(q.url, q, state); mx = Math.max(mx, state.skew - base); return { getResponseCode() { return r.code; }, getContentText() { return r.body; }, getHeaders() { return r.headers || {}; } }; }); state.skew = base + mx; return out; } },
     HtmlService: {
       XFrameOptionsMode: { DEFAULT: 'DEFAULT' },
       createHtmlOutputFromFile() { return { getContent() { return fs.readFileSync(opts.indexFile || path.join(here, '../out/Desk-Index.txt'), 'utf8'); } }; },
@@ -67,7 +70,7 @@ export function makeEnv(opts = {}) {
   };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(path.join(here, '../src/Code.gs.js'), 'utf8'), ctx, { filename: 'Code.gs' });
-  vm.runInContext(fs.readFileSync(path.join(here, '../src/sap.gs.js'), 'utf8'), ctx, { filename: 'sap.gs' });
+  vm.runInContext(fs.readFileSync(opts.sapFile || process.env.SAP_GS_FILE || path.join(here, '../src/sap.gs.js'), 'utf8'), ctx, { filename: 'sap.gs' });
   function storedAll() { // {col/id: json} using the same rule as the server: newest token with all parts
     const out = {};
     Object.keys(sheets).filter(n => n.startsWith('c_')).forEach(n => {

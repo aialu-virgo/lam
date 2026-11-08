@@ -115,11 +115,11 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   // shadow first (so sync is allowed), then make SAP fail on the first billing page
   r = env.call('sapShadowRun'); ok('shadow run completes with the right password', r.ok && r.done, sj(r).slice(0, 200));
   const stored0 = sj(env.stored());
-  S.failNext(/A_BillingDocument\?/, 403, 5); r = env.call('sapSync');
+  const nBefore403 = S.calls.length; S.failNext(/A_BillingDocument\?/, 403, 5); r = env.call('sapSync');
   ok('403 on the first page: code sap_forbidden, nothing staged, nothing written', r.code === 'sap_forbidden' && sj(env.stored()) === stored0 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/')), sj(r));
-  ok('403 is not retried', S.calls.filter(c => /A_BillingDocument\?/.test(c.path + c.query)).length <= 2);
+  ok('403 is not retried (only the two planning calls went out)', S.calls.slice(nBefore403).filter(c => /A_BillingDocument\?/.test(c.path + c.query)).length <= 2);
   S.fails = []; const n0 = S.calls.length; S.failNext(/A_BillingDocument\?/, 500, 99); r = env.call('sapSync');
-  ok('500: retried 3 times, then code sap_error, nothing staged', r.code === 'sap_error' && /HTTP 500/.test(r.message) && S.calls.length - n0 === 4 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/')), sj(r) + (S.calls.length - n0));
+  ok('500: retried 3 times (after the parallel try), then code sap_error, nothing staged', r.code === 'sap_error' && /HTTP 500/.test(r.message) && S.calls.length - n0 === 6 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/')), sj(r) + (S.calls.length - n0));   // the two one-row planning calls go out together, then the first one is retried 3 times alone
   ok('500: the run flag is released (the next run is not "busy")', !/in progress/.test(r.message) && env.call('sapSync').code === 'sap_error');
   S.fails = []; S.failNext(/A_BillingDocument\?/, 404, 1); r = env.call('sapSync'); ok('404: code sap_not_found, tells to run sapVerifyMetadata', r.code === 'sap_not_found' && /sapVerifyMetadata/.test(r.message), sj(r));
   S.fails = []; S.failNext(/./, 0, 99, { throw: true }); r = env.call('sapSync');
@@ -129,9 +129,9 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   S.fails = [];
   // failure on page 2 of a month: no manifest (nothing committed), the cursor is kept, the next run finishes the month
   ({ S, env } = build({ docs, s4opts: { pageCap: 25 } })); env.call('sapShadowRun'); env.ctx.SAP_CHUNK_ROWS = 20;
-  let seen = 0; const orig = S.fetch; S.fetch = (u, o, e) => { if (/A_BillingDocument\?/.test(u) && /skip=50/.test(u) && (S.once || 0) < 4) { S.once = (S.once || 0) + 1; return { code: 500, body: '{"error":{"message":{"value":"boom"}}}' }; } return orig(u, o, e); }; void seen;
+  let seen = 0; const orig = S.fetch; S.fetch = (u, o, e) => { if (/A_BillingDocument\?/.test(u) && /BillingDocument gt '/.test(decodeURIComponent(u)) && (S.once || 0) < 99) { S.once = (S.once || 0) + 1; return { code: 500, body: '{"error":{"message":{"value":"boom"}}}' }; } return orig(u, o, e); }; void seen;
   r = env.call('sapSync'); ok('500 on page 3: the run fails and no manifest is written', r.code === 'sap_error' && !('sapstage/man_2026-10' in env.stored()), sj(r));
-  ok('the cursor was kept, so the next run resumes', env.call('sapStatus').status.resume === true);
+  ok('the cursor was kept, so the next run resumes', env.call('sapStatus').status.resume === true); S.once = 1000;
   r = env.call('sapSync'); ok('next run resumes and completes', r.ok && r.done && r.resumed === true && 'sapstage/man_2026-10' in env.stored(), sj(r));
   const got = stagedRows(env, '2026-10'), exp = expect(docs, '2026-10');
   ok('resumed month holds exactly the expected rows (no gap, no repeat)', got.rows.length === exp.sales + exp.credit && new Set(got.rows.map(x => x[0] + '|' + x[1])).size === got.rows.length, got.rows.length + ' vs ' + (exp.sales + exp.credit));
@@ -379,13 +379,14 @@ function sapJsonOf(env, k) { try { return JSON.parse(env.props[k] || '{}'); } ca
   const pages = S.calls.slice(nShadow).filter(c => /A_BillingDocument\?/.test(c.path + c.query) && /orderby/.test(c.query) && /expand/.test(c.query) && /2026-10-01/.test(decodeURIComponent(c.query)) && /2026-11-01/.test(decodeURIComponent(c.query)));
   const hdrs = docs.filter(d => d.CompanyCode === '1000' && iso(d.BillingDocumentDate) >= '2026-10-01' && iso(d.BillingDocumentDate) < '2026-11-01').length;
   ok('paging: a server that returns fewer rows than $top is followed with $skip until the count is reached', r.ok && pages.length === Math.ceil(hdrs / 17) + 0 || pages.length >= Math.ceil(hdrs / 17), pages.length + ' pages for ' + hdrs + ' documents');
-  ok('paging: $top and $skip (increasing by what was received) and $orderby on the key; $inlinecount on the first page only', pages.every((c, i) => { const q = new URLSearchParams(c.query); return q.get('$top') === '200' && +q.get('$skip') === i * 17 && q.get('$orderby') === 'BillingDocument asc' && (i === 0 ? q.get('$inlinecount') === 'allpages' : !q.get('$inlinecount')); }));
+  ok('paging by key: no request uses $skip; each next page asks for BillingDocument gt the last one read, ordered by the key', pages.length > 1 && pages.every(c => { const q = new URLSearchParams(c.query); return !q.has('$skip') && q.get('$orderby') === 'BillingDocument asc'; }) && pages.some(c => /BillingDocument gt '\d{10}'/.test(decodeURIComponent(c.query))));
+  ok('paging: the count comes from the one-row planning call, not from the pages', S.calls.slice(nShadow).filter(c => /inlinecount/.test(c.query) && /\$top=1(&|$)/.test(c.query)).length >= 1 && pages.every(c => !/inlinecount/.test(c.query)));
   ok('paging: every line arrived once', got.rows.length === exp.sales + exp.credit && new Set(got.rows.map(x => x[0] + '|' + x[1])).size === got.rows.length);
   ok('paging: the count check passed and is recorded', got.man.countChecked === true);
   // count mismatch
   ({ S, env } = build({ docs, s4opts: { miscount: 0 } })); env.call('sapShadowRun'); S.miscount = 3; r = env.call('sapSync');
-  ok('a count that does not match what was read stops the month: nothing staged, no manifest', r.code === 'sap_error' && /counted/.test(r.message) && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/man_')), sj(r));
-  ok('and the next run starts the month again (the bad cursor is cleared)', env.call('sapStatus').status.resume === false);
+  ok('a count that does not match what was read is a warning with both numbers: the month IS staged, nothing thrown away', r.ok && r.done && 'sapstage/man_2026-10' in env.stored() && env.call('sapStatus').status.warnings.some(w => /read \d+ but SAP counted \d+/.test(w.msg)), sj(r).slice(0, 300));
+  ok('and the cursor is not left behind to restart from', env.call('sapStatus').status.resume === false);
   // no inlinecount support
   ({ S, env } = build({ docs, s4opts: { noCount: true } })); env.call('sapShadowRun'); r = env.call('sapSync'); const g3 = stagedRows(env, '2026-10');
   ok('a server without $inlinecount works (stops at the empty page); the manifest says the count was not checked', r.ok && g3.man.countChecked === false && g3.rows.length === exp.sales + exp.credit, sj(g3.man.countChecked));
