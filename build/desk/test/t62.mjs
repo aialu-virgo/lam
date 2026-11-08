@@ -3,7 +3,7 @@ import fs from 'fs';import { createRequire } from 'module';
 const require=createRequire(import.meta.url);const G=require('../../demo-data/generator.js');
 const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';const AF=SP+'af/';
 const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
-const browser=await chromium.launch();const res=[];const ok=(n,c,d)=>res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
+const browser=await chromium.launch();const res=[];process.on('exit',()=>console.log(res.join('\n')));const ok=(n,c,d)=>res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
 const csvOf=(h,rows)=>[h.join(',')].concat(rows.map(r=>r.map(v=>{v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(','))).join('\n');
 const plants=Object.keys(store).filter(k=>/^plants\//.test(k)&&store[k].plant_name&&/^DEMO/.test(store[k].plant_name)).slice(0,4).map(k=>({code:k.slice(7),name:store[k].plant_name}));
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -86,13 +86,13 @@ ok('rating: with more than 10 branches the card shows Top 5 and Bottom 5 (10 row
 /* ---- 4. collections bars ---- */
 const CB=await ev(()=>{const mk=(l,A,cur)=>({label:l,A:A,isCur:!!cur});return window.__dbg.oxCollBars([mk('Q1 FY26',3.1e9),mk('Q2 FY26',3.4e9),mk('Q3 FY26',null),mk('Q4 FY26',3.3e9),mk('Q1 FY27',3.6e9),mk('Q2 FY27',3.3e9),mk('Q3 FY27',null,true)])});
 ok('collections card: seven quarters as bars with the rupee-crore value on each, n/l for a quarter not loaded, QoQ in the tap text',/>310</.test(CB)&&/>340</.test(CB)&&/>n\/l</.test(CB)&&/receipts not loaded/.test(CB)&&/QoQ \+/.test(CB),CB.slice(0,200));
+const flags=await ev(()=>{const S=window.__dbg.S,o={};for(const k of Object.keys(S.cells)){const c=S.cells[k];if(c.entity==='INV')Object.keys(c.plants).forEach(p=>{o[k+'|'+p]=c.plants[p].dimFrom})}return o});
 /* ---- 5. never zero when the item detail is missing ---- */
 await ev(()=>{const S=window.__dbg.S;for(const k of ['2026-10','2026-09','2026-08','2026-07']){const c=S.cells['INV_'+k];Object.keys(c.plants).forEach(p=>{c.plants[p]=Object.assign({},c.plants[p],{dimFrom:undefined})})}window.__dbg.DS.dimVer++;window.__desk.S.lastHtml=''});
 await ev(()=>{location.hash='#/sales'});await page.waitForTimeout(300);await ev(()=>{location.hash='#/overview'});await page.waitForTimeout(1500);
 const t2=await page.innerText('#main').catch(()=>page.innerText('body'));
 ok('not loaded, never zero: months loaded before v44 (no detail) show "No thickness or brand detail" and name the fix, with no bars',/No thickness or brand detail for Q3 FY27/.test(t2)&&/Reload these months in Data Intake/.test(t2)&&(await ev(()=>document.querySelectorAll('.ox-sp').length))===0,'');
 /* restore the detail flags, then a partial case */
-const flags=await ev(()=>{const S=window.__dbg.S,o={};for(const k of Object.keys(S.cells)){const c=S.cells[k];if(c.entity==='INV')Object.keys(c.plants).forEach(p=>{o[k+'|'+p]=c.plants[p].dimFrom})}return o});
 await ev(([f])=>{const S=window.__dbg.S;Object.keys(f).forEach(k=>{const[ck,p]=k.split('|');S.cells[ck].plants[p]=Object.assign({},S.cells[ck].plants[p],{dimFrom:f[k]})});window.__dbg.DS.dimVer++;S.lastHtml=''},[flags]);
 await ev(()=>{location.hash='#/sales'});await page.waitForTimeout(300);await ev(()=>{location.hash='#/overview'});await page.waitForTimeout(1500);
 const t3=await page.innerText('#main').catch(()=>page.innerText('body'));
@@ -115,7 +115,7 @@ ok('zones: Overview shows ZONE tiles and says 3 plants take the zone from their 
 await ev(()=>{location.hash='#/admin'});await page.waitForTimeout(800);
 await page.click('[data-act="atab"][data-t="plants"]');await page.waitForTimeout(500);
 ok('admin: Plants tab has the "Set zones from sales" action',(await page.$('[data-act="zones-set"]'))!=null,'');
-await page.click('[data-act="zones-set"]');await page.waitForSelector('[data-act="zones-go"]',{timeout:30000});
+await page.click('[data-act="zones-set"]');await page.waitForSelector('[data-act="zones-go"]',{timeout:30000}).catch(async()=>{console.log('NO DIALOG',(await page.innerText('body')).slice(-600),errs.slice(-3))});
 const dl=await page.innerText('#dlg');
 const nBlank=codes.slice(1).length;
 ok('admin: the preview lists each plant with master, sales zone, lines and share, and offers to write only the blank ones',/Set zones from sales/.test(dl)&&/Write 3 zones to the plant master/.test(dl)&&codes.every(c=>dl.includes(plants.find(p=>p.code===c).name))&&/never changed/.test(dl),dl.slice(0,200));
@@ -148,7 +148,7 @@ const shots={};
 for(const [w,sch] of [[1440,'light'],[360,'dark'],[1440,'dark'],[360,'light']]){
   await page.setViewportSize({width:w,height:900});await page.emulateMedia({colorScheme:sch});
   await ev(()=>{location.hash='#/sales'});await page.waitForTimeout(200);await ev(()=>{location.hash='#/overview'});await page.waitForTimeout(1200);
-  shots[w+sch]=await ev(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,ovf:Array.from(document.querySelectorAll('.ox-card')).filter(e=>e.scrollWidth>e.clientWidth+1).length}));
+  shots[w+sch]=await ev(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,ovf:Array.from(document.querySelectorAll('.ox-card')).filter(e=>e.scrollWidth>e.clientWidth+1).length,which:Array.from(document.querySelectorAll('.ox-card')).filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>e.querySelector('h2').innerText.slice(0,30)+' '+e.scrollWidth+'>'+e.clientWidth)}));
   await page.screenshot({path:SP+'v44-overview-'+w+'-'+sch+'.png',fullPage:true});
 }
 ok('layout: no horizontal page scroll and no card overflow at 360 and 1440, light and dark',Object.values(shots).every(x=>x.sw<=x.iw&&x.ovf===0),JSON.stringify(shots));
@@ -157,7 +157,6 @@ const dist=fs.readFileSync(process.env.DIST||new URL('../dist/index.html',import
 const src53=fs.readFileSync(new URL('../src/53-splits.js',import.meta.url).pathname,'utf8');
 ok('no LLM calls: the new module has no network or model call, and the page still has no ask-Claude call',!/fetch\(|XMLHttpRequest|window\.claude|WebSocket/.test(src53)&&!/window\.claude\.(complete|ask|prompt)/.test(dist),'');
 console.log(errs.filter(e=>!/ERR_FAILED/.test(e)).slice(0,3));
-console.log(res.join('\n'));
 await page.context().close();
 /* ---- 12. set_zones with no zone detail loaded fails the job with the reason, changes nothing ---- */
 const d2=clone(st0);d2['jobs/jn']={type:'set_zones',requested_by:'coordinator',requested_at:new Date().toISOString(),reason:'no detail',status:'queued'};
