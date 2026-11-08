@@ -5017,7 +5017,7 @@ function geoIngest(){
   S.geoRaw.forEach(function(x){if(x.kind==='state'&&/^\d\d$/.test(x.state_code||'')){st[x.state_code]=Object.assign({},x);stored++}});
   Object.keys(st).forEach(function(c){var s=st[c];alias.set(c,c);alias.set(String(+c),c);alias.set(geoNorm(s.state_name),c);String(s.aliases||'').split('|').forEach(function(a){var k=geoNorm(a);if(k)alias.set(k,c)})});
   S.geoRaw.forEach(function(x){if(x.kind==='district'&&x.district_id){di[x.district_id]=Object.assign({},x);dn.set(x.state_code+'|'+geoNorm(x.district_name),x.district_id)}});
-  GEO.states=st;GEO.alias=alias;GEO.districts=di;GEO.dname=dn;GEO.stored=stored;GEO.ver++;DS.cache={};
+  GEO.states=st;GEO.alias=alias;GEO.districts=di;GEO.dname=dn;GEO.stored=stored;GEO.ver++;DS.cache={};if(typeof schedule==='function'&&S.loaded){S.lastHtml='';schedule()}
   var meta=S.geoRaw.find(function(x){return x._id==='pin_main'}),key=meta?(meta.at||'')+'|'+(meta.chunks||0):'';
   if(key!==GEO.pinKey){GEO.pinKey=key;if(!meta){GEO.pins=new Map()}else{var dm={};S.geoRaw.forEach(function(x){dm[x._id]=x});(async function(){var m=new Map();for(var i=0;i<(meta.chunks||0);i++){var d=dm['pin_c'+i];if(!d)continue;try{JSON.parse(await ungz(d.z)).forEach(function(r){m.set(String(r[0]),r)})}catch(e){}}if(key===GEO.pinKey){GEO.pins=m;GEO.ver++;DS.cache={};S.lastHtml='';schedule()}})()}}
 }
