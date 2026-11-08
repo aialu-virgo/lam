@@ -18,7 +18,7 @@ async function snap(file, stageRows) {
   await page.waitForTimeout(1500);
   const maps = await page.evaluate(() => { const D = window.__dbg.DS; return JSON.stringify([D.pg, D.spk, D.spIdx, D.xf, D.ptot, D.spRaw, D.plants, D.months]) });
   const out = { maps: crypto.createHash('sha1').update(maps).digest('hex'), mapBytes: maps.length, pages: {} };
-  const txt = async (h, wait) => { await page.evaluate(h => { location.hash = h }, h); await page.waitForTimeout(wait || 2500); return page.evaluate(() => document.getElementById('pg').innerText) };
+  const txt = async (h, wait) => { await page.evaluate(h => { location.hash = h }, h); await page.waitForTimeout(wait || 2500); await page.waitForFunction(() => !/…/.test(document.getElementById('pg').innerText), null, { timeout: 60000 }).catch(() => { }); await page.waitForTimeout(500); return page.evaluate(() => document.getElementById('pg').innerText) };
   out.pages.overview = await txt('#/overview');
   out.pages.sales = await txt('#/sales');
   out.pages.dashboard = await txt('#/dashboard', 6000);
