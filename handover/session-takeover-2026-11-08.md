@@ -41,3 +41,11 @@ Backup → restore with Replace everything on `/exec` (not confirmed done); Peop
 ## 5. Rules that bit today
 - A file sent to a Principal must have passed a blind QA check. `out/` is git-ignored, so keep a copy of anything sent (QA scratch copies were used once to resend).
 - Commit after each agent report; the stop hook enforces it.
+
+## Update 17:10 IST — parallel-session merge
+- Claude.ai publish of our build was refused: the other Lam session ("Virgo Lam Performance Desk", branch m8-gcp / m8-v44-fix) published v44 as version 47 at 15:21 IST.
+- Merged both into `claude/serene-clarke-g6hgzg`: 41567e6 (m8-gcp) and c6622f9 (m8-v44-fix), pushed. Their decisions D64–D71 are now D84–D91.
+- Tests on c6622f9: desk suite 745 PASS / 7 baseline FAIL; gas-unit, shim, targets, sap, qa4 all pass; **gas-e2e 46/2 FAIL** (restore re-run differs from backup by 11–13 docs: extra R1 actions, later roll/R4 timestamps). Regression enters with 41567e6. Engineer is fixing (due 18:15).
+- **Do not publish or send files until gas-e2e is 48/0 and a blind QA of the merged build passes.** Then: publish dist to the claude.ai Desk (merge onto version 47 is now in source), republish the setup page, send the three files, log D92, and message session_01MrczuPzhyUR5CA4GNy3QT5 that it may resume.
+- The other session ran a live data reload until ~17:15 IST; check with it before any write to the Desk database.
+- Vijay was told to hold pasting/restoring the 15:35 files.
