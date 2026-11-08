@@ -216,12 +216,57 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   ok('logs: each of the 7 public functions wrote exactly one "SAP ..." line on success, naming the function', per.every(x => x.ok && x.n === 1 && x.line.includes('"fn":"' + x.f + '"') && x.line.includes('"ok":true')), sj(per.map(x => [x.f, x.n])));
   const failed = [];
   env.props.SAP_PASSWORD = 'wrong-pw'; for (const f of ['sapVerifyMetadata', 'sapShadowRun']) { const l0 = logsOf(env).length; const rr = env.call(f); failed.push({ f, ok: rr.ok, code: rr.code, n: logsOf(env).length - l0, line: logsOf(env).slice(-1)[0] || '' }); }
-  ok('logs: a failed run (wrong password, HTTP 401) is logged too, with ok:false and the code', failed.every(x => x.ok === false && x.n === 1 && x.line.includes('"ok":false') && x.line.includes('sap_auth')), sj(failed));
+  ok('logs: a failed run (wrong password, HTTP 401; then the shadow run refused because verify failed) is logged too, with ok:false and the code', failed.every(x => x.ok === false && x.n === 1 && x.line.includes('"ok":false') && /sap_auth|sap_verify_gap/.test(x.line)), sj(failed));
   env.setEmail('se@virgoasia.com'); const l1 = logsOf(env).length, rf = env.call('sapStatus'); env.setEmail(SUPER);
   ok('logs: a refused caller is logged as a failure', rf.ok === false && logsOf(env).length === l1 + 1 && logsOf(env).slice(-1)[0].includes('permission_denied'));
   const allLogs = (env.state.logs || []).join('\n');
   ok('logs: no password, user name or SAP address in any log line', !allLogs.includes(S.password) && !allLogs.includes('wrong-pw') && !allLogs.includes(S.user) && !allLogs.includes('mock-tenant') && !/Basic /.test(allLogs) && allLogs.length > 0);
 }
+/* =============================== A4c. follow-ups: verify required before reads, failed verify voids OK, valid log JSON, separate shadow cursor, refused trigger logged =============================== */
+{
+  const docs = synthDocs({ masters }), logsOf = (env) => (env.state.logs || []).filter(l => l.startsWith('SAP '));
+  // 2. reads need a passing saved verify; never run = refused with "Run sapVerifyMetadata first"
+  let { S, env } = build({ docs, verified: false }); let n0 = S.calls.length;
+  let sh = env.call('sapShadowRun'), sy = env.call('sapSync');
+  ok('never verified: the shadow run is refused with "Run sapVerifyMetadata first" and no SAP call', sh.ok === false && sh.code === 'sap_verify_first' && /Run sapVerifyMetadata first/.test(sh.message) && S.calls.length === n0, sj(sh));
+  ok('never verified: the sync is refused the same way, nothing staged', sy.ok === false && sy.code === 'sap_verify_first' && /Run sapVerifyMetadata first/.test(sy.message) && S.calls.length === n0 && !('sapstage/man_2026-10' in env.stored()), sj(sy));
+  ok('never verified: the card says to run sapVerifyMetadata', /sapVerifyMetadata/.test(env.call('sapStatus').status.next));
+  ok('after a passing verify the shadow run reads', env.call('sapVerifyMetadata').ok === true && env.call('sapShadowRun').done === true);
+  // 1. $metadata unreachable after an earlier OK voids the OK
+  ({ S, env } = build({ docs, verified: false })); ok('setup: verify passes', env.call('sapVerifyMetadata').ok === true && env.call('sapStatus').status.verify.ok === true);
+  S.failNext(/\$metadata/, 0, 99, { throw: true }); const vf = env.call('sapVerifyMetadata'), sv = env.call('sapStatus').status;
+  ok('verify failing with an error (SAP unreachable) after an OK: the saved verify.ok becomes false (failed:true), lastOk false', vf.ok === false && sv.verify.ok === false && sv.verify.failed === true && sv.lastOk === false, sj([vf.code, sv.verify]));
+  S.fails = []; n0 = S.calls.length; sh = env.call('sapShadowRun');
+  ok('...so the shadow run is refused until verify passes again (no SAP call)', sh.ok === false && sh.code === 'sap_verify_gap' && S.calls.length === n0, sj(sh));
+  ok('...and a later passing verify clears it', env.call('sapVerifyMetadata').ok === true && env.call('sapStatus').status.verify.failed === false && env.call('sapShadowRun').ok === true);
+  // 3. the log line is always valid JSON and keeps ms; only msg is cut and redacted
+  ({ S, env } = build({ docs })); const long = 'x'.repeat(500) + ' ' + S.password + ' ' + S.user + ' ' + S.host;
+  env.ctx.sapLogLine_('sapTest', { ok: false, code: 'sap_error', message: long }, 1234);
+  const ln = logsOf(env).slice(-1)[0], jl = (() => { try { return JSON.parse(ln.slice(4)); } catch (e) { return null; } })();
+  ok('a long message does not break the log line: it parses as JSON, ms is kept, msg is cut to 160', jl && jl.ms === 1234 && jl.fn === 'sapTest' && jl.ok === false && jl.code === 'sap_error' && jl.msg.length <= 160, ln);
+  const short = 'a ' + S.password + ' b ' + S.user; env.ctx.sapLogLine_('sapTest', { ok: false, message: short }, 7);
+  const l2 = logsOf(env).slice(-1)[0], j2 = (() => { try { return JSON.parse(l2.slice(4)); } catch (e) { return null; } })();
+  ok('a short message with secrets: still valid JSON, secrets replaced by ***, ms kept', j2 && j2.ms === 7 && !l2.includes(S.password) && !l2.includes(S.user) && /\*\*\*/.test(j2.msg), l2);
+  env.call('sapVerifyMetadata'); env.call('sapShadowRun'); env.call('sapSync');
+  ok('every SAP log line of real runs parses as JSON with a numeric ms', logsOf(env).length >= 4 && logsOf(env).every(l => { try { const j = JSON.parse(l.slice(4)); return typeof j.ms === 'number' && typeof j.fn === 'string'; } catch (e) { return false; } }));
+  // 4. a shadow run never overwrites or clears a paused sync's cursor
+  const d2 = synthDocs({ masters, from: '2026-10-01', to: '2026-10-12', perDayPerPlant: 3 });
+  ({ S, env } = build({ docs: d2, s4opts: { pageCap: 20, msPerCall: 40000 } })); env.props.SAP_RUN_BUDGET_MS = '150000'; env.ctx.SAP_CHUNK_ROWS = 30;
+  let r = env.call('sapShadowRun'), k = 0; while (!r.done && k++ < 40) r = env.call('sapShadowRun');
+  r = env.call('sapSync'); const paused = env.props.SAP_CURSOR;
+  ok('setup: a sync is paused at the time limit with its cursor saved', r.ok && r.done === false && paused && JSON.parse(paused).job === 'sync', String(paused).slice(0, 80));
+  r = env.call('sapShadowRun'); const midShadow = env.props.SAP_CURSOR, shCur = env.props.SAP_CURSOR_SHADOW;
+  ok('a shadow run cut at the limit keeps its own cursor and leaves the sync cursor byte for byte unchanged', r.ok && r.done === false && midShadow === paused && shCur && JSON.parse(shCur).job === 'shadow', sj(r).slice(0, 120));
+  k = 0; while (!r.done && k++ < 40) r = env.call('sapShadowRun');
+  ok('a finished shadow run clears only the shadow cursor; the paused sync cursor is still there and the card says resume', r.done === true && env.props.SAP_CURSOR === paused && !env.props.SAP_CURSOR_SHADOW && env.call('sapStatus').status.resume === true);
+  r = env.call('sapSync'); k = 0; let resumed = r.resumed; while (!r.done && k++ < 60) { r = env.call('sapSync'); resumed = resumed || r.resumed; }
+  ok('the paused sync then resumes (resumed:true) and finishes', r.done === true && resumed === true && 'sapstage/man_2026-10' in env.stored());
+  // 5. a refused trigger call writes exactly one log line
+  ({ S, env } = build({ docs })); n0 = S.calls.length;
+  for (const f of ['sapSyncTrigger_', 'sapContinueTrigger_']) { env.setEmail('se@virgoasia.com'); const l0 = logsOf(env).length; env.ctx[f]();
+    const add = logsOf(env).slice(l0); ok(f + ': a refused call writes exactly one log line (ok:false, permission_denied, no SAP call)', add.length === 1 && add[0].includes('"fn":"' + f + '"') && add[0].includes('"ok":false') && add[0].includes('permission_denied') && S.calls.length === n0, sj(add)); }
+}
+
 /* =============================== A5. filters, cut-off, cancellation modes, other types =============================== */
 {
   const docs = synthDocs({ masters, from: '2026-09-24', to: '2026-09-30', extras: false, startNo: 80000001 }).concat(synthDocs({ masters, from: '2026-10-01', to: '2026-10-08' }));
