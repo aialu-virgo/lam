@@ -35,6 +35,7 @@ related:
 | Fri 6 Nov 09:00 (was Thu 23:30, Fri 01:00, Fri 06:00) | Desk on Google Apps Script (D66): backup download in claude.ai Desk, restore + Apps Script project in Vijay's Drive, QA passed, Drive link sent | Full-Stack Engineer + Engineering QA | QA passed pass 5 07:58; v44 + setup page published by 12:24 (D68; slipped past 09:00); deployed by Vijay 8 Nov 11:48 (D76); restore pending |
 | Sat 7 Nov 15:30 | "Targets & Potential" tab mock-up for approval (Vijay, 7 Nov) | Product Designer | published 14:05, approved (D70); built, QA passed round 3, desk-v45 published (D72); new GAS files sent |
 | Sun 8 Nov 13:00 | S/4 OData feed: mapping (Data Architect), then Apps Script connector on a mock SAP, QA passed (D73) | Data Architect + Full-Stack Engineer | mapping done; built on mock, fast QA passed, files sent 00:35 Sun (D74; Vijay moved deadline to 00:52); sync locked until dry run matches |
+| Sun 8 Nov 15:00 | Targets & Potential by State → District: model change + mock-up for approval (D77) | Data Architect + Product Designer | in progress |
 
 ## Milestones
 **M0 Discovery**
