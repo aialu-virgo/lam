@@ -672,6 +672,8 @@ function sapShadowRun_(ymArg) {
   sapVerifyGate_('sales');
   var firstYm = sapYm_(SAP_FEED_FROM), ym = ymArg || firstYm;
   if (!/^\d{4}-\d\d$/.test(ym) || ym < firstYm) fail_('invalid_argument', 'The shadow run reads ' + firstYm + ' or later only.');
+  var nPlants = 0; readAll_(ss, 'plants').docs.forEach(function (d) { try { var o = JSON.parse(d.json); if (o && o.plant_code && o.active !== false) nPlants++; } catch (e) {} });
+  if (!nPlants) fail_('unavailable', 'The Desk has no active plants in its plants list (Admin > Plants), so every SAP line would be left out and the comparison would be empty. Nothing was read from SAP and nothing was changed. If this Desk was just restored, finish the restore first (a stale page may have refused it), then run this again.');
   sapAcquire_();
   var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, job = null, resumed = false, info = null;
   try {

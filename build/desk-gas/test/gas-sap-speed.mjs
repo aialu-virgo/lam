@@ -223,8 +223,11 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
   let t = build({ docs: docs0(), plants: ['1001'] }); let r = t.env.call('sapShadowRun');
   ok('plants missing from the store: counted per reason with the plant codes seen', r.done && r.drops.plantNotInStore > 0 && r.drops.counted > 0 && r.dropExamples.plantNotInStore['1013'] > 0 && r.dropExamples.plantNotInStore['1021'] > 0 && /plantNotInStore \d+ \(/.test(r.message), sj([r.drops, r.dropExamples]));
   ok('the log line carries the reasons', (t.env.state.logs || []).some(l => /^SAP \{"fn":"sapShadowRun".*"drops":\{/.test(l)));
-  t = build({ docs: docs0(), plants: [] }); r = t.env.call('sapShadowRun');
-  ok('an empty store of plants: the comparison is flagged as EMPTY with the reason, not silently clean', r.done && !r.drops.counted && r.drops.plantNotInStore > 1000 && /WARNING: no line was counted/.test(r.message) && /WARNING/.test(t.env.call('sapStatus').status.message), r.message.slice(0, 300));
+  t = build({ docs: docs0(), plants: [] }); const c0 = t.S.calls.length; r = t.env.call('sapShadowRun');
+  ok('an empty Desk plants list: the shadow run refuses to start, says why, reads nothing and writes nothing', r.ok === false && /no active plants/.test(r.message) && t.S.calls.length === c0 && !t.env.props.SAP_RUN && !t.env.props.SAP_CURSOR_SHADOW, sj(r).slice(0, 250));
+  ok('...also through the automatic run: no trigger is installed', t.env.call('sapShadowRunAuto').ok === false && t.env.state.triggers.length === 0);
+  t = build({ docs: docs0(), plants: ['1001'] }); t.env.call('deskWrite', [[set('plants', '1001', { plant_code: '1001', plant_name: 'x', plant_type: 'Depot', zone: '', state: '', b1_bpl_name: 'x', business: 'laminates', active: false })]]);
+  ok('only inactive plants counts as empty too', t.env.call('sapShadowRun').ok === false);
   const m2 = { products: Object.fromEntries(Object.keys(masters.products).map(k => [k, { type: 'FERT', mg3: 'LAM', mg4: '8X4' }])), customers: masters.customers };
   t = build({ docs: docs0(), s4opts: { products: m2.products } }); r = t.env.call('sapShadowRun');
   ok('product types that are not sheet groups: noProductGroup with the type seen (FERT)', r.done && r.drops.noProductGroup > 1000 && r.dropExamples.noProductGroup.FERT > 1000 && !r.drops.counted && /WARNING/.test(r.message), sj([r.drops, r.dropExamples]));
