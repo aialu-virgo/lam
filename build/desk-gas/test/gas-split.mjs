@@ -78,5 +78,12 @@ const env2 = E({ htmlFiles: del('Index3') });
 ok('indexDiag reports a missing file and carries on', /Index3: MISSING/.test(env2.ctx.indexDiag()) && /Index4: raw length/.test(env2.ctx.indexDiag()));
 const env3 = E(); env3.setEmail('someone@virgoasia.com'); const refused = env3.ctx.indexDiag();
 ok('indexDiag and pageDiag refuse everyone but the owner or a Super admin, and say nothing about the setup', refused === 'Only the project owner or a Super admin may run this.' && env3.ctx.pageDiag() === refused && !(env3.state.logs || []).length);
+// every collection the built page reads is known to the server (an unknown one made /exec fail with invalid_argument)
+{ const pageSrc = fs.readFileSync(path.join(here, '../../desk/dist/index.html'), 'utf8'); const used = new Set([...pageSrc.matchAll(/collection\('([a-z_]+)'/g)].map(m => m[1]).concat([...pageSrc.matchAll(/db\.doc\('([a-z_]+)\//g)].map(m => m[1])));
+  const E3 = makeEnv(); const known = new Set([...E3.ctx.ADMIN_COLLECTIONS, ...E3.ctx.SHARED_COLLECTIONS]);
+  const unknown = [...used].filter(c => !known.has(c));
+  ok('every collection the page reads or writes is known to Code.gs (unknown: ' + unknown.join(',') + ')', used.size > 20 && unknown.length === 0);
+  ok('jobs is an admin collection (read by active users, written by a Super admin only)', E3.ctx.ADMIN_COLLECTIONS.includes('jobs') && !E3.ctx.SHARED_COLLECTIONS.includes('jobs'));
+  const plan = E3.call('deskPlan', ['jobs']); ok('deskPlan accepts jobs for an active user', plan.ok === true); }
 console.log('gas-split: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
