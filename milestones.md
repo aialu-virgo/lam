@@ -36,7 +36,7 @@ related:
 | Sat 7 Nov 15:30 | "Targets & Potential" tab mock-up for approval (Vijay, 7 Nov) | Product Designer | published 14:05, approved (D70); built, QA passed round 3, desk-v45 published (D72); new GAS files sent |
 | Sun 8 Nov 13:00 | S/4 OData feed: mapping (Data Architect), then Apps Script connector on a mock SAP, QA passed (D73) | Data Architect + Full-Stack Engineer | mapping done; built on mock, fast QA passed, files sent 00:35 Sun (D74; Vijay moved deadline to 00:52); sync locked until dry run matches |
 | Sun 8 Nov 15:00 | Targets & Potential by State → District: model change + mock-up for approval (D77) | Data Architect + Product Designer | model done (D79); mock-up blind check passed round 2, published 12:12 for approval |
-| Sun 8 Nov 18:00 | Targets & Potential by State built (D80), QA passed, claude.ai Desk + Apps Script files sent | Full-Stack Engineer + Engineering QA | build started |
+| Sun 8 Nov 16:45 (was 18:00; Vijay asked earlier) | Targets & Potential by State built (D80), QA passed, claude.ai Desk + Apps Script files sent | Full-Stack Engineer + Engineering QA | built; QA round 1 passed except C6, fixed 3348da8; re-check due 16:30; takeover note [handover/session-takeover-2026-11-08.md](handover/session-takeover-2026-11-08.md) |
 
 ## Milestones
 **M0 Discovery**
