@@ -6,10 +6,20 @@ import path from 'path';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 const here = path.dirname(fileURLToPath(import.meta.url));
+/* What the real HtmlService hands back is NOT what was pasted (tenant, 8 Nov 2026: Index came back 31,837 characters shorter; block comments are the suspected cause, unproven).
+ * Default mimic: block comments are removed (except the /*@@ ... marker comments, which the real tenant kept: version 11 booted) and trailing whitespace is trimmed.
+ * mode 'none' = hand back the text unchanged. */
+export function htmlProcess(t, mode = 'strip-comments') {
+  if (mode === 'none') return t;
+  return t.replace(/\/\*(?!@@)[\s\S]*?\*\//g, '').replace(/\s+$/, '');
+}
 export function makeEnv(opts = {}) {
   const CELL_LIMIT = 50000, state = { email: opts.email || 'data@virgoasia.com', locks: 0, calls: 0, lockFail: false, failAfterSetValues: null, held: 0, skew: 0, deleteCost: 0, onDelete: null, triggers: [] };
   const stats = { gv: [], sv: 0, byFn: {} };
   const sheets = {}, props = {}, cache = {};
+  const drv = opts.drive || { folders: {}, files: {} }; drv.reads = 0; drv.listings = 0; // DriveApp mock: folders { id: [file] }, files { id: file }; file = { id, name, updated (ms), content }
+  const mkFile = f => ({ getId() { return f.id; }, getName() { return f.name; }, getLastUpdated() { return new Date(f.updated); }, getBlob() { return { getDataAsString(enc) { if (enc !== 'UTF-8') throw new Error('expected UTF-8'); if (f.readError) throw new Error(f.readError); drv.reads++; return f.content; } }; } });
+  const cacheStats = { puts: 0, gets: 0, maxBytes: 0 };
   function mkSheet(name) {
     const s = { name, rows: [], maxRows: 1000, maxCols: 26 };
     s.api = {
@@ -48,7 +58,9 @@ export function makeEnv(opts = {}) {
     console, Math, Date: class extends Date { static now() { return Date.now() + state.skew; } }, JSON, Object, Array, String, Number, Error,
     SpreadsheetApp: { create() { ss.first = mkSheet('Sheet1'); return ss; }, openById(id) { if (id !== 'SHEET1') throw new Error('no such sheet'); return ss; } },
     LockService: { getScriptLock() { return { waitLock() { if (state.held > 0) throw new Error('Lock re-entered: the script lock is already held by this execution'); state.locks++; if (state.lockFail) throw new Error('Could not obtain lock after 30000 ms'); state.held++; }, releaseLock() { if (state.held > 0) state.held--; } }; } },
-    CacheService: { getScriptCache() { return { get(k) { return k in cache ? cache[k] : null; }, put(k, v) { cache[k] = v; }, getAll(ks) { state.cacheGetAll = (state.cacheGetAll || 0) + 1; if (ks.length > 100) throw new Error('getAll: at most 100 keys'); const o = {}; ks.forEach(k => { if (k in cache) o[k] = cache[k]; }); return o; }, putAll(o) { state.cachePutAll = (state.cachePutAll || 0) + 1; if (Object.keys(o).length > 100) throw new Error('putAll: at most 100 keys'); Object.assign(cache, o); } }; } },
+    CacheService: { getScriptCache() { return { get(k) { cacheStats.gets++; if (opts.cacheFail) throw new Error('cache unavailable'); return k in cache ? cache[k] : null; }, put(k, v) { cacheStats.puts++; const b = Buffer.byteLength(String(v), 'utf8'); if (b > 102400) throw new Error('Argument too large: value'); cacheStats.maxBytes = Math.max(cacheStats.maxBytes, b); if (opts.cacheFail) throw new Error('cache unavailable'); cache[k] = v; }, getAll(ks) { state.cacheGetAll = (state.cacheGetAll || 0) + 1; if (ks.length > 100) throw new Error('getAll: at most 100 keys'); if (opts.cacheFail) throw new Error('cache unavailable'); const o = {}; ks.forEach(k => { if (k in cache) o[k] = cache[k]; }); return o; }, putAll(o) { state.cachePutAll = (state.cachePutAll || 0) + 1; if (Object.keys(o).length > 100) throw new Error('putAll: at most 100 keys'); if (opts.cacheFail) throw new Error('cache unavailable'); Object.keys(o).forEach(k => { if (Buffer.byteLength(String(o[k]), 'utf8') > 102400) throw new Error('Argument too large: value'); cache[k] = o[k]; }); } }; } },
+    DriveApp: { getFolderById(id) { const l = drv.folders[id]; if (!l) throw new Error('No item with the given ID could be found. Possibly it has been deleted.'); return { getFiles() { drv.listings++; let i = 0; const a = l.map(mkFile); return { hasNext() { return i < a.length; }, next() { return a[i++]; } }; } }; },
+      getFileById(id) { const f = (drv.files || {})[id] || Object.values(drv.folders).flat().find(x => x.id === id); if (!f) throw new Error('No item with the given ID could be found.'); return mkFile(f); } },
     PropertiesService: { getScriptProperties() { return { getProperty(k) { return k in props ? props[k] : null; }, setProperty(k, v) { if (String(v).length > 9216) throw new Error('Property value too large'); props[k] = String(v); }, deleteProperty(k) { delete props[k]; } }; } },
     Session: { getActiveUser() { return { getEmail() { return state.email; } }; }, getEffectiveUser() { return { getEmail() { return state.effective || 'data@virgoasia.com'; } }; } },
     ScriptApp: { getService() { return { getUrl() { return 'https://script.google.com/a/macros/virgoasia.com/s/XYZ/exec'; } }; },
@@ -65,8 +77,10 @@ export function makeEnv(opts = {}) {
     HtmlService: {
       XFrameOptionsMode: { DEFAULT: 'DEFAULT' },
       createHtmlOutputFromFile(name) { return { getContent() { // opts.htmlFiles = { Index: text, Index2: text ... } overrides the built parts; a missing name throws like Apps Script
-        if (opts.htmlFiles) { if (!(name in opts.htmlFiles)) throw new Error('Unknown file: ' + name); return opts.htmlFiles[name]; }
-        const f = path.join(here, '../out/Desk-' + name + '.txt'); if (!fs.existsSync(f)) throw new Error('Unknown file: ' + name); return fs.readFileSync(f, 'utf8'); } }; },
+        let t;
+        if (opts.htmlFiles) { if (!(name in opts.htmlFiles)) throw new Error('Unknown file: ' + name); t = opts.htmlFiles[name]; }
+        else { const f = path.join(here, '../out/Desk-' + name + '.txt'); if (!fs.existsSync(f)) throw new Error('Unknown file: ' + name); t = fs.readFileSync(f, 'utf8'); }
+        return htmlProcess(t, opts.htmlProcess); } }; },
       createHtmlOutput(h) { const o = { html: h, title: null, meta: [], setTitle(t) { o.title = t; return o; }, addMetaTag(a, b) { o.meta.push([a, b]); return o; }, setXFrameOptionsMode() { return o; } }; return o; },
     },
   };
@@ -84,7 +98,7 @@ export function makeEnv(opts = {}) {
     });
     return out;
   }
-  return { ctx, state, sheets, stats, props, clearCache() { Object.keys(cache).forEach(k => delete cache[k]); }, setEmail(e) { state.email = e; }, stored: storedAll,
+  return { ctx, state, sheets, stats, props, drive: drv, cacheStats, cacheKeys() { return Object.keys(cache); }, clearCache() { Object.keys(cache).forEach(k => delete cache[k]); }, setEmail(e) { state.email = e; }, stored: storedAll,
     callRaw(fn, args = []) { state.calls++; return JSON.parse(JSON.stringify(ctx[fn](...args))); },
     call(fn, args = []) { state.calls++; stats.byFn[fn] = (stats.byFn[fn] || 0) + 1; const r = JSON.parse(JSON.stringify(ctx[fn](...args)));
       /* deskWrite answers per operation; for convenience r.ok / r.code summarise the batch (ok only if every operation was applied), r.results keeps the detail */
