@@ -109,7 +109,7 @@ function pageErr_(file, problem, fix) { return { error: { file: file, problem: p
 /* checks the raw text of a page file; returns {html, build, sum} or {error} */
 function pageCheck_(name, raw) {
   var nl = raw.indexOf('\n'), head = nl < 0 ? raw : raw.slice(0, nl);
-  var m = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->$/.exec(head.replace(/^﻿/, ''));
+  var m = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->$/.exec(head.replace(/^\uFEFF/, '').replace(/\r$/, ''));
   if (!m) return pageErr_(name, 'has no valid DESK-PAGE header on line 1 (it is not a Desk page file, or it was converted or edited)');
   var body = raw.slice(nl + 1), nb = indexNorm_(body);
   if (nb.length !== +m[3]) return pageErr_(name, 'is incomplete or was changed: it has ' + nb.length + ' characters after the header, it must have ' + m[3] + (nb.length < +m[3] ? ' (the upload was cut short)' : ' (extra text)'));
@@ -186,7 +186,7 @@ function pageDiag() {
     else {
       lines.push('Folder: ' + (props.getProperty('DESK_PAGE_FILE_ID') ? '(pinned file)' : 'ok') + ' | chosen file: ' + found.name + ' | id ' + found.file.getId() + ' | updated ' + found.file.getLastUpdated());
       try {
-        var raw = found.file.getBlob().getDataAsString('UTF-8'), h = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->/.exec(raw.replace(/^﻿/, '')), r = pageCheck_(found.name, raw);
+        var raw = found.file.getBlob().getDataAsString('UTF-8'), h = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->/.exec(raw.replace(/^\uFEFF/, '')), r = pageCheck_(found.name, raw);
         lines.push('Raw length ' + raw.length + (h ? ' | build ' + h[1] + ' | api ' + h[2] + ' | header chars ' + h[3] + ' | header sum ' + h[4] : ' | no header found'));
         lines.push('Check: ' + (r.error ? 'FAILED: ' + r.error.problem : 'passed'));
       } catch (err) { lines.push('Read failed: ' + String(err && err.message || err)); }

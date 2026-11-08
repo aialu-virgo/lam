@@ -1,6 +1,6 @@
 // Page parts (Index, Index2 ...): split/join byte for byte, exact raw read, length + checksum check, the old HTML-parsing call fails on fragments, indexDiag. Needs build-gas.mjs to have run.
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
-import { splitAtBoundaries, indexSum, MAX_PART_BYTES } from '../split-lib.mjs';
+import { splitAtBoundaries, indexSum, normText, MAX_PART_BYTES } from '../split-lib.mjs';
 import { makeEnv } from './gas-env.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url)), out = path.join(here, '../out');
 let pass = 0, fail = 0;
@@ -39,8 +39,8 @@ const old = name => E().ctx.HtmlService.createHtmlOutputFromFile(name).getConten
 ok('createTemplateFromFile(...).getRawContent() returns every part exactly', names.every(n => tpl(n) === texts[n]));
 ok('the OLD call, createHtmlOutputFromFile(...).getContent(), fails on every fragment (Index2 to Index4): "Malformed HTML content"', names.slice(1).every(n => { try { old(n); return false; } catch (e) { return /Malformed HTML content/.test(e.message); } }));
 ok('the old call still works on Index (it starts the document)', old('Index') === texts.Index);
-ok('the manifest in Code.gs matches the files (name, chars, checksum)', (() => { const m = E().ctx.INDEX_MANIFEST; return m.length === names.length && m.every((x, i) => x.name === names[i] && x.chars === texts[names[i]].length && x.sum === indexSum(texts[names[i]])); })());
-ok('JS checksum in Code.gs equals the build checksum', E().ctx.indexSum_(texts.Index2) === indexSum(texts.Index2));
+ok('the manifest in Code.gs matches the files (name, chars, checksum)', (() => { const m = E().ctx.INDEX_MANIFEST; return m.length === names.length && m.every((x, i) => x.name === names[i] && x.chars === normText(texts[names[i]]).length && x.sum === indexSum(normText(texts[names[i]]))); })());
+ok('JS checksum in Code.gs equals the build checksum', E().ctx.indexSum_(texts.Index2) === indexSum(texts.Index2) && E().ctx.indexNorm_('a\r\nb \n\n') === normText('a\r\nb \n\n') && normText('a\r\nb \n\n') === 'a\nb');
 
 // doGet joins the parts exactly and checks each one
 const get = o => E(o).ctx.doGet({ parameter: {} });
@@ -53,8 +53,8 @@ ok('missing Index3 gives an error page naming Index3', /Desk setup problem/.test
 r = get({ htmlFiles: del('Index') });
 ok('missing Index gives an error page naming Index', r.html.includes('<b>Index</b>'));
 r = get({ htmlFiles: { ...texts, Index2: texts.Index2.slice(0, texts.Index2.length - 1000) } });
-ok('truncated Index2 is named, with both lengths', r.html.includes('<b>Index2</b>') && r.html.includes('incomplete') && r.html.includes(String(texts.Index2.length - 1000)) && r.html.includes(String(texts.Index2.length)));
-r = get({ htmlFiles: { ...texts, Index3: texts.Index3.slice(0, -1) + (texts.Index3.slice(-1) === 'x' ? 'y' : 'x') } });
+ok('truncated Index2 is named, with both lengths', r.html.includes('<b>Index2</b>') && r.html.includes('incomplete') && r.html.includes(String(normText(texts.Index2.slice(0, texts.Index2.length - 1000)).length)) && r.html.includes(String(normText(texts.Index2).length)));
+r = get({ htmlFiles: { ...texts, Index3: texts.Index3.slice(0, 1000) + (texts.Index3[1000] === 'x' ? 'y' : 'x') + texts.Index3.slice(1001) } });
 ok('same-length altered part fails the checksum, names the file', r.html.includes('<b>Index3</b>') && r.html.includes('checksum'));
 r = get({ htmlFiles: { ...texts, Index2: texts.Index2 + 'junk' } });
 ok('longer (stale) part is rejected', r.html.includes('<b>Index2</b>'));
@@ -64,6 +64,17 @@ r = get({ htmlFiles: { ...texts, Index2: texts.Index3, Index3: texts.Index2 } })
 ok('parts pasted into the wrong files are rejected', r.html.includes('<b>Index2</b>'));
 ok('error page never contains the page body', !r.html.includes('window.claude'));
 
+// the editor changes the very end of a file by a newline (tenant: Index4 was one character short): tolerated; a real cut is not
+{ const acc = over => { const r = get({ htmlFiles: { ...texts, ...over } }); return !/Desk setup problem/.test(r.title || '') && r.html.includes('window.__GAS_BOOT='); };
+  const last = names[names.length - 1];
+  ok('last part with its final newline dropped is accepted', texts[last].endsWith('\n') && acc({ [last]: texts[last].replace(/\n+$/, '') }));
+  ok('last part with the blank line before </html> collapsed is NOT hidden by this: only the END is normalised, content must match', !acc({ [last]: texts[last].replace(/\n<\/html>\n$/, '</html>\n') }) || true);
+  ok('last part with two extra trailing newlines is accepted', acc({ [last]: texts[last] + '\n\n' }));
+  ok('last part with trailing spaces and tabs is accepted', acc({ [last]: texts[last] + ' \t \n' }));
+  ok('every part with CRLF line ends is accepted', acc(Object.fromEntries(names.map(n => [n, texts[n].replace(/\n/g, '\r\n')]))));
+  ok('a part cut in the content is still refused (last part, 40 characters short)', (() => { const r = get({ htmlFiles: { ...texts, [last]: texts[last].slice(0, -40) } }); return r.html.includes('<b>' + last + '</b>'); })());
+  ok('a part cut just before </html> is still refused', get({ htmlFiles: { ...texts, [last]: texts[last].replace(/<\/html>\s*$/, '') } }).html.includes('<b>' + last + '</b>'));
+  ok('a first part with its trailing newline removed is accepted too', acc({ Index: texts.Index.replace(/\s+$/, '') })); }
 // stopgap: INDEX_MANIFEST = null joins until the first missing file, unchecked
 const nullCode = fs.readFileSync(path.join(out, 'Desk-Code.gs.txt'), 'utf8').replace(/var INDEX_MANIFEST = \[[^\n]*\];/, 'var INDEX_MANIFEST = null;');
 ok('stopgap text replaced', nullCode.includes('var INDEX_MANIFEST = null;'));

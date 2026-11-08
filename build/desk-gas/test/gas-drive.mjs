@@ -1,7 +1,7 @@
 // Page served from Google Drive (desk-page-<build>.html): newest file chosen, integrity, api, pin, cache, fallback, errors, pageDiag. Needs build-gas.mjs to have run.
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
 import { makeEnv } from './gas-env.mjs';
-import { indexSum } from '../split-lib.mjs';
+import { indexSum, normText } from '../split-lib.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url)), out = path.join(here, '../out');
 let pass = 0, fail = 0; const ok = (n, c, d) => { if (c) pass++; else { fail++; console.log('FAIL', n, d || ''); } };
 const pageFile = fs.readdirSync(out).find(f => /^desk-page-.+\.html$/.test(f));
@@ -9,10 +9,10 @@ const raw = fs.readFileSync(path.join(out, pageFile), 'utf8');
 const m = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->\n/.exec(raw);
 ok('the build wrote desk-page-<build>.html with a header on line 1', !!m && pageFile === 'desk-page-' + m[1] + '.html');
 const body = raw.slice(raw.indexOf('\n') + 1);
-ok('header chars and sum describe the text after it; page ends with </html>', +m[3] === body.length && m[4] === indexSum(body) && /<\/html>\n$/.test(body) && body.startsWith('<!DOCTYPE html>'));
+ok('header chars and sum describe the text after it; page ends with </html>', +m[3] === normText(body).length && m[4] === indexSum(normText(body)) && /<\/html>\n$/.test(body) && body.startsWith('<!DOCTYPE html>'));
 ok('the header api equals DESK_API in Code.gs', +m[2] === +/var DESK_API = (\d+);/.exec(fs.readFileSync(path.join(out, 'Desk-Code.gs.txt'), 'utf8'))[1]);
 ok('the Drive page equals the Index parts joined ', body === ['', 2, 3, 4].map(n => fs.readFileSync(path.join(out, 'Desk-Index' + n + '.txt'), 'utf8')).join(''));
-const withHeader = (build, api, text) => '<!--DESK-PAGE build=' + build + ' api=' + api + ' chars=' + text.length + ' sum=' + indexSum(text) + '-->\n' + text;
+const withHeader = (build, api, text) => '<!--DESK-PAGE build=' + build + ' api=' + api + ' chars=' + normText(text).length + ' sum=' + indexSum(normText(text)) + '-->\n' + text;
 const mkf = (id, name, content, updated = 1000) => ({ id, name, content, updated });
 const NOW = Date.now();
 const setup = (files, extra = {}, props = { DESK_PAGE_FOLDER_ID: 'FOLD' }) => { const e = makeEnv({ drive: { folders: { FOLD: files }, files: {} }, ...extra }); Object.assign(e.props, props); return e; };
@@ -75,6 +75,16 @@ for (const bad of ['desk-page-9.html', 'desk-page-2026110800-ab.html', 'desk-pag
 r = html(setup([mkf('g', 'desk-page-202611091200-ab.html', mk('1', bodyTag('JUST')), 1), mkf('h', 'desk-page-202611081200-zz.html', mk('2', bodyTag('LATE')), 9999)]));
 ok('order is by build time then hash, not by upload time or plain file name luck', r.html.includes('<!--JUST-->') && !r.html.includes('<!--LATE-->'));
 
+// the editor/Drive can change the very end of a file by a newline: tolerated; a real cut is not
+{ const okPage = t => { const r = one(t); return !/Desk setup problem/.test(r.title || '') && r.html.startsWith('<!DOCTYPE html>'); };
+  const good = mk('9');
+  ok('Drive page with its final newline dropped is accepted', okPage(good.replace(/\n+$/, '')));
+  ok('Drive page with an extra trailing blank line is accepted', okPage(good + '\n\n'));
+  ok('Drive page with CRLF line ends (and a CRLF end) is accepted', okPage(good.replace(/\n/g, '\r\n')));
+  ok('Drive page cut in the content is still refused', named(one(good.slice(0, -300)), 'incomplete'));
+  ok('Drive page cut just before </html> is refused', named(one(good.replace(/<\/html>\s*$/, '')), '</html>') || named(one(good.replace(/<\/html>\s*$/, '')), 'incomplete'));
+  ok('Drive page with one character changed is still refused', (() => { const i = good.indexOf('Desk', 400); return named(one(good.slice(0, i) + 'Dusk' + good.slice(i + 4)), 'checksum'); })()); }
+
 // pin
 e = setup([mkf('a', 'desk-page-202611010001-a1.html', mk('1', bodyTag('PINNED'))), mkf('b', 'desk-page-202611010002-a2.html', mk('2', bodyTag('NEWER')))], {}, { DESK_PAGE_FOLDER_ID: 'FOLD', DESK_PAGE_FILE_ID: 'a' });
 r = html(e);
@@ -132,7 +142,7 @@ ok('no DESK_PAGE_FOLDER_ID: the Index files are served as before', r.html.includ
 // pageDiag
 e = setup([mkf('a', 'desk-page-202611010001-a1.html', mk('1')), mkf('b', 'desk-page-202611010002-a2.html', mk('2', body, 999))]);
 let d = e.ctx.pageDiag();
-ok('pageDiag logs folder, chosen file, build, chars, check result and api', d.includes('DESK_API (Code.gs) = ' + m[2]) && d.includes('FOLD') && d.includes('chosen file: desk-page-202611010002-a2.html') && d.includes('build 2') && d.includes('api 999') && d.includes('header chars ' + body.length) && d.includes('Check: FAILED') && (e.state.logs || []).some(l => l.includes('chosen file')));
+ok('pageDiag logs folder, chosen file, build, chars, check result and api', d.includes('DESK_API (Code.gs) = ' + m[2]) && d.includes('FOLD') && d.includes('chosen file: desk-page-202611010002-a2.html') && d.includes('build 2') && d.includes('api 999') && d.includes('header chars ' + normText(body).length) && d.includes('Check: FAILED') && (e.state.logs || []).some(l => l.includes('chosen file')));
 e = setup([mkf('a', 'desk-page-202611010001-a1.html', mk('1'))]); d = e.ctx.pageDiag();
 ok('pageDiag reports a pass', d.includes('Check: passed'));
 ok('pageDiag reads Drive, not the cache', (html(e), e.drive.reads, e.ctx.pageDiag(), e.drive.reads === 3));
