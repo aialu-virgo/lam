@@ -1,0 +1,18 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+store['dashroles/role_hod']={role:'HOD',cards:[{id:'c1',measure:'sheets',by:'none',visual:'kpi',span:2}],v:1};
+store['dashlayouts/u_data_virgoasia_com']={email:'data@virgoasia.com',mine:[{id:'c2',measure:'coll',by:'none',visual:'kpi',span:1}],active:'mine',v:1};
+const browser=await chromium.launch();const res=[];process.on('exit',()=>console.log(res.join('\n')));
+const ok=(n,c,d)=>res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
+const {page,errs}=await open(browser,{store,today:'2026-10-23'});await page.waitForTimeout(4500);
+await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(800);
+await page.click('[data-t="tools"]');await page.waitForTimeout(500);
+await page.click('[data-act="fb-make"]');await page.waitForFunction(()=>window.__desk.S.fb&&['ready','error'].includes(window.__desk.S.fb.stage),null,{timeout:120000});
+const fb=await page.evaluate(()=>({stage:window.__desk.S.fb.stage,man:window.__desk.S.fb.manifest,files:(window.__desk.S.fb.files||[]).map(f=>f.text||'')}));
+ok('FB1: the full backup is built',fb.stage==='ready','');
+ok('FB2: the manifest lists dashroles and dashlayouts with their documents',fb.man&&fb.man.collections.dashroles&&fb.man.collections.dashroles.docs===1&&fb.man.collections.dashlayouts&&fb.man.collections.dashlayouts.docs===1,JSON.stringify(Object.keys((fb.man||{}).collections||{})));
+const all=fb.files.join('');
+ok('FB3: the backup files carry the layout documents themselves',/u_data_virgoasia_com/.test(all)&&/role_hod/.test(all),'');
+await browser.close();

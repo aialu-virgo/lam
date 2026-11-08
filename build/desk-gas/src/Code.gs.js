@@ -184,7 +184,10 @@ function requireUser_() {
   return resolveUser_(email);
 }
 function isAdmin_(who) { return who.role === 'Super admin' && who.active; }
-function canWrite_(who, col) {
+/* My Dashboard (M8): dashlayouts/u_<slug of email> is a person's own layout. Only that person or a Super admin writes it; dashroles (role defaults) is admin only. Same slug as the page (slug(): lower case, non-alphanumerics to _, trimmed, 120 characters). */
+function dashSlug_(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 120); }
+function canWrite_(who, col, id) {
+  if (col === 'dashlayouts') return !!who.role && who.active && (isAdmin_(who) || (!!who.email && id === 'u_' + dashSlug_(who.email)));
   if (col === 'geography') return who.active && (who.role === 'Super admin' || who.role === 'Management / HO');   // D80: geography masters, admin collection; Admin › Geography is Super admin and Management / HO
   if (ADMIN_COLLECTIONS.indexOf(col) >= 0) return isAdmin_(who);
   if (col === 'planlocks') return who.active && (who.role === 'Super admin' || who.role === 'Management / HO');
@@ -272,7 +275,7 @@ function checkOp_(who, o) {
   if (!o || (o.op !== 'set' && o.op !== 'merge' && o.op !== 'delete')) fail_('invalid_argument', 'Bad operation.');
   if (!knownCol_(o.col)) fail_('invalid_argument', 'Unknown collection.');
   checkId_(o.id);
-  if (!canWrite_(who, o.col)) fail_('permission_denied', 'Writing to ' + o.col + ' needs ' + ((o.col === 'planlocks' || o.col === 'geography') ? 'Management / HO or Super admin.' : ADMIN_COLLECTIONS.indexOf(o.col) >= 0 ? 'the Super admin role.' : 'an active user.'));
+  if (!canWrite_(who, o.col, o.id)) fail_('permission_denied', 'Writing to ' + o.col + (o.col === 'dashlayouts' ? ' is limited to your own layout.' : ' needs ' + ((o.col === 'planlocks' || o.col === 'geography') ? 'Management / HO or Super admin.' : ADMIN_COLLECTIONS.indexOf(o.col) >= 0 ? 'the Super admin role.' : 'an active user.')));
   if (o.op === 'set' || o.op === 'merge') {
     if (typeof o.json !== 'string') fail_('invalid_argument', 'Missing document.');
     if (o.json.length > MAX_DOC_CHARS) fail_('invalid_argument', 'Document too large (' + o.json.length + ' characters, limit ' + MAX_DOC_CHARS + ').');

@@ -17,7 +17,7 @@ ok('seed Super admin can write users on an empty store (revision +2)', r.ok && r
 ok('one sheet per collection was created', !!E.sheets.c_users && !!E.sheets.info);
 E.setEmail('se@virgoasia.com');
 r = E.call('deskWrite', [[set('periods', 'FY27-Q2', { status: 'closed' })]]); ok('non-admin write to periods refused', !r.ok && r.code === 'permission_denied', JSON.stringify(r));
-const ADMIN = ['periods','audit','settings','users','plants','cells','inv','roll','mappings','transfers','uploads','rejects','items','itemmeta','salesmaster','orders','deliveries','receivables','collections','stock','backups','customers','creditnotes','geography'];
+const ADMIN = ['dashroles','periods','audit','settings','users','plants','cells','inv','roll','mappings','transfers','uploads','rejects','items','itemmeta','salesmaster','orders','deliveries','receivables','collections','stock','backups','customers','creditnotes','geography'];
 let refused = 0; ADMIN.forEach(c => { const x = E.call('deskWrite', [[set(c, 'x', { a: 1 })]]); if (!x.ok && x.code === 'permission_denied') refused++; });
 ok('non-admin refused on all ' + ADMIN.length + ' admin collections', refused === ADMIN.length, refused);
 ok('geography masters (D80): a Sales executive cannot write them', E.call('deskWrite', [[set('geography', 'st_27', { kind: 'state' })]]).code === 'permission_denied');
@@ -137,6 +137,12 @@ ok('doGet injects boot data, sets title, keeps the marker out', out.title === 'V
   ok('geography masters: Management / HO and Super admin write; HOD refused (D80)', as('mgmt@virgoasia.com', [set('geography', 'st_27', { kind: 'state' })]).ok && as('data@virgoasia.com', [set('geography', 'st_24', { kind: 'state' })]).ok && as('hod@virgoasia.com', [set('geography', 'st_29', { kind: 'state' })]).code === 'permission_denied');
   ok('planlocks stays Management / HO and Super admin only', as('mgmt@virgoasia.com', [set('planlocks', 'FY27-Q3', { by: 'm' })]).ok && as('data@virgoasia.com', [set('planlocks', 'FY27-Q4', { by: 'm' })]).ok && ['hod', 'bm', 'se', 'coord', 'acc'].every((u) => as(u + '@virgoasia.com', [set('planlocks', 'FY28-Q1', { by: 'x' })]).code === 'permission_denied'));
   ok('the admin collections stay Super admin only (a HOD, a manager and a coordinator are refused; geography also lets Management / HO write, D80)', ADMIN.every((c) => c === 'geography' ? ['hod', 'bm', 'coord'].every((u) => as(u + '@virgoasia.com', [set(c, 'zz', { a: 1 })]).code === 'permission_denied') : ['hod', 'mgmt', 'bm', 'coord'].every((u) => as(u + '@virgoasia.com', [set(c, 'zz', { a: 1 })]).code === 'permission_denied')));
+  ok('My Dashboard: a person writes only their own layout (dashlayouts/u_<slug of email>); another person\'s is refused; Super admin may write any',
+    as('se@virgoasia.com', [set('dashlayouts', 'u_se_virgoasia_com', { mine: [] })]).ok && as('se@virgoasia.com', [set('dashlayouts', 'u_bm_virgoasia_com', { mine: [] })]).code === 'permission_denied' && as('se@virgoasia.com', [set('dashlayouts', 'u_data_virgoasia_com', { mine: [] })]).code === 'permission_denied'
+    && as('bm@virgoasia.com', [set('dashlayouts', 'u_bm_virgoasia_com', { mine: [] })]).ok && as('bm@virgoasia.com', [{ op: 'delete', col: 'dashlayouts', id: 'u_se_virgoasia_com' }]).code === 'permission_denied' && as('data@virgoasia.com', [set('dashlayouts', 'u_se_virgoasia_com', { mine: [1] })]).ok);
+  ok('My Dashboard: dashroles (role defaults) is Super admin only; inactive and unknown users cannot write a layout',
+    as('data@virgoasia.com', [set('dashroles', 'role_hod', { cards: [] })]).ok && ['mgmt', 'hod', 'bm', 'se'].every((u) => as(u + '@virgoasia.com', [set('dashroles', 'role_hod', { cards: [] })]).code === 'permission_denied')
+    && as('off@virgoasia.com', [set('dashlayouts', 'u_off_virgoasia_com', { mine: [] })]).code === 'permission_denied' && as('stranger@virgoasia.com', [set('dashlayouts', 'u_stranger_virgoasia_com', { mine: [] })]).code === 'permission_denied');
   ok('inactive and unknown users are refused everywhere', as('off@virgoasia.com', [set('actions', 'Z1', { id: 'Z1' })]).code === 'permission_denied' && as('stranger@virgoasia.com', [set('log', 'Z2', { id: 'Z2' })]).code === 'permission_denied');
   // merge
   as('data@virgoasia.com', [set('settings', 'main', { a: 1, b: 1 })]);

@@ -38,3 +38,4 @@ related:
 - [Target model](target-model.md) — draft, approval not submitted
 - [Wireframes](wireframes.md) — ready for approval; every page drawn, approval not submitted
   - [Targets & Potential mock-up](wireframes/targets-potential.html) — draft, awaiting Vijay's approval (7 Nov 2026)
+- [My Dashboard builder spec](dashboard-builder-spec.md) — built into the Desk (M8, 8 Nov 2026); [reference prototype](wireframes/dashboard-builder.html) is partial, DEMO numbers
