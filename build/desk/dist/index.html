@@ -9361,7 +9361,7 @@ function acNum(s,re){var m=re.exec(s||'');return m?[+m[1],+m[2]]:null}
 function acCollect(){
   var tasks=[],errs=[];
   try{
-    var names=Object.keys(ACT.subs),ld=names.filter(function(n){return S.loaded[n]}).length;
+    var names=Object.keys(ACT.subs).filter(function(n){return !(n==='jobs'&&typeof window.__gasCall==='function')}),ld=names.filter(function(n){return S.loaded[n]}).length;
     Object.keys(S.errs||{}).forEach(function(k){if(k==='jobs'&&typeof window.__gasCall==='function')return;/* the admin job queue exists on claude.ai only; Apps Script has no such collection (known, shown in the message area, not worth a red chip) */errs.push({key:'sub:'+k,msg:'Could not read '+k+' ('+S.errs[k]+')'})});
     if(DS.spErr)errs.push({key:'sp',msg:'Salesperson history failed: '+DS.spErr});
     if(ACT.err&&Date.now()-ACT.err.at<30000&&ACT.err.at!==ACT.errSeen)errs.push({key:'db'+ACT.err.at,msg:(ACT.err.kind==='w'?'A save failed: ':'A read failed: ')+ACT.err.msg});
