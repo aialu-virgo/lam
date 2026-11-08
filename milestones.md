@@ -31,7 +31,7 @@ related:
 | Wed 4 Nov 15:00 | v38: no DEMO targets against real sales, 6+ quarters with values, brand in item master (D55) | Full-Stack Engineer | published 13:58; item master reloaded with brand (D56); QA FAIL (D57); v39 15:13, QA: one label defect (D58); v40 16:00, QA passed (D59) |
 | Wed 4 Nov 13:45 | Mock-up v3: thickness, brand, collections, branch rating cards (D55) | Product Designer | published 13:19; awaiting approval |
 | Thu 5 Nov 13:00 | v41: credit-note files blocked in sales intake, CN lock, bulk Undo (D60) | Full-Stack Engineer | published 12:13; QA FAIL on undo integrity (D61); v42 12:37, QA passed (D63); Undo cleared |
-| Sun 8 Nov 13:00 | v43: admin job queue; recovery Undo + Clear demo queued by Delivery Lead (D66) | Full-Stack Engineer | in build |
+| Sun 8 Nov 13:00 | v43: admin job queue; recovery Undo + Clear demo queued by Delivery Lead (D66) | Full-Stack Engineer | v43 live (version 46); jobs queued; runs when Vijay opens the Desk |
 | After Vijay opens the Desk | Sales Apr 2025–Sep 2026 restored; credit notes written and locked | Delivery Lead | open |
 | Sun 8 Nov 18:00 | v44: thickness, brand, collections, branch-rating cards; zones from sales (D64, D65) | Full-Stack Engineer | in build |
 
