@@ -7,7 +7,10 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function refresh() { if (X.refresh) X.refresh(); }
   function sup() { return !!(X.isSuper && X.isSuper()); }
-  function hold(on) { try { var D = window.__desk && window.__desk.S; if (D) { D.engBlock = !!on; if (!on) { D.engSig = null; refresh(); } } } catch (e) {} }
+  /* While a restore runs (and settles) the page's writers (rules engine, roll rebuild, ladder) are paused through S.engBlock, and the page shows a notice. The pause always ends: 4 s after the post-restore refresh, and in any case HOLD_MS after the restore ends, whatever its state (done, incomplete, error); the refresh itself is given POLL_MS. Test hooks: window.__GAS_HOLD_MS, __GAS_POLL_MS, __GAS_SETTLE_MS. */
+  var holdTimer = 0;
+  function ms(k, d) { var v = window[k]; return typeof v === 'number' && v >= 0 ? v : d; }
+  function hold(on) { try { var D = window.__desk && window.__desk.S; if (D) { clearTimeout(holdTimer); holdTimer = 0; D.engBlock = !!on; D.engNote = on ? 'Rules and roll-ups are paused while a restore runs or settles. They resume by themselves.' : ''; if (!on) { D.engSig = null } refresh(); } } catch (e) {} }
   function fmtN(n) { return Number(n).toLocaleString('en-IN'); }
   function guard(ev) { ev.preventDefault(); ev.returnValue = ''; return ''; }
   X.sizes = async function () { var r = await window.__gasCall('deskSizes', []); return { cols: r.cols, note: 'Apps Script pages are ' + (r.pageChars / 1e6).toFixed(1) + ' M characters (PAGE_CHARS in Code.gs).' }; };
@@ -121,7 +124,9 @@
     }
     window.removeEventListener('beforeunload', guard); window.__gasPause = false;
     /* the page's writers (rules engine, roll rebuild, ladder) stay blocked until the refresh after the restore has settled, and for good while the store is half restored */
-    var pl = window.__gasPoll ? window.__gasPoll() : null; Promise.resolve(pl).then(function () { setTimeout(function () { if (R.stage !== 'incomplete' && R.stage !== 'working') hold(false); }, 4000); }); refresh();
+    var pl = window.__gasPoll ? window.__gasPoll() : null, pollGave = new Promise(function (res) { setTimeout(res, ms('__GAS_POLL_MS', 15000)); });
+    Promise.race([Promise.resolve(pl).catch(function () {}), pollGave]).then(function () { setTimeout(function () { if (R.stage !== 'incomplete' && R.stage !== 'working') hold(false); }, ms('__GAS_SETTLE_MS', 4000)); });
+    clearTimeout(holdTimer); holdTimer = setTimeout(function () { if (R.stage !== 'working') hold(false); }, ms('__GAS_HOLD_MS', 60000)); refresh();
   }
   document.addEventListener('change', function (ev) {
     var t = ev.target; if (!t) return;

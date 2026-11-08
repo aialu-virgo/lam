@@ -166,14 +166,24 @@ ok('the database was not touched by any refused restore (replace was never ticke
 /* ---- a restore that stops half way: clear incomplete state, safe re-run ---- */
 await pick(R.page, files); await R.page.waitForFunction(() => window.__gasRestoreState().stage === 'verified', null, { timeout: 120000 });
 await R.page.check('#gr-replace');
+await R.page.evaluate(() => { window.__GAS_HOLD_MS = 6000; window.__GAS_POLL_MS = 1000; window.__GAS_SETTLE_MS = 500; });
 env2.state.failAfterSetValues = 12;
 await R.page.click('[data-gr="run"]'); await R.page.waitForFunction(() => ['incomplete', 'done', 'verified'].includes(window.__gasRestoreState().stage), null, { timeout: 300000 });
 env2.state.failAfterSetValues = null;
 const inc = await R.page.evaluate(() => ({ s: window.__gasRestoreState(), txt: document.querySelector('#pg').innerText }));
 ok('a restore that stops partway shows "Restore incomplete" with the per-collection table', inc.s.stage === 'incomplete' && /Restore incomplete/i.test(inc.txt) && /Written so far/i.test(inc.txt) && inc.s.report.length === 30 && /Replace everything/.test(inc.txt), inc.s.stage + ' ' + inc.s.err);
 ok('the incomplete store really is partial', Object.keys(env2.stored()).length < dataBefore);
+const h1 = await R.page.evaluate(() => ({ b: window.__desk.S.engBlock, note: !!document.querySelector('#eng-note') && /Rules and roll-ups are paused/.test(document.querySelector('#eng-note').innerText) }));
+ok('after a restore that ends incomplete the writers stay paused and the page says so', h1.b === true && h1.note, JSON.stringify(h1));
+await R.page.waitForTimeout(8000);
+const h2 = await R.page.evaluate(() => ({ b: window.__desk.S.engBlock, note: !!document.querySelector('#eng-note') }));
+ok('the pause ends on its own after the timeout even though the restore never finished (no reload, no retry)', h2.b === false && h2.note === false, JSON.stringify(h2));
+await R.page.evaluate(() => { window.__realPoll = window.__gasPoll; window.__gasPoll = () => new Promise(() => {}); });
 await R.page.waitForTimeout(1500);
 await R.page.click('[data-gr="run"]'); await R.page.waitForFunction(() => ['done', 'verified', 'incomplete'].includes(window.__gasRestoreState().stage), null, { timeout: 600000 });
+await R.page.waitForTimeout(3500);
+const h3 = await R.page.evaluate(() => { window.__gasPoll = window.__realPoll; return { b: window.__desk.S.engBlock, note: !!document.querySelector('#eng-note') }; });
+ok('a poll that never returns does not keep the writers paused after a finished restore', h3.b === false && h3.note === false, JSON.stringify(h3));
 const got3 = env2.stored(); let bad3 = 0; Object.keys(mock).forEach(k => { if (got3[k] !== JSON.stringify(mock[k])) bad3++; });
 ok('re-running the restore after the failure is safe and ends exactly equal to the backup', (await R.page.evaluate(() => window.__gasRestoreState().stage)) === 'done' && bad3 === 0 && Object.keys(got3).length === Object.keys(mock).length, bad3);
 await R.page.waitForTimeout(2500);
