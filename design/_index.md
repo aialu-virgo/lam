@@ -18,6 +18,7 @@ related:
   - design/role-matrix.md
   - design/target-model.md
   - design/wireframes.md
+  - design/dashboard-builder-spec.md
   - CLAUDE.md
 ---
 
@@ -36,4 +37,5 @@ related:
 - [Priority rules](priority-rules.md) — draft, approval not submitted
 - [Role matrix](role-matrix.md) — draft, approval not submitted
 - [Target model](target-model.md) — draft, approval not submitted
+- [My Dashboard builder, spec](dashboard-builder-spec.md) — draft, build direct (Vijay, 8 Nov); partial reference [prototype](wireframes/dashboard-builder.html)
 - [Wireframes](wireframes.md) — ready for approval; every page drawn, approval not submitted
