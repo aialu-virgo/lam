@@ -8,7 +8,7 @@
  *   inv chunks and upload entry are made by the same code as a file upload.
  * SETTINGS (Script Properties only; never in code, the sheet, the backup, a log or the page):
  *   SAP_BASE_URL (https host, e.g. https://tenant-api.s4hana.cloud.sap), SAP_USER, SAP_PASSWORD, SAP_COMPANY_CODE (default SAP_DEFAULT_COMPANY), CANCEL_MODE (exclude | mirror, default exclude).
- * STATE (Script Properties): SAP_STATUS (what the card shows), SAP_CURSOR (resume point of a run cut at the time limit), SAP_WM (watermark), SAP_RUN (run flag), SAP_SHADOW (last shadow result).
+ * STATE (Script Properties): SAP_STATUS (what the card shows), SAP_CURSOR (resume point of a sync cut at the time limit), SAP_CURSOR_SHADOW (the same for a shadow run), SAP_OPT_SKIP (optional names left out), SAP_WM (watermark), SAP_RUN (run flag), SAP_SHADOW (last shadow result).
  * ACCESS: every function below is refused unless the caller is the project owner or an active Super admin. The time trigger runs sapSyncTrigger_ / sapContinueTrigger_ as the owner.
  * LOCKS: the script lock is taken here only for (a) the short run-flag test-and-set and (b) the staging write section, exactly as deskWrite does; never while it is held, never across a SAP call. */
 var SAP_FEED_FROM = '2026-10-01';        // billing documents dated before this are never read or written (data to 30 Sep 2026 stays as uploaded)
@@ -142,7 +142,7 @@ function sapTriggerOn_() { return ScriptApp.getProjectTriggers().some(function (
 function sapNext_(s, missing, trig) {
   if (missing.length) return 'Set ' + missing.join(', ') + ' in the Apps Script project (Project Settings, Script properties). Then run sapVerifyMetadata.';
   if (s.resume) return 'The last run stopped at the 6-minute limit. Run sapSync again (the daily trigger also continues it).';
-  if (!s.verify || !s.verify.ok) return s.verify ? 'SAP lacks ' + s.verify.gaps + ' required name(s) (' + (s.verify.blocking || []).join(', ') + '). Send the sapVerifyMetadata result to the Delivery Lead.' : 'Run sapVerifyMetadata once to check the SAP service names.';
+  if (!s.verify || !s.verify.ok) return s.verify && s.verify.failed ? 'The last sapVerifyMetadata did not finish. Run it again.' : s.verify ? 'SAP lacks ' + s.verify.gaps + ' required name(s) (' + (s.verify.blocking || []).join(', ') + '). Send the sapVerifyMetadata result to the Delivery Lead.' : 'Run sapVerifyMetadata once to check the SAP service names.';
   if (!s.shadow) return 'Run sapShadowRun (October 2026, writes nothing) and show Vijay the differences. The first real run needs his OK.';
   if (s.unresolved && s.unresolved.rows) return 'Credit memos for ' + s.unresolved.months.join(', ') + ' are not loaded: ' + s.unresolved.rows + ' lines use product codes that are not in the item master. Load the item master with the S/4 codes (Q18). Credit coverage stays off until this is zero.';
   var pend = Object.keys(s.staged || {}).filter(function (k) { return s.staged[k].status !== 'loaded'; });
@@ -337,7 +337,8 @@ function sapNewJob_(kind, months, extra) {
   Object.keys(extra || {}).forEach(function (k) { j[k] = extra[k]; });
   return j;
 }
-function sapSaveCursor_(job) { sapSetJson_('SAP_CURSOR', job); }
+function sapCursorKey_(kind) { return kind === 'shadow' ? 'SAP_CURSOR_SHADOW' : 'SAP_CURSOR'; }   // a shadow run never touches a paused sync's cursor
+function sapSaveCursor_(job) { sapSetJson_(sapCursorKey_(job.job), job); }
 /* runs until every month is done or the time budget is used. Returns {done}. Staged chunks are written before the cursor moves past them. */
 function sapRunJob_(cfg, job, t0, budget, handlers) {
   var ctx = { prod: Object.create(null), cust: Object.create(null) }, buf = [];
@@ -452,7 +453,7 @@ function sapShadowRun_(ymArg) {
   var firstYm = sapYm_(SAP_FEED_FROM), ym = ymArg || firstYm;
   if (!/^\d{4}-\d\d$/.test(ym) || ym < firstYm) fail_('invalid_argument', 'The shadow run reads ' + firstYm + ' or later only.');
   sapAcquire_();
-  var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, job = sapGetJson_('SAP_CURSOR', null), resumed = false;
+  var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, job = sapGetJson_('SAP_CURSOR_SHADOW', null), resumed = false;
   try {
     if (job && job.job === 'shadow' && job.months[0] === ym) resumed = true;
     else job = sapNewJob_('shadow', [ym], { tally: {}, seen: 0 });
@@ -479,7 +480,7 @@ function sapShadowRun_(ymArg) {
       return { ok: true, done: false, resumed: resumed, message: 'Stopped at the run time limit. Run sapShadowRun again to continue; nothing was written.' };
     }
     var diffs = sapCompare_(ss, ym, job.tally);
-    sapProps_().setProperty('SAP_CURSOR', '');
+    sapProps_().setProperty('SAP_CURSOR_SHADOW', '');
     var bad = diffs.filter(function (d) { return !d.equal; }), now = new Date(Date.now()).toISOString();
     sapSetJson_('SAP_SHADOW', { at: now, ym: ym, rows: bad.slice(0, 40) });
     sapStatusPatch_({ lastAt: now, lastKind: 'shadow', lastOk: true, message: 'Shadow run for ' + ym + ': ' + diffs.length + ' plant-months compared, ' + bad.length + ' differ. Nothing was written.', conn: { ok: true, at: now },
@@ -491,7 +492,7 @@ function sapShadowRun_(ymArg) {
     var patch = { lastAt: new Date(Date.now()).toISOString(), lastKind: 'shadow', lastOk: false, message: sapRedact_(cfg, e.message || e) };
     if (conn) patch.conn = { ok: false, at: new Date(Date.now()).toISOString() };
     sapStatusPatch_(patch);
-    if (/counted/.test(String(e.message))) sapProps_().setProperty('SAP_CURSOR', '');
+    if (/counted/.test(String(e.message))) sapProps_().setProperty('SAP_CURSOR_SHADOW', '');
     throw e;
   } finally { sapRelease_(); }
 }
@@ -529,7 +530,9 @@ function sapParseMeta_(xml) {
 /* the saved verify result blocks reads while a REQUIRED name is a GAP (optional GAPs only warn) */
 function sapVerifyGate_() {
   var v = sapStatusGet_().verify;
-  if (v && v.ok === false) fail_('sap_verify_gap', 'SAP does not offer ' + (v.gaps || 0) + ' required name(s): ' + (v.blocking || []).join(', ') + '. Nothing was read and nothing was changed. Send the sapVerifyMetadata result to the Delivery Lead; run sapVerifyMetadata again once it is fixed.');
+  if (!v) fail_('sap_verify_first', 'Run sapVerifyMetadata first. Nothing was read and nothing was changed. The shadow run and the sync need a passing verify on record.');
+  if (v.failed) fail_('sap_verify_gap', 'The last sapVerifyMetadata did not finish (' + (v.error || 'error') + '). Nothing was read and nothing was changed. Run sapVerifyMetadata again and read the result before the shadow run or the sync.');
+  if (v.ok !== true) fail_('sap_verify_gap', 'SAP does not offer ' + (v.gaps || 0) + ' required name(s): ' + (v.blocking || []).join(', ') + '. Nothing was read and nothing was changed. Send the sapVerifyMetadata result to the Delivery Lead; run sapVerifyMetadata again once it is fixed.');
 }
 function sapVerifyRun_() {
   var cfg = sapCfg_(), rows = [], gaps = 0, ogaps = 0, seen = {}, sets = {}, forced = String(sapProps_().getProperty('SAP_BILLING_SHAPE') || '').trim().toUpperCase(), shape = forced === 'B' ? 'B' : 'A';
@@ -565,7 +568,8 @@ function sapVerifyRun_() {
     if (!forced) sapProps_().setProperty('SAP_SHAPE', shape);
   } catch (e) {
     sapErrPush_(cfg, e.message || e);
-    sapStatusPatch_({ lastAt: new Date(Date.now()).toISOString(), lastKind: 'verify', lastOk: false, message: sapRedact_(cfg, e.message || e), conn: { ok: false, at: new Date(Date.now()).toISOString() } });
+    var fAt = new Date(Date.now()).toISOString(), prevV = sapStatusGet_().verify || {};   // a failed verify also voids an earlier OK
+    sapStatusPatch_({ lastAt: fAt, lastKind: 'verify', lastOk: false, message: sapRedact_(cfg, e.message || e), conn: { ok: false, at: fAt }, verify: Object.assign({}, prevV, { at: fAt, ok: false, failed: true, error: sapRedact_(cfg, e.message || e).slice(0, 120) }) });
     throw e;
   }
   var now = new Date(Date.now()).toISOString(), okAll = gaps === 0;
@@ -576,7 +580,7 @@ function sapVerifyRun_() {
   if (!okAll) msg += ' Blocking (required, missing on SAP): ' + blocking.slice(0, 8).join(', ') + '. The shadow run and sync are blocked until this is fixed.';
   else if (ogaps) msg += ' Warning: optional ' + skip.join(', ') + ' not on this tenant; left out of the reads, its column stays blank. Nothing else is affected.';
   var warning = okAll && ogaps ? msg : '';
-  sapStatusPatch_({ lastAt: now, lastKind: 'verify', lastOk: okAll, message: msg, conn: { ok: true, at: now }, verify: { at: now, ok: okAll, gaps: gaps, optionalGaps: ogaps, checked: rows.length, shape: shape, blocking: blocking.slice(0, 10), optionalSkipped: skip } });
+  sapStatusPatch_({ lastAt: now, lastKind: 'verify', lastOk: okAll, message: msg, conn: { ok: true, at: now }, verify: { at: now, ok: okAll, failed: false, gaps: gaps, optionalGaps: ogaps, checked: rows.length, shape: shape, blocking: blocking.slice(0, 10), optionalSkipped: skip } });
   var out = { ok: okAll, allOk: gaps + ogaps === 0, gaps: gaps, optionalGaps: ogaps, optionalSkipped: skip, shape: shape, checked: rows.length, rows: rows, message: msg };
   if (warning) out.warning = warning;
   if (!okAll) { out.code = 'sap_verify_gap'; out.blocking = blocking; }
@@ -587,12 +591,14 @@ function sapVerifyRun_() {
 /* every public function writes ONE line to the execution log, success or failure: function, ok, code, counts, short message. Never a credential, the user name or the SAP address (redacted from the settings). */
 function sapLogLine_(fn, r, ms) {
   try {
-    var p = sapProps_(), secrets = [p.getProperty('SAP_USER'), p.getProperty('SAP_PASSWORD'), p.getProperty('SAP_BASE_URL')], line = {};
-    line.fn = fn; line.ok = !!(r && r.ok); if (r && r.code) line.code = r.code;
+    var p = sapProps_(), line = {};
+    line.fn = fn; line.ok = !!(r && r.ok); if (r && r.code) line.code = String(r.code);
     ['done', 'gaps', 'optionalGaps', 'differ', 'plantMonths', 'stagedRows', 'removed'].forEach(function (k) { if (r && r[k] !== undefined) line[k] = r[k]; });
     if (r && r.status && r.status.lastKind) line.last = r.status.lastKind;
-    line.ms = ms; line.msg = String(r && r.message || '').slice(0, 160);
-    Logger.log('SAP ' + sapRedact_({ secrets: secrets }, JSON.stringify(line)));
+    line.ms = ms;
+    // only the free-text msg is redacted and cut, so the line is always valid JSON and keeps ms
+    line.msg = sapRedact_({ secrets: [p.getProperty('SAP_USER'), p.getProperty('SAP_PASSWORD'), p.getProperty('SAP_BASE_URL')] }, String(r && r.message || '')).slice(0, 160);
+    Logger.log('SAP ' + JSON.stringify(line));
   } catch (e) { try { Logger.log('SAP ' + fn + ' (log failed)'); } catch (e2) {} }
 }
 function sapPub_(fn, body) {
@@ -637,12 +643,12 @@ function sapTriggerGate_() {
   return email === eff || isAdmin_(resolveUser_(email));
 }
 function sapSyncTrigger_() {
-  if (!sapTriggerGate_()) return;
+  if (!sapTriggerGate_()) { sapLogLine_('sapSyncTrigger_', { ok: false, code: 'permission_denied', message: 'Refused: not the owner or a Super admin.' }, 0); return; }
   var t0 = Date.now(), r = wrap_(function () { return sapSyncRun_('trigger'); });
   sapLogLine_('sapSyncTrigger_', r, Date.now() - t0);
 }
 function sapContinueTrigger_() {
-  if (!sapTriggerGate_()) return;
+  if (!sapTriggerGate_()) { sapLogLine_('sapContinueTrigger_', { ok: false, code: 'permission_denied', message: 'Refused: not the owner or a Super admin.' }, 0); return; }
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapContinueTrigger_') ScriptApp.deleteTrigger(t); });
   sapSyncTrigger_();
 }

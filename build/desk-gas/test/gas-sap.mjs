@@ -11,12 +11,13 @@ const set = (col, id, o) => ({ op: 'set', col, id, json: JSON.stringify(o) });
 const PLANTS = ['1001', '1013', '1021'];
 const SUPER = 'data@virgoasia.com';
 const masters = synthMasters(7);
-function build({ docs, s4opts = {}, props = true, plants = PLANTS } = {}) {
+function build({ docs, s4opts = {}, props = true, plants = PLANTS, verified = true } = {}) {
   const S = makeS4(Object.assign({ docs: docs || synthDocs({ masters }), products: masters.products, customers: masters.customers }, s4opts));
   const env = makeEnv({ fetch: (u, o, st) => S.fetch(u, o, st) });
   env.call('deskWrite', [[set('users', 'u1', { email: SUPER, role: 'Super admin', active: true, name: 'Vijay' }), set('users', 'u2', { email: 'se@virgoasia.com', role: 'Sales executive', active: true, name: 'Se' }),
     ...plants.map(p => set('plants', p, { plant_code: p, plant_name: 'Depot ' + p, plant_type: 'Depot', zone: '', state: '', b1_bpl_name: 'Depot ' + p, business: 'laminates', active: true }))]]);
   if (props) Object.assign(env.props, { SAP_BASE_URL: S.host, SAP_USER: S.user, SAP_PASSWORD: S.password });
+  if (verified) env.props.SAP_STATUS = JSON.stringify({ verify: { at: '2026-11-08T06:00:00.000Z', ok: true, failed: false, gaps: 0, optionalGaps: 0, checked: 29, shape: 'A' } }); // test only: a passing verify on record (reads need one); tests of verify itself pass verified:false
   env.props.SAP_SYNC_ENABLED = 'yes'; // test only; the property is never set in the build
   env.setEmail(SUPER);
   return { S, env };
@@ -106,7 +107,10 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   ok('401: clear message, code sap_auth, no retry', r.code === 'sap_auth' && /HTTP 401/.test(r.message) && S.calls.length === 1, sj(r) + S.calls.length);
   ok('401: the wrong password is not in the message, the status or the errors', !sj(r).includes('wrong-pw') && !sj(env.call('sapStatus')).includes('wrong-pw') && !(env.props.SAP_STATUS || '').includes('wrong-pw'));
   const st401 = env.call('sapStatus').status; ok('401: the card says Not connected and shows the error', st401.connected === false && st401.errors.length === 1 && st401.lastOk === false);
-  env.props.SAP_PASSWORD = S.password;
+  { const v401 = env.call('sapStatus').status.verify, nc = S.calls.length, rsh = env.call('sapShadowRun');
+    ok('verify failing with an error after an earlier OK voids it: saved verify.ok is false, failed is true', v401.ok === false && v401.failed === true, sj(v401));
+    ok('...and the shadow run is then refused (no SAP call) until verify passes again', rsh.ok === false && rsh.code === 'sap_verify_gap' && /did not finish/.test(rsh.message) && S.calls.length === nc, sj(rsh)); }
+  env.props.SAP_PASSWORD = S.password; ok('verify passes again with the right password', env.call('sapVerifyMetadata').ok === true && env.call('sapStatus').status.verify.ok === true);
   // shadow first (so sync is allowed), then make SAP fail on the first billing page
   r = env.call('sapShadowRun'); ok('shadow run completes with the right password', r.ok && r.done, sj(r).slice(0, 200));
   const stored0 = sj(env.stored());
