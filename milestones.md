@@ -31,7 +31,7 @@ related:
 | Tue 3 Nov 23:30 | Infographic Overview built on real data, published (v36); QA check right after | Full-Stack Engineer | published 21:50 (v36); v37 22:46, QA passed (D54) |
 | Wed 4 Nov 15:00 | v38: no DEMO targets against real sales, 6+ quarters with values, brand in item master (D55) | Full-Stack Engineer | published 13:58; item master reloaded with brand (D56); QA FAIL (D57); v39 15:13, QA: one label defect (D58); v40 16:00, QA passed (D59) |
 | Wed 4 Nov 13:45 | Mock-up v3: thickness, brand, collections, branch rating cards (D55) | Product Designer | published 13:19; awaiting approval |
-| Sun 8 Nov 21:00 | claude.ai Desk v49 from 5db7cfe (backup covers dashboards, D103); speed fix next | Full-Stack Engineer | v49 published 21:00 |
+| Sun 8 Nov 20:52 | claude.ai Desk v49 from 5db7cfe (backup covers dashboards, D103); speed fix next | Full-Stack Engineer | v49 published 20:52 |
 | Thu 5 Nov 13:00 | v41: credit-note files blocked in sales intake, CN lock, bulk Undo (D60) | Full-Stack Engineer | published 12:13; QA FAIL on undo integrity (D61); v42 12:37, QA passed (D63); Undo cleared |
 | Thu 5 Nov (after Undo) | Sales Apr 2025–Sep 2026 restored; credit notes loaded as credit notes and locked | Vijay + Delivery Lead | open |
 | Fri 6 Nov 09:00 (was Thu 23:30, Fri 01:00, Fri 06:00) | Desk on Google Apps Script (D66): backup download in claude.ai Desk, restore + Apps Script project in Vijay's Drive, QA passed, Drive link sent | Full-Stack Engineer + Engineering QA | QA passed pass 5 07:58; v44 + setup page published by 12:24 (D68; slipped past 09:00); deployed by Vijay 8 Nov 11:48 (D76); restore pending |
