@@ -40,7 +40,13 @@ var SAP_META = [
   { svc: 'billing', set: 'A_BillingDocument', nav: ['to_Item'], props: ['BillingDocument', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate', 'TransactionCurrency'] },
   { svc: 'billing', set: 'A_BillingDocumentItem', nav: [], props: ['BillingDocument', 'BillingDocumentItem', 'Plant', 'Material', 'BillingQuantity', 'BillingQuantityUnit', 'NetAmount', 'TransactionCurrency', 'AdditionalMaterialGroup3', 'AdditionalMaterialGroup4', 'ReferenceSDDocument'], opt: ['ReferenceSDDocument'] },
   { svc: 'product', set: 'A_Product', nav: [], props: ['Product', 'ProductType'] },
-  { svc: 'partner', set: 'A_Customer', nav: [], props: ['Customer', 'CustomerName'], opt: ['CustomerName'] }];
+  { svc: 'partner', set: 'A_Customer', nav: [], props: ['Customer', 'CustomerName', 'CustomerAccountGroup', 'DeletionIndicator', 'PostingIsBlocked', 'LegacyB1Code'], opt: ['CustomerName', 'CustomerAccountGroup', 'DeletionIndicator', 'PostingIsBlocked', 'LegacyB1Code'], custOnly: ['CustomerAccountGroup', 'DeletionIndicator', 'PostingIsBlocked', 'LegacyB1Code'] },
+  /* customer master read (D78, spec 1.4). scope 'cust': a GAP here blocks only the customer read, never the billing reads. Required: what the geography figures need (the in-scope test, state, PIN).
+   * Optional: what no figure depends on (name, groups, terms, salesperson, sales district, city, district text, GSTIN, blocked flags, legacy code). An optional entity set (optSet) that is missing is skipped whole. */
+  { svc: 'partner', set: 'A_CustomerCompany', nav: [], props: ['Customer', 'CompanyCode'], scope: 'cust' },
+  { svc: 'partner', set: 'A_CustomerSalesArea', nav: [], props: ['Customer', 'CustomerGroup', 'SalesGroup', 'CustomerPaymentTerms', 'SalesDistrict'], opt: ['CustomerGroup', 'SalesGroup', 'CustomerPaymentTerms', 'SalesDistrict'], optSet: true, scope: 'cust' },
+  { svc: 'partner', set: 'A_BusinessPartnerAddress', nav: [], props: ['BusinessPartner', 'AddressID', 'Region', 'PostalCode', 'CityName', 'District'], opt: ['AddressID', 'CityName', 'District'], scope: 'cust' },
+  { svc: 'partner', set: 'A_BusinessPartnerTax', nav: [], props: ['BusinessPartner', 'BPTaxType', 'BPTaxNumber'], opt: ['BPTaxType', 'BPTaxNumber'], optSet: true, scope: 'cust' }];
 
 /* ---------- access and settings ---------- */
 function sapAuth_() {
@@ -67,7 +73,7 @@ function sapCfg_() {
   var shape = String(p.getProperty('SAP_BILLING_SHAPE') || p.getProperty('SAP_SHAPE') || 'A').trim().toUpperCase() === 'B' ? 'B' : 'A';
   return { base: base, company: company, cancel: cancel, shape: shape, auth: 'Basic ' + Utilities.base64Encode(user + ':' + pass), skip: sapGetJson_('SAP_OPT_SKIP', []), secrets: [user, pass, p.getProperty('SAP_BASE_URL')] };
 }
-function sapSkipped_(cfg, set, prop) { return !!(cfg && cfg.skip && cfg.skip.indexOf(set + '.' + prop) >= 0); }
+function sapSkipped_(cfg, set, prop) { return !!(cfg && cfg.skip && (cfg.skip.indexOf(set + '.' + prop) >= 0 || cfg.skip.indexOf(set + '.(entity set)') >= 0)); }
 function sapRedact_(cfg, s) {
   s = String(s == null ? '' : s);
   (cfg && cfg.secrets || []).forEach(function (x) { x = String(x || ''); if (x.length >= 3) s = s.split(x).join('***'); });
@@ -142,7 +148,7 @@ function sapTriggerOn_() { return ScriptApp.getProjectTriggers().some(function (
 function sapNext_(s, missing, trig) {
   if (missing.length) return 'Set ' + missing.join(', ') + ' in the Apps Script project (Project Settings, Script properties). Then run sapVerifyMetadata.';
   if (s.resume) return 'The last run stopped at the 6-minute limit. Run sapSync again (the daily trigger also continues it).';
-  if (!s.verify || !s.verify.ok) return s.verify && s.verify.failed ? 'The last sapVerifyMetadata did not finish. Run it again.' : s.verify ? 'SAP lacks ' + s.verify.gaps + ' required name(s) (' + (s.verify.blocking || []).join(', ') + '). Send the sapVerifyMetadata result to the Delivery Lead.' : 'Run sapVerifyMetadata once to check the SAP service names.';
+  if (!s.verify || s.verify.failed || (s.verify.blockingSales !== undefined ? s.verify.blockingSales.length : !s.verify.ok)) return s.verify && s.verify.failed ? 'The last sapVerifyMetadata did not finish. Run it again.' : s.verify ? 'SAP lacks ' + s.verify.gaps + ' required name(s) (' + (s.verify.blockingSales || s.verify.blocking || []).join(', ') + '). Send the sapVerifyMetadata result to the Delivery Lead.' : 'Run sapVerifyMetadata once to check the SAP service names.';
   if (!s.shadow) return 'Run sapShadowRun (October 2026, writes nothing) and show Vijay the differences. The first real run needs his OK.';
   if (s.unresolved && s.unresolved.rows) return 'Credit memos for ' + s.unresolved.months.join(', ') + ' are not loaded: ' + s.unresolved.rows + ' lines use product codes that are not in the item master. Load the item master with the S/4 codes (Q18). Credit coverage stays off until this is zero.';
   var pend = Object.keys(s.staged || {}).filter(function (k) { return s.staged[k].status !== 'loaded'; });
@@ -160,7 +166,8 @@ function sapStatusView_() {
     read: s.read || { headers: 0, lines: 0 }, staged: s.staged || {}, stagedRows: s.stagedRows || 0, loaded: s.loaded || { rows: 0, at: '' },
     errors: s.errors || [], shadow: s.shadow || null, verify: s.verify || null, unresolved: s.unresolved || null, skippedMonths: s.skippedMonths || [], resume: s.resume,
     feedFrom: SAP_FEED_FROM, cancelMode: String(sapProps_().getProperty('CANCEL_MODE') || 'exclude').toLowerCase() === 'mirror' ? 'mirror' : 'exclude',
-    next: sapNext_(s, miss, trig) };
+    cust: s.cust || null,
+    next: sapNext_(s, miss, trig) + (s.cust && s.cust.status === 'staged' ? ' Customer master: ' + (s.cust.rows || 0) + ' customers are staged; click Load SAP feed to put them into the Desk.' : '') };
 }
 
 /* ---------- run flag ---------- */
@@ -190,10 +197,10 @@ function sapGz_(o) { return Utilities.base64Encode(Utilities.gzip(Utilities.newB
 function sapUngz_(z) { return Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(z), 'application/x-gzip')).getDataAsString(); }
 function sapChunkId_(ym, run, seq) { return 'c_' + ym + '_' + run + '_' + seq; }
 /* one gzip chunk document per call; halves the rows when the document would be over the store limit */
-function sapChunkOps_(ym, run, seq, rows, out) {
+function sapChunkOps_(ym, run, seq, rows, out, idFn) {
   var z = sapGz_(rows);
-  if (z.length > 200000 && rows.length > 1) { var h = Math.ceil(rows.length / 2); seq = sapChunkOps_(ym, run, seq, rows.slice(0, h), out); return sapChunkOps_(ym, run, seq, rows.slice(h), out); }
-  out.push({ op: 'set', col: 'sapstage', id: sapChunkId_(ym, run, seq), json: JSON.stringify({ ym: ym, run: run, seq: seq, n: rows.length, z: z }) });
+  if (z.length > 200000 && rows.length > 1) { var h = Math.ceil(rows.length / 2); seq = sapChunkOps_(ym, run, seq, rows.slice(0, h), out, idFn); return sapChunkOps_(ym, run, seq, rows.slice(h), out, idFn); }
+  out.push({ op: 'set', col: 'sapstage', id: (idFn || sapChunkId_)(ym, run, seq), json: JSON.stringify({ ym: ym, run: run, seq: seq, n: rows.length, z: z }) });
   return seq + 1;
 }
 
@@ -380,7 +387,7 @@ function sapRunJob_(cfg, job, t0, budget, handlers) {
 function sapSyncRun_(source) {
   if (String(sapProps_().getProperty('SAP_SYNC_ENABLED') || '').trim().toLowerCase() !== 'yes') fail_('sap_sync_disabled', 'sapSync is switched off. It stays off until the Script Property SAP_SYNC_ENABLED is set to yes (after the shadow run is accepted). Nothing was read.');
   var cfg = sapCfg_(), st = sapStatusGet_();
-  sapVerifyGate_();
+  sapVerifyGate_('sales');
   if (!st.shadow) fail_('sap_shadow_first', 'Run sapShadowRun first and have Vijay accept the October comparison. Nothing was read.');
   var ss = book_(true); sapAcquire_();
   var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, job = sapGetJson_('SAP_CURSOR', null), resumed = false, res = null;
@@ -449,7 +456,7 @@ function sapGroupOf_(cat, tt) {   // the S/4 rule of the register intake, withou
 function sapShadowRun_(ymArg) {
   var cfg = sapCfg_(), ss = book_(false);
   if (!ss) fail_('unavailable', 'The database is not set up yet. Run setup() once.');
-  sapVerifyGate_();
+  sapVerifyGate_('sales');
   var firstYm = sapYm_(SAP_FEED_FROM), ym = ymArg || firstYm;
   if (!/^\d{4}-\d\d$/.test(ym) || ym < firstYm) fail_('invalid_argument', 'The shadow run reads ' + firstYm + ' or later only.');
   sapAcquire_();
@@ -528,11 +535,13 @@ function sapParseMeta_(xml) {
   return sets;
 }
 /* the saved verify result blocks reads while a REQUIRED name is a GAP (optional GAPs only warn) */
-function sapVerifyGate_() {
+function sapVerifyGate_(scope) {
   var v = sapStatusGet_().verify;
-  if (!v) fail_('sap_verify_first', 'Run sapVerifyMetadata first. Nothing was read and nothing was changed. The shadow run and the sync need a passing verify on record.');
-  if (v.failed) fail_('sap_verify_gap', 'The last sapVerifyMetadata did not finish (' + (v.error || 'error') + '). Nothing was read and nothing was changed. Run sapVerifyMetadata again and read the result before the shadow run or the sync.');
-  if (v.ok !== true) fail_('sap_verify_gap', 'SAP does not offer ' + (v.gaps || 0) + ' required name(s): ' + (v.blocking || []).join(', ') + '. Nothing was read and nothing was changed. Send the sapVerifyMetadata result to the Delivery Lead; run sapVerifyMetadata again once it is fixed.');
+  if (!v) fail_('sap_verify_first', 'Run sapVerifyMetadata first. Nothing was read and nothing was changed. The shadow run, the sync and the customer read need a passing verify on record.');
+  if (v.failed) fail_('sap_verify_gap', 'The last sapVerifyMetadata did not finish (' + (v.error || 'error') + '). Nothing was read and nothing was changed. Run sapVerifyMetadata again and read the result before reading from SAP.');
+  var list = scope === 'cust' ? v.blockingCust : v.blockingSales;   // a missing customer-master name blocks the customer read only; billing names block the billing reads
+  if (list === undefined) list = v.ok === true ? [] : ['(see sapVerifyMetadata)'];
+  if (list.length) fail_('sap_verify_gap', 'SAP does not offer ' + (scope === 'cust' ? 'these names the customer read needs' : (v.gaps || 0) + ' required name(s)') + ': ' + list.join(', ') + '. Nothing was read and nothing was changed. Send the sapVerifyMetadata result to the Delivery Lead; run sapVerifyMetadata again once it is fixed.');
 }
 function sapVerifyRun_() {
   var cfg = sapCfg_(), rows = [], gaps = 0, ogaps = 0, seen = {}, sets = {}, forced = String(sapProps_().getProperty('SAP_BILLING_SHAPE') || '').trim().toUpperCase(), shape = forced === 'B' ? 'B' : 'A';
@@ -540,15 +549,18 @@ function sapVerifyRun_() {
     var rr = [], g = 0, og = 0;
     list.forEach(function (e) {
       if (!(e.svc in seen)) { seen[e.svc] = sapParseMeta_(sapHttp_(cfg, SAP_SVC[e.svc], '$metadata', null, 'application/xml').text); }
-      sets = seen[e.svc]; var t = sets[e.set], opt = e.opt || [];
+      sets = seen[e.svc]; var t = sets[e.set], opt = e.opt || [], custOnly = e.custOnly || [];
+      function scoped(r, prop) { if (e.scope === 'cust' || custOnly.indexOf(prop) >= 0) r.scope = 'cust'; return r; }
       function row(prop, ok) {
-        var isOpt = opt.indexOf(prop) >= 0, r = { service: SAP_SVC[e.svc], entitySet: e.set, property: prop, status: ok ? 'ok' : 'GAP' };
+        var isOpt = !!e.optSet || opt.indexOf(prop) >= 0, r = scoped({ service: SAP_SVC[e.svc], entitySet: e.set, property: prop, status: ok ? 'ok' : 'GAP' }, prop);
         if (isOpt) r.optional = true;
         if (!ok) { if (isOpt) og++; else g++; }
         rr.push(r);
       }
-      if (!t) {   // a missing entity set cannot be read at all: it is always required
-        g++; rr.push({ service: SAP_SVC[e.svc], entitySet: e.set, property: '(entity set)', status: 'GAP' });
+      if (!t) {   // a missing entity set cannot be read at all: it is required, unless the set is marked optSet (then the whole set is left out of the reads)
+        var setRow = scoped({ service: SAP_SVC[e.svc], entitySet: e.set, property: '(entity set)', status: 'GAP' }, '');
+        if (e.optSet) { setRow.optional = true; og++; } else g++;
+        rr.push(setRow);
         e.nav.forEach(function (n) { row(n + ' (navigation)', false); });
         e.props.forEach(function (p) { row(p, false); });
         return;
@@ -573,18 +585,106 @@ function sapVerifyRun_() {
     throw e;
   }
   var now = new Date(Date.now()).toISOString(), okAll = gaps === 0;
-  var blocking = rows.filter(function (r) { return r.status === 'GAP' && !r.optional; }).map(function (r) { return r.entitySet + '.' + r.property; });
+  var reqGap = rows.filter(function (r) { return r.status === 'GAP' && !r.optional; }), nm = function (r) { return r.entitySet + '.' + r.property; };
+  var blocking = reqGap.map(nm), blockingCust = reqGap.filter(function (r) { return r.scope === 'cust'; }).map(nm), blockingSales = reqGap.filter(function (r) { return r.scope !== 'cust'; }).map(nm);
   var skip = rows.filter(function (r) { return r.status === 'GAP' && r.optional; }).map(function (r) { return r.entitySet + '.' + r.property; });
   sapSetJson_('SAP_OPT_SKIP', skip);   // optional GAPs are left out of every later read; an empty list clears an old one
   var nOk = rows.length - gaps - ogaps, msg = 'SAP names checked: ' + nOk + ' ok, ' + gaps + ' required GAP, ' + ogaps + ' optional GAP.';
-  if (!okAll) msg += ' Blocking (required, missing on SAP): ' + blocking.slice(0, 8).join(', ') + '. The shadow run and sync are blocked until this is fixed.';
+  if (!okAll) msg += ' Blocking (required, missing on SAP): ' + blocking.slice(0, 8).join(', ') + '.' + (blockingSales.length ? ' The shadow run and sync are blocked until this is fixed.' : '') + (blockingCust.length ? ' The customer read is blocked until this is fixed' + (blockingSales.length ? '.' : '; billing reads are not affected.') : '');
   else if (ogaps) msg += ' Warning: optional ' + skip.join(', ') + ' not on this tenant; left out of the reads, its column stays blank. Nothing else is affected.';
   var warning = okAll && ogaps ? msg : '';
-  sapStatusPatch_({ lastAt: now, lastKind: 'verify', lastOk: okAll, message: msg, conn: { ok: true, at: now }, verify: { at: now, ok: okAll, failed: false, gaps: gaps, optionalGaps: ogaps, checked: rows.length, shape: shape, blocking: blocking.slice(0, 10), optionalSkipped: skip } });
+  sapStatusPatch_({ lastAt: now, lastKind: 'verify', lastOk: okAll, message: msg, conn: { ok: true, at: now }, verify: { at: now, ok: okAll, failed: false, gaps: gaps, optionalGaps: ogaps, checked: rows.length, shape: shape, blocking: blocking.slice(0, 10), blockingSales: blockingSales.slice(0, 10), blockingCust: blockingCust.slice(0, 10), optionalSkipped: skip } });
   var out = { ok: okAll, allOk: gaps + ogaps === 0, gaps: gaps, optionalGaps: ogaps, optionalSkipped: skip, shape: shape, checked: rows.length, rows: rows, message: msg };
   if (warning) out.warning = warning;
-  if (!okAll) { out.code = 'sap_verify_gap'; out.blocking = blocking; }
+  if (!okAll) { out.code = 'sap_verify_gap'; out.blocking = blocking; out.blockingSales = blockingSales; out.blockingCust = blockingCust; }
   return out;
+}
+
+/* ---------- customer master read (D78, spec 1.4): staged for the page's customer intake ---------- */
+/* Columns of the staged customer rows. The names are the ones the page's customer intake maps (Customer, Name, Customer Group, City, Region, Sales Executive, Payment Terms) plus the new
+ * ones the page adds for D78 (Postal Code, District, GSTIN). Region is the SAP region code. Postal Code is blank unless it is 6 digits. Sales Executive is the sales group code (a suggestion).
+ * Credit limit and balance are NOT read (credit management is a separate API, spec row 15). */
+var SAP_CUST_COLS = ['Customer', 'Name', 'Customer Group', 'City', 'Region', 'Postal Code', 'District', 'GSTIN', 'Sales Executive', 'Payment Terms', 'Sales District', 'Blocked', 'Legacy Code', 'Address Count'];
+function sapCustChunkId_(x, run, seq) { return 'cust_c_' + run + '_' + seq; }   // never starts with c_ or man_: the page's billing loader reads those prefixes
+/* reads every page of one entity set and hands each row to each(); stops with nothing staged at the time budget; checks the count when the server gives one */
+function sapReadAll_(cfg, t0, budget, svc, set, p, each) {
+  var got = 0, total = null;
+  for (;;) {
+    if (Date.now() - t0 > budget) fail_('sap_timeout', 'The customer read stopped at the run time limit while reading ' + set + '. Nothing was staged. Run sapCustomerSync again.');
+    sapBeat_();
+    p['$skip'] = String(got); if (got === 0) p['$inlinecount'] = 'allpages'; else delete p['$inlinecount'];
+    var r = sapJson_(cfg, sapHttp_(cfg, svc, set, p)); if (got === 0) total = r.count;
+    r.results.forEach(function (o) { each(o); });
+    got += r.results.length;
+    if (!r.results.length || (total !== null && got >= total)) break;
+  }
+  if (total !== null && got !== total) fail_('sap_error', 'The read of ' + set + ' returned ' + got + ' rows but SAP counted ' + total + '. Nothing was staged.');
+  return got;
+}
+function sapSel_(cfg, set, fields) { return fields.filter(function (f) { return !sapSkipped_(cfg, set, f); }).join(','); }
+function sapStr_(v, n) { return String(v == null ? '' : v).trim().slice(0, n || 200); }
+function sapCustomerRun_() {
+  var cfg = sapCfg_(); sapVerifyGate_('cust'); sapAcquire_();
+  var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, P = SAP_SVC.partner;
+  try {
+    var inScope = Object.create(null), cust = Object.create(null), order = [], c = { read: 0, inScope: 0, outOfScope: 0, notCustomerGroup: 0, blocked: 0, salesAreas: 0, severalSalesAreas: 0, addresses: 0, severalAddresses: 0, noAddress: 0, pin6: 0, pinBad: 0, noRegion: 0, withDistrict: 0, withCity: 0, withGstin: 0, gstinNot15: 0, withGroup: 0, withSalesGroup: 0, withLegacy: 0 };
+    var cc = { '$filter': 'CompanyCode eq ' + sapQ_(cfg.company), '$select': 'Customer,CompanyCode', '$orderby': 'Customer asc', '$top': String(SAP_PAGE_TOP) };
+    sapReadAll_(cfg, t0, budget, P, 'A_CustomerCompany', cc, function (o) { inScope[sapTrim0_(o.Customer)] = 1; });
+    var cf = ['Customer', 'CustomerName', 'CustomerAccountGroup', 'DeletionIndicator', 'PostingIsBlocked', 'LegacyB1Code'];
+    sapReadAll_(cfg, t0, budget, P, 'A_Customer', { '$select': sapSel_(cfg, 'A_Customer', cf), '$orderby': 'Customer asc', '$top': String(SAP_PAGE_TOP) }, function (o) {
+      c.read++; var k = sapTrim0_(o.Customer); if (!k) return;
+      if (!inScope[k]) { c.outOfScope++; return; }
+      if (cust[k]) return;
+      var blocked = sapBool_(o.DeletionIndicator) || sapBool_(o.PostingIsBlocked);
+      cust[k] = { code: k, name: sapStr_(o.CustomerName, 60), blocked: blocked, legacy: sapStr_(o.LegacyB1Code, 30), group: '', city: '', region: '', pin: '', district: '', gstin: '', sg: '', terms: '', sd: '', addr: 0, aid: null, sa: 0 };
+      order.push(k); c.inScope++; if (blocked) c.blocked++; if (cust[k].legacy) c.withLegacy++;
+    });
+    if (!sapSkipped_(cfg, 'A_CustomerSalesArea', '(entity set)')) {
+      var sf = ['Customer', 'CustomerGroup', 'SalesGroup', 'CustomerPaymentTerms', 'SalesDistrict'];
+      sapReadAll_(cfg, t0, budget, P, 'A_CustomerSalesArea', { '$select': sapSel_(cfg, 'A_CustomerSalesArea', sf), '$orderby': 'Customer asc', '$top': String(SAP_PAGE_TOP) }, function (o) {
+        var u = cust[sapTrim0_(o.Customer)]; if (!u) return; c.salesAreas++; u.sa++;
+        if (u.sa > 1) return;   // several sales areas: the first read is kept, the customer is counted
+        u.group = sapStr_(o.CustomerGroup, 24); u.sg = sapStr_(o.SalesGroup, 30); u.terms = sapStr_(o.CustomerPaymentTerms, 20); u.sd = sapStr_(o.SalesDistrict, 20);
+      });
+    }
+    var af = ['BusinessPartner', 'AddressID', 'Region', 'PostalCode', 'CityName', 'District'], hasAid = !sapSkipped_(cfg, 'A_BusinessPartnerAddress', 'AddressID');
+    sapReadAll_(cfg, t0, budget, P, 'A_BusinessPartnerAddress', { '$select': sapSel_(cfg, 'A_BusinessPartnerAddress', af), '$orderby': hasAid ? 'BusinessPartner asc,AddressID asc' : 'BusinessPartner asc', '$top': String(SAP_PAGE_TOP) }, function (o) {
+      var u = cust[sapTrim0_(o.BusinessPartner)]; if (!u) return; c.addresses++; u.addr++;
+      var id = sapTrim0_(o.AddressID), lower = u.aid === null || (hasAid && id !== '' && (/^\d+$/.test(id) && /^\d+$/.test(u.aid) ? +id < +u.aid : id < u.aid));
+      if (!lower) return;   // address rule (spec 1.4, candidate): the lowest address number; the bill-to usage test waits for checklist 21
+      u.aid = id; u.region = sapStr_(o.Region, 6); u.pin = sapStr_(o.PostalCode, 12).replace(/\s+/g, ''); u.city = sapStr_(o.CityName, 24); u.district = sapStr_(o.District, 40);
+    });
+    if (!sapSkipped_(cfg, 'A_BusinessPartnerTax', '(entity set)')) {
+      sapReadAll_(cfg, t0, budget, P, 'A_BusinessPartnerTax', { '$filter': 'BPTaxType eq ' + sapQ_('IN3'), '$select': sapSel_(cfg, 'A_BusinessPartnerTax', ['BusinessPartner', 'BPTaxType', 'BPTaxNumber']), '$orderby': 'BusinessPartner asc', '$top': String(SAP_PAGE_TOP) }, function (o) {
+        var u = cust[sapTrim0_(o.BusinessPartner)]; if (u && !u.gstin) u.gstin = sapStr_(o.BPTaxNumber, 20).toUpperCase();
+      });
+    }
+    var rows = order.map(function (k) {
+      var u = cust[k];
+      if (u.addr === 0) c.noAddress++; if (u.addr > 1) c.severalAddresses++; if (u.sa > 1) c.severalSalesAreas++;
+      if (/^\d{6}$/.test(u.pin)) c.pin6++; else { if (u.pin) c.pinBad++; u.pin = ''; }
+      if (!u.region) c.noRegion++; if (u.district) c.withDistrict++; if (u.city) c.withCity++; if (u.group) c.withGroup++; if (u.sg) c.withSalesGroup++;
+      if (u.gstin) { c.withGstin++; if (u.gstin.length !== 15) c.gstinNot15++; }
+      return [u.code, u.name, u.group, u.city, u.region, u.pin, u.district, u.gstin, u.sg, u.terms, u.sd, u.blocked ? 'Y' : '', u.legacy, u.addr];
+    });
+    var run = Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4), ops = [], seq = 0, now = new Date(Date.now()).toISOString();
+    for (var i = 0; i < rows.length; i += SAP_CHUNK_ROWS) seq = sapChunkOps_('cust', run, seq, rows.slice(i, i + SAP_CHUNK_ROWS), ops, sapCustChunkId_);
+    var man = { run: run, at: now, complete: true, cols: SAP_CUST_COLS, n: seq, rows: rows.length, status: 'staged', company: cfg.company, counts: c, skippedOptional: (cfg.skip || []).slice(0, 12) };
+    var prev = null; try { var raw = docsRaw_(colSheet_(book_(false), 'sapstage', false), ['cust_man']); prev = raw['cust_man'] ? JSON.parse(raw['cust_man']) : null; } catch (e) {}
+    ops.push({ op: 'set', col: 'sapstage', id: 'cust_man', json: JSON.stringify(man) });
+    if (prev && prev.run && prev.run !== run) for (var s2 = 0; s2 < (prev.n || 0); s2++) ops.push({ op: 'delete', col: 'sapstage', id: sapCustChunkId_('cust', prev.run, s2) });
+    sapStageWrite_(ops);
+    var msg = 'Customer read: ' + c.inScope + ' customers in company ' + cfg.company + ' staged (' + c.outOfScope + ' of ' + c.read + ' read are outside it); ' + c.pin6 + ' with a 6-digit PIN, ' + c.noRegion + ' without a region, ' + c.severalAddresses + ' with several addresses.';
+    sapStatusPatch_({ lastAt: now, lastKind: 'customers', lastOk: true, message: msg, conn: { ok: true, at: now }, cust: { run: run, rows: rows.length, at: now, status: 'staged', counts: c } });
+    return { ok: true, customers: rows.length, read: c.read, inScope: c.inScope, outOfScope: c.outOfScope, counts: c, message: msg };
+  } catch (e) {
+    var conn = /^sap_/.test(e.deskCode || '') && e.deskCode !== 'sap_timeout';
+    sapErrPush_(cfg, e.message || e);
+    var patch = { lastAt: new Date(Date.now()).toISOString(), lastKind: 'customers', lastOk: false, message: sapRedact_(cfg, e.message || e) };
+    if (conn) patch.conn = { ok: false, at: new Date(Date.now()).toISOString() };
+    sapStatusPatch_(patch);
+    throw e;
+  } finally { sapRelease_(); }
 }
 
 /* ---------- public functions (owner or Super admin) ---------- */
@@ -593,7 +693,7 @@ function sapLogLine_(fn, r, ms) {
   try {
     var p = sapProps_(), line = {};
     line.fn = fn; line.ok = !!(r && r.ok); if (r && r.code) line.code = String(r.code);
-    ['done', 'gaps', 'optionalGaps', 'differ', 'plantMonths', 'stagedRows', 'removed'].forEach(function (k) { if (r && r[k] !== undefined) line[k] = r[k]; });
+    ['done', 'gaps', 'optionalGaps', 'differ', 'plantMonths', 'stagedRows', 'removed', 'customers', 'inScope', 'outOfScope'].forEach(function (k) { if (r && r[k] !== undefined) line[k] = r[k]; });
     if (r && r.status && r.status.lastKind) line.last = r.status.lastKind;
     line.ms = ms;
     // only the free-text msg is redacted and cut, so the line is always valid JSON and keeps ms
@@ -608,6 +708,7 @@ function sapPub_(fn, body) {
 function sapVerifyMetadata() { return sapPub_('sapVerifyMetadata', sapVerifyRun_); }
 function sapShadowRun(ym) { return sapPub_('sapShadowRun', function () { return sapShadowRun_(ym); }); }
 function sapSync() { return sapPub_('sapSync', function () { return sapSyncRun_('manual'); }); }
+function sapCustomerSync() { return sapPub_('sapCustomerSync', sapCustomerRun_); }
 function sapStatus() { return sapPub_('sapStatus', function () { return { ok: true, status: sapStatusView_() }; }); }
 function sapInstallDailyTrigger() {
   return sapPub_('sapInstallDailyTrigger', function () {
@@ -632,7 +733,16 @@ function sapMarkLoaded(summary) {
       sapStageWrite_(ops);
     }
     var un = s.unresolved && +s.unresolved.rows > 0 ? { rows: +s.unresolved.rows | 0, codes: +s.unresolved.codes | 0, value: Math.round(+s.unresolved.value || 0), months: (s.unresolved.months || []).filter(function (m) { return /^\d{4}-\d\d$/.test(m); }) } : null;
-    sapStatusPatch_({ staged: staged, loaded: { rows: Math.max(0, +s.rows | 0), at: at, months: months }, unresolved: un, message: String(s.message || '').slice(0, 200) });
+    var patch = { staged: staged, loaded: { rows: Math.max(0, +s.rows | 0), at: at, months: months }, unresolved: un, message: String(s.message || '').slice(0, 200) };
+    if (s.customers) {   // the page reports the customer master it loaded: { run, rows }
+      var cu = st.cust || {}, cr = docsRaw_(colSheet_(book_(true), 'sapstage', false), ['cust_man']), cm = cr['cust_man'] ? JSON.parse(cr['cust_man']) : null;
+      if (cm && String(cm.run) === String(s.customers.run)) {
+        sapStageWrite_([{ op: 'merge', col: 'sapstage', id: 'cust_man', json: JSON.stringify({ status: 'loaded', loadedAt: at }) }]);
+        cu.status = 'loaded'; cu.loadedAt = at; cu.loadedRows = Math.max(0, +s.customers.rows | 0); patch.cust = cu;
+      }
+      if (!months.length && !(+s.rows > 0)) { delete patch.staged; delete patch.loaded; delete patch.unresolved; if (!s.message) delete patch.message; }   // a customers-only report leaves the billing counts alone
+    }
+    sapStatusPatch_(patch);
     return { ok: true };
   });
 }

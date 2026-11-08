@@ -129,6 +129,10 @@ Product and customer name reads for code resolution are by key and cached by the
 
 **How it lands.** Rows are passed through the existing customer-master loader as one upload entry labelled "S/4 customer feed" (Undo works as for a file). Requirement for the Full-Stack Engineer: the master is keyed by (`source_system`, `customer_code`) and a load replaces only its own system's rows, because today's Admin intake replaces the whole master per load ([Customer](customer.md)), which would let a B1 file wipe the S/4 customers or the reverse. **Assumed:** B1 history customers not in S/4 stay on the OCRD upload (Q-D13), matched to S/4 by legacy code, then GSTIN. Only the Desk database holds the rows; nothing goes into the repo.
 
+
+#### 1.4a Built on the mock tenant (D78, 8 Nov): `sapCustomerSync`
+Reads, in this order and joined by customer code: `A_CustomerCompany` (filter `CompanyCode eq <company>`; the in-scope test), `A_Customer`, `A_CustomerSalesArea` (first sales area kept, others counted), `A_BusinessPartnerAddress` (lowest `AddressID`; several addresses counted; the bill-to usage test waits for checklist 21), `A_BusinessPartnerTax` (filter `BPTaxType eq 'IN3'`). Each set is paged with `$top=200`, `$orderby`, `$inlinecount` and a count check; no `$expand`. Assumes the address and tax rows carry the customer number as `BusinessPartner` (checklist 21 checks it). **Required** (a GAP blocks the customer read only, never billing): `A_CustomerCompany.Customer, CompanyCode`; `A_BusinessPartnerAddress.BusinessPartner, Region, PostalCode`. **Optional** (no figure depends on it): `A_Customer.CustomerName, CustomerAccountGroup, DeletionIndicator, PostingIsBlocked, LegacyB1Code`; all of `A_CustomerSalesArea` and `A_BusinessPartnerTax` (a missing set is skipped whole); `A_BusinessPartnerAddress.AddressID, CityName, District`. Not read: credit limit (row 15). PIN is staged only when it is 6 digits (else blank and counted). Staged in `sapstage` as `cust_man` and `cust_c_<run>_<n>`.
+
 ## 2. Filters
 All names in this section: candidate — verify against $metadata.
 

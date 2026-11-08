@@ -42,10 +42,35 @@ const META = {
   API_BILLING_DOCUMENT_SRV: { A_BillingDocument: { type: 'A_BillingDocumentType', props: ['BillingDocument', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate', 'TransactionCurrency', 'SDDocumentCategory'], nav: ['to_Item'] },
     A_BillingDocumentItem: { type: 'A_BillingDocumentItemType', props: ['BillingDocument', 'BillingDocumentItem', 'Plant', 'Material', 'BillingQuantity', 'BillingQuantityUnit', 'NetAmount', 'TransactionCurrency', 'AdditionalMaterialGroup3', 'AdditionalMaterialGroup4', 'ReferenceSDDocument', 'TaxAmount', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate'], nav: [] } },
   API_PRODUCT_SRV: { A_Product: { type: 'A_ProductType', props: ['Product', 'ProductType', 'BaseUnit'], nav: [] } },
-  API_BUSINESS_PARTNER: { A_Customer: { type: 'A_CustomerType', props: ['Customer', 'CustomerName'], nav: [] } } };
+  API_BUSINESS_PARTNER: { A_Customer: { type: 'A_CustomerType', props: ['Customer', 'CustomerName', 'CustomerAccountGroup', 'DeletionIndicator', 'PostingIsBlocked', 'LegacyB1Code'], nav: [] },
+    A_CustomerCompany: { type: 'A_CustomerCompanyType', props: ['Customer', 'CompanyCode'], nav: [] },
+    A_CustomerSalesArea: { type: 'A_CustomerSalesAreaType', props: ['Customer', 'SalesOrganization', 'CustomerGroup', 'SalesGroup', 'CustomerPaymentTerms', 'SalesDistrict'], nav: [] },
+    A_BusinessPartnerAddress: { type: 'A_BusinessPartnerAddressType', props: ['BusinessPartner', 'AddressID', 'Region', 'PostalCode', 'CityName', 'District', 'StreetName'], nav: [] },
+    A_BusinessPartnerTax: { type: 'A_BusinessPartnerTaxType', props: ['BusinessPartner', 'BPTaxType', 'BPTaxNumber'], nav: [] } } };
+/* customer master for the mock tenant: the 25 synthetic customers (company 1000) with addresses, sales areas and GSTIN, plus 5 customers of another company (ignored), and addresses of a non-customer partner.
+ * Deliberate cases: one customer with two addresses (listed highest first; the lowest AddressID must win), one with none, one 4-digit PIN, one blank PIN, one with two sales areas, one 14-character GSTIN, one blocked, one other-type tax row. */
+export function synthBP(masters = synthMasters()) {
+  const codes = Object.keys(masters.customers), regions = ['GJ', 'MH', 'RJ'], bp = { customers: [], company: [], salesAreas: [], addresses: [], taxes: [] };
+  codes.forEach((k, i) => {
+    const id = pad(k, 10);
+    bp.customers.push({ Customer: id, CustomerName: masters.customers[k], CustomerAccountGroup: 'ZSD1', DeletionIndicator: false, PostingIsBlocked: i % 11 === 10, LegacyB1Code: i % 2 === 0 ? 'C' + pad(i, 5) : '' });
+    bp.company.push({ Customer: id, CompanyCode: '1000' });
+    bp.salesAreas.push({ Customer: id, SalesOrganization: '1000', CustomerGroup: i % 2 ? 'C2' : 'C1', SalesGroup: i % 3 ? 'SG' + (i % 3) : '', CustomerPaymentTerms: 'Z030', SalesDistrict: 'ZONE0' + (1 + i % 3) });
+    if (i === 4) bp.salesAreas.push({ Customer: id, SalesOrganization: '2000', CustomerGroup: 'C9', SalesGroup: 'SGX', CustomerPaymentTerms: 'Z090', SalesDistrict: 'ZONE09' });
+    const adr = (aid, region, pin, city, district) => ({ BusinessPartner: id, AddressID: pad(aid, 10), Country: 'IN', Region: region, PostalCode: pin, CityName: city, District: district, StreetName: 'Synthetic Road ' + i });
+    if (i === 9) { /* no address */ }
+    else if (i === 7) { bp.addresses.push(adr(2, 'MH', '400001', 'Mumbai', 'Mumbai'), adr(1, 'GJ', '380007', 'Ahmedabad', 'Ahmedabad')); }
+    else bp.addresses.push(adr(1, regions[i % 3], i === 3 ? '3800' : i === 5 ? '' : '3800' + pad(i, 2), 'City ' + (i % 6), i % 4 === 0 ? '' : 'District ' + (i % 5)));
+    if (i % 5 !== 0) bp.taxes.push({ BusinessPartner: id, BPTaxType: 'IN3', BPTaxNumber: i === 6 ? '24AAAAA0006A1Z' : '24AAAAA' + pad(i, 4) + 'A1Z5' });
+    if (i === 1) bp.taxes.push({ BusinessPartner: id, BPTaxType: 'IN4', BPTaxNumber: 'PANONLY123' });
+  });
+  for (let j = 0; j < 5; j++) { const id = pad(60000000 + j, 10); bp.customers.push({ Customer: id, CustomerName: 'Other Company Customer ' + j, CustomerAccountGroup: 'ZSD1', DeletionIndicator: false, PostingIsBlocked: false, LegacyB1Code: '' }); bp.company.push({ Customer: id, CompanyCode: '2000' }); bp.addresses.push({ BusinessPartner: id, AddressID: pad(1, 10), Region: 'KA', PostalCode: '560001', CityName: 'Bengaluru', District: 'Bengaluru', StreetName: 'x' }); }
+  bp.addresses.push({ BusinessPartner: pad(70000001, 10), AddressID: pad(1, 10), Region: 'TN', PostalCode: '600001', CityName: 'Chennai', District: 'Chennai', StreetName: 'supplier' });
+  return bp;
+}
 export function makeS4(cfg = {}) {
   const S = { user: 'svc_reader', password: 'S3cret-pw-9', host: 'https://mock-tenant-api.s4hana.test', docs: cfg.docs || [], products: cfg.products || synthMasters().products, customers: cfg.customers || synthMasters().customers,
-    pageCap: cfg.pageCap || null, msPerCall: cfg.msPerCall || 0, calls: [], fails: [], metaGaps: cfg.metaGaps || [], noCount: !!cfg.noCount, miscount: 0, leak: !!cfg.leak };
+    bp: cfg.bp || synthBP(cfg.customers ? { products: {}, customers: cfg.customers } : synthMasters()), pageCap: cfg.pageCap || null, msPerCall: cfg.msPerCall || 0, calls: [], fails: [], metaGaps: cfg.metaGaps || [], noCount: !!cfg.noCount, miscount: 0, leak: !!cfg.leak };
   const res = (code, body, headers) => ({ code, body: typeof body === 'string' ? body : JSON.stringify(body), headers: headers || {} });
   const strip = (s) => String(s).replace(/^0+/, '');
   function lit(v) { v = v.trim(); let m; if ((m = /^datetime'([^']+)'$/.exec(v))) return { t: 'd', v: Date.parse(m[1] + 'Z') }; if ((m = /^'(.*)'$/.exec(v))) return { t: 's', v: m[1].replace(/''/g, "'") }; if (v === 'true' || v === 'false') return { t: 'b', v: v === 'true' }; return { t: 'n', v: +v }; }
@@ -93,6 +118,7 @@ export function makeS4(cfg = {}) {
       }
     }
     if (rest === '$metadata') return res(200, metaXml(svc), { 'content-type': 'application/xml' });
+    { const esn = /^(A_\w+)/.exec(rest); if (esn && S.metaGaps.includes(svc + '.' + esn[1])) return res(404, { error: { message: { value: "Resource not found for the segment '" + esn[1] + "'." } } }); }
     let mm;
     if (svc === 'API_BILLING_DOCUMENT_SRV') {
       if ((mm = /^A_BillingDocument\('([^']*)'\)$/.exec(rest))) { const d = S.docs.find(x => x.BillingDocument === mm[1]); return d ? res(200, { d: pick(d, q.get('$select')) }) : res(404, { error: { message: { value: 'Resource not found' } } }); }
@@ -100,7 +126,7 @@ export function makeS4(cfg = {}) {
       if (rest === 'A_BillingDocument') return res(200, list(S.docs, q, 'BillingDocument', 'to_Item'));
     }
     if (svc === 'API_PRODUCT_SRV' && rest === 'A_Product') return res(200, list(Object.keys(S.products).map(k => ({ Product: k, ProductType: S.products[k].type, BaseUnit: 'PC' })).concat(Object.keys(S.products).map(k => ({ Product: pad(k, 18), ProductType: S.products[k].type, BaseUnit: 'PC' }))), q, 'Product'));
-    if (svc === 'API_BUSINESS_PARTNER' && rest === 'A_Customer') return res(200, list(Object.keys(S.customers).map(k => ({ Customer: pad(k, 10), CustomerName: S.customers[k] })), q, 'Customer'));
+    if (svc === 'API_BUSINESS_PARTNER') { const set = { A_Customer: S.bp.customers, A_CustomerCompany: S.bp.company, A_CustomerSalesArea: S.bp.salesAreas, A_BusinessPartnerAddress: S.bp.addresses, A_BusinessPartnerTax: S.bp.taxes }[rest]; if (set) return res(200, list(set, q, 'Customer')); }
     return res(404, { error: { message: { value: 'Entity set not found' } } });
   };
   S.failNext = (when, code, times = 1, extra = {}) => S.fails.push(Object.assign({ when, code, times }, extra));

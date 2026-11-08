@@ -477,7 +477,7 @@ function histHolds(u){
   if(e==='RC')return (S.recvSnaps||[]).some(function(d){return d.upload===id});
   if(e==='CN')return (S.cn||[]).some(function(d){return d.upload===id});
   if(e==='IT')return !!(S.itemMeta&&S.itemMeta.upload===id);
-  if(e==='CU')return !!(S.custMeta&&S.custMeta.upload===id);
+  if(e==='CU')return !!(S.custMeta&&(S.custMeta.uploads||[S.custMeta.upload]).indexOf(id)>=0);
   return true;
 }
 function histReplacedBy(u){

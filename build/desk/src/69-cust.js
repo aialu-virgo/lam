@@ -14,7 +14,9 @@ var CU_FIELDS=[
  {k:'sp',label:'Salesperson',canon:'salesperson',c:['SlpName','Sales Employee','SlpCode','Sales Executive']},
  {k:'limit',label:'Credit limit',canon:'credit_limit',c:['CreditLine','Credit Limit','Credit limit amount','Credit Line']},
  {k:'bal',label:'Account balance',canon:'balance',c:['Balance','Account Balance','Current Balance']},
- {k:'terms',label:'Payment terms',canon:'payment_terms',c:['PymntGroup','Payment Terms','Payment Group','Terms']}];
+ {k:'terms',label:'Payment terms',canon:'payment_terms',c:['PymntGroup','Payment Terms','Payment Group','Terms']},
+ {k:'pin',label:'PIN code (D77: district by PIN)',canon:'pin',c:['ZipCode','Zip Code','PIN','PIN Code','Pincode','Pin Code','PostalCode','Postal Code']},
+ {k:'dist',label:'District (D77)',canon:'district',c:['District','County']}];
 function custDetect(headers){
   var set={};headers.forEach(function(h){set[norm(h)]=1});var has=function(a){return a.some(function(x){return set[norm(x)]})};
   if(has(['docnum','itemcode','linetotal','quantity','docduedate','branchname','tranfser','invoice document number','checksum','onhand','whscode']))return null;
@@ -38,7 +40,7 @@ async function custPick(file){
   S.lastHtml='';schedule();
 }
 async function custParse(){
-  var st=S.cu,m=st.map,rows=st.rows,c=function(k){return m[k]==null?-1:m[k]},cC=c('code'),cN=c('name'),cT=c('type'),cG=c('group'),cCi=c('city'),cS=c('state'),cSp=c('sp'),cL=c('limit'),cB=c('bal'),cP=c('terms');
+  var st=S.cu,m=st.map,rows=st.rows,c=function(k){return m[k]==null?-1:m[k]},cC=c('code'),cN=c('name'),cT=c('type'),cG=c('group'),cCi=c('city'),cS=c('state'),cSp=c('sp'),cL=c('limit'),cB=c('bal'),cP=c('terms'),cPin=c('pin'),cDi=c('dist');
   var res={read:rows.length,loaded:0,rejected:0,rejects:[],skippedType:0,warned:0,custs:[],withLimit:0,withSp:0};
   var seen={},T0=Date.now(),g=function(r,i){return i>=0?String(r[i]==null?'':r[i]).trim():''};
   st.stage='working';st.msg='Checking...';schedule();await tick();
@@ -53,7 +55,8 @@ async function custParse(){
     var lim=cL>=0?toNum(r[cL]):0,bal=cB>=0?toNum(r[cB]):0;
     if(isNaN(lim)){res.warned++;lim=0}if(isNaN(bal))bal=0;
     var sp=g(r,cSp);if(lim>0)res.withLimit++;if(sp)res.withSp++;
-    res.custs.push([code,g(r,cN).slice(0,40),g(r,cG).slice(0,24),g(r,cCi).slice(0,24),g(r,cS).slice(0,20),sp.slice(0,30),Math.round(lim),Math.round(bal),g(r,cP).slice(0,20)]);res.loaded++;
+    var pin=g(r,cPin).replace(/\.0$/,'').replace(/\s/g,'');if(pin&&!/^[1-9]\d{5}$/.test(pin)){res.warned++;res.badPin=(res.badPin||0)+1;pin=''}if(pin)res.withPin=(res.withPin||0)+1;
+    res.custs.push([code,g(r,cN).slice(0,40),g(r,cG).slice(0,24),g(r,cCi).slice(0,24),g(r,cS).slice(0,20),sp.slice(0,30),Math.round(lim),Math.round(bal),g(r,cP).slice(0,20),pin,g(r,cDi).slice(0,40),st.sys]);res.loaded++;
   }
   st.res=res;st.stage='checked';st.msg='';S.lastHtml='';schedule();
 }
@@ -63,10 +66,12 @@ async function custLoad(){
   st.stage='loading';st.msg='Writing customers...';schedule();await tick();
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),by=whoAmI(),failed=null,demo=!!st.demo;
   try{
-    var per=3000,n=Math.max(1,Math.ceil(r.custs.length/per));
-    for(var i=0;i<n;i++){await dset('customers/c'+i,{z:await gz(JSON.stringify(r.custs.slice(i*per,(i+1)*per))),n:Math.min(per,r.custs.length-i*per),i:i,upload:uid,fmt:'gz-json v1: [code,name,group,city,state,salesperson,credit limit,balance,payment terms]',demo:demo||undefined})}
-    var old=(S.custMeta&&S.custMeta.chunks)||0;for(var j=n;j<old;j++)await ddel('customers/c'+j);
-    await dset('customers/main',{at:nowISO(),by:by,file:st.name,layout:st.layout,sys:st.sys,read:r.read,loaded:r.loaded,rejected:r.rejected,skipped_type:r.skippedType,with_limit:r.withLimit,chunks:n,upload:uid,demo:demo||undefined});
+    /* D79: keyed by (source system, customer code): a B1 load replaces only B1 customers, never S/4 ones */
+    var sys=st.sys==='S4'?'S4':'B1',per=3000,n=Math.max(1,Math.ceil(r.custs.length/per)),oldM=S.custRaw.find(function(x){return x._id==='main_'+sys}),legacy=S.custRaw.find(function(x){return x._id==='main'});
+    for(var i=0;i<n;i++){await dset('customers/'+sys+'_c'+i,{z:await gz(JSON.stringify(r.custs.slice(i*per,(i+1)*per))),n:Math.min(per,r.custs.length-i*per),i:i,sys:sys,upload:uid,fmt:'gz-json v2: [code,name,group,city,state,salesperson,credit limit,balance,payment terms,pin,district,source system]',demo:demo||undefined})}
+    var old=(oldM&&oldM.chunks)||0;for(var j=n;j<old;j++)await ddel('customers/'+sys+'_c'+j);
+    await dset('customers/main_'+sys,{at:nowISO(),by:by,file:st.name,layout:st.layout,sys:sys,read:r.read,loaded:r.loaded,rejected:r.rejected,skipped_type:r.skippedType,with_limit:r.withLimit,with_pin:r.withPin||0,chunks:n,upload:uid,demo:demo||undefined});
+    if(legacy&&(legacy.sys||'B1')===sys){for(var lj=0;lj<(legacy.chunks||0);lj++)await ddel('customers/c'+lj);await ddel('customers/main')}
     await dset('uploads/'+uid,{at:nowISO(),by:by,sys:st.sys,entity:'CU',file:st.name,size:st.size||0,mode:'master',periodLabel:'Customer master snapshot',read:r.read,loaded:r.loaded,rejected:r.rejected,skipped:r.rejected,warned:r.warned,status:'Loaded',demo:demo||undefined,fixes:{not_customers:r.skippedType}});
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:demo||undefined})}
     var mp={};Object.keys(st.map).forEach(function(k){mp[k]=st.map[k]>=0?st.headers[st.map[k]]:null});await dset('mappings/'+st.sys+'_customer_'+String(st.layout).toLowerCase().replace(/[^a-z0-9]+/g,''),{map:mp,sys:st.sys,entity:'CU',at:nowISO(),by:by});
@@ -76,8 +81,8 @@ async function custLoad(){
   S.lastHtml='';schedule();
 }
 function custHtml(){
-  var st=S.cu,m=S.custMeta,h='<section class="card"><div class="hd"><h2>Customer master &middot; '+(m?fmtN(m.loaded)+' customers':'not loaded')+'</h2><div class="row"><label class="btn pri sm" for="up-cust" style="cursor:pointer">Upload customer master (XLSX or CSV)</label><input id="up-cust" data-mfile="cust" type="file" accept=".xlsx,.xls,.csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="mst-tmpl" data-t="cust">Download template</button></div></div>';
-  h+='<p class="note" style="margin:0">B1 OCRD (customers only, CardType C) or the S/4 business partner list. Each load replaces the whole master. Used to name customers wherever only a code shows, to suggest the salesperson, and to show the credit limit and "over limit by" next to open receivables.</p>';
+  var st=S.cu,m=S.custMeta,h='<section class="card"><div class="hd"><h2>Customer master &middot; '+(m?fmtN(m.loaded)+' customers ('+esc((m.systems||[]).join(', '))+')':'not loaded')+'</h2><div class="row"><label class="btn pri sm" for="up-cust" style="cursor:pointer">Upload customer master (XLSX or CSV)</label><input id="up-cust" data-mfile="cust" type="file" accept=".xlsx,.xls,.csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="mst-tmpl" data-t="cust">Download template</button></div></div>';
+  h+='<p class="note" style="margin:0">B1 OCRD (customers only, CardType C) or the S/4 business partner list. Each load replaces the customers of its own source system only (B1 or S/4, D79). State, PIN and District give targets by state and, later, by district (D77). Used to name customers wherever only a code shows, to suggest the salesperson, and to show the credit limit and "over limit by" next to open receivables.</p>';
   if(m)h+='<div class="kpis"><div class="kpi"><small>Customers stored</small><b>'+fmtN(m.loaded)+'</b><small>'+fmtN(m.with_limit||0)+' with a credit limit</small></div><div class="kpi"><small>Rejected rows</small><b>'+fmtN(m.rejected)+'</b></div><div class="kpi"><small>Loaded</small><b style="font-size:14px;font-family:var(--font)">'+esc(istStr(m.at))+'</b><small>'+esc((m.by||'').split('@')[0])+' · '+esc(m.file||'')+'</small></div></div>';
   else h+='<div class="empty">No customer master yet.</div>';
   if(st&&st.msg&&(st.stage==='idle'||st.stage==='working'||st.stage==='done'||st.stage==='checked'))h+='<div class="banner '+(st.stage==='idle'?'err':'info')+'">'+esc(st.msg)+'</div>';
@@ -108,18 +113,22 @@ document.addEventListener('change',function(ev){
 });
 /* ---- ingest: customers/c<i> -> S.custIdx (code -> row) ---- */
 function ingestCust(){
-  var meta=S.custRaw.find(function(x){return x._id==='main'})||null;S.custMeta=meta;
-  var key=meta?(meta.upload||'')+'|'+(meta.at||'')+'|'+(meta.chunks||0):'';
+  /* metas: main_B1, main_S4 and the legacy single "main" (before D79); one index code -> row over all of them */
+  var metas=S.custRaw.filter(function(x){return x._id==='main'||/^main_/.test(x._id)});
+  var key=metas.map(function(m){return m._id+':'+(m.upload||'')+'|'+(m.at||'')+'|'+(m.chunks||0)}).sort().join(',');
+  S.custMeta=metas.length?{loaded:metas.reduce(function(a,m){return a+(m.loaded||0)},0),with_limit:metas.reduce(function(a,m){return a+(m.with_limit||0)},0),with_pin:metas.reduce(function(a,m){return a+(m.with_pin||0)},0),rejected:metas.reduce(function(a,m){return a+(m.rejected||0)},0),
+    at:metas.map(function(m){return m.at||''}).sort().slice(-1)[0],by:metas[0].by,file:metas.map(function(m){return m.file}).join(', '),upload:metas.map(function(m){return m.upload}).sort().slice(-1)[0],uploads:metas.map(function(m){return m.upload}),systems:metas.map(function(m){return (m.sys||'B1')+(m._id==='main'?' (before D79)':'')}),per:metas}:null;
   if(key===S.custKey)return;S.custKey=key;
-  if(!meta){S.custIdx=new Map();S.lastHtml='';schedule();return}
+  if(!metas.length){S.custIdx=new Map();S.lastHtml='';schedule();return}
   var dm={};S.custRaw.forEach(function(x){dm[x._id]=x});
   (async function(){
     var idx=new Map();
-    for(var i=0;i<(meta.chunks||0);i++){var d=dm['c'+i];if(!d)continue;try{JSON.parse(await ungz(d.z)).forEach(function(a){idx.set(a[0],a)})}catch(e){}}
+    for(var mi=0;mi<metas.length;mi++){var m=metas[mi],pre=m._id==='main'?'c':(m.sys||m._id.slice(5))+'_c';
+      for(var i=0;i<(m.chunks||0);i++){var d=dm[pre+i];if(!d)continue;try{JSON.parse(await ungz(d.z)).forEach(function(a){if(a.length<12)a[11]=m.sys||'B1';idx.set(a[0],a)})}catch(e){}}}
     if(key!==S.custKey)return;
     S.custIdx=idx;DS.cache={};S.engSig=null;S.lastHtml='';schedule();
   })();
 }
-/* [code,name,group,city,state,salesperson,limit,balance,terms] or null */
+/* [code,name,group,city,state,salesperson,limit,balance,terms,pin,district,source system] or null */
 function custInfo(code){return S.custIdx&&S.custIdx.size?(S.custIdx.get(String(code||'').toUpperCase())||null):null}
 function custName(code,fallback){var c=custInfo(code);return (fallback&&String(fallback).trim())||(c?c[1]:'')}

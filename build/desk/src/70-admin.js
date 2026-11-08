@@ -21,11 +21,16 @@ function refreshAdmin0(){
 }
 /* ---- plan permissions (one home for the P1 rules; the Targets & Potential tab and the CSV upload both call these) ---- */
 function planVisible(x){var sc=SC();if(!sc.plants)return true;return !!x.plant_code&&sc.plants.has(x.plant_code)}
-/* who may propose a sales target: Branch manager (own plants), Management / HO, Super admin. HOD and Sales executive view only (D70). */
+/* who may propose a sales target (D70, D79): Branch manager of the state's default plant (state record) or of the district's responsible plant (district record), Management / HO, Super admin.
+   HOD and Sales executive view only. Plant-keyed (legacy) records are frozen read only. */
 function planGuard(x){
   var u=effUser();if(readOnly())return 'Viewing as another user: preview is read-only';
   if(['Super admin','Management / HO','Branch / depot manager'].indexOf(u.role)<0)return 'Your role cannot propose or approve sales targets';
-  if(u.role==='Branch / depot manager'&&(!x.plant_code||!holdsPlant(u,x.plant_code)))return 'A Branch manager proposes targets for own plants only';
+  if(!x.state_code)return x.plant_code||x.territory?'Plant-based (legacy) figures are read only; potential and targets are set by state':'A state is required';
+  if(!GEO.states[x.state_code])return 'State '+x.state_code+' is not in the state list';
+  var did=x.district_id||'_state';
+  if(did==='_state'){var dp=geoDefaultPlant(x.state_code);if(u.role==='Branch / depot manager'){if(!dp)return stateName(x.state_code)+' has no default plant: Management / HO and Super admin edit it';if(!holdsPlant(u,dp))return stateName(x.state_code)+'\'s default plant is '+plantShort(dp)+', not yours'}}
+  else{var d=GEO.districts[did];if(!d||d.state_code!==x.state_code)return 'District '+did+' is not in the district list of '+stateName(x.state_code);var rp=d.responsible_plant_code||'';if(u.role==='Branch / depot manager'){if(!rp)return d.district_name+' has no responsible plant: Management / HO and Super admin edit it';if(!holdsPlant(u,rp))return d.district_name+' belongs to '+plantShort(rp)+', not your plant'}}
   return '';
 }
 /* the proposer is whoever last saved a Draft; a "returned" Draft written by the approver does not make the approver the proposer */

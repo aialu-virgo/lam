@@ -557,7 +557,8 @@ var INV={fields:[
  {k:'size',label:'Size (feet, AxB)',canon:'size_ft',b1:['Size'],s4:['Material Group 4']},
  {k:'sp',label:'Salesperson',canon:'salesperson_name_raw',b1:['Salesemployee'],s4:['Sales Executive']},
  {k:'acct',label:'Sale account name (transfer flag)',canon:'sale_account_name',b1:['AcctName'],s4:[]},
- {k:'zone',label:'Zone (transfer flag)',canon:'zone',b1:['Zone'],s4:['Sales District']}]};
+ {k:'zone',label:'Zone (transfer flag)',canon:'zone',b1:['Zone'],s4:['Sales District']},
+ {k:'cstate',label:'Customer state (D77: state of the customer, for targets by state)',canon:'customer_state',b1:['State'],s4:['State']}]};
 function headerIndex(headers){var m={};headers.forEach(function(h,i){var k=norm(h);if(k!==''&&!(k in m))m[k]=i});return m}
 function detect(headers){
   var ix=headerIndex(headers),has=function(n){return norm(n) in ix};
@@ -680,7 +681,7 @@ async function runValidation(){
   var g=gridQuarters(),lo=qStartYm(g.list[0]),hi=qEndYm(g.cur);
   var res={af:{dateKinds:{},lineSynth:0,dupNoLine:0,catAlias:0,catSpellings:0,catUnknown:{},catBlank:0,zoneNorm:0,zoneSpellings:0,zoneUnknown:{},junk:{zone:0,itype:0,pos:0},xferSuggest:{},spNames:{},blankSp:0,spFilled:0,spUnlinked:0},preHist:{rows:0,value:0},read:n,good:0,rejected:0,warned:0,fanout:0,injection:0,reasons:{},rejects:[],groups:{},other:{rows:0,value:0},xfer:{rows:0,value:0},quarters:{},pm:new Map(),unknownPlants:{},dateInfo:{mixed:false,swapped:0,unfixable:0},minDate:null,maxDate:null,missingSize:0,noLineCol:map.line<0};
   var cols=function(k){return map[k]==null?-1:map[k]};
-  var cDoc=cols('doc'),cLine=cols('line'),cDate=cols('date'),cPlant=cols('plant'),cCust=cols('cust'),cName=cols('cname'),cItem=cols('item'),cQty=cols('qty'),cNet=cols('net'),cType=cols('itype'),cCat=cols('cat'),cTT=cols('tt'),cSize=cols('size'),cSp=cols('sp'),cAcct=cols('acct'),cZone=cols('zone');
+  var cDoc=cols('doc'),cLine=cols('line'),cDate=cols('date'),cPlant=cols('plant'),cCust=cols('cust'),cName=cols('cname'),cItem=cols('item'),cQty=cols('qty'),cNet=cols('net'),cType=cols('itype'),cCat=cols('cat'),cTT=cols('tt'),cSize=cols('size'),cSp=cols('sp'),cAcct=cols('acct'),cZone=cols('zone'),cCst=cols('cstate');
   /* pass 1: date kinds */
   var nSerial=0,nText=0;
   for(var i=0;i<n;i++){var v=rows[i][cDate];if(typeof v==='number'||(typeof v==='string'&&/^\s*\d{5}(\.\d+)?\s*$/.test(v)))nSerial++;else if(typeof v==='string'&&/^\s*\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4}/.test(v))nText++}
@@ -777,11 +778,12 @@ async function runValidation(){
     if(!xf){G.rows++;G.value+=val;G.sheets+=qty}
     var qk=fyOf(dt.y,dt.m).key,Q=res.quarters[qk]||(res.quarters[qk]={rows:0,plants:new Set(),months:new Set()});Q.rows++;Q.plants.add(pl.plant_code);Q.months.add(ym);
     var pk=pl.plant_code+'|'+ym,P=res.pm.get(pk);
-    if(!P){P={plant:pl.plant_code,ym:ym,agg:new Map(),docs:new Map()};res.pm.set(pk,P)}
+    if(!P){P={plant:pl.plant_code,ym:ym,agg:new Map(),docs:new Map(),cs:{}};res.pm.set(pk,P)}
     var cust=String(r[cCust]).trim(),cn=cName>=0?String(r[cName]==null?'':r[cName]).trim().slice(0,60):'',sp=cSp>=0?String(r[cSp]==null?'':r[cSp]).trim().slice(0,50):'';
     if(sys==='S4'&&!sp){res.af.blankSp++;if(linker){var lkp=linker.map.get(cust);if(lkp){sp=String(lkp).slice(0,50);res.af.spFilled++}else res.af.spUnlinked++}}
     if(!xf&&sys==='B1'&&own.length){var cnu=cn.toUpperCase();if(own.some(function(o){return cnu.indexOf(o)>=0})){var xo=res.af.xferSuggest[cust]||(res.af.xferSuggest[cust]={name:cn,rows:0,value:0});xo.rows++;xo.value+=val}}
     if(!xf&&sp)res.af.spNames[sp]=(res.af.spNames[sp]||0)+1;
+    if(cCst>=0&&!P.cs[cust]){var cst=String(r[cCst]==null?'':r[cCst]).trim().slice(0,40);if(cst)P.cs[cust]=cst}
     var ak=cust+'|'+sp+'|'+grp+'|'+(xf?1:0),A=P.agg.get(ak);
     if(!A){A=[cust,cn,sp,grp,xf?1:0,0,0,0,0,0];P.agg.set(ak,A)}
     A[6]++;A[7]+=qty;A[8]+=sq;A[9]+=val;
@@ -813,7 +815,8 @@ async function packChunks(sys,P){
   var hdr=[];if(U.keepDocs!==false)P.docs.forEach(function(d){var h=d.h;hdr.push([h[0],h[1],h[2],h[3],h[4],Math.round(h[5]*100)/100,h[6],Math.round(h[7]*10)/10,h[8]||'',h[9]||'INV'])});
   var out=[];
   async function fit(a,h){
-    var z=await gz(JSON.stringify({a:a,h:h}));
+    var cs={};a.forEach(function(x){if(P.cs&&P.cs[x[0]])cs[x[0]]=P.cs[x[0]]});
+    var z=await gz(JSON.stringify(Object.keys(cs).length?{a:a,h:h,cs:cs}:{a:a,h:h}));
     if(z.length>CHUNK_LIM&&(a.length+h.length)>1){
       var am=Math.ceil(a.length/2),hm=Math.ceil(h.length/2);
       await fit(a.slice(0,am),h.slice(0,hm));await fit(a.slice(am),h.slice(hm));
@@ -1262,6 +1265,7 @@ async function boot(){
     subscribe('followups',db.collection('followups'),function(d){S.followups=d});
     subscribe('settings',db.collection('settings'),function(d){var m=d.find(function(x){return x._id==='main'});S.settings=m||null;applySettings(m);ingestAliases(d);DS.cache={}});
     subscribe('phasing',db.collection('phasing'),function(d){S.phasing=d;DS.cache={}});
+    subscribe('geography',db.collection('geography'),function(d){S.geoRaw=d;geoIngest()});
     subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
     subscribe('receivables',db.collection('receivables'),function(d){S.recvRaw=d;ingestRecv()});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});

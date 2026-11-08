@@ -46,8 +46,8 @@ var DEPT_PAGES={Sales:['overview','sales','team'],CRR:['sales','team'],Accounts:
 function pagesFor(u){
   var base=['today'];if(!u)return [];
   var r=u.role;
-  if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake','admin'];
-  if(r==='Management / HO')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake'];
+  if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake','admin','geography'];
+  if(r==='Management / HO')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake','geography'];
   if(r==='HOD'){var p=DEPT_PAGES[u.department]||DEPT_PAGES.Sales;return p.filter(function(x){return x!=='sales'||true}).concat(['today','actions','targets'])}
   if(r==='Branch / depot manager')return ['overview','sales','receivables','inventory','today','actions','team','targets'];
   if(r==='Sales executive')return ['sales','today','actions','team','targets'];
@@ -216,20 +216,35 @@ function approvedOf(x){
 function r2(v){return Math.round(v*100)/100}
 function leafTgt(pot,share){return r2((+pot||0)*(+share||0)/100)}
 function phasingFor(x){
-  var best=null,bs=-1;
+  var best=null,bs=-1,geo=!!x.state_code,xd=x.district_id||'_state';
   (S.phasing||[]).forEach(function(p){
-    if(p.fy_quarter!==x.fy_quarter)return;if(p.demo&&realActual(x.plant_code,x.fy_quarter))return;var s=0;
-    if(p.plant_code){if(p.plant_code!==x.plant_code)return;s+=4}
+    if(p.fy_quarter!==x.fy_quarter)return;var s=0;
+    if(geo){
+      if(p.plant_code)return;if(p.demo&&typeof geoRealSales==='function'&&geoRealSales())return;
+      if(p.state_code){if(p.state_code!==x.state_code)return;var pd=p.district_id||'_state';if(pd===xd)s+=8;else if(pd==='_state')s+=4;else return}
+    }else{
+      if(p.state_code)return;if(p.demo&&realActual(x.plant_code,x.fy_quarter))return;
+      if(p.plant_code){if(p.plant_code!==x.plant_code)return;s+=4}
+    }
     if(p.product_group){if(p.product_group!==x.product_group)return;s+=2}
     if(p.customer_segment){if(p.customer_segment!==x.customer_segment)return;s+=1}
     if(s>bs){bs=s;best=p}
   });
   return best&&best.pct&&best.pct.length===3?best.pct:[100/3,100/3,100/3];
 }
+/* D77: a geography record's plant is its responsible plant (district) or the state's default plant; never the invoicing plant */
+function geoRespPlant(x){if(!x.state_code)return x.plant_code||'';var d=x.district_id||'_state';return d==='_state'?geoDefaultPlant(x.state_code):geoDistrictPlant(d)}
+/* the _state record carries the unallocated slice once districts exist: state potential less the districts (same quarter, state, group, segment) */
+function geoDistSum(x,approved){
+  if(!x.state_code||(x.district_id||'_state')!=='_state')return 0;var t=0;
+  (S.potential||[]).forEach(function(y){if(y.fy_quarter===x.fy_quarter&&y.state_code===x.state_code&&y.district_id&&y.district_id!=='_state'&&y.product_group===x.product_group&&(y.customer_segment||'All')===(x.customer_segment||'All')){var s=approved?approvedOf(y):y;if(s)t+=+s.potential_value_inr||0}});
+  return t;
+}
 function monthsOfTarget(t,pct){var a=r2(t*pct[0]/100),b=r2(t*pct[1]/100);return [a,b,r2(t-a-b)]}
 function leafMatch(x,f){
-  if(f.plant){if(x.plant_code!==f.plant)return false}
-  else if(f.plants){if(!x.plant_code||!f.plants.has(x.plant_code))return false}
+  var pc=x.state_code?geoRespPlant(x):x.plant_code;
+  if(f.plant){if(pc!==f.plant)return false}
+  else if(f.plants){if(!pc||!f.plants.has(pc))return false}
   if(f.group&&x.product_group!==f.group)return false;
   return true;
 }
@@ -244,10 +259,14 @@ function planQ(f,q){
   var key='pq'+JSON.stringify([f.plants?Array.from(f.plants):null,f.plant||'',f.group||'',q])+S.potVer+'|'+Object.keys(S.cells).length+'|'+S.uploads.length;
   if(DS.cache[key])return DS.cache[key];
   var R={pot:0,potSqft:0,potSh:0,tgtSh:0,tgtShD:0,tgtSq:0,tgtSqD:0,tgt:0,orig:0,draft:0,nAppr:0,nDraft:0,nLeaf:0,months:[0,0,0],draftMonths:[0,0,0],revs:[],kind:'none'};
+  /* D79: from the geography start quarter the state records count; plant records (legacy) count only for quarters with no state record */
+  var useGeo=(S.potential||[]).some(function(x){return x.fy_quarter===q&&x.state_code&&!(x.demo&&typeof geoRealSales==='function'&&geoRealSales())});
   (S.potential||[]).forEach(function(x){
-    if(x.fy_quarter!==q||!leafMatch(x,f))return;
-    if(x.demo&&realActual(x.plant_code,q))return;
-    R.nLeaf++;var ap=approvedOf(x),pct=phasingFor(x);
+    if(x.fy_quarter!==q)return;if(useGeo!==!!x.state_code)return;if(!leafMatch(x,f))return;
+    if(x.state_code?(x.demo&&geoRealSales()):(x.demo&&realActual(x.plant_code,q)))return;
+    R.nLeaf++;var ap0=approvedOf(x),pct=phasingFor(x);
+    var ds=geoDistSum(x,false),dsA=geoDistSum(x,true),ap=ap0&&dsA?Object.assign({},ap0,{potential_value_inr:Math.max(0,(+ap0.potential_value_inr||0)-dsA)}):ap0;
+    if(ds)x=Object.assign({},x,{potential_value_inr:Math.max(0,(+x.potential_value_inr||0)-ds)});
     var src=ap||x;R.pot+=+src.potential_value_inr||0;R.potSqft+=+src.potential_qty_sqft||0;R.potSh+=shOfLeaf(src);
     if(ap){var t=leafTgt(ap.potential_value_inr,ap.share_pct);R.tgt+=t;R.nAppr++;R.tgtSq+=(+ap.potential_qty_sqft||0)*(+ap.share_pct||0)/100;R.tgtSh+=shOfLeaf(ap)*(+ap.share_pct||0)/100;monthsOfTarget(t,pct).forEach(function(v,i){R.months[i]+=v});
       var og=x.original||ap;R.orig+=leafTgt(og.potential_value_inr,og.share_pct)}

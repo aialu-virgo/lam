@@ -22,6 +22,7 @@ function build({ docs, s4opts = {}, props = true, plants = PLANTS, verified = tr
   env.setEmail(SUPER);
   return { S, env };
 }
+const stagedCust = (env) => { const st = env.stored(), man = JSON.parse(st['sapstage/cust_man'] || 'null'); if (!man) return null; const rows = []; for (let i = 0; i < man.n; i++) { const c = JSON.parse(st['sapstage/cust_c_' + man.run + '_' + i]); JSON.parse(zlib.gunzipSync(Buffer.from(c.z, 'base64')).toString()).forEach(r => rows.push(r)); } return { man, rows }; };
 const stagedRows = (env, ym) => { const st = env.stored(), man = JSON.parse(st['sapstage/man_' + ym] || 'null'); if (!man) return null; const rows = []; for (let i = 0; i < man.n; i++) { const c = JSON.parse(st['sapstage/c_' + ym + '_' + man.run + '_' + i]); JSON.parse(zlib.gunzipSync(Buffer.from(c.z, 'base64')).toString()).forEach(r => rows.push(r)); } return { man, rows }; };
 const sj = (o) => JSON.stringify(o);
 const odMs = (d) => +/\((\d+)\)/.exec(d)[1];
@@ -46,7 +47,7 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
 /* =============================== A1. access: Super admin or project owner only =============================== */
 {
   const { S, env } = build(); const before0 = sj(env.stored());
-  const fns = [['sapStatus', []], ['sapVerifyMetadata', []], ['sapShadowRun', []], ['sapSync', []], ['sapInstallDailyTrigger', []], ['sapRemoveDailyTrigger', []], ['sapMarkLoaded', [{ months: ['2026-10'] }]]];
+  const fns = [['sapStatus', []], ['sapVerifyMetadata', []], ['sapShadowRun', []], ['sapSync', []], ['sapCustomerSync', []], ['sapCustomerSync', []], ['sapInstallDailyTrigger', []], ['sapRemoveDailyTrigger', []], ['sapMarkLoaded', [{ months: ['2026-10'] }]]];
   for (const who of ['se@virgoasia.com', 'stranger@virgoasia.com', '']) {
     env.setEmail(who); const rs = fns.map(([f, a]) => env.call(f, a));
     ok('"' + (who || 'no email') + '": refused on all ' + fns.length + ' SAP functions', rs.every(r => r.ok === false && /permission_denied|unauthenticated/.test(r.code)), sj(rs.map(r => r.code)));
@@ -139,7 +140,7 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
 /* =============================== A4. verify $metadata =============================== */
 {
   let { S, env } = build(); let r = env.call('sapVerifyMetadata');
-  ok('sapVerifyMetadata: every entity set and property ok', r.ok && r.allOk && r.gaps === 0 && r.rows.every(x => x.status === 'ok') && r.rows.length === 29 && r.optionalGaps === 0, sj(r).slice(0, 300));
+  ok('sapVerifyMetadata: every entity set and property ok', r.ok && r.allOk && r.gaps === 0 && r.rows.every(x => x.status === 'ok') && r.rows.length === 53 && r.optionalGaps === 0, sj(r).slice(0, 300));
   ok('it reports per service, entity set and property', ['API_BILLING_DOCUMENT_SRV', 'API_PRODUCT_SRV', 'API_BUSINESS_PARTNER'].every(s => r.rows.some(x => x.service === s)) && r.rows.some(x => x.entitySet === 'A_BillingDocument' && x.property === 'LastChangeDate' && x.status === 'ok') && r.rows.some(x => x.property === 'to_Item (navigation)'));
   ok('only $metadata was read, with GET and the Basic header (and no password in any URL)', S.calls.length === 3 && S.calls.every(c => c.method === 'get' && /\$metadata$/.test(c.path) && /^Basic /.test(c.headers.Authorization) && !c.url.includes(S.password)));
   ({ S, env } = build({ s4opts: { metaGaps: ['A_BillingDocument.LastChangeDate', 'API_PRODUCT_SRV.A_Product'] } })); env.props.SAP_BILLING_SHAPE = 'A'; r = env.call('sapVerifyMetadata');
@@ -175,7 +176,7 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   const logsOf = (env) => (env.state.logs || []).filter(l => l.startsWith('SAP '));
   // 1. the real tenant has no SalesDistrict: the feed never names it (verify list, $select, $expand) and the column stays blank
   let { S, env } = build({ docs, s4opts: { pageCap: 17 } }); let r = env.call('sapVerifyMetadata');
-  ok('tenant without SalesDistrict: verify is ok with no GAP (the property is not in the list)', r.ok === true && r.gaps === 0 && !r.rows.some(x => x.property === 'SalesDistrict'), sj(r.rows.filter(x => x.status === 'GAP')));
+  ok('tenant without SalesDistrict on the billing item: verify is ok with no GAP (the property is not in the billing list)', r.ok === true && r.gaps === 0 && !r.rows.some(x => x.property === 'SalesDistrict' && x.entitySet === 'A_BillingDocumentItem'), sj(r.rows.filter(x => x.status === 'GAP')));
   r = env.call('sapShadowRun'); const st1 = env.call('sapSync');
   ok('shadow run and sync complete on the tenant that has no SalesDistrict', r.ok && r.done && st1.ok && st1.done, sj([r, st1]).slice(0, 300));
   ok('no request names SalesDistrict (strict mock answers 404 "Resource not found for the segment" for an unknown name)', S.calls.every(c => !/SalesDistrict/.test(decodeURIComponent(c.url))) && S.calls.length > 5);
@@ -211,9 +212,9 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   const same = cases.map(mg => { const e = build({ docs, s4opts: mg }); e.env.props.SAP_BILLING_SHAPE = 'A'; const v = e.env.call('sapVerifyMetadata'), sv = e.env.call('sapStatus').status; return v.ok === sv.verify.ok && sv.lastOk === v.ok && v.gaps === sv.verify.gaps && v.optionalGaps === sv.verify.optionalGaps; });
   ok('verify: the returned ok, gaps and optionalGaps equal the saved status (verify.ok, lastOk) in all ' + cases.length + ' cases', same.every(Boolean), sj(same));
   // 5. logs: every public function writes one line, success or failure, with no credential or address
-  ({ S, env } = build({ docs })); const pub = [['sapVerifyMetadata', []], ['sapShadowRun', []], ['sapSync', []], ['sapStatus', []], ['sapInstallDailyTrigger', []], ['sapRemoveDailyTrigger', []], ['sapMarkLoaded', [{ months: ['2026-10'] }]]];
+  ({ S, env } = build({ docs })); const pub = [['sapVerifyMetadata', []], ['sapShadowRun', []], ['sapSync', []], ['sapCustomerSync', []], ['sapStatus', []], ['sapInstallDailyTrigger', []], ['sapRemoveDailyTrigger', []], ['sapMarkLoaded', [{ months: ['2026-10'] }]]];
   const per = pub.map(([f, a]) => { const l0 = logsOf(env).length; const rr = env.call(f, a); const ls = logsOf(env); return { f, ok: rr.ok, n: ls.length - l0, line: ls[ls.length - 1] || '' }; });
-  ok('logs: each of the 7 public functions wrote exactly one "SAP ..." line on success, naming the function', per.every(x => x.ok && x.n === 1 && x.line.includes('"fn":"' + x.f + '"') && x.line.includes('"ok":true')), sj(per.map(x => [x.f, x.n])));
+  ok('logs: each of the 8 public functions wrote exactly one "SAP ..." line on success, naming the function', per.every(x => x.ok && x.n === 1 && x.line.includes('"fn":"' + x.f + '"') && x.line.includes('"ok":true')), sj(per.map(x => [x.f, x.n])));
   const failed = [];
   env.props.SAP_PASSWORD = 'wrong-pw'; for (const f of ['sapVerifyMetadata', 'sapShadowRun']) { const l0 = logsOf(env).length; const rr = env.call(f); failed.push({ f, ok: rr.ok, code: rr.code, n: logsOf(env).length - l0, line: logsOf(env).slice(-1)[0] || '' }); }
   ok('logs: a failed run (wrong password, HTTP 401; then the shadow run refused because verify failed) is logged too, with ok:false and the code', failed.every(x => x.ok === false && x.n === 1 && x.line.includes('"ok":false') && /sap_auth|sap_verify_gap/.test(x.line)), sj(failed));
@@ -266,6 +267,80 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   for (const f of ['sapSyncTrigger_', 'sapContinueTrigger_']) { env.setEmail('se@virgoasia.com'); const l0 = logsOf(env).length; env.ctx[f]();
     const add = logsOf(env).slice(l0); ok(f + ': a refused call writes exactly one log line (ok:false, permission_denied, no SAP call)', add.length === 1 && add[0].includes('"fn":"' + f + '"') && add[0].includes('"ok":false') && add[0].includes('permission_denied') && S.calls.length === n0, sj(add)); }
 }
+
+/* =============================== A4d. customer master read (D78): verify, paging, refusals, staging, no write without Super =============================== */
+{
+  const docs = synthDocs({ masters }), logsOf = (env) => (env.state.logs || []).filter(l => l.startsWith('SAP '));
+  const CODES = Object.keys(masters.customers), N = CODES.length;
+  // verify: the customer names are checked, per service / entity set / property, with the scope marked
+  let { S, env } = build({ docs, verified: false }); let r = env.call('sapVerifyMetadata');
+  ok('verify: the customer-master entity sets and properties are checked and all ok on the mock tenant', r.ok === true && r.gaps === 0 && ['A_CustomerCompany', 'A_CustomerSalesArea', 'A_BusinessPartnerAddress', 'A_BusinessPartnerTax'].every(n => r.rows.some(x => x.entitySet === n && x.property === '(entity set)' && x.status === 'ok')) && r.rows.some(x => x.entitySet === 'A_BusinessPartnerAddress' && x.property === 'PostalCode' && x.scope === 'cust' && !x.optional), sj(r.rows.filter(x => x.status === 'GAP')));
+  ok('verify: only region, PIN, address key and the company scope are required for the customer read; the rest is optional', (() => { const req = r.rows.filter(x => x.scope === 'cust' && !x.optional && x.property !== '(entity set)').map(x => x.entitySet + '.' + x.property).sort(); return sj(req) === sj(['A_BusinessPartnerAddress.BusinessPartner', 'A_BusinessPartnerAddress.PostalCode', 'A_BusinessPartnerAddress.Region', 'A_CustomerCompany.CompanyCode', 'A_CustomerCompany.Customer']); })());
+  // refusals: never verified, failed verify, required customer GAP, non-Super
+  ({ S, env } = build({ docs, verified: false })); let n0 = S.calls.length; r = env.call('sapCustomerSync');
+  ok('never verified: the customer read is refused "Run sapVerifyMetadata first", no SAP call, nothing staged', r.ok === false && r.code === 'sap_verify_first' && /Run sapVerifyMetadata first/.test(r.message) && S.calls.length === n0 && !('sapstage/cust_man' in env.stored()), sj(r));
+  env.call('sapVerifyMetadata'); S.failNext(/\$metadata/, 0, 99, { throw: true }); env.call('sapVerifyMetadata'); S.fails = []; n0 = S.calls.length; r = env.call('sapCustomerSync');
+  ok('after a failed verify the customer read is refused until verify passes (no SAP call)', r.ok === false && r.code === 'sap_verify_gap' && S.calls.length === n0, sj(r));
+  ({ S, env } = build({ docs, s4opts: { metaGaps: ['A_BusinessPartnerAddress.PostalCode'] }, verified: false })); r = env.call('sapVerifyMetadata'); n0 = S.calls.length;
+  const rc = env.call('sapCustomerSync'), nAfterRc = S.calls.length, rs = env.call('sapShadowRun');
+  ok('a required customer GAP (PostalCode): verify ok is false and names it; the customer read is refused with a clear message and no SAP call', r.ok === false && sj(r.blockingCust) === sj(['A_BusinessPartnerAddress.PostalCode']) && r.blockingSales.length === 0 && rc.ok === false && rc.code === 'sap_verify_gap' && /PostalCode/.test(rc.message) && /Nothing was read/.test(rc.message) && nAfterRc === n0, sj([r.ok, rc]));
+  ok('...but billing reads are not blocked by a customer-only GAP (the shadow run completes)', rs.ok === true && rs.done === true, sj(rs).slice(0, 200));
+  ({ S, env } = build({ docs, s4opts: { metaGaps: ['A_BillingDocumentItem.NetAmount'] }, verified: false })); env.props.SAP_BILLING_SHAPE = 'A'; r = env.call('sapVerifyMetadata');
+  ok('a required BILLING GAP blocks the shadow run, not the customer read (which does not use billing names)', r.ok === false && r.blockingCust.length === 0 && env.call('sapShadowRun').code === 'sap_verify_gap' && env.call('sapCustomerSync').ok === true);
+  ({ S, env } = build({ docs })); n0 = S.calls.length; const w0 = sj(env.stored());
+  for (const who of ['se@virgoasia.com', 'stranger@virgoasia.com', '']) { env.setEmail(who); const x = env.call('sapCustomerSync'); ok('"' + (who || 'no email') + '": sapCustomerSync refused, no SAP call, nothing written', x.ok === false && /permission_denied|unauthenticated/.test(x.code) && S.calls.length === n0 && sj(env.stored()) === w0, sj(x)); }
+  env.setEmail('se@virgoasia.com'); const rd = env.call('deskGetMany', [['sapstage/cust_man']]), wr = env.call('deskWrite', [[set('sapstage', 'cust_man', { status: 'loaded' })]]), mk = env.call('sapMarkLoaded', [{ customers: { run: 'x', rows: 1 } }]);
+  ok('a non-Super user cannot read, overwrite or mark the staged customer master', rd.code === 'permission_denied' && wr.code === 'permission_denied' && mk.ok === false && mk.code === 'permission_denied');
+  env.setEmail(SUPER);
+  // staging
+  ({ S, env } = build({ docs })); const before = sj(Object.keys(env.stored()).filter(k => !k.startsWith('sapstage/'))); r = env.call('sapCustomerSync'); const g = stagedCust(env);
+  ok('staging: the read completes and stages one row per in-scope customer', r.ok === true && r.customers === N && g && g.rows.length === N && g.man.status === 'staged' && g.man.complete === true && g.man.rows === N, sj(r).slice(0, 300));
+  ok('staging: customers of another company are dropped and counted (30 customers read, 5 outside), and a non-customer partner address is ignored', g.man.counts.read === N + 5 && g.man.counts.outOfScope === 5 && g.rows.every(x => !/^6000000/.test(x[0])) && g.man.counts.inScope === N, sj(g.man.counts));
+  ok('staging: columns are the page\'s intake names plus Postal Code, District, GSTIN', sj(g.man.cols) === sj(['Customer', 'Name', 'Customer Group', 'City', 'Region', 'Postal Code', 'District', 'GSTIN', 'Sales Executive', 'Payment Terms', 'Sales District', 'Blocked', 'Legacy Code', 'Address Count']) && g.rows.every(x => x.length === 14));
+  const by = {}; g.rows.forEach(x => by[x[0]] = x); const code = (i) => String(+CODES[i]);
+  ok('staging: codes are trimmed of leading zeros and names kept', by[code(0)] && by[code(0)][1] === masters.customers[CODES[0]], sj(by[code(0)]));
+  ok('staging: with several addresses the lowest AddressID wins (region GJ, not MH) and the customer is counted', by[code(7)][4] === 'GJ' && by[code(7)][5] === '380007' && by[code(7)][13] === 2 && g.man.counts.severalAddresses === 1, sj(by[code(7)]));
+  ok('staging: a customer with no address has blank region and PIN and is counted', by[code(9)][4] === '' && by[code(9)][5] === '' && by[code(9)][13] === 0 && g.man.counts.noAddress === 1 && g.man.counts.noRegion === 1);
+  ok('staging: a PIN that is not 6 digits is stored blank and counted (4-digit and blank)', by[code(3)][5] === '' && by[code(5)][5] === '' && g.man.counts.pinBad === 1 && g.man.counts.pin6 === N - 3, sj([g.man.counts.pinBad, g.man.counts.pin6]));
+  ok('staging: GSTIN is the IN3 tax number only (an IN4 row is ignored); a 14-character one is kept and counted', by[code(2)][7] === '24AAAAA0002A1Z5' && by[code(1)][7] === '24AAAAA0001A1Z5' && by[code(6)][7].length === 14 && g.man.counts.gstinNot15 === 1 && by[code(0)][7] === '', sj([by[code(2)][7], by[code(6)][7]]));
+  ok('staging: district text, city, group, sales group, terms, sales district and legacy code are carried; a blocked customer is flagged', by[code(1)][6] === 'District 1' && by[code(0)][6] === '' && by[code(1)][3] === 'City 1' && by[code(1)][2] === 'C2' && by[code(1)][8] === 'SG1' && by[code(1)][9] === 'Z030' && by[code(1)][10] === 'ZONE02' && by[code(0)][12] === 'C00000' && by[code(10)][11] === 'Y' && by[code(0)][11] === '', sj([by[code(1)], by[code(10)]]));
+  ok('staging: with two sales areas the first is kept and the customer is counted', by[code(4)][2] === 'C1' && by[code(4)][8] === 'SG1' && g.man.counts.severalSalesAreas === 1, sj(by[code(4)]));
+  ok('staging: chunk and manifest ids never start with c_ or man_ (the page\'s billing loader reads those)', Object.keys(env.stored()).filter(k => k.startsWith('sapstage/')).every(k => !/^sapstage\/(c_|man_)/.test(k) || /^sapstage\/(c_2|man_2)/.test(k)) && Object.keys(env.stored()).some(k => /^sapstage\/cust_c_/.test(k)));
+  ok('staging: only the admin-only sapstage collection was written, plus the status', sj(Object.keys(env.stored()).filter(k => !k.startsWith('sapstage/'))) === before && !!sapJsonOf(env, 'SAP_STATUS').cust);
+  ok('staging: no request wrote to SAP, none carried the password, no property outside the customer set was invented', S.calls.every(c => c.method === 'get' && !c.url.includes(S.password)));
+  const st = env.call('sapStatus').status;
+  ok('status: the card data shows the staged customers and the next step mentions them', st.cust && st.cust.rows === N && st.cust.status === 'staged' && /Customer master: 25 customers are staged/.test(st.next) && st.lastKind === 'customers');
+  // a second read replaces the first run's chunks (no pile-up)
+  const run1 = g.man.run; r = env.call('sapCustomerSync'); const g2 = stagedCust(env);
+  ok('a second read replaces the staged customers: a new run id, the old chunks are deleted, the rows are the same', g2.man.run !== run1 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/cust_c_' + run1)) && g2.rows.length === N);
+  // paging: a server that caps the page size is followed to the end; the count is checked
+  ({ S, env } = build({ docs, s4opts: { pageCap: 7 } })); n0 = S.calls.length; r = env.call('sapCustomerSync'); const g3 = stagedCust(env);
+  const pageCalls = S.calls.slice(n0).filter(c => /A_(Customer|BusinessPartner)/.test(c.path));
+  ok('paging: with a page cap of 7 every set is read to the end (all customers and addresses arrive), in several calls per set', r.ok && g3.rows.length === N && sj(g3.rows.map(x => x.join('|')).sort()) === sj(g.rows.map(x => x.join('|')).sort()) && pageCalls.length > 10, pageCalls.length);
+  ok('paging: $skip advances with the rows already read, $orderby is set, and the count is requested on the first page only', (() => { const q = pageCalls.filter(c => /A_BusinessPartnerAddress/.test(c.path)).map(c => new URLSearchParams(c.query)); return q.length > 2 && q[0].get('$inlinecount') === 'allpages' && q.slice(1).every(x => !x.get('$inlinecount')) && q.every(x => /BusinessPartner asc/.test(x.get('$orderby'))) && q[1].get('$skip') === '7' && q[2].get('$skip') === '14'; })());
+  ok('the company filter is sent on the scope read', pageCalls.some(c => /A_CustomerCompany/.test(c.path) && /CompanyCode eq '1000'/.test(decodeURIComponent(c.query))) && pageCalls.some(c => /A_BusinessPartnerTax/.test(c.path) && /BPTaxType eq 'IN3'/.test(decodeURIComponent(c.query))));
+  ({ S, env } = build({ docs, s4opts: { noCount: true } })); r = env.call('sapCustomerSync'); ok('a server without $inlinecount works (stops at the empty page)', r.ok && stagedCust(env).rows.length === N, sj(r).slice(0, 200));
+  ({ S, env } = build({ docs, s4opts: { pageCap: 7 } })); S.miscount = 3; r = env.call('sapCustomerSync');
+  ok('a count mismatch stages nothing and says so', r.ok === false && /counted/.test(r.message) && !('sapstage/cust_man' in env.stored()), sj(r));
+  // failures: nothing staged, clear status, no secrets
+  ({ S, env } = build({ docs })); S.failNext(/A_BusinessPartnerAddress/, 500, 99); r = env.call('sapCustomerSync'); const sf = env.call('sapStatus').status;
+  ok('a 500 on the address read: code sap_error, nothing staged, the run flag released, the card shows the failure', r.code === 'sap_error' && !('sapstage/cust_man' in env.stored()) && sf.lastOk === false && sf.lastKind === 'customers' && env.call('sapCustomerSync').code === 'sap_error');
+  ({ S, env } = build({ docs, s4opts: { msPerCall: 40000, pageCap: 7 } })); env.props.SAP_RUN_BUDGET_MS = '150000'; r = env.call('sapCustomerSync');
+  ok('the time budget stops the read with nothing staged and says to run it again', r.ok === false && r.code === 'sap_timeout' && /Nothing was staged/.test(r.message) && !('sapstage/cust_man' in env.stored()), sj(r));
+  ok('a non-Super refusal and every failure are logged as one line each, with no secret', (() => { const ls = logsOf(env).join('\n'); return /"fn":"sapCustomerSync"/.test(ls) && !ls.includes(S.password) && !ls.includes('mock-tenant'); })());
+  // optional parts: an optional property or set missing on the tenant is left out, the read still completes, the column is blank
+  ({ S, env } = build({ docs, s4opts: { metaGaps: ['A_BusinessPartnerAddress.District', 'API_BUSINESS_PARTNER.A_CustomerSalesArea', 'API_BUSINESS_PARTNER.A_BusinessPartnerTax'] }, verified: false })); r = env.call('sapVerifyMetadata');
+  ok('optional: a missing District property and two missing optional sets are warnings only (ok true), listed in the skip list', r.ok === true && r.gaps === 0 && r.optionalGaps >= 3 && r.warning && ['A_BusinessPartnerAddress.District', 'A_CustomerSalesArea.(entity set)', 'A_BusinessPartnerTax.(entity set)'].every(k => (JSON.parse(env.props.SAP_OPT_SKIP) || []).includes(k)), sj([r.ok, r.optionalGaps, env.props.SAP_OPT_SKIP]));
+  n0 = S.calls.length; r = env.call('sapCustomerSync'); const g4 = stagedCust(env);
+  ok('optional: the read completes without those names (strict tenant answers 200), and their columns are blank', r.ok === true && g4.rows.length === N && g4.rows.every(x => x[6] === '' && x[7] === '' && x[2] === '' && x[8] === '' && x[9] === '') && S.calls.slice(n0).every(c => !/A_CustomerSalesArea|A_BusinessPartnerTax|District/.test(decodeURIComponent(c.url))), sj(r).slice(0, 200));
+  ok('optional: region and PIN are still read', g4.rows.some(x => x[4] === 'GJ') && g4.rows.filter(x => /^\d{6}$/.test(x[5])).length === N - 3);
+  // mark loaded: the page reports { run, rows }; the manifest and status become loaded; billing counts are untouched
+  ({ S, env } = build({ docs })); env.call('sapCustomerSync'); const run = stagedCust(env).man.run; const bill0 = sj(env.call('sapStatus').status.loaded);
+  let ml = env.call('sapMarkLoaded', [{ customers: { run: 'wrong', rows: 5 } }]); ok('sapMarkLoaded for customers with a run id that is not the staged one changes nothing', ml.ok && JSON.parse(env.stored()['sapstage/cust_man']).status === 'staged' && env.call('sapStatus').status.cust.status === 'staged');
+  ml = env.call('sapMarkLoaded', [{ customers: { run, rows: N } }]); const st2 = env.call('sapStatus').status;
+  ok('sapMarkLoaded for customers marks the manifest and the card loaded; the billing loaded counts are untouched; the next step no longer lists them', ml.ok && JSON.parse(env.stored()['sapstage/cust_man']).status === 'loaded' && st2.cust.status === 'loaded' && st2.cust.loadedRows === N && sj(st2.loaded) === bill0 && !/Customer master:/.test(st2.next), sj(st2.cust));
+}
+function sapJsonOf(env, k) { try { return JSON.parse(env.props[k] || '{}'); } catch (e) { return {}; } }
 
 /* =============================== A5. filters, cut-off, cancellation modes, other types =============================== */
 {

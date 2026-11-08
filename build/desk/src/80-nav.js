@@ -4,7 +4,7 @@ S.acF={status:'',owner:'',rule:'',q:''};S.logF={kind:'',by:'',q:'',from:''};S.ac
 S.actions=[];S.followups=[];S.phasing=[];S.rollDocs={};S.rollLoaded=false;S.orders=[];S.deliv=[];S.recv=[];S.coll=[];S.stock=[];S.potVer=0;S.viewAs=null;S.demoMode=false;
 var PAGES=[
  ['overview','Overview','Overview'],['sales','Sales','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
- ['today','Today','Team'],['actions','Action Center','Team'],['team','Team & Scorecard','Team'],['targets','Targets & Potential','Plan'],['intake','Data Intake','Data'],['admin','Admin','Data']];
+ ['today','Today','Team'],['actions','Action Center','Team'],['team','Team & Scorecard','Team'],['targets','Targets & Potential','Plan'],['intake','Data Intake','Data'],['admin','Admin','Data'],['geography','Geography','Data']];
 var TITLES={
  overview:['Overview','Sheets sold, collections and stock against market potential. Growth is always against the previous quarter.'],
  sales:['Sales','Branch → salesperson → customer → SAP document · A/B/C customer tiles'],
@@ -14,8 +14,9 @@ var TITLES={
  actions:['Action Center','Actions, raise action, Follow-ups to send, Action log'],
  team:['Team & Scorecard','KRA / KPI plan against actual per person and role'],
  intake:['Data Intake','SAP B1 now, S/4HANA ready. CSV or XLSX. Every row keeps its SAP reference.'],
- targets:['Targets & Potential','Fill the quarter\'s market potential and sales target in one place'],
- admin:['Admin','Users, plants, rules and settings.']};
+ targets:['Targets & Potential','Set the quarter\'s market potential and sales target per state and product group'],
+ admin:['Admin','Users, plants, rules and settings.'],
+ geography:['Admin › Geography','Default plant of each state, plant of each district, state, district and PIN lists']};
 var PERIOD_PAGES=['overview','sales','team'],FILTER_PAGES=['overview','sales','team','receivables','inventory'];
 
 function route(){
@@ -34,7 +35,7 @@ function dataChip(){
 }
 /* line icons, 24x24, stroke 2, drawn at 17px like the reference (no icon library) */
 var NAV_ICON={overview:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
- sales:'<path d="M3 20h18M6 16l4-5 4 3 5-7"/>',targets:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',orders:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',receivables:'<path d="M7 4h10M7 9h10M7 4c5 0 5 5 0 5l7 11"/>',inventory:'<path d="M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4"/>',
+ sales:'<path d="M3 20h18M6 16l4-5 4 3 5-7"/>',geography:'<path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',targets:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',orders:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',receivables:'<path d="M7 4h10M7 9h10M7 4c5 0 5 5 0 5l7 11"/>',inventory:'<path d="M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4"/>',
  today:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>',actions:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
  team:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c2 .6 3.2 2.4 3.5 5.5"/>',
  intake:'<path d="M12 16V4M7 9l5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',admin:'<path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/>'};
@@ -116,6 +117,7 @@ function pageHtml(u){
   var pg=S.tab;
   if(pg==='today')return pageToday();
   if(pg==='targets')return pageTargets();
+  if(pg==='geography')return pageGeography();
   if(pg==='actions')return S.threadId?pageThread(S.threadId):pageActions();
   var body='';
   if(pg==='overview')body=pageOverview();else if(pg==='sales')body=pageSales();else if(pg==='team')body=pageTeam();
