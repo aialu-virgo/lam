@@ -37,7 +37,7 @@ function acCollect(){
     if(S.jobBusy)tasks.push({label:'Running admin jobs',order:8});
     if(S.dbState==='init')tasks.push({label:'Opening the Desk',order:9});
     else if(names.length&&ld<names.length&&!Object.keys(S.errs||{}).filter(function(k){return !(k==='jobs'&&typeof window.__gasCall==='function')}).length)tasks.push({label:'Loading data '+ld+' of '+names.length,done:ld,total:names.length,order:9});
-    if(ACT.w>0)tasks.push({label:'Saving '+ACT.w+' change'+(ACT.w>1?'s':''),order:10});
+    if(ACT.w>0)tasks.push({label:'Saving '+ACT.w+' change'+(ACT.w>1?'s':''),order:3.5});
     else if(ACT.r>0&&!tasks.length)tasks.push({label:'Loading data',order:11});
     if((window.__gasInflight||0)>0&&!tasks.length)tasks.push({label:'Waiting for the server ('+window.__gasInflight+')',order:12});
   }catch(e){}
