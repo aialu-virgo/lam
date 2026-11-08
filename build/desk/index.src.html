@@ -702,7 +702,7 @@ async function runValidation(){
   function rej(i,doc,line,field,reason,val){res.rejected++;res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,doc,line,field,reason,val==null?'':val])}
   var catSp={},zoneSp={},own=ownNames(),hxp=headerIndex(U.headers),cPos=('place of supply' in hxp)?hxp['place of supply']:-1,linker=null;
   if(sys==='S4'){var blank0=0,cset=new Set();for(var bi=0;bi<n;bi++){if(cSp<0||!String(rows[bi][cSp]==null?'':rows[bi][cSp]).trim()){blank0++;cset.add(String(rows[bi][cCust]).trim())}}if(blank0>0){U.progressMsg='Linking S/4 customers to B1 salespeople...';renderUpload();await tick();linker=await buildB1Linker(cset);res.af.link=linker}}
-  var IIDX=null;try{IIDX=await loadItemIdx()}catch(e){IIDX=null}/* v44 (D55, D65): item thickness and brand come from the item master; the line's zone is kept for the zone rule */
+  var IIDX=null;try{IIDX=await loadItemIdx()}catch(e){IIDX=null}/* v44 (D55, D85): item thickness and brand come from the item master; the line's zone is kept for the zone rule */
   var T0=Date.now();
   for(i=0;i<n;i++){
     if(Date.now()-T0>40){T0=Date.now();U.progress=Math.round(i/n*100);U.progressMsg='Checking row '+fmtN(i)+' of '+fmtN(n);var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%';var pm=$('#i-upload .bar+.note');if(pm)pm.textContent=U.progressMsg;await tick()}
@@ -812,7 +812,7 @@ async function writeRoll(plant,ym,sys,rows,src,demo){
   if(demo){var ex=S.rollDocs&&S.rollDocs[plant+'-'+ym],cp=S.cells['INV_'+ym]&&S.cells['INV_'+ym].plants&&S.cells['INV_'+ym].plants[plant];if((ex&&!ex.demo)||(cp&&!cp.demo))throw new Error('Demo roll write refused: '+plant+' '+ym)}
   await dset('roll/'+plant+'-'+ym,{plant:plant,ym:ym,sys:sys,n:rows.length,z:await gz(JSON.stringify(rows)),src:src,at:nowISO(),demo:demo||undefined});
 }
-/* v44: item thickness and brand label for the Overview splits (D55); zone digit 1-5 for the zone rule (D65) */
+/* v44: item thickness and brand label for the Overview splits (D55); zone digit 1-5 for the zone rule (D85) */
 function dimKeyOf(idx,code,grp,zone){
   var it=idx&&code!=null?idx.get(String(code).trim().toUpperCase()):null,thk=it&&it[3]!=null&&it[3]>0?(Math.round(it[3]*100)/100).toFixed(2)+' MM':'Unknown',br=it&&it[4]?String(it[4]).trim().slice(0,30):'No brand',zm=/^ZONE([1-5])$/.exec(zone||''),z=zm?zm[1]:'';
   return {a:thk,b:br||'No brand',z:z,k:thk+'\u0001'+br+'\u0001'+grp+'\u0001'+z};
@@ -983,7 +983,7 @@ function usersHtml(){
 function plantsHtml(){
   var rows=S.plants.slice().sort(function(a,b){return a.plant_code<b.plant_code?-1:1});
   var nameless=rows.filter(function(p){return !p.plant_name&&!p.b1_bpl_name}).length;
-  return '<section class="card"><div class="hd"><h2>Plants and branches &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="plant-add">Add plant</button><label class="btn sm" for="up-plants" style="cursor:pointer">Upload plant list (CSV)</label><input id="up-plants" data-file="plants" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="plants">Download template</button><button class="btn sm" data-act="plant-reset">Add missing default codes</button><button class="btn sm" data-act="zones-set" title="Zone = the zone on most of a plant sales lines in its last 12 loaded months (D65)">Set zones from sales</button></div></div>'
+  return '<section class="card"><div class="hd"><h2>Plants and branches &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="plant-add">Add plant</button><label class="btn sm" for="up-plants" style="cursor:pointer">Upload plant list (CSV)</label><input id="up-plants" data-file="plants" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="plants">Download template</button><button class="btn sm" data-act="plant-reset">Add missing default codes</button><button class="btn sm" data-act="zones-set" title="Zone = the zone on most of a plant sales lines in its last 12 loaded months (D85)">Set zones from sales</button></div></div>'
   +(nameless?'<div class="banner warn">'+nameless+' plant(s) have no name yet. B1 files carry the branch name only, so upload the Plant List (code and name) before loading B1 history. Or give names in the intake step.</div>':'')
   +'<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Zone</th><th>State</th><th>B1 branch name</th><th>Business</th><th>Active</th><th></th></tr></thead><tbody>'
   +rows.map(function(p){return '<tr><td class="mono">'+esc(p.plant_code)+'</td><td>'+esc(p.plant_name||'-')+(p.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(p.plant_type)+'</td><td>'+esc(p.zone||'-')+'</td><td>'+esc(p.state||'-')+'</td><td class="break">'+esc(p.b1_bpl_name||'-')+'</td><td>'+esc(p.business||'laminates')+'</td><td>'+(p.active===false?'<span class="pill mute">Off</span>':'<span class="pill ok">On</span>')+'</td><td><button class="btn sm" data-act="plant-edit" data-id="'+esc(p._id)+'">Edit</button></td></tr>'}).join('')+'</tbody></table></div>'

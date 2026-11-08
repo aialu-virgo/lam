@@ -213,7 +213,7 @@ details.tp-row[open]>summary{background:color-mix(in srgb,var(--brand-soft) 45%,
 }
 @media (max-width:520px){.tp-tools,.tp-tools .fld{width:100%}.tp-tools select{width:100%}.tp-sticky{position:static}.tp-bar{flex-direction:column;align-items:stretch}.tp-bar .btn{flex:1 1 44%}.tp-dgrid{grid-template-columns:1fr}.tp-pop{position:static}}
 
-/* v44: thickness and brand splits, branch rating (mock-up v3, D64) */
+/* v44: thickness and brand splits, branch rating (mock-up v3, D84) */
 .ox-sp{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}.ox-sp .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.ox-sp .h b:first-child{overflow-wrap:anywhere}.ox-sp .m{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 8px;font-size:12px;color:var(--ink2);align-items:center}
 .ox-bul.share .f{background:var(--act)}
 .ox-brk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 28px}@media(max-width:900px){.ox-brk{grid-template-columns:minmax(0,1fr)}}

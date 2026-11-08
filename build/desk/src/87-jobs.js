@@ -1,4 +1,4 @@
-/* ================= Admin job queue (D64, 8 Nov 2026) =================
+/* ================= Admin job queue (D84, 8 Nov 2026) =================
  * jobs/<id> = {type:'undo'|'clear_demo'|'set_zones', uploads:[ids] (undo), requested_by, requested_at, reason, status:'queued'}.
  * A Super admin's page runs queued jobs in requested_at order about 4 s after load. A job runs once: the doc is claimed with a lease
  * (the platform's single-writer primitive) and its status is re-read and set to 'running' before anything starts, so two open tabs cannot both run it.
@@ -42,4 +42,4 @@ async function runJobs(holder,opts){
   return ran;
 }
 Object.assign(handlers,{'job-dismiss':function(){S.jobBanner='';S.lastHtml='';schedule()}});
-/* set_zones (D65) is setZonesFromSales in src/53-splits.js: fills blank zones in the plant master from the zone on most sales lines (last 12 loaded months); it fails the job, with the reason, when no sales line carries a zone */
+/* set_zones (D85) is setZonesFromSales in src/53-splits.js: fills blank zones in the plant master from the zone on most sales lines (last 12 loaded months); it fails the job, with the reason, when no sales line carries a zone */

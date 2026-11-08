@@ -125,7 +125,7 @@ ok('admin: the zones are written to the plant master (source, time and line coun
 ok('admin: the page confirms with a banner',/Set zones from sales: zones written to the plant master: 3/.test(await page.innerText('#up-msg')),(await page.innerText('#up-msg')).slice(0,120));
 /* ---- 7. the set_zones job type ---- */
 for(const c of codes)await setM(c,'');await page.waitForTimeout(600);
-await ev(async()=>{await window.__desk.dset('jobs/jz',{type:'set_zones',requested_by:'coordinator',requested_at:new Date().toISOString(),reason:'D65 test',status:'queued'})});
+await ev(async()=>{await window.__desk.dset('jobs/jz',{type:'set_zones',requested_by:'coordinator',requested_at:new Date().toISOString(),reason:'D85 test',status:'queued'})});
 await page.waitForFunction(()=>{const j=window.__mockStore()['jobs/jz'];return j&&(j.status==='failed'||j.status==='done')},null,{timeout:60000});await page.waitForTimeout(500);
 const jz=(await ms('^jobs/'))['jobs/jz'],pl3=await ms('^plants/');
 ok('job set_zones: runs from the queue, ends "done", writes the 4 zones, result text says how many',jz.status==='done'&&/zones written to the plant master: 4/.test(jz.results[0].text)&&codes.every(c=>pl3['plants/'+c].zone===wantZ(c)),JSON.stringify(jz.results));

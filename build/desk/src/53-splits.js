@@ -1,4 +1,4 @@
-/* ================= Overview v44: thickness and brand splits, collections bars, branch rating, zones (D55, D64, D65; built 8 Nov 2026) =================
+/* ================= Overview v44: thickness and brand splits, collections bars, branch rating, zones (D55, D84, D85; built 8 Nov 2026) =================
  * Thickness, brand and zone come from "detail chunks" written at sales upload (index.src.html: dimKeyOf, packChunks). A detail chunk sits after the
  * normal chunks of a plant-month ({a:[],h:[],d:rows}, doc flag dim:true; the cell records dimFrom = index of the first one). Months loaded before v44 have none:
  * the cards then say "not loaded" and name the fix (reload the month), never a zero. Rows: [thickness label, brand, group, zone digit, lines, sheets, sqft, net].
@@ -38,11 +38,11 @@ async function loadDim(plants,yms){
 }
 /* the plant-months of a window and how many carry detail / have it read */
 function dimState(plants,w){
-  var sc=SC(),total=0,have=0,loaded=0;
+  var sc=SC(),total=0,have=0,loaded=0,miss={};
   wins(w).forEach(function(x){if(!(x.frac>0))return;var c=S.cells['INV_'+x.ym];if(!c)return;
     Object.keys(c.plants||{}).forEach(function(p){if(!plantInScope(sc,p)||(plants&&plants.size&&!plants.has(p)))return;total++;var info=c.plants[p];
-      if(info.dimFrom!=null){have++;var d=DS.dim[p+SEP+x.ym];if(d&&d.at===info.at)loaded++}})});
-  return {total:total,have:have,loaded:loaded,complete:total>0&&have===total,ready:loaded===have};
+      if(info.dimFrom==null)miss[p]=1;if(info.dimFrom!=null){have++;var d=DS.dim[p+SEP+x.ym];if(d&&d.at===info.at)loaded++}})});
+  return {missing:Object.keys(miss),total:total,have:have,loaded:loaded,complete:total>0&&have===total,ready:loaded===have};
 }
 /* totals per label (idx 0 thickness, 1 brand) over a window; months scaled by their fraction, like sumF */
 function dimAgg(plants,w,idx){
@@ -59,7 +59,7 @@ function zoneMonthsOf(p){
   var l=[];Object.keys(S.cells).forEach(function(k){var c=S.cells[k];if(c.entity!=='INV'||!c.plants||!c.plants[p]||c.plants[p].dimFrom==null)return;l.push(c.ym)});
   return l.sort().reverse().slice(0,12);
 }
-/* zone of a plant from its sales lines: the zone on most lines in its last 12 loaded months (D65). ambiguous on a tie; null when no line carries a zone */
+/* zone of a plant from its sales lines: the zone on most lines in its last 12 loaded months (D85). ambiguous on a tie; null when no line carries a zone */
 function zoneFromLines(p){
   var cnt={},tot=0;
   zoneMonthsOf(p).forEach(function(ym){var d=DS.dim[p+SEP+ym];if(!d)return;d.rows.forEach(function(r){if(!r[3])return;cnt[r[3]]=(cnt[r[3]]||0)+r[4];tot+=r[4]})});
@@ -84,7 +84,7 @@ function dimKick(ctx,needZones){
   loadDim(ctx.plants,ms).then(function(n){DS.dimBusy=false;if(n){S.lastHtml='';schedule()}}).catch(function(e){DS.dimBusy=false;S.err=(S.err||'')+'item detail: '+((e&&e.message)||e)+' '});
 }
 
-/* ---- Admin: set zones from sales (D65) ---- */
+/* ---- Admin: set zones from sales (D85) ---- */
 async function zonesFromSales(){
   var codes=S.plants.filter(function(p){return p.active!==false}).map(function(p){return p.plant_code}),s={};
   codes.forEach(function(p){zoneMonthsOf(p).forEach(function(m){s[m]=1})});
@@ -123,7 +123,7 @@ Object.assign(handlers,{
     var z=await zonesFromSales();
     if(!z.loadedAny){openDlg('<h3>Set zones from sales</h3><div class="banner warn" style="display:block"><b>No sales line with a zone is loaded.</b> Sales months loaded before v44 carry no zone. Reload the months in Data Intake › Sales (it replaces them), then run this again.</div><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>');return}
     var blank=z.list.filter(function(r){return r.zone&&!zoneMasterOf(r.plant)}).length;
-    openDlg('<h3>Set zones from sales</h3><p class="note" style="margin:0">A plant\'s zone is the zone on most of its sales lines in its last 12 loaded months (D65). Only plants with a blank zone in the master are written; a zone already in the master is never changed. Ties are left blank.</p>'+zonesPreviewHtml(z)+'<div class="row"><button class="btn pri" data-act="zones-go"'+(blank?'':' disabled')+'>Write '+blank+' zone'+(blank===1?'':'s')+' to the plant master</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');
+    openDlg('<h3>Set zones from sales</h3><p class="note" style="margin:0">A plant\'s zone is the zone on most of its sales lines in its last 12 loaded months (D85). Only plants with a blank zone in the master are written; a zone already in the master is never changed. Ties are left blank.</p>'+zonesPreviewHtml(z)+'<div class="row"><button class="btn pri" data-act="zones-go"'+(blank?'':' disabled')+'>Write '+blank+' zone'+(blank===1?'':'s')+' to the plant master</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');
   }catch(e){toast('Zones: '+dbErrText(e))}
  },
  'zones-go':async function(){
@@ -132,7 +132,7 @@ Object.assign(handlers,{
  }
 });
 
-/* ---- branch rating: weighted percentile rank, sales 50 / collections 30 / stock days 20 (D55, D64). Informational only. ---- */
+/* ---- branch rating: weighted percentile rank, sales 50 / collections 30 / stock days 20 (D55, D84). Informational only. ---- */
 var RATING_W={sk:50,col:30,stk:20};
 function ratingStars(sc){return sc>=80?5:sc>=60?4:sc>=40?3:sc>=20?2:1}
 /* percentile of each row among rows that have the measure: (below + half of ties) / (n-1) x 100; hi = higher is better. Fewer than 2 rows: no percentile. */
@@ -180,7 +180,7 @@ function oxRatingRow(b,rk,basis){
   var sTxt=b.sk==null?null:(basis==='ach'?Math.floor(b.sk)+'%':(b.sk>=0?'+':'−')+Math.abs(b.sk).toFixed(0)+'% QoQ');
   var tip=b.id+' '+b.name+' · score '+b.score.toFixed(0)+' → '+b.st+' of 5 stars · Sales '+(b.sk==null?'n/a':(basis==='ach'?'Ach '+b.sk.toFixed(1)+'% in sheets':'QoQ '+b.sk.toFixed(1)+'% in sheets (no target)')+' P'+Math.round(b.p_sk)+' (50%)')+' · Collection '+(b.col==null?'n/a':b.col.toFixed(1)+'% collected ÷ invoiced P'+Math.round(b.p_col)+' (30%)')+' · Stock days '+(b.stk==null?'n/a':b.stk.toFixed(0)+' days P'+Math.round(b.p_stk)+' (20%, lower is better)')+' · weights used: '+b.W;
   return '<div class="ox-br"'+oxTip(tip)+'><div class="h"><span><b class="mono">#'+rk+'</b> <b>'+esc(b.name)+'</b> <span class="note mono">'+esc(b.id)+'</span></span><span>'+oxStars(b.st)+' <span class="mono" style="font-size:12px">'+b.score.toFixed(0)+'</span></span></div><div class="ox-row">'
-   +chip('Sales',sTxt,b.p_sk)+chip('Coll.',b.col==null?null:Math.floor(b.col)+'%',b.p_col)+chip('Stock',b.stk==null?null:Math.round(b.stk)+'d',b.p_stk)+'</div>'+(b.n3<3?'<span class="note">based on '+b.n3+' of 3 measures, others reweighted</span>':'')+(b.ck?'<span class="note">Sales: Check target (above '+ACH_MAX+'%)</span>':'')+'</div>';
+   +chip('Sales',sTxt,b.p_sk)+chip('Coll.',b.col==null?null:Math.floor(b.col)+'%',b.p_col)+chip('Stock',b.stk==null?null:Math.round(b.stk)+'d',b.p_stk)+'</div>'+(b.n3<3?'<span class="note">based on '+b.n3+' of 3 measures, others reweighted</span>':'')+(b.ck&&basis==='ach'?'<span class="note">Sales: Check target (above '+ACH_MAX+'%)</span>':'')+'</div>';
 }
 function oxRatingCard(R,res,colLabel){
   var rated=R.rows.filter(function(b){return b.score!=null}).sort(function(a,b){return b.score-a.score||b.sh-a.sh});
@@ -195,7 +195,7 @@ function oxRatingTable(R){
   var rated=R.rows.filter(function(b){return b.score!=null}).sort(function(a,b){return b.score-a.score||b.sh-a.sh}),un=R.rows.filter(function(b){return b.score==null});
   var f1=function(v,s){return v==null?'<td class="num"><span class="ox-nl">n/a</span></td>':'<td class="num">'+s+'</td>'};
   return '<div class="tw"><table class="std"><thead><tr><th>#</th><th>Branch</th><th>Zone</th><th>Stars</th><th class="num">Score</th><th class="num">Sales ('+(R.basis==='ach'?'Ach %':'QoQ %')+')</th><th class="num">Collected ÷ invoiced</th><th class="num">Stock days</th><th>Measures used</th></tr></thead><tbody>'
-   +rated.map(function(b,i){var zz=zoneOfPlant(b.id).z;return '<tr><td>'+(i+1)+'</td><td><b>'+esc(b.name)+'</b> <span class="note mono">'+esc(b.id)+'</span></td><td>'+(zz?esc(zz):'—')+'</td><td>'+oxStars(b.st)+'</td><td class="num">'+b.score.toFixed(0)+'</td>'+f1(b.sk,(R.basis==='ach'?b.sk.toFixed(1)+'%':(b.sk>=0?'+':'−')+Math.abs(b.sk||0).toFixed(1)+'%'))+f1(b.col,(b.col||0).toFixed(1)+'%')+f1(b.stk,Math.round(b.stk||0))+'<td class="note">'+esc(b.W)+'</td></tr>'}).join('')
+   +rated.map(function(b,i){var zz=zoneOfPlant(b.id).z;return '<tr><td>'+(i+1)+'</td><td><b>'+esc(b.name)+'</b> <span class="note mono">'+esc(b.id)+'</span></td><td>'+(zz?esc(zz):'—')+'</td><td>'+oxStars(b.st)+'</td><td class="num">'+b.score.toFixed(0)+'</td>'+f1(b.sk,b.sk==null?'':(R.basis==='ach'?b.sk.toFixed(1)+'%':(b.sk>=0?'+':'−')+Math.abs(b.sk).toFixed(1)+'%'))+f1(b.col,b.col==null?'':b.col.toFixed(1)+'%')+f1(b.stk,b.stk==null?'':String(Math.round(b.stk)))+'<td class="note">'+esc(b.W)+'</td></tr>'}).join('')
    +un.map(function(b){return '<tr><td>—</td><td><b>'+esc(b.name)+'</b> <span class="note mono">'+esc(b.id)+'</span></td><td colspan="7" class="note">not rated: no measure could be ranked</td></tr>'}).join('')+'</tbody></table></div><p class="note">Informational only. Percentile rank among the branches listed; a missing measure is dropped and the weights of the others rescaled.</p>';
 }
 
@@ -224,13 +224,13 @@ function oxSplitCard(kind,ctx){
   if(!st.have)return head+'<div class="ox-empty"><b>No thickness or brand detail for '+esc(res.label)+'</b><span>'+(st.total?'Sales loaded before v44 carry no item detail ('+st.total+' plant-month'+(st.total===1?'':'s')+' in this period). Reload these months in Data Intake › Sales; the replace keeps the old data until the new file is checked.':'No sales are loaded for this period.')+' Shown as not loaded, never as zero.</span></div></section>';
   var h=head;
   if(!st.ready)h+='<div class="ox-row"><span class="ox-chip nl">Reading item detail… '+st.loaded+' of '+st.have+'</span></div>';
-  else if(!st.complete)h+='<div class="ox-row"><span class="ox-chip warn">Partial: '+st.have+' of '+st.total+' plant-months carry item detail</span></div>';
+  else if(!st.complete)h+='<div class="ox-row"><span class="ox-chip warn">Partial: '+st.have+' of '+st.total+' plant-months carry item detail</span></div><p class="note" style="margin:0"><b>Loaded plants only.</b> '+st.missing.length+' plant'+(st.missing.length===1?' is':'s are')+' missing from this split ('+esc(st.missing.slice(0,6).map(plantShort).join(', ')+(st.missing.length>6?' +'+(st.missing.length-6):''))+'); shares are of the loaded plants, not of all sales. Reload those plants\' months to complete it.</p>';
   if(st.ready||D.rows.length){
     var mx=Math.max.apply(null,D.rows.map(function(r){return r.sh}).concat([1]));
     h+=D.rows.map(function(r){
-      var q=r.q,tip=r.label+' · '+oxLakh(r.sh)+' lakh sheets · '+r.share.toFixed(1)+'% of sheets · '+fmtMoney(r.n)+' invoiced'+(q.state==='ok'?' · Last Qtr '+oxLakh(r.P)+' · QoQ '+oxSgn(q.v,Math.abs(q.v).toFixed(1))+'%':' · QoQ '+(q.txt||'—'))+' · no target (targets are set by plant and product group)';
+      var q=r.q,tip=r.label+' · '+oxLakh(r.sh)+' lakh sheets · '+r.share.toFixed(1)+(st.complete?'% of sheets':'% of the loaded plants\' sheets (partial)')+' · '+fmtMoney(r.n)+' invoiced'+(q.state==='ok'?' · Last Qtr '+oxLakh(r.P)+' · QoQ '+oxSgn(q.v,Math.abs(q.v).toFixed(1))+'%':' · QoQ '+(q.txt||'—'))+' · no target (targets are set by plant and product group)';
       return '<div class="ox-sp"'+oxTip(tip)+'><div class="h"><b>'+esc(r.label)+'</b><span class="mono"><b>'+oxLakh(r.sh)+'</b> lakh</span></div><div class="ox-bul share"><div class="f" style="width:'+(r.sh/mx*100).toFixed(1)+'%"></div></div>'
-       +'<div class="m"><span>'+r.share.toFixed(1)+'% share · '+esc(fmtMoney(r.n))+'</span><span class="ox-row"><span class="ox-chip sm nl">no target</span>'+oxQoqChip(q)+'</span></div></div>';
+       +'<div class="m"><span>'+r.share.toFixed(1)+(st.complete?'% share':'% of loaded plants')+' · '+esc(fmtMoney(r.n))+'</span><span class="ox-row"><span class="ox-chip sm nl">no target</span>'+oxQoqChip(q)+'</span></div></div>';
     }).join('');
   }
   h+='<p class="note" style="margin:0">Sheets first, then share and ₹, '+esc(res.label)+'. Invoiced external lines (credit notes carry no item). Bar = share of sheets, scaled to the largest row. Targets are set by plant and product group, so no Ach % here.'+(kind==='thk'?' Thickness is read from the item master and rounded to 2 decimals; items without one are "Unknown".':' Items without a brand are "No brand".')+'</p></section>';
@@ -242,7 +242,7 @@ function oxSplitTable(kind,ctx){
   var all=Array.from(dimAgg(ctx.plants,res.cur,D.idx).values()).sort(function(a,b){return b.sh-a.sh}),P=res.prior?dimAgg(ctx.plants,res.prior,D.idx):new Map(),tot=D.total||1;
   return '<div class="tw"><table class="std"><thead><tr><th>'+(kind==='thk'?'Thickness':'Brand')+'</th><th class="num">Lakh sheets</th><th class="num">Share %</th><th class="num">₹ invoiced</th><th class="num">Last Qtr</th><th class="num">QoQ %</th></tr></thead><tbody>'
    +all.map(function(a){var pv=P.get(a.k),pOk=D.stP&&D.stP.complete&&D.stP.ready&&D.st.complete&&D.st.ready,q=pOk?qoqOf(a.sh,pv?pv.sh:0,{}):null;return '<tr><td><b>'+esc(a.k)+'</b></td><td class="num">'+oxLakh(a.sh)+'</td><td class="num">'+(a.sh/tot*100).toFixed(1)+'%</td><td class="num">'+esc(fmtMoney(a.n))+'</td><td class="num">'+(pOk&&pv?oxLakh(pv.sh):'<span class="ox-nl">not loaded</span>')+'</td><td class="num">'+(q&&q.state==='ok'?fmtPct(q.v,true):'<span class="note">'+esc(q?q.txt:'partial')+'</span>')+'</td></tr>'}).join('')
-   +'<tr class="tot"><td>Total</td><td class="num">'+oxLakh(D.total)+'</td><td class="num">100%</td><td class="num">'+esc(fmtMoney(D.totalN))+'</td><td></td><td></td></tr></tbody></table></div><p class="note">Invoiced external lines; '+D.st.have+' of '+D.st.total+' plant-months carry item detail.</p>';
+   +'<tr class="tot"><td>'+(D.st.complete?'Total':'Total, loaded plants only')+'</td><td class="num">'+oxLakh(D.total)+'</td><td class="num">100%</td><td class="num">'+esc(fmtMoney(D.totalN))+'</td><td></td><td></td></tr></tbody></table></div><p class="note">Invoiced external lines; '+D.st.have+' of '+D.st.total+' plant-months carry item detail.</p>';
 }
 
 /* ---- collections: six quarters and the current one as bars, ₹ crore on each bar (mock-up v3) ---- */
@@ -260,3 +260,6 @@ function oxCollBars(cser){
   });
   return out+'</svg>';
 }
+
+/* one card failing never takes the Overview down: it is replaced by a small notice naming the card */
+function oxSafe(name,fn){try{return fn()}catch(e){return '<section class="ox-card ox-h"><h2>'+esc(name)+'</h2><div class="ox-empty"><b>This card could not be drawn</b><span>'+esc((e&&e.message)||String(e))+'. The rest of the Overview is unaffected.</span></div></section>'}}
