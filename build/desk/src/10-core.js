@@ -43,7 +43,12 @@ function ymLabel(ym){return MON[+ym.slice(5,7)-1]+' '+ym.slice(0,4)}
 function realToday(){var n=istNow();return isoOf(n.y,n.m,n.d)}
 function TODAY(){var t=lsGet('desk-today');return /^\d{4}-\d\d-\d\d$/.test(t||'')?t:realToday()}
 function isWD(s){return dow(s)!==0&&!holidaySet()[s]}
-function wdBetween(a,b){/* working days from a to b inclusive */var n=0;if(b<a)return 0;for(var d=a;d<=b;d=addDays(d,1))if(isWD(d))n++;return n}
+var WDC={hol:null,m:{}};/* perf: working-day counts are memoised per holiday list (the Sales and Team pages ask once per person) */
+function wdBetween(a,b){/* working days from a to b inclusive */
+  var h=holidaySet();if(WDC.hol!==h){WDC.hol=h;WDC.m={}}
+  var k=a+'|'+b,v=WDC.m[k];if(v!==undefined)return v;
+  var n=0;if(b>=a){for(var d=a;d<=b;d=addDays(d,1))if(isWD(d))n++}
+  WDC.m[k]=n;return n}
 function WD(ym){var last=ym+'-'+pad(ymDays(ym));return Math.max(1,wdBetween(ym+'-01',last))}
 function addWD(s,n){var d=s,k=0;while(k<n){d=addDays(d,1);if(isWD(d))k++}return d}
 function shiftYm(ym,k){var y=+ym.slice(0,4),m=+ym.slice(5,7)-1+k;y+=Math.floor(m/12);m=((m%12)+12)%12;return y+'-'+pad(m+1)}

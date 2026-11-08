@@ -880,7 +880,7 @@ async function runLoad(opts){
         await writeRoll(P.plant,ym,sys,rollRowsOf(P.agg),atNow,demo);
         bytes+=cb;loadedLines+=lines;done++;
       }
-      await dset('cells/'+cellId,cell);S.cells[cellId]=cell;
+      await dset('cells/'+cellId,cell);S.cells[cellId]=cell;cellRefTouch();
       for(var si=0;si<stale.length;si++)await ddel(stale[si]);
     }
   }catch(e){failed=e}

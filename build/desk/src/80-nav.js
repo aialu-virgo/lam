@@ -58,7 +58,7 @@ function navTagSig(u){var t=navTags(u,0);return Object.keys(t).map(function(k){r
 var LOGO_SRC='/*@@LOGO@@*/';
 function brandLogo(){return '<span class="brandmark">'+(LOGO_SRC?'<img class="brandlogo" src="'+LOGO_SRC+'" alt="Virgo">':'<span class="brandtext">Virgo</span>')+'</span>'}
 function navHtml(u){
-  var pages=pagesFor(u),open=0;try{open=todayCandidates(u).length}catch(e){}
+  var pages=pagesFor(u),open=0;try{open=(!DS.spReady||DS.engWait)?0:todayCandidates(u).length}catch(e){}
   var groups={};PAGES.forEach(function(p){(groups[p[2]]=groups[p[2]]||[]).push(p)});
   return ['Overview','Team','Plan','Data'].map(function(g){
     var items=groups[g].filter(function(p){return pages.indexOf(p[0])>=0});if(!items.length)return '';
@@ -116,10 +116,18 @@ function ctrlBar(pg){
   if(PERIOD_PAGES.indexOf(pg)>=0)h+='<span class="chip">Compared with: '+esc(res.priorLabel||'previous quarter')+'</span>'+(res.pro?'<span class="chip">To-date plan and previous quarter pro-rated by working days ('+res.N+' elapsed)</span>':'');
   return h+'</section>';
 }
+function spWaiting(pg){
+  if(!DS.spReady&&(pg==='sales'||pg==='team'||pg==='dashboard'||(pg==='overview'&&S.f.sp)))return true;
+  return (pg==='today'||(pg==='actions'&&!S.threadId))&&(!DS.spReady||DS.engWait);
+}
+function spGateHtml(){
+  if(DS.spErr)return '<section class="card" role="alert"><div class="banner err" style="display:flex">Reading the salesperson history failed: '+esc(DS.spErr)+'</div><p class="note">No salesperson figures are shown until it is read in full. The branch totals on Overview are not affected.</p><div class="row"><button class="btn pri" data-act="sp-retry">Try again</button> <button class="btn" onclick="location.reload()">Reload the page</button></div></section>';
+  return '<section class="card" role="status"><h2>Reading salesperson history…</h2><p class="note">The totals by branch are ready on Overview. This page needs the detail by salesperson, which is still being read.</p></section>';
+}
 function pageHtml(u){
   var pg=S.tab;
-  /* large history: pages that read per-salesperson totals wait for stage 2 (a few seconds); the rest are already complete */
-  if(!DS.spReady&&(pg==='sales'||pg==='team'||pg==='dashboard'||(pg==='overview'&&S.f.sp)))return '<section class="card" role="status"><h2>Reading salesperson history</h2><p class="note">The totals by branch are ready on Overview. This page needs the detail by salesperson, which is still being read.</p></section>';
+  /* large history: pages that read per-salesperson totals wait for stage 2; Today and Action Center also wait for the rules engine's first full pass */
+  if(spWaiting(pg))return spGateHtml();
   if(pg==='today')return pageToday();
   if(pg==='targets')return pageTargets();
   if(pg==='dashboard')return pageDash();
@@ -157,7 +165,7 @@ function renderAll(){
   if(!$('#shell'))root.innerHTML='<div id="shell"></div>';
   var sh=$('#shell');
   var sig=[S.role,S.viewAs||'',S.tab,S.demoMode,S.viewer&&S.viewer.email,S.users.length,u.role,S.threadId?1:0].join('|');
-  var navOpen=(function(){try{return todayCandidates(u).length}catch(e){return 0}})();
+  var navOpen=(function(){try{return (!DS.spReady||DS.engWait)?0:todayCandidates(u).length}catch(e){return 0}})();
   sig+='|'+navOpen+'|'+navTagSig(u);
   var rebuilt=false;
   if(sh.getAttribute('data-sig')!==sig){
@@ -180,6 +188,7 @@ function renderAll(){
 /* ---- handlers ---- */
 function goto(pg,opt){opt=opt||{};if(opt.plant!=null)S.f.plant=opt.plant||'';if(opt.group!=null)S.f.group=opt.group||'';location.hash='#/'+pg}
 Object.assign(handlers,{
+ 'sp-retry':function(){DS.spErr='';S.lastHtml='';schedule();return ingestRoll()},
  'boot-retry':function(){boot()},
  'clear-f':function(){S.f.plant='';S.f.sp='';S.f.group='';S.f.search='';S.lastHtml='';schedule()},
  'goto':function(t){S.f.plant=t.getAttribute('data-plant')||S.f.plant;S.f.group=t.getAttribute('data-group')||''},

@@ -60,7 +60,7 @@ function canPage(u,pg){return pagesFor(u).indexOf(pg)>=0}
 function isCust(u){return u&&u.role==='Coordinator (sales / CRR)'}
 
 /* ---- roll-up store: plant x month, decoded in scope only ---- */
-var DS={raw:{},sig:'',ver:0,pg:{},spk:{},spIdx:{},xf:{},busy:false,again:false,status:'idle',cust:{},custVer:0,custJobs:0,custDone:0,cache:{},plants:[],months:[],spReady:true,gen:0};
+var DS={raw:{},sig:'',ver:0,pg:{},spk:{},spIdx:{},xf:{},busy:false,again:false,status:'idle',cust:{},custVer:0,custJobs:0,custDone:0,cache:{},plants:[],months:[],spReady:true,gen:0,spErr:'',engWait:false};
 function T0(){return {n:0,sh:0,sq:0,d:0,l:0}}
 /* perf (large stores): reading the history is staged. Stage 1 builds plant x product group x month totals (everything the Overview, Receivables,
    Inventory and Targets pages read) and the page paints; stage 2 builds the per-salesperson maps in short slices (Sales, Team, My Dashboard, the rules
@@ -95,7 +95,7 @@ async function ingestRoll(){
       }
       if(changed||DS.ver===0||!DS.spReady){
         if(!sc.sp&&rawRowCount()>STAGE_ROWS){
-          var g=++DS.gen;DS.spReady=false;
+          var g=++DS.gen;DS.spReady=false;DS.spErr='';DS.engWait=true;
           if(await rebuildMapsA(g)){DS.ver++;DS.cache={};DS.ready=true;DS.status='Reading salesperson detail';S.lastHtml='';schedule();
             if(await rebuildMapsB(g)){DS.spReady=true;DS.ver++;DS.cache={};S.lastHtml='';S.engSig=null}}
           if(DS.again)continue;
@@ -103,12 +103,12 @@ async function ingestRoll(){
       }
       DS.status='ready';
     }while(DS.again);
-  }catch(e){DS.status='error: '+((e&&e.message)||e);DS.spReady=true}
+  }catch(e){DS.status='error: '+((e&&e.message)||e);if(!DS.spReady){DS.spErr=String((e&&e.message)||e);DS.spk={};DS.spIdx={}}/* a failed stage 2 never leaves partial salesperson maps readable: pages that need them show the error and a retry */}
   DS.busy=false;DS.ready=true;schedule();afterData();
 }
 /* one pass, synchronous: small stores, and callers that need the maps right now (a master change) */
 function rebuildMaps(){
-  DS.gen++;DS.spReady=true;rollReset();
+  DS.gen++;DS.spReady=true;DS.spErr='';rollReset();
   var ids=Object.keys(DS.raw);ids.forEach(rollAdd);rollLists(ids);
   ids.forEach(function(id){rollB(DS.raw[id])});
 }
@@ -172,7 +172,7 @@ function sumF(f,w){
 function distinct(kind,f){/* list of plants, groups or salespeople present in scope data */
   if(kind==='plant')return DS.plants.slice();
   if(kind==='group')return GROUPS.filter(function(g){return Object.keys(DS.pg).some(function(k){return k.split(SEP)[1]===g})});
-  if(kind==='sp')return Object.keys(DS.spIdx).filter(Boolean).sort();
+  if(kind==='sp')return !DS.spReady?[]:Object.keys(DS.spIdx).filter(Boolean).sort();
   return [];
 }
 function spPlants(sp){var o={};(DS.spIdx[sp]||[]).forEach(function(k){o[k.split(SEP)[1]]=1});return Object.keys(o)}

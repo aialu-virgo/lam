@@ -155,7 +155,10 @@ function integrityHtml(){
   return '<div class="banner err" role="alert" style="flex-direction:column;align-items:flex-start"><b>Integrity alert · '+l.length+' closed-quarter or lock change'+(l.length>1?'s':'')+' without a matching Super-admin log entry</b>'+l.slice(0,8).map(function(x){return '<span>'+esc(x.text)+'</span>'}).join('')+(l.length>8?'<span>and '+(l.length-8)+' more (Admin › Tools)</span>':'')+'<span class="note">Someone wrote to the database directly, or a record was edited outside the page. Check who, then accept the current state to log it.</span><button class="btn sm" data-act="integ-accept">Accept the current state (logged)</button></div>';
 }
 var _afterData=afterData;
-afterData=function(){ensureRolls();runEngine();runLadder();integrityCheck()};
+afterData=function(){ensureRolls();
+  /* a large history holds Today and Action Center back until the engine's first full pass (DS.engWait) */
+  var done=function(){if(DS.engWait&&DS.spReady){DS.engWait=false;S.lastHtml='';schedule()}};
+  Promise.resolve(runEngine()).then(done,done);runLadder();integrityCheck()};
 Object.assign(handlers,{
  'st-save':function(){return saveSettings()},
  'rb-run':function(){return ensureRolls(true)},
