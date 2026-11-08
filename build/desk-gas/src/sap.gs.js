@@ -9,7 +9,7 @@
  * SETTINGS (Script Properties only; never in code, the sheet, the backup, a log or the page):
  *   SAP_BASE_URL (https host, e.g. https://tenant-api.s4hana.cloud.sap), SAP_USER, SAP_PASSWORD, SAP_COMPANY_CODE (default SAP_DEFAULT_COMPANY), CANCEL_MODE (exclude | mirror, default exclude).
  * STATE (Script Properties): SAP_STATUS (what the card shows), SAP_CURSOR (resume point of a sync cut at the time limit), SAP_CURSOR_SHADOW (the same for a shadow run), SAP_OPT_SKIP (optional names left out), SAP_WM (watermark), SAP_RUN (run flag), SAP_SHADOW (last shadow result), SAP_PAGE_EFF (page size learned from a refusal or a server cap), SAP_AUTO (an automatic chain in progress).
- *   SPEED (all optional Script Properties): SAP_PAGE_TOP (rows per page, default 500), SAP_CONCURRENCY (pages read at once, default 4), SAP_LOOKUP_BATCH (keys per lookup call, default 20), SAP_RUN_BUDGET_MS, SAP_AUTO_MAX_RUNS (default 8).
+ *   SPEED (all optional Script Properties): SAP_PAGE_TOP (rows per page, default 500), SAP_CONCURRENCY (pages read at once, default 4), SAP_LOOKUP_BATCH (keys per lookup call, default 40), SAP_RUN_BUDGET_MS, SAP_AUTO_MAX_RUNS (default 8).
  * ACCESS: every function below is refused unless the caller is the project owner or an active Super admin. The time trigger runs sapSyncTrigger_ / sapContinueTrigger_ as the owner.
  * LOCKS: the script lock is taken here only for (a) the short run-flag test-and-set and (b) the staging write section, exactly as deskWrite does; never while it is held, never across a SAP call. */
 var SAP_FEED_FROM = '2026-10-01';        // billing documents dated before this are never read or written (data to 30 Sep 2026 stays as uploaded)
@@ -205,6 +205,9 @@ function sapEntJson_(cfg, svc, ent) {
   catch (e) { if (e.sapShrink || ent.code === 429) return null; throw e; }
   return null;
 }
+var SAP_MONTHS_ = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function sapMonthName_(ym) { var m = /^(\d{4})-(\d\d)$/.exec(String(ym || '')); return m && SAP_MONTHS_[+m[2] - 1] ? SAP_MONTHS_[+m[2] - 1] + ' ' + m[1] : String(ym || ''); }
+function sapFeedMonthName_() { return sapMonthName_(sapYm_(SAP_FEED_FROM)); }
 function sapFmt_(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
 /* ---------- small helpers ---------- */
@@ -241,7 +244,7 @@ function sapNext_(s, missing, trig) {
   if (missing.length) return 'Set ' + missing.join(', ') + ' in the Apps Script project (Project Settings, Script properties). Then run sapVerifyMetadata.';
   if (s.resume) return 'The last sync stopped at its 5-minute run limit (SAP_RUN_BUDGET_MS). Run sapSyncAuto once to finish it without more clicks (the daily trigger also continues it).';
   if (!s.verify || s.verify.failed || (s.verify.blockingSales !== undefined ? s.verify.blockingSales.length : !s.verify.ok)) return s.verify && s.verify.failed ? 'The last sapVerifyMetadata did not finish. Run it again.' : s.verify ? 'SAP lacks ' + s.verify.gaps + ' required name(s) (' + (s.verify.blockingSales || s.verify.blocking || []).join(', ') + '). Send the sapVerifyMetadata result to the Delivery Lead.' : 'Run sapVerifyMetadata once to check the SAP service names.';
-  if (!s.shadow) return 'Run sapShadowRunAuto (October 2026, writes nothing; it continues by itself if one run is not enough) and show Vijay the differences. The first real run needs his OK.';
+  if (!s.shadow) return 'Run sapShadowRunAuto (' + sapFeedMonthName_() + ', writes nothing; it continues by itself if one run is not enough) and show Vijay the differences. The first real run needs his OK.';
   if (s.unresolved && s.unresolved.rows) return 'Credit memos for ' + s.unresolved.months.join(', ') + ' are not loaded: ' + s.unresolved.rows + ' lines use product codes that are not in the item master. Load the item master with the S/4 codes (Q18). Credit coverage stays off until this is zero.';
   var pend = Object.keys(s.staged || {}).filter(function (k) { return s.staged[k].status !== 'loaded'; });
   if (String(sapProps_().getProperty('SAP_SYNC_ENABLED') || '').trim().toLowerCase() !== 'yes') return 'sapSync is off. After Vijay accepts the shadow run, the Delivery Lead tells you when to set the Script Property SAP_SYNC_ENABLED to yes.';
@@ -645,12 +648,31 @@ function sapProgress_(job, t0, budget, u0, done, pg) {
 }
 
 /* ---------- sapSync ---------- */
-function sapSyncRun_(source) {
+/* every reason to refuse a shadow run, checked WITHOUT any side effect (nothing cleared, scheduled, acquired or read); the automatic chain calls it before it touches its trigger, record or position */
+function sapShadowPre_(ymArg) {
+  var cfg = sapCfg_(), ss = book_(false);
+  if (!ss) fail_('unavailable', 'The database is not set up yet. Run setup() once.');
+  sapVerifyGate_('sales');
+  var firstYm = sapYm_(SAP_FEED_FROM), ym = ymArg || firstYm;
+  if (!/^\d{4}-\d\d$/.test(ym) || ym < firstYm) fail_('invalid_argument', 'The shadow run reads ' + firstYm + ' or later only.');
+  sapCursorGet_('SAP_CURSOR_SHADOW');   // an unreadable saved position is a refusal too
+  sapShadowMonthGuard_(ymArg);
+  sapRequirePlants_(ss, 'the comparison would be empty');
+  return { cfg: cfg, ss: ss, ym: ym };
+}
+/* the same for the sync */
+function sapSyncPre_() {
   if (String(sapProps_().getProperty('SAP_SYNC_ENABLED') || '').trim().toLowerCase() !== 'yes') fail_('sap_sync_disabled', 'sapSync is switched off. It stays off until the Script Property SAP_SYNC_ENABLED is set to yes (after the shadow run is accepted). Nothing was read.');
   var cfg = sapCfg_(), st = sapStatusGet_();
   sapVerifyGate_('sales');
-  if (!st.shadow) fail_('sap_shadow_first', 'Run sapShadowRun first and have Vijay accept the October comparison. Nothing was read.');
-  var ss = book_(true); sapRequirePlants_(ss, 'the staged month would hold no rows'); sapAcquire_();
+  if (!st.shadow) fail_('sap_shadow_first', 'Run sapShadowRun first and have Vijay accept the ' + sapFeedMonthName_() + ' comparison. Nothing was read.');
+  var ss = book_(true); sapRequirePlants_(ss, 'the staged month would hold no rows');
+  sapCursorGet_('SAP_CURSOR');
+  return { cfg: cfg, st: st, ss: ss };
+}
+function sapSyncRun_(source) {
+  var pre = sapSyncPre_(), cfg = pre.cfg, st = pre.st, ss = pre.ss;
+  sapAcquire_();
   var contOff = function () { try { ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapContinueTrigger_') ScriptApp.deleteTrigger(t); }); } catch (e) {} };
   if (source === 'trigger') sapContinueLater_(SAP_RUN_STALE_MS + 30000);   // a watchdog: if Google kills this run, this trigger (after the run flag has gone stale) carries on from the saved position
   var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, job = null, resumed = false, res = null, info = null;
@@ -730,13 +752,7 @@ function sapDropText_(job) {
   return 'Lines counted ' + (D.counted || 0) + (parts.length ? '; left out: ' + parts.join('; ') : '; none left out') + '.';
 }
 function sapShadowRun_(ymArg) {
-  var cfg = sapCfg_(), ss = book_(false);
-  if (!ss) fail_('unavailable', 'The database is not set up yet. Run setup() once.');
-  sapVerifyGate_('sales');
-  var firstYm = sapYm_(SAP_FEED_FROM), ym = ymArg || firstYm;
-  sapShadowMonthGuard_(ymArg);
-  if (!/^\d{4}-\d\d$/.test(ym) || ym < firstYm) fail_('invalid_argument', 'The shadow run reads ' + firstYm + ' or later only.');
-  sapRequirePlants_(ss, 'the comparison would be empty');
+  var pre = sapShadowPre_(ymArg), cfg = pre.cfg, ss = pre.ss, firstYm = sapYm_(SAP_FEED_FROM), ym = pre.ym;
   sapAcquire_();
   var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, job = null, resumed = false, info = null;
   try {
@@ -1021,7 +1037,7 @@ function sapAutoStep_(kind, ymArg, first) {
   if (first) {
     if (sapRunBusy_()) fail_('unavailable', 'Another SAP run is in progress. If it is an automatic one it carries on by itself; check sapStatus in a few minutes.');   // never take over a run that is going
     if (st && st.kind && st.kind !== kind && sapAutoTriggers_(st.kind).length) fail_('unavailable', 'An automatic ' + SAP_AUTO_KINDS[st.kind].label + ' is waiting for its next run. Let it finish, or stop it with sapStopAuto, before starting an automatic ' + K.label + '.');
-    if (kind === 'shadow') sapShadowMonthGuard_(ymArg);   // before anything is cleared or scheduled
+    if (kind === 'shadow') sapShadowPre_(ymArg); else sapSyncPre_();   // every refusal (gate, settings, plants, month, unreadable position) BEFORE anything is cleared or scheduled
     sapAutoClear_(); st = { kind: kind, ym: ymArg || '', runs: 0, busy: 0, since: new Date(Date.now()).toISOString() };
   } else {
     if (!st || st.kind !== kind) { sapAutoTriggers_(kind).forEach(function (t) { ScriptApp.deleteTrigger(t); }); return { ok: true, done: false, auto: { state: 'cancelled' }, message: 'The automatic ' + K.label + ' was cancelled; nothing was read.' }; }

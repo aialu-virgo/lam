@@ -371,4 +371,37 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
   ok('a sync cut at the run limit: sapStatus names the 5-minute run limit (not 6 minutes) and sapSyncAuto', /5-minute run limit/.test(nx) && /sapSyncAuto/.test(nx) && !/6-minute/.test(nx) && /sapSyncAuto/.test(msg), nx + ' | ' + msg);
 }
 
+{ // round 3: a refused automatic call never touches a waiting chain, its record or the saved position
+  const snap = (env) => sj([env.state.triggers.map(y => [y.fn, y.ms]), env.props.SAP_AUTO, env.props.SAP_CURSOR_SHADOW, env.props.SAP_CURSOR || '', env.props.SAP_RUN || '']);
+  const off = (t) => t.env.call('deskWrite', [PLANTS.map(p => set('plants', p, { plant_code: p, plant_name: 'x', plant_type: 'Depot', zone: '', state: '', b1_bpl_name: 'x', business: 'laminates', active: false }))]);
+  const live = (extra = {}) => { const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: Object.assign({ SAP_RUN_BUDGET_MS: '170000' }, extra) }); const r = t.env.call('sapShadowRunAuto'); if (!(r.ok && r.done === false)) throw new Error('setup of the waiting chain failed'); return t; };
+  const cases = [
+    ['no active plants', off, /no active plants/],
+    ['a month in progress (different month asked)', null, /part-way/, ['2026-11']],
+    ['an invalid month', null, /or later only/, ['2025-01']],
+    ['the verify gate failing', (t) => { t.env.props.SAP_STATUS = JSON.stringify({ verify: { at: 'x', ok: false, failed: true, error: 'x' } }); }, /did not finish/],
+    ['a missing SAP setting', (t) => { delete t.env.props.SAP_PASSWORD; }, /Missing Script Properties/],
+    ['an unreadable saved position', (t) => { t.env.props.SAP_CURSOR_SHADOW = '{broken'; }, /cannot be read/],
+  ];
+  for (const [name, pre, re, args] of cases) {
+    const t = live(); if (pre) pre(t); const before = snap(t.env), c0 = t.S.calls.length;
+    const r = t.env.call('sapShadowRunAuto', args || []); const r2 = t.env.call('sapSyncAuto');
+    ok('refused sapShadowRunAuto (' + name + '): triggers, SAP_AUTO, cursor and run flag exactly as before; no SAP call', r.ok === false && re.test(r.message) && snap(t.env) === before && t.S.calls.length === c0, sj([r.code, r.message, r2.code]).slice(0, 300));
+    ok('  ...the waiting chain still has its one trigger and its record', t.env.state.triggers.filter(y => y.fn === 'sapShadowAutoTrigger_').length === 1 && JSON.parse(t.env.props.SAP_AUTO).kind === 'shadow');
+    ok('  ...and sapSyncAuto in the same state is refused too without touching them', r2.ok === false && snap(t.env) === before);
+  }
+  { // sync side: a waiting sync chain, then each refusal
+    const mkSync = (extra = {}) => { const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: Object.assign({ SAP_RUN_BUDGET_MS: '170000' }, extra) }); runAll(t.env, 'sapShadowRun'); const r = t.env.call('sapSyncAuto'); if (!(r.ok && r.done === false)) throw new Error('sync chain setup failed'); return t; };
+    for (const [name, pre, re] of [['no active plants', off, /no active plants/], ['sync switched off', (t) => { t.env.props.SAP_SYNC_ENABLED = 'no'; }, /switched off/], ['an unreadable sync position', (t) => { t.env.props.SAP_CURSOR = '{broken'; }, /cannot be read/]]) {
+      const t = mkSync(); pre(t); const before = snap(t.env), c0 = t.S.calls.length; const r = t.env.call('sapSyncAuto');
+      ok('refused sapSyncAuto (' + name + '): the waiting sync chain, its record and the position are untouched; no SAP call', r.ok === false && re.test(r.message) && snap(t.env) === before && t.S.calls.length === c0 && t.env.state.triggers.filter(y => y.fn === 'sapSyncAutoTrigger_').length === 1, sj([r.code, r.message]).slice(0, 300));
+    }
+  }
+  { // the month is named from the feed start, not hard-coded
+    const t = build({ docs: docs0() }); t.env.props.SAP_STATUS = JSON.stringify({ verify: JSON.parse(t.env.props.SAP_STATUS).verify });
+    const a = t.env.call('sapStatus').status.next; t.env.ctx.SAP_FEED_FROM = '2027-01-01'; const b = t.env.call('sapStatus').status.next; t.env.ctx.SAP_FEED_FROM = '2026-10-01';
+    ok('sapStatus names the month from the feed start (October 2026 now, January 2027 if the start moves)', /\(October 2026,/.test(a) && /\(January 2027,/.test(b), a.slice(0, 120) + ' | ' + b.slice(0, 120));
+  }
+}
+
 console.log('TOTAL ' + res.filter(l => l.startsWith('PASS')).length + ' PASS ' + res.filter(l => l.startsWith('FAIL')).length + ' FAIL');
