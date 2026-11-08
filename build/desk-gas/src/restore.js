@@ -7,6 +7,7 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function refresh() { if (X.refresh) X.refresh(); }
   function sup() { return !!(X.isSuper && X.isSuper()); }
+  function hold(on) { try { var D = window.__desk && window.__desk.S; if (D) { D.engBlock = !!on; if (!on) { D.engSig = null; refresh(); } } } catch (e) {} }
   function fmtN(n) { return Number(n).toLocaleString('en-IN'); }
   function guard(ev) { ev.preventDefault(); ev.returnValue = ''; return ''; }
   X.sizes = async function () { var r = await window.__gasCall('deskSizes', []); return { cols: r.cols, note: 'Apps Script pages are ' + (r.pageChars / 1e6).toFixed(1) + ' M characters (PAGE_CHARS in Code.gs).' }; };
@@ -88,7 +89,7 @@
     if (!sup()) return;
     if (R.stage !== 'verified' && R.stage !== 'incomplete') return;
     var call = window.__gasCall, cols = Object.keys(R.man.collections), wiping = false;
-    R.err = ''; R.report = null; R.stage = 'working'; R.msg = 'Checking the database'; R.pct = 1; R.written = {}; window.__gasPause = true; window.addEventListener('beforeunload', guard); refresh();
+    R.err = ''; R.report = null; R.stage = 'working'; R.msg = 'Checking the database'; R.pct = 1; R.written = {}; window.__gasPause = true; hold(true); window.addEventListener('beforeunload', guard); refresh();
     try {
       var st = await call('deskStats', []);
       if (!st.empty && !st.seedOnly && !R.replace) { R.stage = R.started ? 'incomplete' : 'verified'; throw new Error('The database already holds data. Nothing was written. Tick "Replace everything" to overwrite it.'); }
@@ -118,7 +119,9 @@
       R.err = (e && e.message) || String(e);
       if (R.stage === 'incomplete') { R.replace = true; R.report = cols.map(function (c) { return { c: c, want: R.man.collections[c].docs, got: R.written[c] || 0, ok: false, pending: true }; }); }
     }
-    window.removeEventListener('beforeunload', guard); window.__gasPause = false; if (window.__gasPoll) window.__gasPoll(); refresh();
+    window.removeEventListener('beforeunload', guard); window.__gasPause = false;
+    /* the page's writers (rules engine, roll rebuild, ladder) stay blocked until the refresh after the restore has settled, and for good while the store is half restored */
+    var pl = window.__gasPoll ? window.__gasPoll() : null; Promise.resolve(pl).then(function () { setTimeout(function () { if (R.stage !== 'incomplete' && R.stage !== 'working') hold(false); }, 4000); }); refresh();
   }
   document.addEventListener('change', function (ev) {
     var t = ev.target; if (!t) return;

@@ -350,7 +350,7 @@ function buildDraft(a,step,today){
     days_overdue:od>0?od:0,created_day:today,created_at:nowISO(),status:'Drafted',sender:senderOf(a),demo:a.demo||undefined};
 }
 async function runLadder(){
-  var u=effUser();if(!u||readOnly()||S.ladBusy)return;
+  var u=effUser();if(!u||readOnly()||S.ladBusy||S.engBlock)return;
   if(!S.loaded.actions||!S.loaded.followups||!S.loaded.settings||!S.loaded.users)return;
   var today=TODAY(),sig=[today,S.actions.length,S.followups.length,S.actions.map(function(a){return a.status+a.due}).join('')].join('|');
   if(S.ladSig===sig)return;S.ladSig=sig;S.ladBusy=true;
