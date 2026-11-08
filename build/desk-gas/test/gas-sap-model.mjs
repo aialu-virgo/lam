@@ -35,7 +35,7 @@ function runNew(msPerCall, props) {
     env.state.skew += 60000;   // the one-off trigger fires about a minute after the run stopped
     const a = env.state.skew; env.ctx.sapShadowAutoTrigger_(); runs++; secs.push(Math.round((env.state.skew - a) / 1000));
   }
-  const st = env.call('sapStatus').status; env.setEmail(SUPER);
+  env.setEmail(SUPER); const st = env.call('sapStatus').status;
   const sh = JSON.parse(env.props.SAP_SHADOW || 'null');
   return { ok: !!(st.progress && st.progress.done), runs, secs, minutes: (env.state.skew - t0) / 60000, calls: S.calls.length, max: Math.max(...secs), pages: S.calls.filter(c => /\/A_BillingDocument(Item)?$/.test(c.path)).length, lookups: S.calls.filter(c => /A_Product|A_Customer/.test(c.path)).length, shadow: sh };
 }
