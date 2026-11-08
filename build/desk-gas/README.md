@@ -25,7 +25,7 @@ Paste `Desk-Code.gs.txt` the same way only if it was re-issued.
 
 ## Good to know
 - Access is by the Users list in Admin. Anyone else in the domain sees "Ask your admin for access" and receives no data.
-- Only a Super admin can write the 23 admin collections (periods, users, plants, cells, inv, roll, uploads ... ); the server refuses everyone else. `planlocks` is Super admin or Management / HO only. Unknown and inactive users cannot read or write.
+- Only a Super admin can write the admin collections (periods, users, plants, cells, inv, roll, uploads ... ); the server refuses everyone else. `planlocks` and the `geography` master (states, districts, PIN list; Admin › Geography, D80) are Super admin or Management / HO only. Unknown and inactive users cannot read or write.
 - **Action and follow-up permissions are enforced by the page, as on claude.ai.** The server lets any active user write `actions`, `followups`, `potential`, `phasing` and `log`; the page decides who may respond to, assign, verify or draft for an action. Not enforced on the server either: field-level changes, approver differs from proposer, closed and locked quarters, and the audit trail (written by the page).
 - **Reads are not filtered by row.** A signed-in user with a role can read every collection through browser tools, as on claude.ai today.
 - Other people's changes appear within about 30 seconds (the page checks a small revision map and re-reads only what changed).

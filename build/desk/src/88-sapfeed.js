@@ -30,7 +30,9 @@ function sapRenderFeed(el){
      +'<div class="kpi"><small>Rows read</small><b>'+fmtN((st.read&&st.read.lines)||0)+'</b><small>'+fmtN((st.read&&st.read.headers)||0)+' documents</small></div>'
      +'<div class="kpi"><small>Rows loaded</small><b>'+fmtN((st.loaded&&st.loaded.rows)||0)+'</b><small>'+(st.loaded&&st.loaded.at?esc(istStr(st.loaded.at)):'not yet')+'</small></div>'
      +'<div class="kpi"><small>Waiting to load</small><b>'+fmtN(pend.reduce(function(a,m){return a+(st.staged[m].rows||0)},0))+'</b><small>'+esc(pend.map(ymLabel).join(', ')||'nothing')+'</small></div>'
-     +'<div class="kpi"><small>Errors</small><b>'+fmtN(errN)+'</b><small>'+(errN?esc(st.errors[0].msg):'none')+'</small></div></div>'
+     +'<div class="kpi"><small>Errors</small><b>'+fmtN(errN)+'</b><small>'+(errN?esc(st.errors[0].msg):'none')+'</small></div>'
+     +(st.cust?'<div class="kpi"><small>Customer master</small><b>'+fmtN(st.cust.rows||0)+'</b><small>'+esc(st.cust.status||'')+(st.cust.loadedAt?' '+esc(istStr(st.cust.loadedAt)):st.cust.at?' '+esc(istStr(st.cust.at)):'')+(st.cust.counts?' · '+fmtN(st.cust.counts.pin6||0)+' with PIN, '+fmtN(st.cust.counts.noRegion||0)+' no region':'')+'</small></div>':'')+'</div>'
+     +(function(){var gp=custRegionGaps();return gp.n?'<div class="banner warn" style="display:block"><b>'+fmtN(gp.n)+' S/4 customers have a region with no state:</b> '+esc(Object.keys(gp.regions).sort().map(function(k){return k+' ('+gp.regions[k]+')'}).join(', '))+'. They count as "state unknown" until the region code is added to the state\'s aliases as SAP:&lt;code&gt; in Admin › Geography.</div>':''})()
      +'<p class="note" style="margin:0"><b>Next step:</b> '+esc(st.next||'')+'</p>';
     if(st.message&&st.lastOk===false)h+='<div class="banner err" style="display:block">'+esc(st.message)+'</div>';
     if(st.skippedMonths&&st.skippedMonths.length)h+='<p class="note" style="margin:0">Closed quarters are never re-read: skipped '+esc(st.skippedMonths.map(ymLabel).join(', '))+'.</p>';
@@ -38,7 +40,7 @@ function sapRenderFeed(el){
     if(SAPF.held&&SAPF.held.length)h+='<div class="banner warn" style="display:block"><b>Held: the feed would replace '+SAPF.held.reduce(function(a,x){return a+x.plants},0)+' plant-months that hold more lines than the new data</b> ('+esc(SAPF.held.map(function(x){return ymLabel(x.ym)}).join(', '))+'). The feed never confirms for itself.<label class="chip" style="margin-top:8px"><input type="checkbox" data-chg="sap-confrep" '+(SAPF.confirm?'checked':'')+'> I confirm: replace these months</label></div>';
     if(SAPF.err)h+='<div class="banner err" style="display:block">'+esc(SAPF.err)+'</div>';
     if(SAPF.msg)h+='<div class="banner '+(SAPF.busy?'info':'ok')+'" style="display:block">'+esc(SAPF.msg)+'</div>';
-    h+='<div class="row"><button class="btn pri" data-act="sap-load" '+(pend.length&&!SAPF.busy&&sapSuper()?'':'disabled')+'>Load SAP feed</button><button class="btn" data-act="sap-refresh" '+(SAPF.busy?'disabled':'')+'>Refresh status</button></div>'
+    h+='<div class="row"><button class="btn pri" data-act="sap-load" '+((pend.length||(st.cust&&st.cust.status==='staged'))&&!SAPF.busy&&sapSuper()?'':'disabled')+'>Load SAP feed</button><button class="btn" data-act="sap-refresh" '+(SAPF.busy?'disabled':'')+'>Refresh status</button></div>'
      +'<p class="note" style="margin:0">Settings, the shadow run and the daily trigger are in the Apps Script project (see the setup page). Read-only: nothing is written to SAP.</p>';
   }
   var sig=h;if(SAPF.sig===sig&&el.firstChild)return true;SAPF.sig=sig;el.innerHTML=h;return true;
@@ -50,10 +52,20 @@ async function sapFeedLoad(){
   SAPF.busy=true;SAPF.msg='Reading the staged SAP rows...';SAPF.err='';SAPF.held=null;SAPF.sig='';renderFeed();
   var summary={months:[],rows:0,message:'',unresolved:null},stop=null;
   try{
-    var snap=await S.db.collection('sapstage').get(),man={},chunks={};
-    snap.docs.forEach(function(d){var o=d.data();if(d.id.indexOf('man_')===0)man[o.ym]=o;else if(d.id.indexOf('c_')===0)chunks[d.id]=o});
+    var snap=await S.db.collection('sapstage').get(),man={},chunks={},cman=null,cchunks={};
+    snap.docs.forEach(function(d){var o=d.data();if(d.id==='cust_man')cman=o;else if(d.id.indexOf('cust_c_')===0)cchunks[d.id]=o;else if(d.id.indexOf('man_')===0)man[o.ym]=o;else if(d.id.indexOf('c_')===0)chunks[d.id]=o});
+    /* ---- customer master first (D78): state, PIN and district then reach the billing rows loaded below ---- */
+    var custDone=null;
+    if(cman&&cman.complete&&cman.status!=='loaded'){
+      var crows=[];for(var cs=0;cs<(cman.n||0);cs++){var cc=cchunks['cust_c_'+cman.run+'_'+cs];if(!cc)throw new Error('The staged customer rows are incomplete (part '+(cs+1)+' of '+cman.n+' is missing). Run sapCustomerSync again. Nothing was loaded.');JSON.parse(await ungz(cc.z)).forEach(function(r){crows.push(r)})}
+      SAPF.msg='Loading '+fmtN(crows.length)+' staged customers...';renderFeed();
+      custDone=await custFeedLoad({sys:'S4',headers:cman.cols,rows:crows,name:'SAP S/4 customer feed (run '+cman.run+')',layout:'S/4 business partner (SAP feed)'});
+      if(!custDone.ok)throw new Error('Customer master not loaded: '+(custDone.msg||'stopped')+'. Nothing else was loaded.');
+      await window.__gasCall('sapMarkLoaded',[{customers:{run:cman.run,rows:custDone.loaded}}]);
+      SAPF.cust={loaded:custDone.loaded,rejected:custDone.rejected,gaps:custRegionGaps()};
+    }
     var yms=Object.keys(man).filter(function(m){return man[m].complete&&man[m].status!=='loaded'}).sort();
-    if(!yms.length){SAPF.msg='Nothing is waiting to be loaded.';return}
+    if(!yms.length){SAPF.msg=custDone?'Customer master loaded: '+fmtN(custDone.loaded)+' S/4 customers ('+fmtN(custDone.rejected)+' rejected). No billing month is waiting.':'Nothing is waiting to be loaded.';return}
     var skippedClosed=[],hdr=null,sales=[],cred={},cut=0,runs={};
     for(var mi=0;mi<yms.length;mi++){
       var ym=yms[mi],m=man[ym],q=S.periods[qKeyOfYm(ym)];
@@ -114,7 +126,7 @@ async function sapFeedLoad(){
     var parts=[];if(sales.length)parts.push('sales loaded');if(credLoaded)parts.push(fmtN(credLoaded)+' credit-memo lines loaded');if(skippedClosed.length)parts.push('closed quarters skipped: '+skippedClosed.map(ymLabel).join(', '));if(un.rows)parts.push(fmtN(un.rows)+' credit-memo lines held back (item master)');
     summary.message=(summary.message||'')+' '+parts.join('; ');
     await window.__gasCall('sapMarkLoaded',[summary]);
-    SAPF.msg='Done. '+fmtN(summary.rows)+' rows loaded'+(parts.length?' ('+parts.join('; ')+')':'')+'.';
+    SAPF.msg='Done. '+(custDone?fmtN(custDone.loaded)+' customers loaded; ':'')+fmtN(summary.rows)+' rows loaded'+(parts.length?' ('+parts.join('; ')+')':'')+'.';
   }catch(e){SAPF.err=(e&&e.message)||String(e);SAPF.msg=''}
   finally{SAPF.busy=false;SAPF.sig='';try{await sapRefreshStatus()}catch(e){}renderFeed()}
 }

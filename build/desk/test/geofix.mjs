@@ -12,7 +12,7 @@ export async function geoStore(browser,out){
     const codes=new Set();Object.values(D.GEOA.rows).forEach(R=>R.a.forEach(r=>codes.add(r[0])));
     const list=[...codes].sort();
     /* customer i: state STATES[i%3]; Maharashtra customers with i%2==0 get a Pune PIN (411001), i%6==3 a Nagpur PIN (440001), others no PIN */
-    const rows=list.map((c,i)=>{const st=STATES[i%3];let pin='';if(st==='Maharashtra'){pin=i%2===0?'411001':(i%6===3?'440001':'')}if(st==='Gujarat'&&i%2===1)pin='380001';return [c,'DEMO customer '+c,'','',st,'',0,0,'',pin,'','B1']});
+    const rows=list.map((c,i)=>{const st=STATES[i%3];let pin='';if(st==='Maharashtra'){pin=i%2===0?'411001':(i%9===3?'440001':'')}if(st==='Gujarat'&&i%2===1)pin='380001';return [c,'DEMO customer '+c,'','',st,'',0,0,'',pin,'','B1']});
     await D.dset('customers/B1_c0',{z:await D.gz(JSON.stringify(rows)),n:rows.length,i:0,sys:'B1',upload:'ugeofix',fmt:'gz-json v2',demo:true});
     await D.dset('customers/main_B1',{at:new Date().toISOString(),by:'super@demo',file:'DEMO customers',layout:'B1 customer master (OCRD)',sys:'B1',read:rows.length,loaded:rows.length,rejected:0,chunks:1,upload:'ugeofix',demo:true});
     const now=new Date().toISOString();

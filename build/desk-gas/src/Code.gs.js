@@ -14,7 +14,7 @@ var MAX_DOC_CHARS = 262144;      // 256 KiB per document, as the page assumes
 var PAGE_CHARS = 2500000;        // characters per page read (one getValues)
 var PAGE_ROWS = 4000;            // rows per page read
 var STALE_WRITE_MS = 150000;     // an odd revision whose heartbeat (wts) is older than this is a crashed write and is ignored; a live writer refreshes wts before every step
-var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes', 'sapstage'];
+var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes', 'sapstage', 'geography'];
 var SHARED_COLLECTIONS = ['potential', 'phasing', 'actions', 'followups', 'log', 'planlocks'];
 var HEADER = ['id', 'part', 'len', 'json', 'updatedAt', 'updatedBy'];
 
@@ -185,6 +185,7 @@ function requireUser_() {
 }
 function isAdmin_(who) { return who.role === 'Super admin' && who.active; }
 function canWrite_(who, col) {
+  if (col === 'geography') return who.active && (who.role === 'Super admin' || who.role === 'Management / HO');   // D80: geography masters, admin collection; Admin › Geography is Super admin and Management / HO
   if (ADMIN_COLLECTIONS.indexOf(col) >= 0) return isAdmin_(who);
   if (col === 'planlocks') return who.active && (who.role === 'Super admin' || who.role === 'Management / HO');
   if (SHARED_COLLECTIONS.indexOf(col) >= 0) return !!who.role && who.active;
@@ -271,7 +272,7 @@ function checkOp_(who, o) {
   if (!o || (o.op !== 'set' && o.op !== 'merge' && o.op !== 'delete')) fail_('invalid_argument', 'Bad operation.');
   if (!knownCol_(o.col)) fail_('invalid_argument', 'Unknown collection.');
   checkId_(o.id);
-  if (!canWrite_(who, o.col)) fail_('permission_denied', 'Writing to ' + o.col + ' needs ' + (ADMIN_COLLECTIONS.indexOf(o.col) >= 0 ? 'the Super admin role.' : o.col === 'planlocks' ? 'Management / HO or Super admin.' : 'an active user.'));
+  if (!canWrite_(who, o.col)) fail_('permission_denied', 'Writing to ' + o.col + ' needs ' + ((o.col === 'planlocks' || o.col === 'geography') ? 'Management / HO or Super admin.' : ADMIN_COLLECTIONS.indexOf(o.col) >= 0 ? 'the Super admin role.' : 'an active user.'));
   if (o.op === 'set' || o.op === 'merge') {
     if (typeof o.json !== 'string') fail_('invalid_argument', 'Missing document.');
     if (o.json.length > MAX_DOC_CHARS) fail_('invalid_argument', 'Document too large (' + o.json.length + ' characters, limit ' + MAX_DOC_CHARS + ').');

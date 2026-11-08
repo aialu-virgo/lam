@@ -26,11 +26,11 @@ const res=[];const ok=(n,c,d)=>{res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
 /* phasing upload */
 {const {page}=await open(browser,{store:JSON.parse(JSON.stringify(store)),viewer:{email:'data@virgoasia.com'}});await page.waitForTimeout(2500);
  await page.evaluate(()=>{location.hash='#/targets'});await page.waitForTimeout(900);
- const csv='fy_quarter,plant_code,product_group,customer_segment,month_in_quarter,phasing_pct\nFY27-Q3,1012,Laminate,Dealer,1,30\nFY27-Q3,1012,Laminate,Dealer,2,30\nFY27-Q3,1012,Laminate,Dealer,3,40\n';
+ const csv='fy_quarter,state_code,district_id,product_group,customer_segment,month_in_quarter,phasing_pct\nFY27-Q3,27,_state,Laminate,,1,30\nFY27-Q3,27,_state,Laminate,,2,30\nFY27-Q3,27,_state,Laminate,,3,40\n';
  fs.writeFileSync(SP+'ph.csv',csv);
- await page.setInputFiles('#up-ph',SP+'ph.csv');await page.waitForTimeout(1200);
- const r=await page.evaluate(()=>{const d=window.__dbg;const P=d.planQ({plant:'1012',group:'Laminate'},'FY27-Q3');return {m:P.months.map(x=>Math.round(x)),tgt:Math.round(P.tgt),ph:d.S.phasing.length}});
- ok('phasing 30/30/40: months sum to the quarter target, month 3 takes the remainder',r.ph===1&&r.m[0]+r.m[1]+r.m[2]-r.tgt<=1&&r.m[2]>r.m[0]&&Math.abs(r.m[0]-r.m[1])<=1,JSON.stringify(r));
+ await page.setInputFiles('#up-ph',SP+'ph.csv');await page.waitForSelector('.tp-upres');await page.click('[data-act="tp-up-load"]');await page.waitForTimeout(1200);
+ const r=await page.evaluate(()=>{const d=window.__dbg;const p=d.S.phasing.find(x=>x._id==='geo_fy27_q3_27_state_laminate');const P=d.planQ({plant:'1012',group:'Laminate'},'FY27-Q3');return {pct:p&&p.pct,m:P.months.map(x=>Math.round(x)),tgt:Math.round(P.tgt)}});
+ ok('phasing upload by state (D77) 30/30/40 stored after Load; plant-quarter months still sum to the quarter target',r.pct&&r.pct.join()==='30,30,40'&&Math.abs(r.m[0]+r.m[1]+r.m[2]-r.tgt)<=1,JSON.stringify(r));
  await page.context().close();}
 console.log(res.join('\n'));
 await browser.close();

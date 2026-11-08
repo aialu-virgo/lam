@@ -237,7 +237,7 @@ function geoRespPlant(x){if(!x.state_code)return x.plant_code||'';var d=x.distri
 /* the _state record carries the unallocated slice once districts exist: state potential less the districts (same quarter, state, group, segment) */
 function geoDistSum(x,approved){
   if(!x.state_code||(x.district_id||'_state')!=='_state')return 0;var t=0;
-  (S.potential||[]).forEach(function(y){if(y.fy_quarter===x.fy_quarter&&y.state_code===x.state_code&&y.district_id&&y.district_id!=='_state'&&y.product_group===x.product_group&&(y.customer_segment||'All')===(x.customer_segment||'All')){var s=approved?approvedOf(y):y;if(s)t+=+s.potential_value_inr||0}});
+  (S.potential||[]).forEach(function(y){if(y.fy_quarter===x.fy_quarter&&y.state_code===x.state_code&&y.district_id&&y.district_id!=='_state'&&y.product_group===x.product_group&&(y.customer_segment||'All')===(x.customer_segment||'All')){var s=approved==='src'?(approvedOf(y)||y):approved?approvedOf(y):y;if(s)t+=+s.potential_value_inr||0}});
   return t;
 }
 function monthsOfTarget(t,pct){var a=r2(t*pct[0]/100),b=r2(t*pct[1]/100);return [a,b,r2(t-a-b)]}
@@ -266,9 +266,9 @@ function planQ(f,q){
     if(x.state_code?(x.demo&&geoRealSales()):(x.demo&&realActual(x.plant_code,q)))return;
     R.nLeaf++;var ap0=approvedOf(x),pct=phasingFor(x);
     var ds=geoDistSum(x,false),dsA=geoDistSum(x,true),ap=ap0&&dsA?Object.assign({},ap0,{potential_value_inr:Math.max(0,(+ap0.potential_value_inr||0)-dsA)}):ap0;
-    if(ds)x=Object.assign({},x,{potential_value_inr:Math.max(0,(+x.potential_value_inr||0)-ds)});
+    if(ds||dsA){var dsS=geoDistSum(x,'src');x=Object.assign({},x,{potential_value_inr:Math.max(0,(+x.potential_value_inr||0)-ds)});if(ap0&&dsS!==dsA)ap=Object.assign({},ap,{potential_value_inr:Math.max(0,(+ap0.potential_value_inr||0)-dsS),_tgtPot:Math.max(0,(+ap0.potential_value_inr||0)-dsA)})}
     var src=ap||x;R.pot+=+src.potential_value_inr||0;R.potSqft+=+src.potential_qty_sqft||0;R.potSh+=shOfLeaf(src);
-    if(ap){var t=leafTgt(ap.potential_value_inr,ap.share_pct);R.tgt+=t;R.nAppr++;R.tgtSq+=(+ap.potential_qty_sqft||0)*(+ap.share_pct||0)/100;R.tgtSh+=shOfLeaf(ap)*(+ap.share_pct||0)/100;monthsOfTarget(t,pct).forEach(function(v,i){R.months[i]+=v});
+    if(ap){var t=leafTgt(ap._tgtPot!=null?ap._tgtPot:ap.potential_value_inr,ap.share_pct);R.tgt+=t;R.nAppr++;R.tgtSq+=(+ap.potential_qty_sqft||0)*(+ap.share_pct||0)/100;R.tgtSh+=shOfLeaf(ap)*(+ap.share_pct||0)/100;monthsOfTarget(t,pct).forEach(function(v,i){R.months[i]+=v});
       var og=x.original||ap;R.orig+=leafTgt(og.potential_value_inr,og.share_pct)}
     if(!ap&&x.share_pct!==''&&x.share_pct!=null){var d=leafTgt(x.potential_value_inr,x.share_pct);R.draft+=d;R.nDraft++;R.tgtSqD+=(+x.potential_qty_sqft||0)*(+x.share_pct||0)/100;R.tgtShD+=shOfLeaf(x)*(+x.share_pct||0)/100;monthsOfTarget(d,pct).forEach(function(v,i){R.draftMonths[i]+=v})}
     R.revs.push(x);

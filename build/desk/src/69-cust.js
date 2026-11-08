@@ -16,7 +16,8 @@ var CU_FIELDS=[
  {k:'bal',label:'Account balance',canon:'balance',c:['Balance','Account Balance','Current Balance']},
  {k:'terms',label:'Payment terms',canon:'payment_terms',c:['PymntGroup','Payment Terms','Payment Group','Terms']},
  {k:'pin',label:'PIN code (D77: district by PIN)',canon:'pin',c:['ZipCode','Zip Code','PIN','PIN Code','Pincode','Pin Code','PostalCode','Postal Code']},
- {k:'dist',label:'District (D77)',canon:'district',c:['District','County']}];
+ {k:'dist',label:'District (D77)',canon:'district',c:['District','County']},
+ {k:'gstin',label:'GSTIN',canon:'gstin',c:['GSTIN','GST No','GSTIN No','GST Number']}];
 function custDetect(headers){
   var set={};headers.forEach(function(h){set[norm(h)]=1});var has=function(a){return a.some(function(x){return set[norm(x)]})};
   if(has(['docnum','itemcode','linetotal','quantity','docduedate','branchname','tranfser','invoice document number','checksum','onhand','whscode']))return null;
@@ -40,7 +41,9 @@ async function custPick(file){
   S.lastHtml='';schedule();
 }
 async function custParse(){
-  var st=S.cu,m=st.map,rows=st.rows,c=function(k){return m[k]==null?-1:m[k]},cC=c('code'),cN=c('name'),cT=c('type'),cG=c('group'),cCi=c('city'),cS=c('state'),cSp=c('sp'),cL=c('limit'),cB=c('bal'),cP=c('terms'),cPin=c('pin'),cDi=c('dist');
+  var st=S.cu,m=st.map,rows=st.rows,c=function(k){return m[k]==null?-1:m[k]},cC=c('code'),cN=c('name'),cT=c('type'),cG=c('group'),cCi=c('city'),cS=c('state'),cSp=c('sp'),cL=c('limit'),cB=c('bal'),cP=c('terms'),cPin=c('pin'),cDi=c('dist'),cGs=c('gstin');
+  /* an S/4 Region is the SAP region code, not a GST code: stored as SAP:<code> and mapped through the state master's aliases (Admin › Geography); unmapped = state unknown */
+  var sapRegion=st.sys==='S4'&&cS>=0&&norm(st.headers[cS])==='region';
   var res={read:rows.length,loaded:0,rejected:0,rejects:[],skippedType:0,warned:0,custs:[],withLimit:0,withSp:0};
   var seen={},T0=Date.now(),g=function(r,i){return i>=0?String(r[i]==null?'':r[i]).trim():''};
   st.stage='working';st.msg='Checking...';schedule();await tick();
@@ -56,7 +59,8 @@ async function custParse(){
     if(isNaN(lim)){res.warned++;lim=0}if(isNaN(bal))bal=0;
     var sp=g(r,cSp);if(lim>0)res.withLimit++;if(sp)res.withSp++;
     var pin=g(r,cPin).replace(/\.0$/,'').replace(/\s/g,'');if(pin&&!/^[1-9]\d{5}$/.test(pin)){res.warned++;res.badPin=(res.badPin||0)+1;pin=''}if(pin)res.withPin=(res.withPin||0)+1;
-    res.custs.push([code,g(r,cN).slice(0,40),g(r,cG).slice(0,24),g(r,cCi).slice(0,24),g(r,cS).slice(0,20),sp.slice(0,30),Math.round(lim),Math.round(bal),g(r,cP).slice(0,20),pin,g(r,cDi).slice(0,40),st.sys]);res.loaded++;
+    var stv=g(r,cS).slice(0,20);if(sapRegion&&stv&&!/^SAP:/i.test(stv))stv='SAP:'+stv;
+    res.custs.push([code,g(r,cN).slice(0,40),g(r,cG).slice(0,24),g(r,cCi).slice(0,24),stv,sp.slice(0,30),Math.round(lim),Math.round(bal),g(r,cP).slice(0,20),pin,g(r,cDi).slice(0,40),st.sys,g(r,cGs).toUpperCase().slice(0,20)]);res.loaded++;
   }
   st.res=res;st.stage='checked';st.msg='';S.lastHtml='';schedule();
 }
@@ -68,7 +72,7 @@ async function custLoad(){
   try{
     /* D79: keyed by (source system, customer code): a B1 load replaces only B1 customers, never S/4 ones */
     var sys=st.sys==='S4'?'S4':'B1',per=3000,n=Math.max(1,Math.ceil(r.custs.length/per)),oldM=S.custRaw.find(function(x){return x._id==='main_'+sys}),legacy=S.custRaw.find(function(x){return x._id==='main'});
-    for(var i=0;i<n;i++){await dset('customers/'+sys+'_c'+i,{z:await gz(JSON.stringify(r.custs.slice(i*per,(i+1)*per))),n:Math.min(per,r.custs.length-i*per),i:i,sys:sys,upload:uid,fmt:'gz-json v2: [code,name,group,city,state,salesperson,credit limit,balance,payment terms,pin,district,source system]',demo:demo||undefined})}
+    for(var i=0;i<n;i++){await dset('customers/'+sys+'_c'+i,{z:await gz(JSON.stringify(r.custs.slice(i*per,(i+1)*per))),n:Math.min(per,r.custs.length-i*per),i:i,sys:sys,upload:uid,fmt:'gz-json v2: [code,name,group,city,state (SAP:<region> for S/4),salesperson,credit limit,balance,payment terms,pin,district,source system,gstin]',demo:demo||undefined})}
     var old=(oldM&&oldM.chunks)||0;for(var j=n;j<old;j++)await ddel('customers/'+sys+'_c'+j);
     await dset('customers/main_'+sys,{at:nowISO(),by:by,file:st.name,layout:st.layout,sys:sys,read:r.read,loaded:r.loaded,rejected:r.rejected,skipped_type:r.skippedType,with_limit:r.withLimit,with_pin:r.withPin||0,chunks:n,upload:uid,demo:demo||undefined});
     if(legacy&&(legacy.sys||'B1')===sys){for(var lj=0;lj<(legacy.chunks||0);lj++)await ddel('customers/c'+lj);await ddel('customers/main')}
@@ -132,3 +136,16 @@ function ingestCust(){
 /* [code,name,group,city,state,salesperson,limit,balance,terms,pin,district,source system] or null */
 function custInfo(code){return S.custIdx&&S.custIdx.size?(S.custIdx.get(String(code||'').toUpperCase())||null):null}
 function custName(code,fallback){var c=custInfo(code);return (fallback&&String(fallback).trim())||(c?c[1]:'')}
+
+/* ---- SAP customer feed (D78): the staged S/4 business partners go through the same parse and load as a file; only the S/4 customers are replaced ---- */
+async function custFeedLoad(o){
+  var st={stage:'mapping',headers:(o.headers||[]).map(function(x){return x==null?'':String(x)}),rows:o.rows||[],sys:o.sys==='S4'?'S4':'B1',layout:o.layout||'S/4 business partner (SAP feed)',name:o.name||'SAP customer feed',size:0,msg:''};
+  st.map=custDefaultMap(st.headers);S.cu=st;
+  if(st.map.code<0||st.map.name<0){st.stage='idle';st.msg='The staged customer rows have no Customer or Name column.';return {ok:false,loaded:0,rejected:0,skippedType:0,msg:st.msg}}
+  await custParse();
+  if(st.stage!=='checked')return {ok:false,loaded:0,rejected:0,skippedType:0,msg:st.msg||'The customer rows could not be checked.'};
+  await custLoad();
+  var r=st.res||{};return {ok:st.stage==='done',loaded:r.loaded||0,rejected:r.rejected||0,skippedType:r.skippedType||0,withPin:r.withPin||0,msg:st.msg};
+}
+/* S/4 region codes that no state alias maps (counted as "state unknown") */
+function custRegionGaps(){var o={},n=0;if(S.custIdx)S.custIdx.forEach(function(a){var v=String(a[4]||'');if(/^SAP:/i.test(v)&&!stateCode(v)){o[v.slice(4)]=(o[v.slice(4)]||0)+1;n++}else if(a[11]==='S4'&&!v){o['(blank)']=(o['(blank)']||0)+1;n++}});return {n:n,regions:o}}

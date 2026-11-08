@@ -1,320 +1,226 @@
-/* Targets & Potential tab (D70): role views, save / submit / approve / return, approver != proposer, copy from last quarter,
-   upload round trip, phasing totals, locked quarter, no DEMO into real data, Admin link. Uses the demo store from t22's family (store-demo.json). */
+/* Targets & Potential by State (D77-D80): role views, who edits, keys and the state-only rule, optional districts (silent when empty, sum rule, unallocated derived),
+   save / submit / approve / return, approver != proposer, lock with actuals snapshot, legacy (by plant) and the start quarter, actuals by customer state and unassigned,
+   plant roll-up by responsible plant, copy, upload in two steps, phasing, Admin › Geography (draft, bands, ties, save), customer master by (system, code) and the SAP customer feed hook.
+   Fixture: store-demo.json plus a DEMO customer master and DEMO geography masters (geofix.mjs). DEMO data only. */
 import { chromium, open } from './run.mjs';
+import { geoStore } from './geofix.mjs';
 import fs from 'fs';
-const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
-const TMP='/tmp/claude-0/-home-user-lam/cc66010f-b189-5207-a8a3-0de9659c9226/scratchpad/';
-const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+const TMP='/tmp/claude-0/-home-user/cc66010f-b189-5207-a8a3-0de9659c9226/scratchpad/';fs.mkdirSync(TMP,{recursive:true});
 const browser=await chromium.launch();const res=[];const ok=(n,c,d)=>res.push([c?'PASS':'FAIL',n,c?'':(d||'')].join(' | '));
 const clone=o=>JSON.parse(JSON.stringify(o));
+await geoStore(browser,TMP+'t59-geo.json');
+const base=JSON.parse(fs.readFileSync(TMP+'t59-geo.json'));
 const Q='FY27-Q3',PQ='FY27-Q2';
-/* a store where the current quarter has no plan yet (last quarter keeps its figures) */
-const emptyQ3=()=>{const s=clone(store);Object.keys(s).forEach(k=>{if(/^potential\/fy27_q3_/.test(k))delete s[k]});return s};
-const go=async(page,who,s,q)=>{};
-const openAs=async(email,s)=>{const o=await open(browser,{store:clone(s),viewer:{email,name:email}});await o.page.waitForTimeout(3500);await o.page.evaluate(()=>{location.hash='#/targets'});await o.page.waitForTimeout(1500);return o};
+const K=(st,did,g,seg)=>('geo_'+[Q,st,did||'_state',g,seg||'All'].join('_')).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+const openAs=async(email,s,hash='#/targets')=>{const o=await open(browser,{store:clone(s),viewer:{email,name:email}});await o.page.waitForTimeout(3000);await o.page.evaluate(h=>{location.hash=h},hash);await o.page.waitForFunction(()=>!window.__dbg.GEOA.jobs,null,{timeout:60000}).catch(()=>{});await o.page.waitForTimeout(1500);return o};
 const mock=p=>p.evaluate(()=>window.__mockStore());
-const doc=(s,k)=>s['potential/'+k];
-const fillCell=async(page,field,key,val)=>{const sel='#tp-'+field+'-'+key;await page.fill(sel,val);await page.dispatchEvent(sel,'change');await page.waitForTimeout(250)};
-const barText=p=>p.innerText('.tp-sticky');
-const pgText=p=>p.innerText('#pg');
-const dbg=(p,fn,arg)=>p.evaluate(fn,arg);
+const fill=async(p,f,key,v)=>{const s='#tp-'+f+'-'+key;await p.fill(s,v);await p.dispatchEvent(s,'change');await p.waitForTimeout(250)};
+const txt=p=>p.innerText('#pg');
+const has=(p,sel)=>p.$(sel).then(x=>!!x);
 
-/* ---------- A. role views ---------- */
+/* ---------- A. role views and who edits ---------- */
 {
-  const views={};
-  for(const [email,label] of [['bm.a@demo','bm'],['hod.sales@demo','hod'],['se.s1@demo','se'],['mgmt@demo','mg'],['super@demo','sa']]){
-    const {page,errs}=await openAs(email,store);
-    const v=await page.evaluate(()=>{
-      const nav=[...document.querySelectorAll('.navg')].map(g=>g.querySelector('h4').innerText+':'+[...g.querySelectorAll('.nl')].map(x=>x.innerText).join('|'));
-      return {nav,inputs:document.querySelectorAll('[data-tp="pot"]').length,rows:document.querySelectorAll('details.tp-row').length,plants:[...document.querySelectorAll('#tp-plant option')].map(o=>o.value).filter(Boolean),
-        bar:document.querySelector('.tp-sticky').innerText,note:document.querySelector('.tp-note').innerText,hasLock:!!document.querySelector('[data-act="tp-lock-open"]'),hasApprove:!!document.querySelector('[data-act="tp-approve"]'),
-        hasUp:!!document.querySelector('#up-pot'),hasCopy:!!document.querySelector('[data-act="tp-copy"]'),head:document.querySelector('h1').innerText,
-        plantHdr:[...document.querySelectorAll('.tp-ph')].map(x=>x.innerText.slice(0,30)),canAdmin:window.__dbg.pagesFor(window.__dbg.effUser()).includes('admin')}});
-    views[label]=v;
-    ok(label+': page opens with no script error',!errs.filter(e=>!/ERR_FAILED/.test(e)).length,JSON.stringify(errs));
-    ok(label+': nav has its own "Plan" group with Targets & Potential, after Team',v.nav.some(n=>/^PLAN:Targets & Potential$/i.test(n))&&v.nav.findIndex(n=>/^PLAN/i.test(n))>v.nav.findIndex(n=>/^TEAM/i.test(n)),JSON.stringify(v.nav));
+  const v={};
+  for(const [email,l] of [['bm.a@demo','bmA'],['bm.b@demo','bmB'],['hod.sales@demo','hod'],['se.s1@demo','se'],['mgmt@demo','mg'],['super@demo','sa']]){
+    const {page,errs}=await openAs(email,base);
+    v[l]=await page.evaluate(()=>({nav:[...document.querySelectorAll('.navg')].map(g=>g.querySelector('h4').innerText+':'+[...g.querySelectorAll('.nl')].map(x=>x.innerText).join('|')),
+      states:window.__dbg.tpModel().states.map(s=>s.code+(s.canSt?'*':'')),pot:[...document.querySelectorAll('[data-tp="pot"]')].map(i=>i.getAttribute('data-key')),
+      bar:document.querySelector('.tp-sticky').innerText,note:document.querySelector('.tp-note').innerText,geo:window.__dbg.pagesFor(window.__dbg.effUser()).includes('geography'),hdr:[...document.querySelectorAll('.tp-ph')].map(x=>x.innerText)}));
+    ok(l+': opens with no script error, own "Plan" group with Targets & Potential',!errs.filter(e=>!/ERR_FAILED/.test(e)).length&&v[l].nav.some(n=>/^PLAN:Targets & Potential$/i.test(n)),JSON.stringify([errs,v[l].nav]));
     await page.context().close();
   }
-  const b=views.bm;
-  ok('bm view: edits own plant only (1012), inputs present, copy/upload/save/submit shown, no approve, no lock',b.plants.join()==='1012'&&b.inputs>0&&b.hasCopy&&b.hasUp&&/Save draft/.test(b.bar)&&/Submit/.test(b.bar)&&!b.hasApprove&&!b.hasLock&&/You are the Branch manager/.test(b.note),JSON.stringify([b.plants,b.inputs,b.bar,b.note.slice(0,60)]));
-  ok('bm view: Admin page is gone for a Branch manager (no separate Plans screen)',!b.canAdmin&&!b.nav.some(n=>/Admin/.test(n)),JSON.stringify(b.nav));
-  const h=views.hod;
-  ok('hod view: view only, all plants, no inputs, no upload, no approve',h.inputs===0&&h.plants.length>=3&&/View only/.test(h.bar)&&!h.hasUp&&!h.hasApprove&&!h.hasCopy&&/View only\. You see all plants/.test(h.note)&&!h.canAdmin,JSON.stringify([h.inputs,h.plants,h.bar]));
-  const s=views.se;
-  ok('se view: view only, plant scope, no inputs, no upload',s.inputs===0&&/View only/.test(s.bar)&&!s.hasUp&&!s.hasApprove&&/View only\. You see the plant where your customers are/.test(s.note)&&s.plants.length>=1&&s.plants.length<=views.hod.plants.length,JSON.stringify([s.inputs,s.plants,s.bar]));
-  const m=views.mg;
-  ok('mg view: all plants, can edit, upload, return and approve, lock quarter, no Admin',m.inputs>0&&m.plants.length>=3&&m.hasUp&&m.hasApprove&&m.hasLock&&/Return with reason/.test(m.bar)&&/You can propose and approve, but never approve a row you proposed/.test(m.note)&&!m.canAdmin,JSON.stringify([m.inputs,m.plants,m.bar]));
-  const a=views.sa;
-  ok('sa view: all plants, edit, approve, lock, Admin kept',a.inputs>0&&a.hasApprove&&a.hasLock&&a.hasUp&&/Approval of a row you proposed still needs another approver/.test(a.note)&&a.canAdmin,JSON.stringify([a.inputs,a.bar]));
-  /* Admin > Market potential is a link to the tab */
-  const {page}=await openAs('super@demo',store);
-  await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(600);
-  await page.click('[data-act="atab"][data-t="potential"]');await page.waitForTimeout(400);
-  const lk=await page.evaluate(()=>({href:(document.querySelector('#a-body a[href="#/targets"]')||{}).getAttribute&&document.querySelector('#a-body a[href="#/targets"]').getAttribute('href'),pot:!!document.querySelector('[data-act="pot-edit"]'),add:!!document.querySelector('[data-act="pot-add"]')}));
-  ok('Admin > Market potential is a link to Targets & Potential (no second entry point)',lk.href==='#/targets'&&!lk.pot&&!lk.add,JSON.stringify(lk));
-  await page.context().close();
+  const a=v.bmA,b=v.bmB;
+  ok('rows are state × product group; state header names the default plant',/Maharashtra/.test(v.mg.hdr.join())&&/default plant: DEMO plant 1012/.test(v.mg.hdr.join())&&/Karnataka.*no default plant/.test(v.mg.hdr.join()),JSON.stringify(v.mg.hdr));
+  ok('BM A (plant 1012): edits Maharashtra (default plant 1012) state rows; Gujarat (default 1013) shown view only; Karnataka (no default plant, no district) not listed',a.states.join()==='24,27*'&&a.pot.some(k=>k===K('27','_state','Laminate'))&&!a.pot.some(k=>/_24_state_/.test(k)),JSON.stringify(a));
+  ok('BM B (plant 1013): edits Gujarat state rows; sees Maharashtra (Nagpur is its district) view only',b.states.join()==='24*,27'&&b.pot.some(k=>k===K('24','_state','Laminate'))&&!b.pot.some(k=>/_27_state_/.test(k)),JSON.stringify(b.states));
+  ok('Management: all states, edits every state incl. Karnataka (no default plant); approve, return, lock',v.mg.states.every(s=>/\*$/.test(s))&&v.mg.states.length===3&&/Lock quarter/.test(v.mg.bar),JSON.stringify([v.mg.states,v.mg.bar]));
+  ok('Super admin: edits all states, sees Geography page',v.sa.states.every(s=>/\*$/.test(s))&&v.sa.geo&&v.mg.geo,JSON.stringify(v.sa.states));
+  ok('HOD: view only (no inputs, no upload), no Geography page',v.hod.pot.length===0&&/View only/.test(v.hod.bar)&&!v.hod.geo&&v.hod.states.length===3,JSON.stringify(v.hod));
+  ok('Sales executive: view only, states of own customers only',v.se.pot.length===0&&/View only/.test(v.se.bar)&&v.se.states.length>=1&&v.se.states.length<=3,JSON.stringify(v.se.states));
+  ok('BM role note names the rule (default plant; other states view only, own districts editable)',/default plant is yours/.test(a.note)&&/Gujarat/.test(a.note)&&/districts mapped to your plant/.test(a.note),a.note);
 }
 
-/* ---------- B. save / submit / approve / return, approver != proposer, default share is a suggestion ---------- */
+/* ---------- B. keys, state required, save, district optional and silent, sum rule, unallocated derived ---------- */
 let S1;
 {
-  const {page}=await openAs('bm.a@demo',emptyQ3());
-  const kL='fy27_q3_1012_laminate_all',kD='fy27_q3_1012_door_all';
-  const info=await page.evaluate(()=>{const D=window.__dbg,ser=D.quarterSeries({plant:'1012',group:'Laminate'}),en=ser.find(x=>x.q==='FY27-Q2'),pot=D.S.potential.filter(x=>x.fy_quarter==='FY27-Q2'&&x.plant_code==='1012'&&x.product_group==='Laminate').reduce((a,x)=>a+(+(x.approved||x).potential_value_inr),0);
-    const r2=v=>Math.round(v*100)/100;return {A:en.H,loaded:en.loaded,pot:pot,dsh:r2(r2(en.H/pot*100)+2),isCur:en.isCur}});
-  ok('empty quarter: guide card with three ways to start, "0 started"',/three ways to start/i.test(await pgText(page))&&/0 started/.test(await pgText(page)),(await pgText(page)).slice(0,300));
-  const ph=await page.getAttribute('#tp-share-'+kL,'placeholder'),cls=await page.getAttribute('#tp-share-'+kL,'class');
-  ok('default share is shown only as a suggestion: last quarter actual ÷ potential + 2 points, hatched, value empty',info.loaded&&!info.isCur&&ph===info.dsh.toFixed(2)&&/dflt/.test(cls)&&(await page.inputValue('#tp-share-'+kL))==='',JSON.stringify([ph,info,cls]));
-  ok('nothing is saved just by opening an empty quarter',!Object.keys(await mock(page)).some(k=>/^potential\/fy27_q3_/.test(k)),'');
-  await fillCell(page,'pot',kL,'2,00,00,000');
-  const sugg=await page.getAttribute('#tp-tgt-'+kL,'placeholder');
-  const expT=await page.evaluate(([p,s])=>window.__dbg.leafTgt(p,s).toLocaleString('en-IN',{maximumFractionDigits:2}),[20000000,info.dsh]);
-  ok('potential typed: target suggestion = potential × default share, still unsaved',sugg===expT&&!Object.keys(await mock(page)).some(k=>/^potential\/fy27_q3_/.test(k)),sugg+' vs '+expT);
-  /* share <-> target linkage on Door: enter potential and target, share follows */
-  await fillCell(page,'pot',kD,'1,00,00,000');await fillCell(page,'tgt',kD,'45,00,000');
-  ok('Target ₹ typed: Share % follows (45,00,000 ÷ 1,00,00,000 = 45.00)',(await page.inputValue('#tp-share-'+kD))==='45.00',await page.inputValue('#tp-share-'+kD));
-  await fillCell(page,'share',kD,'50');
-  ok('Share % typed last: Target ₹ follows (50% of 1,00,00,000 = 50,00,000)',(await page.inputValue('#tp-tgt-'+kD))==='50,00,000',await page.inputValue('#tp-tgt-'+kD));
+  const {page}=await openAs('bm.a@demo',base);
+  const g=await page.evaluate(()=>{const D=window.__dbg;return [D.planGuard({plant_code:'1012'}),D.planGuard({}),D.planGuard({state_code:'24',district_id:'_state'}),D.planGuard({state_code:'24',district_id:'GJ-AHMEDABAD'}),D.planGuard({state_code:'27',district_id:'MH-NAGPUR'}),D.planGuard({state_code:'27',district_id:'MH-KOLHAPUR'}),D.planGuard({state_code:'29',district_id:'_state'})]});
+  ok('State is required; plant-keyed records are legacy read only',/legacy\) figures are read only/.test(g[0])&&/A state is required/.test(g[1]),JSON.stringify(g));
+  ok('BM A: Gujarat state refused (default plant 1013), Ahmedabad district (mapped to 1012) allowed inside Gujarat, Nagpur (1013) refused, Kolhapur (no plant) refused, Karnataka (no default plant) refused',/default plant is DEMO plant 1013, not yours/.test(g[2])&&g[3]===''&&/belongs to DEMO plant 1013/.test(g[4])&&/no responsible plant/.test(g[5])&&/no default plant/.test(g[6]),JSON.stringify(g));
+  ok('District mapping is collapsed and silent while empty (no warning, "nothing to fix")',(await page.evaluate(()=>{const d=document.querySelector('details.tp-dist');return d&&!d.open&&/Not split into districts\. Nothing to fix/.test(d.textContent)&&!/▲/.test(d.textContent)})),'');
+  const kL=K('27','_state','Laminate'),kD=K('27','_state','Door');
+  const dsh=await page.evaluate(k=>{const r=window.__dbg.tpModel().rows.find(x=>x.st==='27'&&x.group==='Laminate');return {ph:document.getElementById('tp-share-'+k).getAttribute('placeholder'),dsh:r.last.dsh,A:r.last.A,pot:r.last.pot}},kL);
+  ok('First state quarter: no last-quarter state potential, so no default share (trade-off D79)',dsh.dsh===null&&dsh.pot===null&&dsh.ph==='',JSON.stringify(dsh));
+  await fill(page,'pot',kL,'9,00,00,000');await fill(page,'share',kL,'48');
+  await fill(page,'pot',kD,'1,00,00,000');await fill(page,'tgt',kD,'45,00,000');
+  ok('Share % and Target ₹ move each other',(await page.inputValue('#tp-share-'+kD))==='45.00'&&(await page.inputValue('#tp-tgt-'+kL))==='4,32,00,000','');
   await page.click('[data-act="tp-save"]');await page.waitForTimeout(900);
-  let s=await mock(page),dl=doc(s,kL),dd=doc(s,kD);
-  ok('Save draft: Laminate saved as Draft with the default share, no demo flag, SAP-free plan fields, one revision by the proposer',dl&&dl.status==='Draft'&&dl.potential_value_inr===20000000&&dl.share_pct===info.dsh&&!dl.demo&&dl.customer_segment==='All'&&dl.plant_code==='1012'&&dl.revisions.length===1&&dl.revisions[0].by==='bm.a@demo'&&dl.rev===1,JSON.stringify(dl));
-  ok('Save draft: Door saved with the entered share 50 and target 50,00,000',dd&&dd.share_pct===50&&dd.status==='Draft',JSON.stringify(dd&&[dd.share_pct,dd.status]));
-  ok('Save draft: "Draft" shown on the rows, not counted as an approved target',/2 Draft/.test(await pgText(page))&&(await page.evaluate(()=>window.__dbg.planQ({plants:null},'FY27-Q3').kind))==='draft','');
-  /* submit needs reason, date, participants */
+  let s=await mock(page),d=s['potential/'+kL];
+  ok('Saved as Draft with key (quarter, state, _state, group, segment) and id geo_…; no plant on the record',d&&d.status==='Draft'&&d.state_code==='27'&&d.district_id==='_state'&&d.customer_segment==='All'&&d.fy_quarter===Q&&!d.plant_code&&d.potential_value_inr===90000000&&d.share_pct===48&&kL==='geo_fy27_q3_27_state_laminate_all',JSON.stringify(d));
+  /* district split: Pune 5,00,00,000 → unallocated 4,00,00,000 × 48% */
+  await page.evaluate(()=>{document.querySelector('details.tp-dist').open=true});await page.waitForTimeout(300);
+  const kP=K('27','MH-PUNE','Laminate'),kN=K('27','MH-NAGPUR','Laminate');
+  ok('BM A edits Pune (own plant), not Nagpur (plant 1013)',await has(page,'#tp-pot-'+kP)&&!(await has(page,'#tp-pot-'+kN)),'');
+  await fill(page,'pot',kP,'5,00,00,000');await fill(page,'share',kP,'50');
+  let dt=await page.evaluate(()=>document.querySelector('details.tp-dist').textContent);
+  ok('With a district filled: "Split across districts" and a derived "Unallocated to districts" row (4,00,00,000 × 48% = 1,92,00,000)',/Split across districts: 5,00,00,000 of 9,00,00,000/.test(dt)&&/Unallocated to districts/.test(dt)&&/1,92,00,000/.test(dt)&&/Maharashtra – unassigned/.test(dt),dt.slice(0,600));
+  await page.click('[data-act="tp-save"]');await page.waitForTimeout(900);s=await mock(page);
+  ok('Unallocated is never stored: only the state and Pune records exist for Maharashtra Laminate',Object.keys(s).filter(k=>/^potential\/geo_fy27_q3_27_.*laminate/.test(k)).sort().join()===['potential/'+kP,'potential/'+kL].sort().join()&&s['potential/'+kP].district_id==='MH-PUNE',Object.keys(s).filter(k=>/geo_fy27_q3_27/.test(k)).join());
+  /* over the state total: save allowed, submit refused */
+  await page.evaluate(()=>{document.querySelector('details.tp-dist').open=true});await fill(page,'pot',kP,'9,40,00,000');
+  dt=await page.evaluate(()=>document.querySelector('details.tp-dist').textContent);
+  ok('Districts over the state total: point-of-entry warning names the excess',/over the Maharashtra total of 9,00,00,000 by 40,00,000/.test(dt),dt.slice(0,400));
+  await page.click('[data-act="tp-save"]');await page.waitForTimeout(800);
+  ok('Draft above the state total can be saved',(await mock(page))['potential/'+kP].potential_value_inr===94000000,'');
+  await page.click('[data-act="tp-submit"]');await page.waitForTimeout(800);
+  ok('Submit refused while districts exceed the state',/districts exceed the state by 40,00,000/.test(await page.innerText('#tp-msg'))&&!(await has(page,'#tp-s-reason')),await page.innerText('#tp-msg'));
+  await page.evaluate(()=>{document.querySelector('details.tp-dist').open=true});await fill(page,'pot',kP,'5,00,00,000');
   await page.click('[data-act="tp-submit"]');await page.waitForSelector('#tp-s-reason');
   await page.click('[data-act="tp-submit-go"]');
-  ok('Submit without a reason is refused',/reason is required/i.test(await page.innerText('#d-err')),await page.innerText('#d-err'));
-  await page.fill('#tp-s-reason','Dealer survey up');await page.fill('#tp-s-part','Branch team');
-  await page.click('[data-act="tp-submit-go"]');await page.waitForTimeout(900);
-  s=await mock(page);dl=doc(s,kL);dd=doc(s,kD);
-  ok('Submit: both rows are Proposed (stored as Discussed) with reason, date and participants on the revision',dl.status==='Discussed'&&dd.status==='Discussed'&&dl.revisions[0].reason==='Dealer survey up'&&dl.revisions[0].participants==='Branch team'&&/^\d{4}-\d\d-\d\d$/.test(dl.revisions[0].discussion_date),JSON.stringify(dl.revisions));
-  ok('Submit: page shows Proposed; the Branch manager has no approve control',/Proposed/.test(await pgText(page))&&!(await page.$('[data-act="tp-approve"]')),'');
-  const bmApprove=await page.evaluate(k=>{const D=window.__dbg,x=D.S.potential.find(p=>p._id===k);return D.advanceDoc(x,D.effUser())},kL);
-  ok('Branch manager cannot approve (rule, not just a hidden button)',/Approval is by SP Sir or a Management/.test(bmApprove.err||''),JSON.stringify(bmApprove.err));
-  S1=await mock(page);await page.context().close();
+  ok('Submit asks reason, date and participants (reason missing refused)',/reason is required/i.test(await page.innerText('#d-err'))&&await has(page,'#tp-s-date')&&await has(page,'#tp-s-part'),'');
+  await page.fill('#tp-s-reason','Dealer survey up');await page.fill('#tp-s-part','Branch team');await page.click('[data-act="tp-submit-go"]');await page.waitForTimeout(1200);
+  s=await mock(page);
+  ok('Submit: state rows and Pune are Proposed (stored Discussed) with reason, date, participants',['potential/'+kL,'potential/'+kD,'potential/'+kP].every(k=>s[k].status==='Discussed'&&s[k].revisions.some(r=>r.reason==='Dealer survey up'&&r.participants==='Branch team'&&/^\d{4}-\d\d-\d\d$/.test(r.discussion_date))),'');
+  S1=s;await page.context().close();
 }
-/* Management: proposes own row, cannot approve it; approves the Branch manager's rows; returns one */
+/* ---------- C. approve, approver != proposer, return ---------- */
 let S2;
 {
   const {page}=await openAs('mgmt@demo',S1);
-  const kL='fy27_q3_1012_laminate_all',kD='fy27_q3_1012_door_all',kP='fy27_q3_1011_pvc_sheet_all';
-  ok('Management sees the Branch manager rows as Proposed with a select box',(await page.$$('[data-tp="sel"]')).length===2,(await page.$$('[data-tp="sel"]')).length);
-  /* Management proposes a row of its own on plant 1011 */
-  await fillCell(page,'pot',kP,'80,00,000');await fillCell(page,'share',kP,'40');
-  await page.click('[data-act="tp-save"]');await page.waitForTimeout(800);
-  await page.click('[data-act="tp-submit"]');await page.waitForSelector('#tp-s-reason');
-  await page.fill('#tp-s-reason','HO view');await page.fill('#tp-s-part','HO team');await page.click('[data-act="tp-submit-go"]');await page.waitForTimeout(900);
+  const kL=K('27','_state','Laminate'),kD=K('27','_state','Door'),kK=K('29','_state','Laminate');
+  await fill(page,'pot',kK,'1,90,00,000');await fill(page,'share',kK,'41');await page.click('[data-act="tp-save"]');await page.waitForTimeout(700);
+  await page.click('[data-act="tp-submit"]');await page.waitForSelector('#tp-s-reason');await page.fill('#tp-s-reason','HO view');await page.fill('#tp-s-part','HO');await page.click('[data-act="tp-submit-go"]');await page.waitForTimeout(1000);
+  ok('Management proposes Karnataka (no default plant); its own row shows "another approver needed", no select box',/You proposed this: another approver needed/.test(await txt(page))&&!(await has(page,'[data-tp="sel"][data-key="'+kK+'"]')),'');
+  const self=await page.evaluate(k=>{const D=window.__dbg;return D.advanceDoc(D.S.potential.find(p=>p._id===k),D.effUser()).err},kK);
+  ok('Approver is never the proposer (rule refuses even when called directly)',/proposer cannot approve/.test(self||''),self);
+  await page.check('[data-tp="sel"][data-key="'+kL+'"]');await page.click('[data-act="tp-approve"]');await page.waitForTimeout(900);
   let s=await mock(page);
-  ok('Management row 1011 PVC submitted by Management; proposer is Management',doc(s,kP)&&doc(s,kP).status==='Discussed'&&await page.evaluate(k=>window.__dbg.proposerOf(window.__dbg.S.potential.find(p=>p._id===k)),kP)==='mgmt@demo','');
-  const own=await page.innerText('details.tp-row:has(#tp-pot-'+kP+')').catch(()=>'');
-  const txt=await pgText(page);
-  ok('Approver is not the proposer: Management sees "another approver needed" on its own row and no select box for it',/You proposed this: another approver needed/.test(txt)&&!(await page.$('[data-tp="sel"][data-key="'+kP+'"]')),txt.slice(0,200));
-  const selfAp=await page.evaluate(k=>{const D=window.__dbg;return D.advanceDoc(D.S.potential.find(p=>p._id===k),D.effUser())},kP);
-  ok('Approver is not the proposer: rule refuses the proposer even when called directly',/proposer cannot approve/.test(selfAp.err||''),JSON.stringify(selfAp));
-  /* approve the Branch manager's Laminate; return Door */
-  await page.check('[data-tp="sel"][data-key="'+kL+'"]');await page.waitForTimeout(300);
-  ok('Approve button counts the ticked rows',/Approve 1 selected/.test(await barText(page)),await barText(page));
-  await page.click('[data-act="tp-approve"]');await page.waitForTimeout(900);
-  s=await mock(page);let dl=doc(s,kL);
-  ok('Approve: Laminate is Approved by Management; approved and original recorded; achievement basis is the approved target',dl.status==='Approved'&&dl.approved&&dl.approved.by==='mgmt@demo'&&dl.original&&dl.approved.potential_value_inr===20000000,JSON.stringify([dl.status,dl.approved,dl.original]));
-  const tg=await page.evaluate(()=>{const P=window.__dbg.planQ({plant:'1012',group:'Laminate'},'FY27-Q3');return [P.kind,Math.round(P.tgt),Math.round(P.orig)]});
-  const exp=Math.round(dl.approved.potential_value_inr*dl.approved.share_pct/100);
-  ok('Approve: planQ counts the approved target (current = original)',tg.join()==='approved,'+exp+','+exp,JSON.stringify([tg,exp]));
-  await page.check('[data-tp="sel"][data-key="'+kD+'"]');
-  await page.click('[data-act="tp-return-open"]');await page.waitForTimeout(300);
-  await page.click('[data-act="tp-return-go"]');await page.waitForTimeout(500);
-  ok('Return without a reason is refused and nothing changes',/reason is required/i.test(await page.innerText('#tp-msg'))&&doc(await mock(page),kD).status==='Discussed','');
-  await page.fill('#tp-ret-text','Door potential looks high. Add the dealer survey note.');await page.dispatchEvent('#tp-ret-text','input');
-  await page.click('[data-act="tp-return-go"]');await page.waitForTimeout(1200);
-  s=await mock(page);const dr=doc(s,kD);
-  const act=Object.values(s).filter(a=>a&&a.rule==='M'&&/Targets returned/.test(a.title||''));
-  ok('Return: Door goes back to Draft with the reason on the revision trail',dr.status==='Draft'&&dr.revisions.slice(-1)[0].returned===true&&dr.revisions.slice(-1)[0].reason==='Door potential looks high. Add the dealer survey note.',JSON.stringify(dr.revisions.slice(-1)));
-  const prop=await page.evaluate(k=>window.__dbg.proposerOf(window.__dbg.S.potential.find(p=>p._id===k)),kD);
-  ok('Return: the proposer stays the Branch manager (the returner does not become proposer); an action lands on the proposer\'s list',prop==='bm.a@demo'&&act.length===1&&act[0].owner==='bm.a@demo'&&act[0].assigner==='mgmt@demo',JSON.stringify(act.map(a=>[a.owner,a.assigner,a.title])));
+  ok('Management approves the BM row: Approved, approved and original recorded',s['potential/'+kL].status==='Approved'&&s['potential/'+kL].approved.by==='mgmt@demo'&&s['potential/'+kL].original,'');
+  await page.check('[data-tp="sel"][data-key="'+kD+'"]');await page.click('[data-act="tp-return-open"]');await page.waitForTimeout(300);
+  await page.fill('#tp-ret-text','Door looks high');await page.dispatchEvent('#tp-ret-text','input');await page.click('[data-act="tp-return-go"]');await page.waitForTimeout(1200);
+  s=await mock(page);const act=Object.values(s).filter(a=>a&&a.rule==='M'&&/Targets returned/.test(a.title||''));
+  ok('Return: Door back to Draft with the reason; proposer stays the BM; action on the BM\'s list',s['potential/'+kD].status==='Draft'&&s['potential/'+kD].revisions.slice(-1)[0].returned&&await page.evaluate(k=>window.__dbg.proposerOf(window.__dbg.S.potential.find(p=>p._id===k)),kD)==='bm.a@demo'&&act.length===1&&act[0].owner==='bm.a@demo',JSON.stringify(act.map(a=>a.owner)));
+  /* plan figures count by responsible plant: Maharashtra (default plant 1012) */
+  const pq=await page.evaluate(()=>{const P=window.__dbg.planQ({plant:'1012',group:'Laminate'},'FY27-Q3');return [P.kind,P.tgt,P.pot]});
+  ok('Approved state target reaches plant 1012 (responsible plant) in plan roll-ups; Pune is not approved, so the approved state slice is 9,00,00,000 × 48% and potential is not double counted',pq[0]==='mixed'&&Math.abs(pq[1]-43200000)<0.01&&Math.abs(pq[2]-90000000)<0.01,JSON.stringify(pq));
   S2=s;await page.context().close();
 }
-/* Super admin approves the Management-proposed row (a second approver), then locks the quarter */
 {
   const {page}=await openAs('super@demo',S2);
-  const kP='fy27_q3_1011_pvc_sheet_all',kL='fy27_q3_1012_laminate_all';
-  await page.check('[data-tp="sel"][data-key="'+kP+'"]');await page.click('[data-act="tp-approve"]');await page.waitForTimeout(900);
-  let s=await mock(page);
-  ok('Another approver (Super admin) approves the Management-proposed row',doc(s,kP).status==='Approved'&&doc(s,kP).approved.by==='super@demo','');
-  /* lock */
-  await page.click('[data-act="tp-lock-open"]');await page.waitForSelector('[data-act="tp-lock-go"]');await page.click('[data-act="tp-lock-go"]');await page.waitForTimeout(3500);
-  s=await mock(page);
-  const lk=await page.evaluate(()=>[window.__dbg.isPlanLocked('FY27-Q3'),window.__dbg.S.potential.filter(x=>x.fy_quarter==='FY27-Q3'&&x.status==='Locked').length]);
-  ok('Lock quarter: Approved rows become Locked and the quarter is plan-locked',lk[0]===true&&lk[1]===2,JSON.stringify(lk));
-  const t=await page.evaluate(()=>({inputs:document.querySelectorAll('[data-tp="pot"]').length,bar:document.querySelector('.tp-sticky').innerText,opt:document.querySelector('#tp-q option:checked').innerText}));
-  ok('Locked quarter is read-only even for Super admin, and the picker marks it Locked',t.inputs===0&&/is locked/.test(t.bar)&&/Locked/.test(t.opt),JSON.stringify(t));
-  const w=await page.evaluate(()=>window.__dbg.tpSave());
-  ok('Saving into a locked quarter is refused',w.saved===0,JSON.stringify(w));
-  /* last quarter is locked in the demo store: view it */
-  await page.selectOption('#tp-q',PQ);await page.waitForTimeout(700);
-  const t2=await page.evaluate(()=>({inputs:document.querySelectorAll('[data-tp="pot"]').length,bar:document.querySelector('.tp-sticky').innerText,opts:[...document.querySelectorAll('#tp-q option')].filter(o=>/Locked/.test(o.innerText)).length}));
-  ok('Locked quarters listed in the picker as read-only (Q2 FY27 shows plain figures)',t2.inputs===0&&/locked/.test(t2.bar)&&t2.opts>=2,JSON.stringify(t2));
+  const kK=K('29','_state','Laminate');
+  await page.check('[data-tp="sel"][data-key="'+kK+'"]');await page.click('[data-act="tp-approve"]');await page.waitForTimeout(900);
+  ok('A second approver (Super admin) approves the Management-proposed row',(await mock(page))['potential/'+kK].status==='Approved','');
+  /* plant roll-up */
+  await page.check('input[data-tp="view"][value="plant"]');await page.waitForTimeout(800);
+  const rt=await txt(page);
+  ok('Plant roll-up by responsible plant, labelled "not invoicing plant"; Karnataka under "No responsible plant"; totals name the row base',/Responsible plant, from customer geography\. This is not invoicing plant/.test(rt)&&/No responsible plant/.test(rt)&&/DEMO plant 1012/.test(rt)&&/vs last quarter of the same rows|—/.test(rt),rt.slice(0,800));
+  await page.check('input[data-tp="view"][value="state"]');await page.waitForTimeout(500);
+  /* actuals by customer state: independent sum from the customer master states */
+  const ac=await page.evaluate(()=>{const D=window.__dbg,ms=D.qMonths('FY27-Q2');let mh=0,un=0;Object.keys(D.GEOA.rows).forEach(k=>{const [p,ym]=k.split('\u0001');if(ms.indexOf(ym)<0)return;D.GEOA.rows[k].a.forEach(r=>{if(r[4]||r[3]!=='Laminate')return;const c=D.custInfo(r[0]);if(c&&c[4]==='Maharashtra'){mh+=r[9];if(!c[9])un+=r[9]}})});
+    const row=D.tpModel().rows.find(x=>x.st==='27'&&x.group==='Laminate');return {mh,un,A:row.last.A,lun:row.last.un}});
+  ok('Last quarter actual of Maharashtra Laminate = sales of customers whose state is Maharashtra (by customer state, all invoicing plants)',Math.abs(ac.mh-ac.A)<0.5&&ac.mh>0,JSON.stringify(ac));
+  ok('Customers with no PIN sit in "Maharashtra – unassigned"',Math.abs(ac.un-ac.lun)<0.5&&ac.un>0,JSON.stringify(ac));
+  const tot=await page.evaluate(()=>[...document.querySelectorAll('.tp-tot')].map(x=>x.innerText).join(' || '));
+  ok('Totals: QoQ uses the same rows that have a target and names the base',/target vs last quarter of the same \d+ rows?/.test(tot),tot.slice(0,600));
+  /* lock with snapshot; later master change does not move the locked quarter */
+  const before=await page.evaluate(()=>window.__dbg.tpModel().rows.find(x=>x.st==='27'&&x.group==='Laminate').ach);
+  await page.click('[data-act="tp-lock-open"]');await page.waitForSelector('[data-act="tp-lock-go"]');await page.click('[data-act="tp-lock-go"]');await page.waitForTimeout(5000);
+  const lk=await page.evaluate(()=>{const D=window.__dbg;return {l:D.isPlanLocked('FY27-Q3'),snap:!!(D.S.planlocks['FY27-Q3']&&D.S.planlocks['FY27-Q3'].geo_snap),inputs:document.querySelectorAll('[data-tp="pot"]').length}});
+  ok('Lock: quarter read only for Super admin too; attributed actuals snapshotted on the lock',lk.l&&lk.snap&&lk.inputs===0,JSON.stringify(lk));
+  /* move every customer to Gujarat in the master: the locked quarter keeps its figures */
+  await page.evaluate(async()=>{const D=window.__dbg;const rows=[...D.S.custIdx.values()].map(a=>{const b=a.slice();b[4]='Gujarat';return b});await D.dset('customers/B1_c0',{z:await D.gz(JSON.stringify(rows)),n:rows.length,i:0,sys:'B1',upload:'ugeofix2',demo:true});await D.dset('customers/main_B1',{at:new Date().toISOString(),by:'x',sys:'B1',loaded:rows.length,chunks:1,upload:'ugeofix2',demo:true})});
+  await page.waitForTimeout(2500);
+  const after=await page.evaluate(()=>{const D=window.__dbg;return [D.tpModel().rows.find(x=>x.st==='27'&&x.group==='Laminate').ach,D.custInfo([...D.S.custIdx.keys()][0])[4]]});
+  ok('Locked quarter: actuals do not move when the master is edited later',after[1]==='Gujarat'&&Math.abs(after[0]-before)<0.5&&before>0,JSON.stringify([before,after]));
   await page.context().close();
 }
-
-/* ---------- C. copy from last quarter; DEMO never enters real data ---------- */
+/* ---------- D. legacy and the start quarter ---------- */
 {
-  const {page}=await openAs('bm.a@demo',store);
-  await page.selectOption('#tp-q','FY27-Q4');await page.waitForTimeout(700);
-  ok('Q4 FY27 is empty before the copy',/0 started/.test(await pgText(page)),'');
-  await page.click('[data-act="tp-copy"]');await page.waitForTimeout(1500);
-  let s=await mock(page);const cp=Object.keys(s).filter(k=>/^potential\/fy27_q4_1012_/.test(k));
-  const src=s['potential/fy27_q3_1012_laminate_dealer'],c=s['potential/fy27_q4_1012_laminate_dealer'];
-  ok('Copy: every own-plant row of last quarter lands in the new quarter as Draft, with potential and share, not other plants',cp.length===6&&!Object.keys(s).some(k=>/^potential\/fy27_q4_(1001|1011|1013)_/.test(k))&&c.status==='Draft'&&c.potential_value_inr===src.approved.potential_value_inr&&c.share_pct===src.approved.share_pct&&c.revisions[0].by==='bm.a@demo'&&/Copied from Q3 FY27/.test(c.revisions[0].reason),JSON.stringify([cp.length,c&&[c.status,c.potential_value_inr,c.share_pct]]));
-  ok('Copy: a DEMO source stays DEMO so Clear demo removes the copy (demo-only store)',c.demo===true,'');
-  const m1=await page.innerText('#tp-msg');
-  await page.click('[data-act="tp-copy"]');await page.waitForTimeout(1200);
-  const m2=await page.innerText('#tp-msg');s=await mock(page);
-  ok('Copy again leaves existing figures alone',/Copied 0 rows/.test(m2)&&/already had figures/.test(m2)&&Object.keys(s).filter(k=>/^potential\/fy27_q4_1012_/.test(k)).length===6,m1+' || '+m2);
+  const {page}=await openAs('super@demo',base);
+  ok('Geography starts at the current open quarter when it has no real Approved plant record (DEMO records do not count)',(await page.evaluate(()=>window.__dbg.geoStartQ()))===Q,'');
+  await page.selectOption('#tp-q',PQ);await page.waitForTimeout(800);
+  const t=await txt(page);
+  ok('An earlier quarter opens "Legacy (by plant)", read only, no inputs, no upload',/Legacy \(by plant\)/.test(t)&&/cannot be edited/.test(t)&&(await page.$$('[data-tp="pot"]')).length===0&&!(await has(page,'#up-pot')),t.slice(0,300));
+  await page.selectOption('#tp-q',Q);await page.waitForTimeout(600);await page.click('[data-act="tp-copy"]');await page.waitForTimeout(800);
+  ok('Copy into the first state quarter from a plant quarter converts nothing',/not converted to states/.test(await page.innerText('#tp-msg'))&&!Object.keys(await mock(page)).some(k=>/^potential\/geo_/.test(k)),await page.innerText('#tp-msg'));
   await page.context().close();
-  /* real sales for plant 1012: its DEMO potential must neither show nor be copied, and a new row carries no demo flag */
-  const r=clone(store);Object.keys(r).forEach(k=>{if(/^cells\//.test(k)){const c=r[k];Object.keys(c.plants||{}).forEach(p=>{if(p==='1012')delete c.plants[p].demo})}});
-  const {page:p2}=await openAs('bm.a@demo',r);
-  const sh=await pgText(p2);
-  ok('Real sales for plant 1012: its DEMO plan figures are not shown (rows Not started)',/0 started/.test(sh)&&!/Approved/.test((await p2.innerText('.tp-gridcard')).replace(/approved/g,'')),sh.slice(0,200));
-  await p2.selectOption('#tp-q','FY27-Q4');await p2.waitForTimeout(600);
-  await p2.click('[data-act="tp-copy"]');await p2.waitForTimeout(1200);
-  const s3=await mock(p2);
-  ok('Real sales: copy from last quarter takes no DEMO value',!Object.keys(s3).some(k=>/^potential\/fy27_q4_1012_/.test(k))&&/no potential figures to copy/.test(await p2.innerText('#tp-msg')),await p2.innerText('#tp-msg'));
-  await p2.selectOption('#tp-q',Q);await p2.waitForTimeout(500);
-  const kL='fy27_q3_1012_laminate_all';await fillCell(p2,'pot',kL,'1,00,00,000');await fillCell(p2,'share',kL,'45');await p2.click('[data-act="tp-save"]');await p2.waitForTimeout(800);
-  const s4=await mock(p2),nd=s4['potential/'+kL];
-  ok('Real sales: a saved row has no demo flag and overwrites nothing DEMO as an approved target',nd&&nd.status==='Draft'&&!nd.demo&&!nd.approved&&nd.revisions.length===1,JSON.stringify(nd));
+  const r=clone(base);const k=Object.keys(r).find(x=>/^potential\/fy27_q3_1012_laminate_dealer$/.test(x));delete r[k].demo;
+  const {page:p2}=await openAs('super@demo',r);
+  ok('A real Approved plant record in the open quarter moves the start to the next quarter',(await p2.evaluate(()=>window.__dbg.geoStartQ()))==='FY27-Q4'&&(await p2.inputValue('#tp-q'))==='FY27-Q4','');
   await p2.context().close();
 }
-
-/* ---------- D. upload round trip ---------- */
+/* ---------- E. copy, upload in two steps, phasing ---------- */
 {
-  const {page}=await openAs('bm.a@demo',emptyQ3());
-  const csv0=await page.evaluate(()=>window.__dbg.tpTemplateCsv('potential'));
-  const L=csv0.trim().split('\n');
-  ok('Template: header of the market-potential file, one row per own plant × product group, quarter filled, potential blank',L[0]==='fy_quarter,plant_code,territory,product_group,customer_segment,potential_value_inr,potential_qty_sheets,potential_qty_sqft,source_type,source_note,owner_email'&&L.length===5&&L.every((l,i)=>i===0||(l.startsWith('FY27-Q3,1012,,')&&/,bm\.a@demo$/.test(l))),csv0);
-  const f=L.slice();
-  f[1]=L[1].split(',').slice(0,5).join(',')+',"3,00,00,000",,,branch estimate,from dealers,bm.a@demo';
-  f[2]=L[2].split(',').slice(0,5).join(',')+',12000000,,,branch estimate,,bm.a@demo';
-  f.push('FY27-Q3,1013,,Laminate,All,5000000,,,branch estimate,,bm.a@demo');/* not this Branch manager's plant */
-  fs.writeFileSync(TMP+'t59-pot.csv',f.join('\n')+'\n');
-  await page.setInputFiles('#up-pot',TMP+'t59-pot.csv');await page.waitForTimeout(1800);
-  let s=await mock(page);const msg=await page.innerText('#up-msg');
-  const k1=Object.keys(s).filter(k=>/^potential\/fy27_q3_1012_/.test(k));
-  ok('Upload: two filled rows saved as Draft revisions by the uploader; blank template rows skipped, not rejected',k1.length===2&&k1.every(k=>s[k].status==='Draft'&&s[k].revisions[0].by==='bm.a@demo'&&!s[k].demo)&&/Template rows left blank \(skipped\)\s*2/.test(msg.replace(/\n/g,' ')),msg.slice(0,300)+JSON.stringify(k1));
-  ok('Upload: the row for another Branch manager\'s plant is rejected with the plant rule',/1 row\(s\) rejected/.test(msg)&&/own plants only/.test(msg)&&!s['potential/fy27_q3_1013_laminate_all'],msg.slice(0,400));
-  ok('Upload: values in the grid, default share (a suggestion) not yet stored',s['potential/fy27_q3_1012_laminate_all'].potential_value_inr===30000000&&s['potential/fy27_q3_1012_laminate_all'].share_pct==='','');
-  /* round trip: the new template carries the uploaded figures */
-  const csv1=await page.evaluate(()=>window.__dbg.tpTemplateCsv('potential'));
-  ok('Round trip: downloading again returns the uploaded potential',/Laminate,All,30000000,/.test(csv1)&&/Door,All,12000000,/.test(csv1),csv1);
-  /* phasing upload: Laminate custom 30/30/40 */
-  const ph0=await page.evaluate(()=>window.__dbg.tpTemplateCsv('phasing')).then(t=>t.trim().split('\n'));
-  ok('Phasing template: header and three month rows per row, current phasing prefilled',ph0[0]==='fy_quarter,plant_code,product_group,customer_segment,month_in_quarter,phasing_pct'&&ph0.length===1+4*3&&/^FY27-Q3,1012,Laminate,,1,33\.33/.test(ph0[1]),ph0.slice(0,3).join(' / '));
-  const pcsv=ph0[0]+'\nFY27-Q3,1012,Laminate,,1,30\nFY27-Q3,1012,Laminate,,2,30\nFY27-Q3,1012,Laminate,,3,40\nFY27-Q3,1013,Laminate,,1,30\nFY27-Q3,1013,Laminate,,2,30\nFY27-Q3,1013,Laminate,,3,40\n';
-  fs.writeFileSync(TMP+'t59-ph.csv',pcsv);
-  await page.setInputFiles('#up-ph',TMP+'t59-ph.csv');await page.waitForTimeout(1500);
-  s=await mock(page);const pm=await page.innerText('#up-msg');
-  const phd=Object.keys(s).filter(k=>/^phasing\//.test(k)).map(k=>s[k]);
-  ok('Phasing upload: own plant accepted (30/30/40), another plant rejected',phd.length===1&&phd[0].plant_code==='1012'&&phd[0].pct.join()==='30,30,40'&&/own plants only/.test(pm),pm.slice(0,300)+JSON.stringify(phd));
-  await fillCell(page,'share','fy27_q3_1012_laminate_all','50');
-  const rd=await page.evaluate(()=>{const row=window.__dbg.tpModel().rows.find(r=>r.plant==='1012'&&r.group==='Laminate');return {m:document.querySelector('input[name^="tp-ph-"]:checked').value}});
-  ok('Uploaded phasing shows as Custom % in the row',rd.m==='custom','');
-  await page.context().close();
-  /* a HOD cannot upload: the same rule refuses every row */
-  const {page:ph}=await openAs('hod.sales@demo',emptyQ3());
-  fs.writeFileSync(TMP+'t59-hod.csv',L[0]+'\nFY27-Q3,1012,,Laminate,All,1000,,,branch estimate,,bm.a@demo\n');
-  await ph.evaluate(async txt=>{await window.__dbg.masterUpload('potential',{name:'hod.csv',text:async()=>txt})},fs.readFileSync(TMP+'t59-hod.csv','utf8'));await ph.waitForTimeout(800);
-  const hm=await ph.evaluate(()=>(document.querySelector('#up-msg')||{innerText:''}).innerText),hs=await mock(ph);
-  const hodGuard=await ph.evaluate(()=>window.__dbg.planGuard({plant_code:'1012'}));
-  ok('HOD upload refused: role cannot propose sales targets, nothing written',/cannot propose or approve sales targets/.test(hodGuard)&&!Object.keys(hs).some(k=>/^potential\/fy27_q3_1012_laminate_all/.test(k)),hodGuard+' | '+hm.slice(0,200));
-  await ph.context().close();
-}
-
-/* ---------- E. phasing totals ---------- */
-{
-  const kL='fy27_q3_1012_laminate_all';
-  const {page}=await openAs('bm.a@demo',emptyQ3());
-  await fillCell(page,'pot',kL,'2,00,00,000');await fillCell(page,'share',kL,'50');
-  await page.click('[data-act="tp-save"]');await page.waitForTimeout(800);
-  const sumM=(q)=>page.evaluate(()=>{const P=window.__dbg.planQ({plant:'1012',group:'Laminate'},'FY27-Q3');return {t:P.tgt,m:P.months.slice(),sum:P.months.reduce((a,b)=>a+b,0)}});
-  let r=await sumM();
-  ok('Equal split: months 33,33,333.33 + 33,33,333.33 + remainder add up to 1,00,00,000',r.t===10000000&&Math.abs(r.sum-10000000)<0.005&&Math.abs(r.m[0]-3333333.33)<0.006&&Math.abs(r.m[2]-3333333.34)<0.006,JSON.stringify(r));
-  /* custom 30/30/40 through the page */
-  await page.evaluate(()=>{const d=document.querySelector('details.tp-row');d.open=true});await page.waitForTimeout(300);
-  await page.check('input[name^="tp-ph-"][value="custom"]');await page.waitForTimeout(400);
-  await page.fill('[id^="tp-phc-"][data-i="0"]','30');await page.fill('[id^="tp-phc-"][data-i="1"]','30');await page.fill('[id^="tp-phc-"][data-i="2"]','30');await page.dispatchEvent('[id^="tp-phc-"][data-i="2"]','change');await page.waitForTimeout(300);
-  await page.click('[data-act="tp-save"]');await page.waitForTimeout(700);
-  ok('Custom % not adding to 100 is refused and nothing is written',/adding up to 100/.test(await page.innerText('#tp-msg'))&&!Object.keys(await mock(page)).some(k=>/^phasing\//.test(k)),await page.innerText('#tp-msg'));
-  await page.fill('[id^="tp-phc-"][data-i="2"]','40');await page.dispatchEvent('[id^="tp-phc-"][data-i="2"]','change');await page.waitForTimeout(300);
-  await page.click('[data-act="tp-save"]');await page.waitForTimeout(900);
-  r=await sumM();
-  ok('Custom 30/30/40: months 30,00,000 / 30,00,000 / 40,00,000, sum equals the quarter target',r.m.join()==='3000000,3000000,4000000'&&r.sum===10000000,JSON.stringify(r));
-  ok('Phasing change is logged',Object.values(await mock(page)).some(l=>l&&l.event==='phasing changed'&&l.quarter==='FY27-Q3'),'');
-  /* working days */
-  await page.evaluate(()=>{document.querySelector('details.tp-row').open=true});
-  await page.check('input[name^="tp-ph-"][value="wd"]');await page.waitForTimeout(400);
-  await page.click('[data-act="tp-save"]');await page.waitForTimeout(900);
-  const wd=await page.evaluate(()=>window.__dbg.qMonths('FY27-Q3').map(window.__dbg.WD));
-  const S=wd.reduce((a,b)=>a+b,0),T=10000000,r2=v=>Math.round(v*100)/100,e1=r2(T*(wd[0]/S*100)/100),e2=r2(T*(wd[1]/S*100)/100),e3=r2(T-e1-e2);
-  r=await sumM();
-  ok('Working days ('+wd.join('/')+'): months follow the days, month 3 takes the remainder, sum = quarter target',Math.abs(r.m[0]-e1)<0.006&&Math.abs(r.m[1]-e2)<0.006&&Math.abs(r.m[2]-e3)<0.006&&Math.abs(r.sum-T)<0.005,JSON.stringify([r,e1,e2,e3]));
-  /* equal split again */
-  await page.evaluate(()=>{document.querySelector('details.tp-row').open=true});
-  await page.check('input[name^="tp-ph-"][value="equal"]');await page.waitForTimeout(400);await page.click('[data-act="tp-save"]');await page.waitForTimeout(900);
-  r=await sumM();
-  ok('Back to equal split: months differ by at most 0.01 and add up',Math.abs(r.m[0]-r.m[1])<0.006&&Math.abs(r.sum-T)<0.005,JSON.stringify(r));
+  const {page}=await openAs('bm.a@demo',S1);
+  await page.selectOption('#tp-q','FY27-Q4');await page.waitForTimeout(800);await page.click('[data-act="tp-copy"]');await page.waitForTimeout(1500);
+  let s=await mock(page);const cp=Object.keys(s).filter(k=>/^potential\/geo_fy27_q4_/.test(k));
+  ok('Copy from last quarter (state records): own rows land as Draft in Q4, nothing of another plant',cp.length===3&&cp.every(k=>s[k].status==='Draft'&&s[k].state_code==='27'),cp.join());
+  await page.selectOption('#tp-q',Q);await page.waitForTimeout(800);
+  const csv=await page.evaluate(()=>window.__dbg.tpTemplateCsv('potential'));const L=csv.trim().split('\n');
+  ok('Template: data-map header, one row per editable state × group (Maharashtra only for BM A), saved values pre-filled',L[0]==='fy_quarter,state_code,district_id,product_group,customer_segment,potential_value_inr,potential_qty_sheets,potential_qty_sqft,share_pct,source_type,source_note,owner_email'&&L.length===5&&L.slice(1).every(l=>l.startsWith('FY27-Q3,27,_state,')),csv);
+  const f=L.slice();f[2]=f[2].replace(',1,00,00,000,',',1,10,00,000,').replace(/,10000000,/,',11000000,');
+  f.push('FY27-Q3,Maharashtr,_state,PVC sheet,All,5000000,,,,branch estimate,,bm.a@demo');f.push('FY27-Q3,24,_state,Laminate,All,6000000,,,,branch estimate,,bm.a@demo');f.push('FY27-Q3,27,_state,Laminat,All,6000000,,,,branch estimate,,bm.a@demo');
+  fs.writeFileSync(TMP+'t59-up.csv',f.join('\n')+'\n');
+  await page.setInputFiles('#up-pot',TMP+'t59-up.csv');await page.waitForSelector('.tp-upres');
+  const ut=await page.innerText('.tp-upres');s=await mock(page);
+  ok('Upload step 1 checks only: result per row, nothing saved before Load',/nothing is saved until you press Load/.test(ut)&&s['potential/'+K('27','_state','Door')].potential_value_inr===10000000,ut.slice(0,200));
+  ok('Unchanged rows skipped with status kept; did-you-mean for state and group; another plant\'s state rejected',/Unchanged/.test(ut)&&/Did you mean Maharashtra\?/.test(ut)&&/Did you mean Laminate\?/.test(ut)&&/default plant is DEMO plant 1013, not yours/.test(ut),ut);
+  await page.click('[data-act="tp-up-load"]');await page.waitForTimeout(1500);s=await mock(page);
+  ok('Load: changed row becomes a Draft revision; unchanged Approved row keeps its status',s['potential/'+K('27','_state','Door')].potential_value_inr===11000000&&s['potential/'+K('27','_state','Door')].status==='Draft'&&s['potential/'+K('27','_state','Laminate')].status===S1['potential/'+K('27','_state','Laminate')].status&&!s['potential/'+K('24','_state','Laminate')],JSON.stringify(s['potential/'+K('27','_state','Door')]&&s['potential/'+K('27','_state','Door')].potential_value_inr));
+  /* phasing: custom 30/30/40 on Maharashtra Laminate reaches plant 1012's months */
+  await page.evaluate(k=>{document.querySelector('details[data-okey="27|Laminate"]').open=true},null);await page.waitForTimeout(300);
+  await page.check('input[name^="tp-ph-"][value="custom"]');await page.waitForTimeout(300);
+  for(const [i,v] of [['0','30'],['1','30'],['2','40']]){const sel='[id^="tp-phc-"][data-i="'+i+'"]';await page.fill(sel,v);await page.dispatchEvent(sel,'change');await page.waitForTimeout(150)}
+  await page.click('[data-act="tp-save"]');await page.waitForTimeout(1000);s=await mock(page);
+  const ph=s['phasing/geo_fy27_q3_27_state_laminate'];
+  const m=await page.evaluate(()=>{const P=window.__dbg.planQ({plant:'1012',group:'Laminate'},'FY27-Q3');return {m:P.months,t:P.tgt}});
+  ok('Phasing by state (key without segment): 30/30/40 stored; months add up to the target',ph&&ph.pct.join()==='30,30,40'&&ph.state_code==='27'&&Math.abs(m.m.reduce((a,b)=>a+b,0)-m.t)<0.01&&Math.abs(m.m[0]-m.t*0.3)<0.02,JSON.stringify([ph,m]));
   await page.context().close();
 }
-
-/* ---------- F. QA regressions: unchanged re-upload keeps status; upload onto DEMO is real; result also as a toast ---------- */
+/* ---------- F. Admin › Geography ---------- */
 {
-  const real=clone(store);Object.keys(real).forEach(k=>{if(/^potential\//.test(k))delete real[k].demo});
-  const {page}=await openAs('super@demo',real);
-  const before=await mock(page),st0=Object.keys(before).filter(k=>/^potential\/fy27_q3_/.test(k)).map(k=>[k,before[k].status,before[k].rev]);
-  const csv=await page.evaluate(()=>window.__dbg.tpTemplateCsv('potential'));fs.writeFileSync(TMP+'t59-same.csv',csv);
-  await page.setInputFiles('#up-pot',TMP+'t59-same.csv');await page.waitForTimeout(2500);
-  let after=await mock(page);const st1=Object.keys(after).filter(k=>/^potential\/fy27_q3_/.test(k)).map(k=>[k,after[k].status,after[k].rev]);
-  const um=(await page.innerText('#up-msg')).replace(/\n/g,' ');
-  const nAppr=st0.filter(x=>x[1]==='Approved').length;
-  ok('Re-uploading an unchanged template keeps every status and revision (no Approved row demoted)',nAppr>10&&JSON.stringify(st0)===JSON.stringify(st1),JSON.stringify([nAppr,st0.filter((x,i)=>JSON.stringify(x)!==JSON.stringify(st1[i])).length]));
-  ok('Unchanged upload: result counts the skipped rows and loads none',/Rows unchanged \(skipped, status kept\)\s*\d+/.test(um)&&!/Loaded \d+ row/.test(um),um.slice(0,300));
-  ok('Upload result is also shown as a toast',/Upload: 0 loaded, \d+ unchanged/.test(await page.innerText('#toast')),await page.innerText('#toast'));
-  /* change one row only */
-  const L=csv.trim().split('\n'),i=L.findIndex(l=>/,1012,,Laminate,Dealer,/.test(l));const c=L[i].split(',');c[5]='99000000';L[i]=c.join(',');
-  fs.writeFileSync(TMP+'t59-one.csv',L.join('\n')+'\n');
-  await page.setInputFiles('#up-pot',TMP+'t59-one.csv');await page.waitForTimeout(2500);
-  after=await mock(page);const ch=Object.keys(after).filter(k=>/^potential\/fy27_q3_/.test(k)&&after[k].status==='Draft');
-  const d=after['potential/fy27_q3_1012_laminate_dealer'];
-  ok('Changed row only becomes a new Draft revision (current approved target kept); the others keep their status',ch.length===st0.filter(x=>x[1]==='Draft').length+1&&ch.includes('potential/fy27_q3_1012_laminate_dealer')&&d.potential_value_inr===99000000&&!!d.approved&&d.rev===before['potential/fy27_q3_1012_laminate_dealer'].rev+1,JSON.stringify([ch,d.rev]));
-  ok('Changed row keeps no demo flag',d.demo===undefined,JSON.stringify(d.demo));
+  const {page}=await openAs('super@demo',base,'#/geography');
+  const b=await page.evaluate(()=>{const D=window.__dbg,v=(a,b)=>D.geoBand({share:a/100},b==null?null:{share:b/100});return [v(60,40),v(59,41),v(50,49),v(47,38),v(46,44),v(45,40),D.geoBand(null,null)]});
+  ok('Bands: High ≥60%; Check 50–59% or <50% with a lead >5 points; Unmapped otherwise',b.join()==='High,Check,Check,Check,Unmapped,Unmapped,Unmapped',b.join());
+  const t=await page.evaluate(()=>{const D=window.__dbg,lq=['2026-09'];return [D.geoVote({'1013':{n:100,sh:5,m:{}},'1012':{n:100,sh:9,m:{}}},lq).top.p,D.geoVote({'1013':{n:100,sh:5,m:{'2026-09':60}},'1012':{n:100,sh:5,m:{'2026-09':40}}},lq).top.p,D.geoVote({'1013':{n:100,sh:5,m:{}},'1012':{n:100,sh:5,m:{}}},lq).top.p]});
+  ok('Tie rule: more sheets, then the latest quarter, then the lower plant code',t.join()==='1012,1013,1012',t.join());
+  await page.click('[data-act="geo-draft"]');await page.waitForFunction(()=>!window.__dbg.GEOA.jobs,null,{timeout:60000});await page.waitForTimeout(1500);
+  const dr=await page.evaluate(()=>{const d=window.__dbg.geoDraft();return {mh:d.states['27']&&d.states['27'].top&&d.states['27'].top.p,band:d.states['27']&&d.states['27'].band,share:d.states['27']&&d.states['27'].top.share,pune:d.districts['MH-PUNE']&&d.districts['MH-PUNE'].total>0,expBand:window.__dbg.geoBand(d.states['27'].top,d.states['27'].second)}});
+  const gt=await txt(page);
+  ok('Draft from sales history: each state voted by invoicing plant over the last 4 closed quarters, with a band from the top two shares',dr.mh&&dr.band===dr.expBand&&/Top plant share of state sales/i.test(gt)&&dr.pune,JSON.stringify(dr));
+  await page.selectOption('select[data-chg="geo-st"][data-k="29"]','1011');await page.click('[data-act="geo-save"]');await page.waitForTimeout(1500);
+  const s=await mock(page);
+  ok('Correct and save: Karnataka default plant 1011 stored as "entered", confirmed by the person',s['geography/st_29'].default_plant_code==='1011'&&s['geography/st_29'].map_source==='entered'&&s['geography/st_29'].confirmed_by==='super@demo',JSON.stringify(s['geography/st_29']));
+  /* state upload adds an SAP region alias */
+  await page.evaluate(async()=>window.__dbg.geoUpload('state','state_code,state_name,aliases,default_plant_code,active\n27,Maharashtra,MH|SAP:13,1012,Y\n2,Bad,,9999,Y\n'));await page.waitForTimeout(800);
+  const gm=await page.innerText('#pg');const s2=await mock(page);
+  ok('State template upload: alias SAP:13 stored for Maharashtra; bad rows rejected with reasons',/MH\|SAP:13/.test(s2['geography/st_27'].aliases)&&/1 rejected/.test(gm)&&/not a laminates plant/.test(gm),gm.slice(-300));
   await page.context().close();
-  /* real sales for 1012 months of Q3: the uploaded row stays visible */
-  const inj=clone(store);for(const ym of ['2026-10','2026-11','2026-12']){const k='cells/INV_'+ym;inj[k]=inj[k]||{entity:'INV',ym,plants:{}};inj[k].plants['1012']={sys:'B1',chunks:1,docs:1,lines:1,net:1000000,sheets:10,bytes:10,upload:'real-test',at:'2026-11-07T00:00:00Z'}}
-  const {page:p2}=await openAs('super@demo',inj);
-  fs.writeFileSync(TMP+'t59-real.csv','fy_quarter,plant_code,territory,product_group,customer_segment,potential_value_inr,potential_qty_sheets,potential_qty_sqft,source_type,source_note,owner_email\nFY27-Q3,1012,,Laminate,Dealer,50000000,,,branch estimate,,super@demo\n');
-  await p2.setInputFiles('#up-pot',TMP+'t59-real.csv');await p2.waitForTimeout(3000);
-  const sh=await p2.evaluate(()=>{const e=document.getElementById('tp-pot-fy27_q3_1012_laminate_dealer');return e?e.value:null});
-  ok('With real sales, an uploaded row onto a DEMO record is visible and real',sh==='5,00,00,000'&&(await mock(p2))['potential/fy27_q3_1012_laminate_dealer'].demo===undefined,String(sh));
-  await p2.context().close();
-  /* E: a DEMO record re-uploaded with its own identical figures is not "unchanged": it becomes a real Draft */
-  {
-    const {page:p3}=await openAs('super@demo',store);
-    const csv3=await p3.evaluate(()=>window.__dbg.tpTemplateCsv('potential'));fs.writeFileSync(TMP+'t59-demo-same.csv',csv3);
-    const b3=await mock(p3),dk=Object.keys(b3).filter(k=>/^potential\/fy27_q3_/.test(k)&&b3[k].demo);
-    await p3.setInputFiles('#up-pot',TMP+'t59-demo-same.csv');await p3.waitForFunction(()=>/Loaded \d+ row/.test((document.querySelector('#up-msg')||{}).innerText||''),null,{timeout:60000});await p3.waitForTimeout(500);
-    const a3=await mock(p3);
-    ok('DEMO records re-uploaded with identical figures become real Draft revisions (never skipped as unchanged)',dk.length>10&&dk.every(k=>a3[k].demo===undefined&&a3[k].status==='Draft'&&a3[k].rev===b3[k].rev+1),JSON.stringify([dk.length,dk.filter(k=>!(a3[k].demo===undefined&&a3[k].status==='Draft'&&a3[k].rev===b3[k].rev+1)).map(k=>[k,a3[k].demo,a3[k].status,a3[k].rev,b3[k].rev])]));
-    await p3.context().close();
-    const inj3=clone(store);for(const ym of ['2026-10','2026-11','2026-12']){const k='cells/INV_'+ym;inj3[k]=inj3[k]||{entity:'INV',ym,plants:{}};inj3[k].plants['1012']={sys:'B1',chunks:1,docs:1,lines:1,net:1000000,sheets:10,bytes:10,upload:'real-test',at:'2026-11-07T00:00:00Z'}}
-    const {page:p4}=await openAs('super@demo',inj3);
-    const d0=inj3['potential/fy27_q3_1012_laminate_dealer'];
-    fs.writeFileSync(TMP+'t59-c7.csv','fy_quarter,plant_code,territory,product_group,customer_segment,potential_value_inr,potential_qty_sheets,potential_qty_sqft,source_type,source_note,owner_email\nFY27-Q3,1012,,Laminate,Dealer,'+d0.potential_value_inr+','+(d0.potential_qty_sheets||'')+','+(d0.potential_qty_sqft||'')+','+d0.source_type+','+(d0.source_note||'')+','+d0.owner_email+'\n');
-    await p4.setInputFiles('#up-pot',TMP+'t59-c7.csv');await p4.waitForTimeout(3000);
-    const v4=await p4.evaluate(()=>{const e=document.getElementById('tp-pot-fy27_q3_1012_laminate_dealer');return e?e.value:null});
-    const s4=(await mock(p4))['potential/fy27_q3_1012_laminate_dealer'];
-    ok('Real sales: an identical re-upload of a DEMO record makes it real and visible (case C7)',s4.demo===undefined&&s4.status==='Draft'&&v4!==null,JSON.stringify([s4.demo,s4.status,v4]));
-    await p4.context().close();
-  }
+  const {page:p3}=await openAs('hod.sales@demo',base,'#/geography');
+  ok('HOD has no Admin › Geography',/Ask your admin for access|does not include this page/.test(await p3.innerText('#pg')),'');
+  await p3.context().close();
+}
+/* ---------- G. customer master by (system, code), SAP customer feed hook, PIN and district reach attribution ---------- */
+{
+  const {page}=await openAs('super@demo',base,'#/admin');
+  const H=['Customer','Name','Customer Group','City','Region','Postal Code','District','GSTIN','Sales Executive','Payment Terms','Sales District','Blocked','Legacy Code','Address Count'];
+  const r1=await page.evaluate(async H=>{const D=window.__dbg;
+    await D.geoUpload('state','state_code,state_name,aliases,default_plant_code,active\n27,Maharashtra,MH|SAP:13,1012,Y\n');
+    const before=D.S.custIdx.size;
+    const r=await D.custFeedLoad({sys:'S4',headers:H,rows:[['50001000','Synthetic Customer 1','01','PUNE','13','411001','','27ABCDE1234F1Z5','S01','0001','','','',1],['50001001','Synthetic Customer 2','01','X','99','','','','','','','','',1],['50001002','Synthetic Customer 3','01','NASHIK','13','','Pune','','','','','','',1]],name:'mock staged customers',layout:'S/4 business partner (SAP feed)'});
+    return {r,before}},H);
+  await page.waitForTimeout(2500);
+  const r2=await page.evaluate(()=>{const D=window.__dbg;return {size:D.S.custIdx.size,b1:D.custInfo([...D.S.custIdx.keys()].find(k=>/^DEMO/.test(k)))||null,s4:D.custInfo('50001000'),g1:D.custGeo('50001000',''),g2:D.custGeo('50001001',''),g3:D.custGeo('50001002',''),gaps:D.custRegionGaps(),docs:Object.keys(window.__mockStore()).filter(k=>/^customers\//.test(k)).sort()}});
+  ok('SAP feed hook: a staged mock customer set loads (3 customers, ok)',r1.r.ok&&r1.r.loaded===3,JSON.stringify(r1));
+  ok('Keyed by (system, code): B1 customers survive the S/4 load',r2.size===r1.before+3&&r2.b1&&r2.b1[11]==='B1'&&r2.docs.includes('customers/main_B1')&&r2.docs.includes('customers/main_S4'),JSON.stringify([r2.size,r1.before,r2.docs]));
+  ok('Region is the SAP region code (SAP:13) mapped through the state alias; PIN 411001 resolves to Pune; District text resolves too; GSTIN stored',r2.s4[4]==='SAP:13'&&r2.g1.st==='27'&&r2.g1.dist==='MH-PUNE'&&r2.g3.dist==='MH-PUNE'&&r2.s4[12]==='27ABCDE1234F1Z5',JSON.stringify([r2.s4,r2.g1,r2.g3]));
+  ok('Unmapped region counts as "state unknown" and is listed',r2.g2.st==='00'&&r2.gaps.n===1&&r2.gaps.regions['99']===1,JSON.stringify([r2.g2,r2.gaps]));
+  /* reverse: a B1 load leaves S/4 customers alone */
+  const r3=await page.evaluate(async()=>{const D=window.__dbg;const r=await D.custFeedLoad({sys:'B1',headers:['CardCode','CardName','CardType','State','ZipCode'],rows:[['VRGLCU000001','B1 Customer','C','Maharashtra','411001']],name:'b1'});return r});
+  await page.waitForTimeout(2500);
+  const r4=await page.evaluate(()=>{const D=window.__dbg;return {s4:!!D.custInfo('50001000'),b1new:D.custInfo('VRGLCU000001'),oldB1:[...D.S.custIdx.keys()].filter(k=>/^DEMO/.test(k)).length}});
+  ok('B1 load replaces only B1 customers: S/4 customers survive, the old B1 set is replaced',r3.ok&&r4.s4&&r4.b1new&&r4.b1new[9]==='411001'&&r4.oldB1===0,JSON.stringify(r4));
+  await page.context().close();
 }
 console.log(res.join('\n'));
 console.log('TOTAL',res.length,'PASS',res.filter(x=>x.startsWith('PASS')).length,'FAIL',res.filter(x=>x.startsWith('FAIL')).length);
