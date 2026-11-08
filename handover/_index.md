@@ -29,5 +29,6 @@ Drafted 20 Oct for M7; each is checked against the page at the acceptance walk-t
 - [Session takeover, 8 Nov 2026](session-takeover-2026-11-08.md) — open threads and next steps at 15:31 IST — active
 
 **Session takeover**
-- [Desk data load and v44, 8 Nov](session-takeover-2026-11-08-desk-load.md) — active
-- [Account takeover](account-takeover.md) — everything another claude.ai account needs to take over, 8 Nov 20:40 IST — active
+- [Account takeover, lane A (Apps Script, SAP, geography)](account-takeover.md) — 8 Nov 20:40 IST — active
+- [Takeover by another Claude account, lane B (claude.ai Desk)](takeover-2026-11-08-new-account.md) — 8 Nov 20:40 IST, QA result and blocked publish — active
+- [Desk data load and v44, 8 Nov 15:35](session-takeover-2026-11-08-desk-load.md) — superseded

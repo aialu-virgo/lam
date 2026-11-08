@@ -1,7 +1,7 @@
 ---
 title: Session takeover — Desk data load and v44 (8 Nov 2026)
 summary: State of the claude.ai Desk sales/credit-note/stock reload, v44 release and Vijay's /exec restore at 15:35 IST, with exact next steps.
-status: active
+status: superseded
 updated: 2026-11-08
 related:
   - handover/_index.md

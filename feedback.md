@@ -11,4 +11,4 @@ related:
 # Feedback
 | Date | Who | Their words | Rule |
 |---|---|---|---|
-| — | — | none yet | — |
+| 2026-11-08 | Vijay | "skip demo push to final version but do as per instructions given" | When Vijay asks for speed on a feature he has specified, build the final version on actual data directly; skip the demo mock-up, keep QA before publish. |
