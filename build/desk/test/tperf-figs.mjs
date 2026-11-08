@@ -2,13 +2,20 @@
  * BASE_DIST = dist/index.html built from the commit before the change; DIST (default) = the new build.
  * Compares, on one synthetic store: the whole roll-up maps (key order included) and the visible text of Overview, Sales, My Dashboard and a drill-down,
  * for (a) the old build, (b) the new build in one pass, (c) the new build forced into the staged path.
- * Usage: BIGSTORE=store.json BASE_DIST=/path/old.html node tperf-figs.mjs */
+ * Usage: BASE_DIST=/path/old.html [BIGSTORE=store.json] node tperf-figs.mjs   (without BIGSTORE a synthetic store is generated) */
 import { chromium, open, dist } from './run.mjs';
 import fs from 'fs';
 import crypto from 'crypto';
-const store = JSON.parse(fs.readFileSync(process.env.BIGSTORE));
+import { execFileSync } from 'child_process';
+import os from 'os';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const here = path.dirname(fileURLToPath(import.meta.url));
 const base = process.env.BASE_DIST;
-if (!base) throw new Error('set BASE_DIST to the old build');
+if (!base || !fs.existsSync(base)) { console.log('SKIP | tperf-figs needs BASE_DIST=<path to the OLD build, e.g. dist/index.html built from 5db7cfe>; nothing compared'); process.exit(0) }
+import { bigStorePath } from './bigstore-util.mjs';
+const bigPath = bigStorePath(80);
+const store = JSON.parse(fs.readFileSync(bigPath));
 const res = []; process.on('exit', () => console.log(res.join('\n')));
 const ok = (n, c, d) => res.push([c ? 'PASS' : 'FAIL', n, d || ''].join(' | '));
 const browser = await chromium.launch();

@@ -2,7 +2,8 @@
  * Injects a fault into a temporary copy of the build (the shipped code has no hook). BIGSTORE=store.json node tperf-fault.mjs */
 import { chromium, open, dist } from './run.mjs';
 import fs from 'fs';
-const store = JSON.parse(fs.readFileSync(process.env.BIGSTORE));
+import { bigStorePath } from './bigstore-util.mjs';
+const store = JSON.parse(fs.readFileSync(bigStorePath(80)));
 const res = []; process.on('exit', () => console.log(res.join('\n')));
 const ok = (n, c, d) => res.push([c ? 'PASS' : 'FAIL', n, d || ''].join(' | '));
 let h = fs.readFileSync(process.env.NEW_DIST || dist, 'utf8');

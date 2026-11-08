@@ -4,7 +4,8 @@
  * Reports: first Overview card, DS ready, longest main-thread stall (long tasks), and whether the page answered a click while loading. */
 import { chromium, open } from './run.mjs';
 import fs from 'fs';
-const store = JSON.parse(fs.readFileSync(process.env.BIGSTORE));
+import { bigStorePath } from './bigstore-util.mjs';
+const store = JSON.parse(fs.readFileSync(bigStorePath(80)));
 const hash = process.argv[2] || '#/overview';
 const browser = await chromium.launch();
 const t0 = Date.now();
