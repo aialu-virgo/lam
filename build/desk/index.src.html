@@ -702,6 +702,7 @@ async function runValidation(){
   function rej(i,doc,line,field,reason,val){res.rejected++;res.reasons[reason]=(res.reasons[reason]||0)+1;if(res.rejects.length<20000)res.rejects.push([i+2,doc,line,field,reason,val==null?'':val])}
   var catSp={},zoneSp={},own=ownNames(),hxp=headerIndex(U.headers),cPos=('place of supply' in hxp)?hxp['place of supply']:-1,linker=null;
   if(sys==='S4'){var blank0=0,cset=new Set();for(var bi=0;bi<n;bi++){if(cSp<0||!String(rows[bi][cSp]==null?'':rows[bi][cSp]).trim()){blank0++;cset.add(String(rows[bi][cCust]).trim())}}if(blank0>0){U.progressMsg='Linking S/4 customers to B1 salespeople...';renderUpload();await tick();linker=await buildB1Linker(cset);res.af.link=linker}}
+  var IIDX=null;try{IIDX=await loadItemIdx()}catch(e){IIDX=null}/* v44 (D55, D65): item thickness and brand come from the item master; the line's zone is kept for the zone rule */
   var T0=Date.now();
   for(i=0;i<n;i++){
     if(Date.now()-T0>40){T0=Date.now();U.progress=Math.round(i/n*100);U.progressMsg='Checking row '+fmtN(i)+' of '+fmtN(n);var bar=$('#i-upload .bar i');if(bar)bar.style.width=U.progress+'%';var pm=$('#i-upload .bar+.note');if(pm)pm.textContent=U.progressMsg;await tick()}
@@ -778,7 +779,7 @@ async function runValidation(){
     if(!xf){G.rows++;G.value+=val;G.sheets+=qty}
     var qk=fyOf(dt.y,dt.m).key,Q=res.quarters[qk]||(res.quarters[qk]={rows:0,plants:new Set(),months:new Set()});Q.rows++;Q.plants.add(pl.plant_code);Q.months.add(ym);
     var pk=pl.plant_code+'|'+ym,P=res.pm.get(pk);
-    if(!P){P={plant:pl.plant_code,ym:ym,agg:new Map(),docs:new Map(),cs:{}};res.pm.set(pk,P)}
+    if(!P){P={plant:pl.plant_code,ym:ym,agg:new Map(),docs:new Map(),cs:{},dim:new Map()};res.pm.set(pk,P)}
     var cust=String(r[cCust]).trim(),cn=cName>=0?String(r[cName]==null?'':r[cName]).trim().slice(0,60):'',sp=cSp>=0?String(r[cSp]==null?'':r[cSp]).trim().slice(0,50):'';
     if(sys==='S4'&&!sp){res.af.blankSp++;if(linker){var lkp=linker.map.get(cust);if(lkp){sp=String(lkp).slice(0,50);res.af.spFilled++}else res.af.spUnlinked++}}
     if(!xf&&sys==='B1'&&own.length){var cnu=cn.toUpperCase();if(own.some(function(o){return cnu.indexOf(o)>=0})){var xo=res.af.xferSuggest[cust]||(res.af.xferSuggest[cust]={name:cn,rows:0,value:0});xo.rows++;xo.value+=val}}
@@ -787,6 +788,7 @@ async function runValidation(){
     var ak=cust+'|'+sp+'|'+grp+'|'+(xf?1:0),A=P.agg.get(ak);
     if(!A){A=[cust,cn,sp,grp,xf?1:0,0,0,0,0,0];P.agg.set(ak,A)}
     A[6]++;A[7]+=qty;A[8]+=sq;A[9]+=val;
+    if(!xf){var dk2=dimKeyOf(IIDX,cItem>=0?r[cItem]:'',grp,zr.z),DA=P.dim.get(dk2.k);if(!DA){DA=[dk2.a,dk2.b,grp,dk2.z,0,0,0,0];P.dim.set(dk2.k,DA)}DA[4]++;DA[5]+=qty;DA[6]+=sq;DA[7]+=val}
     var D=P.docs.get(doc);
     if(!D){D={h:[doc,dt.d,cust,0,0,0,xf?1:0,0,sp,'INV'],ks:[]};P.docs.set(doc,D)}
     D.h[3]++;D.h[4]+=qty;D.h[5]+=val;D.h[7]+=sq;
@@ -810,6 +812,11 @@ async function writeRoll(plant,ym,sys,rows,src,demo){
   if(demo){var ex=S.rollDocs&&S.rollDocs[plant+'-'+ym],cp=S.cells['INV_'+ym]&&S.cells['INV_'+ym].plants&&S.cells['INV_'+ym].plants[plant];if((ex&&!ex.demo)||(cp&&!cp.demo))throw new Error('Demo roll write refused: '+plant+' '+ym)}
   await dset('roll/'+plant+'-'+ym,{plant:plant,ym:ym,sys:sys,n:rows.length,z:await gz(JSON.stringify(rows)),src:src,at:nowISO(),demo:demo||undefined});
 }
+/* v44: item thickness and brand label for the Overview splits (D55); zone digit 1-5 for the zone rule (D65) */
+function dimKeyOf(idx,code,grp,zone){
+  var it=idx&&code!=null?idx.get(String(code).trim().toUpperCase()):null,thk=it&&it[3]!=null&&it[3]>0?(Math.round(it[3]*100)/100).toFixed(2)+' MM':'Unknown',br=it&&it[4]?String(it[4]).trim().slice(0,30):'No brand',zm=/^ZONE([1-5])$/.exec(zone||''),z=zm?zm[1]:'';
+  return {a:thk,b:br||'No brand',z:z,k:thk+'\u0001'+br+'\u0001'+grp+'\u0001'+z};
+}
 async function packChunks(sys,P){
   var agg=[];P.agg.forEach(function(a){agg.push([a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7],Math.round(a[8]*10)/10,Math.round(a[9]*100)/100])});
   var hdr=[];if(U.keepDocs!==false)P.docs.forEach(function(d){var h=d.h;hdr.push([h[0],h[1],h[2],h[3],h[4],Math.round(h[5]*100)/100,h[6],Math.round(h[7]*10)/10,h[8]||'',h[9]||'INV'])});
@@ -823,7 +830,15 @@ async function packChunks(sys,P){
     }else out.push({z:z,na:a.length,nh:h.length});
   }
   await fit(agg,hdr);
-  return out.map(function(c,i){return {id:sys+'-'+P.plant+'-'+P.ym+'-'+i,doc:{z:c.z,na:c.na,nh:c.nh,sys:sys,plant:P.plant,ym:P.ym,i:i,fmt:'gz-json v1: a=[cust,name,salesperson,group,transfer,docs,lines,sheets,sqft,net] h=[doc,day,cust,lines,sheets,net,transfer,sqft,salesperson (v0.9, D10), doc type INV (v0.9); older chunks have 8 fields]'}}});
+  /* v44: thickness / brand / zone detail rides in extra chunks at the end ({a:[],h:[],d:rows}, doc flag dim:true); every older reader ignores them */
+  var dimRows=P.dim?Array.from(P.dim.values()).map(function(d){return [d[0],d[1],d[2],d[3],d[4],d[5],Math.round(d[6]*10)/10,Math.round(d[7]*100)/100]}):[];
+  async function fitD(d){
+    var z=await gz(JSON.stringify({a:[],h:[],d:d}));
+    if(z.length>CHUNK_LIM&&d.length>1){var m=Math.ceil(d.length/2);await fitD(d.slice(0,m));await fitD(d.slice(m))}
+    else out.push({z:z,na:0,nh:0,dim:true,nd:d.length});
+  }
+  if(dimRows.length)await fitD(dimRows);
+  return out.map(function(c,i){return {id:sys+'-'+P.plant+'-'+P.ym+'-'+i,dim:!!c.dim,doc:Object.assign({z:c.z,na:c.na,nh:c.nh,sys:sys,plant:P.plant,ym:P.ym,i:i,fmt:'gz-json v1: a=[cust,name,salesperson,group,transfer,docs,lines,sheets,sqft,net] h=[doc,day,cust,lines,sheets,net,transfer,sqft,salesperson (v0.9, D10), doc type INV (v0.9); older chunks have 8 fields]'},c.dim?{dim:true,dfmt:'[thickness label, brand, group, zone digit or empty, lines, sheets, sqft, net] (v44, external lines only); a and h are empty'}:{})}});
 }
 async function runLoad(opts){
   var r=U.res,sys=U.sys,demo=!!opts.demo,by=whoAmI();
@@ -861,7 +876,7 @@ async function runLoad(opts){
         await Promise.all([0,1,2].map(async function(){while(q.length){var c=q.shift();await dset('inv/'+c.id,Object.assign({demo:demo||undefined,upload:uid},c.doc));cb+=c.doc.z.length;docsW++}}));
         if(old){for(var oi=chunks.length;oi<(old.chunks||0);oi++)stale.push('inv/'+(old.sys||sys)+'-'+P.plant+'-'+ym+'-'+oi);if(old.sys&&old.sys!==sys){for(var oj=0;oj<Math.min(old.chunks||0,chunks.length);oj++)stale.push('inv/'+old.sys+'-'+P.plant+'-'+ym+'-'+oj)}}
         var atNow=nowISO();
-        cell.plants[P.plant]={sys:sys,chunks:chunks.length,docs:docsN,lines:lines,net:Math.round(net),sheets:sheets,bytes:cb,upload:uid,at:atNow,demo:demo||undefined};
+        var dimAt=chunks.findIndex(function(c){return c.dim});cell.plants[P.plant]={sys:sys,chunks:chunks.length,docs:docsN,lines:lines,net:Math.round(net),sheets:sheets,bytes:cb,upload:uid,at:atNow,demo:demo||undefined,dimFrom:dimAt>=0?dimAt:undefined};
         await writeRoll(P.plant,ym,sys,rollRowsOf(P.agg),atNow,demo);
         bytes+=cb;loadedLines+=lines;done++;
       }
@@ -968,7 +983,7 @@ function usersHtml(){
 function plantsHtml(){
   var rows=S.plants.slice().sort(function(a,b){return a.plant_code<b.plant_code?-1:1});
   var nameless=rows.filter(function(p){return !p.plant_name&&!p.b1_bpl_name}).length;
-  return '<section class="card"><div class="hd"><h2>Plants and branches &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="plant-add">Add plant</button><label class="btn sm" for="up-plants" style="cursor:pointer">Upload plant list (CSV)</label><input id="up-plants" data-file="plants" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="plants">Download template</button><button class="btn sm" data-act="plant-reset">Add missing default codes</button></div></div>'
+  return '<section class="card"><div class="hd"><h2>Plants and branches &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="plant-add">Add plant</button><label class="btn sm" for="up-plants" style="cursor:pointer">Upload plant list (CSV)</label><input id="up-plants" data-file="plants" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="plants">Download template</button><button class="btn sm" data-act="plant-reset">Add missing default codes</button><button class="btn sm" data-act="zones-set" title="Zone = the zone on most of a plant sales lines in its last 12 loaded months (D65)">Set zones from sales</button></div></div>'
   +(nameless?'<div class="banner warn">'+nameless+' plant(s) have no name yet. B1 files carry the branch name only, so upload the Plant List (code and name) before loading B1 history. Or give names in the intake step.</div>':'')
   +'<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Zone</th><th>State</th><th>B1 branch name</th><th>Business</th><th>Active</th><th></th></tr></thead><tbody>'
   +rows.map(function(p){return '<tr><td class="mono">'+esc(p.plant_code)+'</td><td>'+esc(p.plant_name||'-')+(p.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(p.plant_type)+'</td><td>'+esc(p.zone||'-')+'</td><td>'+esc(p.state||'-')+'</td><td class="break">'+esc(p.b1_bpl_name||'-')+'</td><td>'+esc(p.business||'laminates')+'</td><td>'+(p.active===false?'<span class="pill mute">Off</span>':'<span class="pill ok">On</span>')+'</td><td><button class="btn sm" data-act="plant-edit" data-id="'+esc(p._id)+'">Edit</button></td></tr>'}).join('')+'</tbody></table></div>'
@@ -1269,6 +1284,7 @@ async function boot(){
     subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
     subscribe('receivables',db.collection('receivables'),function(d){S.recvRaw=d;ingestRecv()});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});
+    subscribe('jobs',db.collection('jobs'),function(d){S.jobs=d;jobSchedule()});
     subscribe('backups',db.collection('backups'),function(d){S.backups=d;bkSchedule()});
     subscribe('customers',db.collection('customers'),function(d){S.custRaw=d;ingestCust()});
     subscribe('creditnotes',db.collection('creditnotes'),function(d){S.cnRaw=d;ingestCN()});
@@ -1279,7 +1295,7 @@ async function boot(){
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},oxBand:oxBand,oxBandChip:oxBandChip,dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},oxBand:oxBand,runJobs:runJobs,oxBandChip:oxBandChip,dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
 boot();
 })();
 </script>

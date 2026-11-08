@@ -184,6 +184,7 @@ async function loadDocs(ctx,ym,cust,plant,key,spF){
     for(var i=0;i<ps.length;i++){var info=c.plants[ps[i]];
       for(var k=0;k<(info.chunks||0);k++){
         var snap=await dget('inv/'+info.sys+'-'+ps[i]+'-'+ym+'-'+k);if(!snap.exists)continue;var o=JSON.parse(await ungz(snap.data().z));
+        if(snap.data().dim)continue;/* v44 thickness/brand detail chunk: no documents */
         if(!snap.data().nh)noIndex=true;
         o.h.forEach(function(h){
           if(h[6])return;if(cust&&h[2]!==cust)return;

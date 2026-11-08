@@ -37,6 +37,9 @@ related:
 | Sun 8 Nov 13:00 | S/4 OData feed: mapping (Data Architect), then Apps Script connector on a mock SAP, QA passed (D73) | Data Architect + Full-Stack Engineer | mapping done; built on mock, fast QA passed, files sent 00:35 Sun (D74; Vijay moved deadline to 00:52); sync locked until dry run matches |
 | Sun 8 Nov 15:00 | Targets & Potential by State → District: model change + mock-up for approval (D77) | Data Architect + Product Designer | model done (D79); mock-up blind check passed round 2, published 12:12 for approval |
 | Sun 8 Nov 16:45 (was 18:00; Vijay asked earlier) | Targets & Potential by State built (D80), QA passed, claude.ai Desk + Apps Script files sent | Full-Stack Engineer + Engineering QA | built; QA round 1 passed except C6, fixed 3348da8; re-check due 16:30; takeover note [handover/session-takeover-2026-11-08.md](handover/session-takeover-2026-11-08.md) |
+| Sun 8 Nov 13:00 | v43: admin job queue; recovery Undo + Clear demo queued by Delivery Lead (D86) | Full-Stack Engineer | v43 live (version 46); jobs ran 12:21–12:36 IST (D88) |
+| After Vijay opens the Desk | Sales Apr 2025–Sep 2026 restored; credit notes written and locked | Delivery Lead | done 12:40 IST (D88) |
+| Sun 8 Nov 18:00 | v44: thickness, brand, collections, branch-rating cards; zones from sales (D84, D85) | Full-Stack Engineer | built, tests run (D89); awaiting QA and publish |
 
 ## Milestones
 **M0 Discovery**
@@ -57,6 +60,6 @@ related:
 
 **M5 v1.0** — [x] QA fixes (acceptance fixes after 11:30 if any) · [x] published and tagged (D22)
 
-**M6 QA pass + acceptance** — [ ] all 12 checks pass ([Brief Part B — design inputs](design/brief-part-b.md) §8) · [ ] SP Sir accepts · [ ] first real B1 upload by Virgo users
+**M6 QA pass + acceptance** — [ ] all 12 checks pass ([Brief Part B — design inputs](design/brief-part-b.md) §8) · [x] SP Sir accepts (D67, relayed by Vijay 8 Nov) · [ ] first real B1 upload by Virgo users
 
 **M7 Handover** — [x] role guides + admin guide (drafts) · [ ] walkthrough in [handover/](handover/_index.md) · [x] S/4HANA switch notes

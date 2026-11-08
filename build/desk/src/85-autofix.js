@@ -550,19 +550,32 @@ Object.assign(handlers,{
  'bulk-go':async function(){
   if(!superOnly('undo uploads'))return;
   var list=bulkSelected(),out=document.getElementById('bulk-out'),btn=document.getElementById('bulk-go');if(btn)btn.disabled=true;
-  var o1=openDlg,c1=closeDlg,done=[];
-  for(var i=0;i<list.length;i++){
-    var cap='';openDlg=function(h){cap=h};closeDlg=function(){};
-    var err=null;
-    try{await undoUpload(list[i]._id)}catch(e){err=dbErrText(e)}
-    openDlg=o1;closeDlg=c1;
-    var de=document.getElementById('d-err');if(!err&&de&&/Undo stopped/.test(de.textContent)){err=de.textContent.replace(/^[\s\S]*?Undo stopped:\s*/,'').trim();de.innerHTML=''}
-    if(!err&&/Undo stopped/.test(cap)){var m=/Undo stopped: ([^<]*)/.exec(cap);err=m?m[1]:'Undo stopped'}
-    if(err){if(out)out.innerHTML='<div class="banner err" style="display:block"><b>Stopped at '+esc(list[i].file||list[i]._id)+'.</b> '+esc(err)+' '+done.length+' of '+list.length+' were undone; nothing after this one was touched.</div>'+(done.length?'<p class="note">Undone: '+esc(done.join(', '))+'</p>':'');return}
-    done.push(list[i].file||list[i]._id);delete S.hist.sel[list[i]._id];
-    if(out)out.innerHTML='<div class="note">'+done.length+' of '+list.length+' undone...</div>';
-  }
-  S.hist.sig='';if(out)out.innerHTML='<div class="banner ok" style="display:block"><b>All '+list.length+' undone</b> (newest first): '+esc(done.join(', '))+'.</div>';
+  var r=await undoBulkRun(list,function(n){if(out)out.innerHTML='<div class="note">'+n+' of '+list.length+' undone...</div>'});
+  r.done.forEach(function(f,k){delete S.hist.sel[list[k]._id]});
+  if(r.stopped){if(out)out.innerHTML='<div class="banner err" style="display:block"><b>Stopped at '+esc(r.stopped.file||r.stopped.id)+'.</b> '+esc(r.stopped.msg)+' '+r.done.length+' of '+list.length+' were undone; nothing after this one was touched.</div>'+(r.done.length?'<p class="note">Undone: '+esc(r.done.join(', '))+'</p>':'');return}
+  S.hist.sig='';if(out)out.innerHTML='<div class="banner ok" style="display:block"><b>All '+list.length+' undone</b> (newest first): '+esc(r.done.join(', '))+'.</div>';
   var bb=$('#hist-bulk');if(bb)bb.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')';
  }
 });
+
+/* the one bulk-undo loop, used by the "Undo selected" dialog and by queued jobs: newest first, through the integrity-checked undoUpload, stop at the first failure */
+async function undoBulkRun(list,progress){
+  var o1=openDlg,c1=closeDlg,done=[],results=[],tmp=null;
+  if(!document.getElementById('d-err')){tmp=document.createElement('div');tmp.id='d-err';tmp.style.display='none';document.body.appendChild(tmp)}
+  try{
+    for(var i=0;i<list.length;i++){
+      var u=list[i],hadBk=bkHas(u._id),cap='',err=null;
+      openDlg=function(h){cap=h};closeDlg=function(){};
+      try{await undoUpload(u._id)}catch(e){err=dbErrText(e)}
+      openDlg=o1;closeDlg=c1;
+      var de=document.getElementById('d-err');if(!err&&de&&/Undo stopped/.test(de.textContent)){err=de.textContent.replace(/^[\s\S]*?Undo stopped:\s*/,'').trim()}
+      if(de)de.innerHTML='';
+      if(!err&&/Undo stopped/.test(cap)){var m=/Undo stopped: ([^<]*)/.exec(cap);err=m?m[1]:'Undo stopped'}
+      if(err){results.push({id:u._id,file:u.file||'',text:'stopped: '+err});return {done:done,results:results,stopped:{id:u._id,file:u.file,msg:err}}}
+      var units=(S.bkLast&&S.bkLast.units)||0;
+      results.push({id:u._id,file:u.file||'',text:hadBk&&units>0?'restored '+units+' plant-month'+(units===1?'':'s'):(hadBk?'removed (backup held nothing to restore)':'removed, no backup')});
+      done.push(u.file||u._id);if(progress)progress(done.length);
+    }
+    return {done:done,results:results,stopped:null};
+  }finally{openDlg=o1;closeDlg=c1;if(tmp)tmp.remove()}
+}

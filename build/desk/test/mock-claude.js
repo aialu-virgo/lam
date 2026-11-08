@@ -14,6 +14,7 @@ function dfz(o){if(o&&typeof o==='object'){Object.freeze(o);Object.keys(o).forEa
   var db={collection:function(c){return query(c)},doc:function(path){return {get:async function(){await new Promise(function(r){setTimeout(r,0)});var e=path in store;return {id:path.slice(path.lastIndexOf('/')+1),exists:e,data:function(){return dfz(clone(store[path]))}}},
     set:async function(d){await new Promise(function(r){setTimeout(r,0)});if(MODE.failSet&&new RegExp(MODE.failSet).test(path))throw {code:'unavailable',message:'write failed'};if(JSON.stringify(d).length>262144)throw {code:'invalid_argument',message:'too large'};store[path]=clone(d);notify(parent(path))},
     update:async function(d){if(!(path in store))throw {code:'invalid_argument',message:'missing'};store[path]=Object.assign({},store[path],clone(d));notify(parent(path))},
+    acquire:async function(o){var L=(window.__leases=window.__leases||{}),now=Date.now(),l=L[path];if(l&&l.exp>now&&l.holder!==o.holder)return {acquired:false,expiresAt:new Date(l.exp).toISOString()};var ttl=Math.min(600000,Math.max(1000,o.ttlMs||30000));L[path]={holder:o.holder,exp:now+ttl};return {acquired:true,version:1,holder:o.holder,expiresAt:new Date(now+ttl).toISOString()}},
     delete:async function(){delete store[path];notify(parent(path))}}}};
   window.__mockStore=function(){return clone(store)};
   window.__saved=[];

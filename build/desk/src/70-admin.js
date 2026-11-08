@@ -242,9 +242,9 @@ async function demoMasters(){
   }
   if(!S.itemMeta){
     var items=[],sizes=[['8X4',32],['7X3',21],['6X4',24]],g=0;
-    for(var i=1;i<=24;i++){var z=sizes[i%3];items.push(['DEMOFG'+pad(i,5),i%6===0?1:0,z[1],i%2?1:0.8,'Pcs',true,z[0]])}
+    for(var i=1;i<=24;i++){var z=sizes[i%3];items.push(['DEMOFG'+pad(i,5),i%6===0?1:0,z[1],i%2?1:0.8,'Pcs',true,z[0],'DEMO Brand '+'ABCD'[i%4]])}
     var uid2='udemoi'+Date.now().toString(36);
-    await dset('items/c0',{z:await gz(JSON.stringify(items)),n:items.length,i:0,at:now,by:by,fmt:'gz-json v1: [code,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sqft per sheet,thickness mm,uom,active,size]',demo:true});
+    await dset('items/c0',{z:await gz(JSON.stringify(items)),n:items.length,i:0,at:now,by:by,fmt:'gz-json v1: [code,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sqft per sheet,thickness mm,uom,active,size,brand]',demo:true});
     await dset('itemmeta/main',{at:now,by:by,file:'DEMO items (synthetic)',sheet:'DEMO',read:items.length,loaded:items.length,out_of_scope:0,rejected:0,warned:0,by_group:{Laminate:20,Door:4},chunks:1,upload:uid2,demo:true});
     await dset('uploads/'+uid2,{at:now,by:by,sys:'B1',entity:'IT',file:'DEMO items (synthetic)',size:0,mode:'master',periodLabel:'Item master snapshot',read:items.length,loaded:items.length,rejected:0,warned:0,status:'Loaded',demo:true});
   }
