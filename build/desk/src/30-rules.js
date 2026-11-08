@@ -119,10 +119,10 @@ function evalR8(){
     var act=sumF(f,w).n;
     if(pw.tgt>0&&achCap(act/pw.tgt*100))out.push(mkCand('R8',plant+'_'+g,q,{title:'Check target · '+where,plant:plant,group:g,value:act-pw.tgt,ctx:{plant:plant},
       source:{label:'Rule R8 · achievement is over '+ACH_MAX+'% of the target',page:'overview',plant:plant,group:g},
-      next:'Achievement is over '+ACH_MAX+'% of the target: check the target ('+where+'). Open Admin › Market potential, then correct the target or confirm it is real.',meta:{kind:'target'}}));
+      next:'Achievement is over '+ACH_MAX+'% of the target: check the target ('+where+'). Open Plan › Targets & Potential, then correct the target or confirm it is real.',meta:{kind:'target'}}));
     if(pw.pot>0&&achCap(act/pw.pot*100))out.push(mkCand('R8',plant+'_'+g+'_pot',q,{title:'Check potential · '+where,plant:plant,group:g,value:act-pw.pot,ctx:{plant:plant},
       source:{label:'Rule R8 · share of potential is over '+ACH_MAX+'%',page:'overview',plant:plant,group:g},
-      next:'Share of potential is over '+ACH_MAX+'%: check the potential ('+where+'). Open Admin › Market potential, then correct the potential or confirm it is real.',meta:{kind:'potential'}}));
+      next:'Share of potential is over '+ACH_MAX+'%: check the potential ('+where+'). Open Plan › Targets & Potential, then correct the potential or confirm it is real.',meta:{kind:'potential'}}));
   })});
   return {out:out,live:null};
 }

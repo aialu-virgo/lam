@@ -55,40 +55,37 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  const after=await page.evaluate(()=>window.__dbg.S.actions.find(a=>a.id==='DEMO_A5').status);ok('preview cannot save a response',before===after,before+'->'+after);
  const logged=await page.evaluate(()=>window.__mockStore());ok('view-as is logged',Object.keys(logged).some(k=>k.startsWith('log/va')),'');
  await page.context().close()}
-/* ---- plan workflow (check 11) ---- */
+/* ---- plan workflow (check 11), now in the Targets & Potential tab (D70) ---- */
 {const st=JSON.parse(JSON.stringify(store));
  const {page}=await open(browser,{store:st,viewer:{email:'bm.a@demo',name:'BM'}});await page.waitForTimeout(2500);
  const key='fy27_q3_1012_laminate_dealer';
  const get=()=>page.evaluate(k=>window.__dbg.S.potential.find(p=>p._id===k),key);
+ const edit=async(p,f,v)=>{await p.fill('#tp-'+f+'-'+key,v);await p.dispatchEvent('#tp-'+f+'-'+key,'change');await p.waitForTimeout(250)};
  let x=await get();ok('seeded leaf is approved with original',x&&x.status==='Approved'&&x.original&&x.approved,x&&x.status);
- await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(500);
- await page.evaluate(k=>{document.querySelector('[data-act="pot-edit"][data-id="'+k+'"]').click()},key);await page.waitForTimeout(400);
- const dlg=await page.innerText('#dlg');ok('dialog shows sense-check and revision log',/Sense-check/i.test(dlg)&&/Revision log/i.test(dlg),dlg.slice(0,60));
- await page.fill('#d-sh','12');await page.click('[data-act="pot-save"]');await page.waitForTimeout(300);
- let er=await page.innerText('#d-err');ok('revision without reason refused',/Reason is required/.test(er),er);
- await page.fill('#d-reason','dealer survey up');await page.fill('#d-part','Branch team');await page.click('[data-act="pot-save"]');await page.waitForTimeout(700);
+ await page.evaluate(()=>{location.hash='#/targets'});await page.waitForTimeout(900);
+ const trail=await page.evaluate(()=>{const d=document.querySelector('details.tp-row');d.open=true;return d.innerText});
+ ok('row detail shows revision trail and sense-check',/Revision trail/i.test(trail)&&/Sense-check/i.test(trail),trail.slice(0,200));
+ await edit(page,'share','12');await page.click('[data-act="tp-save"]');await page.waitForTimeout(700);
  x=await get();const apT=x.approved.share_pct;ok('new revision is Draft; current approved target unchanged; original kept',x.status==='Draft'&&apT===8&&x.original.share_pct===8&&x.share_pct===12,JSON.stringify([x.status,apT,x.original.share_pct]));
- const tgtApproved=await page.evaluate(()=>window.__dbg.planQ({plants:null},'FY27-Q3').tgt);
- /* proposer cannot approve; advance */
- await page.evaluate(k=>window.__desk&&0,key);
- await page.evaluate(k=>{document.querySelector('[data-act="pot-edit"][data-id="'+k+'"]').click()},key);await page.waitForTimeout(300);
- await page.click('[data-act="pot-adv"]');await page.waitForTimeout(500);x=await get();ok('Draft -> Discussed (reason/date/participants present)',x.status==='Discussed',x.status);
- await page.evaluate(k=>{document.querySelector('[data-act="pot-edit"][data-id="'+k+'"]').click()},key);await page.waitForTimeout(300);
- await page.click('[data-act="pot-adv"]');await page.waitForTimeout(500);x=await get();ok('Branch manager cannot approve (stays Discussed)',x.status==='Discussed',x.status);
+ await page.click('[data-act="tp-submit"]');await page.waitForSelector('#tp-s-reason');await page.click('[data-act="tp-submit-go"]');await page.waitForTimeout(300);
+ let er=await page.innerText('#d-err');ok('submit without reason refused',/reason is required/i.test(er),er);
+ await page.fill('#tp-s-reason','dealer survey up');await page.fill('#tp-s-part','Branch team');await page.click('[data-act="tp-submit-go"]');await page.waitForTimeout(700);
+ x=await get();ok('Draft -> Discussed (reason/date/participants present)',x.status==='Discussed',x.status);
+ const bmAp=await page.evaluate(k=>{const D=window.__dbg;return D.advanceDoc(D.S.potential.find(p=>p._id===k),D.effUser())},key);
+ ok('Branch manager cannot approve (stays Discussed)',/Approval is by SP Sir/.test(bmAp.err||'')&&!(await page.$('[data-act="tp-approve"]')),JSON.stringify(bmAp.err));
  const store2=await page.evaluate(()=>window.__mockStore());await page.context().close();
  /* SP Sir approves */
  const {page:p2}=await open(browser,{store:store2,viewer:{email:'spa@virgoasia.com',name:'SP Sir'}});await p2.waitForTimeout(2500);
- await p2.evaluate(()=>{location.hash='#/admin'});await p2.waitForTimeout(500);await p2.click('[data-t="potential"]').catch(()=>{});await p2.waitForTimeout(300);
- await p2.evaluate(k=>{document.querySelector('[data-act="pot-edit"][data-id="'+k+'"]').click()},key);await p2.waitForTimeout(300);
- await p2.click('[data-act="pot-adv"]');await p2.waitForTimeout(600);
+ await p2.evaluate(()=>{location.hash='#/targets'});await p2.waitForTimeout(900);
+ await p2.check('[data-tp="sel"][data-key="'+key+'"]');await p2.click('[data-act="tp-approve"]');await p2.waitForTimeout(700);
  x=await p2.evaluate(k=>window.__dbg.S.potential.find(p=>p._id===k),key);
  ok('SP Sir approves -> current 12%, original stays 8%',x.status==='Approved'&&x.approved.share_pct===12&&x.original.share_pct===8,JSON.stringify([x.status,x.approved&&x.approved.share_pct,x.original&&x.original.share_pct]));
  /* lock quarter, then edit refused */
- await p2.evaluate(()=>{document.querySelector('[data-act="plan-lock"][data-q="FY27-Q3"]').click()});await p2.waitForTimeout(3500);
+ await p2.click('[data-act="tp-lock-open"]');await p2.waitForSelector('[data-act="tp-lock-go"]');await p2.click('[data-act="tp-lock-go"]');await p2.waitForTimeout(3500);
  const lk=await p2.evaluate(()=>[window.__dbg.S.periods['FY27-Q3']&&window.__dbg.S.periods['FY27-Q3'].plan_locked,window.__dbg.S.potential.filter(p=>p.fy_quarter==='FY27-Q3'&&p.status==='Locked').length]);
  ok('Lock quarter freezes Approved targets',lk[0]===true&&lk[1]>0,JSON.stringify(lk));
- await p2.evaluate(k=>{document.querySelector('[data-act="pot-edit"][data-id="'+k+'"]').click()},key);await p2.waitForTimeout(300);
- const dd=await p2.innerText('#dlg');ok('locked quarter dialog is read-only (no save button)',/locked/i.test(dd)&&!/Save revision/.test(dd),'');
+ const dd=await p2.evaluate(()=>({inputs:document.querySelectorAll('[data-tp="pot"],[data-tp="share"]').length,bar:document.querySelector('.tp-sticky').innerText}));
+ ok('locked quarter is read-only (no inputs, no save button)',dd.inputs===0&&/locked/i.test(dd.bar)&&!/Save draft/.test(dd.bar),JSON.stringify(dd));
  await p2.context().close()}
 console.log(res.join('\n'));
 await browser.close();

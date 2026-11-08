@@ -5377,6 +5377,7 @@ function bannersHtml(){
   if(lsGet('desk-today'))h+='<div class="banner info"><span>Test clock: today is set to <b>'+esc(fmtDate(TODAY()))+'</b> for this browser only (Admin › Settings).</span><button class="btn sm" data-act="clock-reset">Use the real date</button></div>';
   if(DS.custJobs>0)h+='<div class="banner info">Reading customer detail '+DS.custDone+' of '+DS.custJobs+'...</div>';
   if(DS.status&&DS.status!=='ready'&&DS.status!=='idle')h+='<div class="banner info">'+esc(DS.status)+'</div>';
+  if(S.jobBanner)h+='<div class="banner '+(S.jobBannerOk?'ok':'err')+'"><span>'+esc(S.jobBanner)+'</span><button class="btn sm" data-act="job-dismiss">Dismiss</button></div>';
   if(S.err)h+='<div class="banner err">Database message: '+esc(S.err)+'</div>';
   return h;
 }
@@ -6086,22 +6087,35 @@ Object.assign(handlers,{
  'bulk-go':async function(){
   if(!superOnly('undo uploads'))return;
   var list=bulkSelected(),out=document.getElementById('bulk-out'),btn=document.getElementById('bulk-go');if(btn)btn.disabled=true;
-  var o1=openDlg,c1=closeDlg,done=[];
-  for(var i=0;i<list.length;i++){
-    var cap='';openDlg=function(h){cap=h};closeDlg=function(){};
-    var err=null;
-    try{await undoUpload(list[i]._id)}catch(e){err=dbErrText(e)}
-    openDlg=o1;closeDlg=c1;
-    var de=document.getElementById('d-err');if(!err&&de&&/Undo stopped/.test(de.textContent)){err=de.textContent.replace(/^[\s\S]*?Undo stopped:\s*/,'').trim();de.innerHTML=''}
-    if(!err&&/Undo stopped/.test(cap)){var m=/Undo stopped: ([^<]*)/.exec(cap);err=m?m[1]:'Undo stopped'}
-    if(err){if(out)out.innerHTML='<div class="banner err" style="display:block"><b>Stopped at '+esc(list[i].file||list[i]._id)+'.</b> '+esc(err)+' '+done.length+' of '+list.length+' were undone; nothing after this one was touched.</div>'+(done.length?'<p class="note">Undone: '+esc(done.join(', '))+'</p>':'');return}
-    done.push(list[i].file||list[i]._id);delete S.hist.sel[list[i]._id];
-    if(out)out.innerHTML='<div class="note">'+done.length+' of '+list.length+' undone...</div>';
-  }
-  S.hist.sig='';if(out)out.innerHTML='<div class="banner ok" style="display:block"><b>All '+list.length+' undone</b> (newest first): '+esc(done.join(', '))+'.</div>';
+  var r=await undoBulkRun(list,function(n){if(out)out.innerHTML='<div class="note">'+n+' of '+list.length+' undone...</div>'});
+  r.done.forEach(function(f,k){delete S.hist.sel[list[k]._id]});
+  if(r.stopped){if(out)out.innerHTML='<div class="banner err" style="display:block"><b>Stopped at '+esc(r.stopped.file||r.stopped.id)+'.</b> '+esc(r.stopped.msg)+' '+r.done.length+' of '+list.length+' were undone; nothing after this one was touched.</div>'+(r.done.length?'<p class="note">Undone: '+esc(r.done.join(', '))+'</p>':'');return}
+  S.hist.sig='';if(out)out.innerHTML='<div class="banner ok" style="display:block"><b>All '+list.length+' undone</b> (newest first): '+esc(r.done.join(', '))+'.</div>';
   var bb=$('#hist-bulk');if(bb)bb.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')';
  }
 });
+
+/* the one bulk-undo loop, used by the "Undo selected" dialog and by queued jobs: newest first, through the integrity-checked undoUpload, stop at the first failure */
+async function undoBulkRun(list,progress){
+  var o1=openDlg,c1=closeDlg,done=[],results=[],tmp=null;
+  if(!document.getElementById('d-err')){tmp=document.createElement('div');tmp.id='d-err';tmp.style.display='none';document.body.appendChild(tmp)}
+  try{
+    for(var i=0;i<list.length;i++){
+      var u=list[i],hadBk=bkHas(u._id),cap='',err=null;
+      openDlg=function(h){cap=h};closeDlg=function(){};
+      try{await undoUpload(u._id)}catch(e){err=dbErrText(e)}
+      openDlg=o1;closeDlg=c1;
+      var de=document.getElementById('d-err');if(!err&&de&&/Undo stopped/.test(de.textContent)){err=de.textContent.replace(/^[\s\S]*?Undo stopped:\s*/,'').trim()}
+      if(de)de.innerHTML='';
+      if(!err&&/Undo stopped/.test(cap)){var m=/Undo stopped: ([^<]*)/.exec(cap);err=m?m[1]:'Undo stopped'}
+      if(err){results.push({id:u._id,file:u.file||'',text:'stopped: '+err});return {done:done,results:results,stopped:{id:u._id,file:u.file,msg:err}}}
+      var units=(S.bkLast&&S.bkLast.units)||0;
+      results.push({id:u._id,file:u.file||'',text:hadBk&&units>0?'restored '+units+' plant-month'+(units===1?'':'s'):(hadBk?'removed (backup held nothing to restore)':'removed, no backup')});
+      done.push(u.file||u._id);if(progress)progress(done.length);
+    }
+    return {done:done,results:results,stopped:null};
+  }finally{openDlg=o1;closeDlg=c1;if(tmp)tmp.remove()}
+}
 
 /* ---- src/86-backup.js ---- */
 /* ================= Backups for replacing uploads (D45, 23 Oct 2026) =================
@@ -6251,6 +6265,54 @@ function bkDialogNote(uid){
   var e=document.getElementById('d-err');if(e)e.insertAdjacentHTML('beforebegin','<div class="banner ok" style="display:block"><b>Undo restores the previous data.</b> A copy taken before this upload replaced it is held for '+BK_DAYS+' days.</div>');
 }
 
+/* ---- src/87-jobs.js ---- */
+/* ================= Admin job queue (D64, 8 Nov 2026) =================
+ * jobs/<id> = {type:'undo'|'clear_demo'|'set_zones', uploads:[ids] (undo), requested_by, requested_at, reason, status:'queued'}.
+ * A Super admin's page runs queued jobs in requested_at order about 4 s after load. A job runs once: the doc is claimed with a lease
+ * (the platform's single-writer primitive) and its status is re-read and set to 'running' before anything starts, so two open tabs cannot both run it.
+ * Undo jobs go newest first through the integrity-checked bulk Undo (stop at the first failure or incomplete backup, locks respected).
+ * The result is written back (status done or failed, per-upload results, finished_at) with an audit entry and a banner. */
+S.jobs=[];S.jobBusy=false;S.jobBanner='';S.jobTab='tab'+Math.random().toString(36).slice(2,8);
+var jobTimer=0;
+function jobSchedule(){clearTimeout(jobTimer);jobTimer=setTimeout(function(){runJobs(S.jobTab)},4000)}
+async function jobExec(j){
+  if(j.type==='undo'){
+    var ids=(j.uploads||[]).slice(),list=[],skipped=[],missing=[];
+    ids.forEach(function(id){var u=S.uploads.find(function(x){return x._id===id});if(!u)missing.push(id);else if(u.status==='Undone')skipped.push({id:id,file:u.file||'',text:'already undone'});else list.push(u)});
+    list.sort(function(a,b){return a.at<b.at?1:-1});
+    if(missing.length)return {ok:false,error:'upload(s) not found in the upload history: '+missing.join(', ')+'. Nothing was changed.',results:skipped};
+    var r=await undoBulkRun(list);
+    var res=skipped.concat(r.results);
+    return r.stopped?{ok:false,error:'stopped at '+(r.stopped.file||r.stopped.id)+': '+r.stopped.msg+' ('+r.done.length+' of '+list.length+' done, the rest untouched)',results:res}:{ok:true,results:res};
+  }
+  if(j.type==='clear_demo'){await demoClear();return {ok:true,results:[{text:'demo data cleared'}]}}
+  if(j.type==='set_zones'){var z=await setZonesFromSales();return {ok:true,results:[{text:z.text}],zones:z.set}}
+  return {ok:false,error:'unknown job type '+j.type,results:[]};
+}
+async function runJobs(holder,opts){
+  if(readOnly()||effRole()!=='Super admin'||!S.loaded.uploads)return 0;
+  if(S.jobBusy&&!(opts&&opts.otherTab))return 0;
+  S.jobBusy=true;var ran=0;
+  try{
+    var q=S.jobs.filter(function(j){return j.status==='queued'}).sort(function(a,b){return (a.requested_at||'')<(b.requested_at||'')?-1:1});
+    for(var k=0;k<q.length;k++){
+      var id=q[k]._id,ref=S.db.doc('jobs/'+id),ac=await ref.acquire({holder:holder,ttlMs:600000});
+      if(!ac.acquired)continue;
+      var snap=await ref.get(),cur=snap.exists?snap.data():null;if(!cur||cur.status!=='queued')continue;
+      await ref.update({status:'running',started_at:nowISO(),started_by:whoAmI(),runner:holder});
+      var out;try{out=await jobExec(cur)}catch(e){out={ok:false,error:dbErrText(e),results:[]}}
+      await ref.update({status:out.ok?'done':'failed',results:out.results||[],error:out.error||null,finished_at:nowISO()});
+      await auditW('admin job '+(out.ok?'done':'failed'),cur.type,{job:id,type:cur.type,reason:(cur.reason||'').slice(0,200),requested_by:cur.requested_by||'',error:(out.error||'').slice(0,300),results:(out.results||[]).slice(0,40).map(function(r){return (r.file||r.id||'')+': '+r.text})});
+      S.jobBanner='Ran queued admin job: '+cur.type+(cur.type==='undo'?' ('+(cur.uploads||[]).length+' upload'+((cur.uploads||[]).length===1?'':'s')+')':'')+' · '+(out.ok?'done':'FAILED')+(out.error?' · '+out.error:'')+(cur.reason?' · reason: '+cur.reason:'');
+      S.jobBannerOk=!!out.ok;ran++;S.lastHtml='';schedule();
+    }
+  }finally{S.jobBusy=false}
+  return ran;
+}
+Object.assign(handlers,{'job-dismiss':function(){S.jobBanner='';S.lastHtml='';schedule()}});
+/* set_zones arrives with the zone work (v44); a queued job of that type fails cleanly until then */
+if(typeof setZonesFromSales==='undefined'){var setZonesFromSales=async function(){throw new Error('set_zones is not available in this version')}}
+
 /* ---- src/99-expose.js ---- */
 /* test hooks (read-only helpers for the self-test; no data) */
 window.__dbg={loadItemIdx:loadItemIdx,stockDays:stockDays,dailySheets:dailySheets,demoLoad:demoLoad,demoClear:demoClear,hasRealData:hasRealData,S:S,DS:DS,CFG:CFG,sumF:sumF,quarterSeries:quarterSeries,trendStats:trendStats,stretchOf:stretchOf,planQ:planQ,planW:planW,resolvePeriod:resolvePeriod,qoqOf:qoqOf,walk:walk,WD:WD,wdBetween:wdBetween,scoreOf:scoreOf,rankSort:rankSort,TODAY:TODAY,qMonths:qMonths,monthsLoaded:monthsLoaded,viewCtx:viewCtx,figs:figs,priorMonth:priorMonth,closedQuarters:closedQuarters,curQuarterKey:curQuarterKey,effUser:effUser,buildDraft:buildDraft,custAgg:custAgg,loadCust:loadCust,classMap:classMap,todayCandidates:todayCandidates,capFor:capFor,scopeOf:scopeOf,fillTpl:fillTpl,addDays:addDays,addWD:addWD,hashRef:hashRef,runLadder:runLadder,runEngine:runEngine,kpiCompute:kpiCompute,itemsHtml:itemsHtml,sempHtml:sempHtml,spMatch:spMatch,spCanon:spCanon,SM:SM,matchStats:matchStats,unmatchedSp:unmatchedSp,nameKey:nameKey};
@@ -6300,6 +6362,7 @@ async function boot(){
     subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
     subscribe('receivables',db.collection('receivables'),function(d){S.recvRaw=d;ingestRecv()});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});
+    subscribe('jobs',db.collection('jobs'),function(d){S.jobs=d;jobSchedule()});
     subscribe('backups',db.collection('backups'),function(d){S.backups=d;bkSchedule()});
     subscribe('customers',db.collection('customers'),function(d){S.custRaw=d;ingestCust()});
     subscribe('creditnotes',db.collection('creditnotes'),function(d){S.cnRaw=d;ingestCN()});
@@ -6310,7 +6373,7 @@ async function boot(){
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},oxBand:oxBand,oxBandChip:oxBandChip,dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},oxBand:oxBand,runJobs:runJobs,oxBandChip:oxBandChip,dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
 /* ===== DEMO RUNTIME (replaces the platform db and user layer with an in-browser store; no network, no sign-in) ===== */
 var DM_PW='Demo@123';
 var DM_ACCTS=[

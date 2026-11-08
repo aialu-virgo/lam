@@ -3,7 +3,7 @@ S.adminTab='users';S.rbBusy=false;
 function adminTabs(){
   var r=effRole();
   if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['customers','Customers'],['aliases','Aliases'],['settings','Rules & settings'],['tools','Tools']];
-  return [['potential','Market potential']];
+  return [['users','Users']];
 }
 function buildAdmin(){
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
@@ -19,32 +19,33 @@ function refreshAdmin0(){
   if(el.getAttribute('data-h')!==String(html.length)+t||(t!=='settings'&&t!=='aliases')){el.innerHTML=html;el.setAttribute('data-h',String(html.length)+t)}
   if(focusId){var f=document.getElementById(focusId);if(f&&f.focus){f.focus();try{var v=f.value;if(f.setSelectionRange&&f.type!=='number'&&f.type!=='email'&&f.type!=='date')f.setSelectionRange(v.length,v.length)}catch(e){}}}
 }
-/* ---- plan permissions ---- */
+/* ---- plan permissions (one home for the P1 rules; the Targets & Potential tab and the CSV upload both call these) ---- */
 function planVisible(x){var sc=SC();if(!sc.plants)return true;return !!x.plant_code&&sc.plants.has(x.plant_code)}
+/* who may propose a sales target: Branch manager (own plants), Management / HO, Super admin. HOD and Sales executive view only (D70). */
 function planGuard(x){
   var u=effUser();if(readOnly())return 'Viewing as another user: preview is read-only';
-  if(['Super admin','Management / HO','HOD','Branch / depot manager'].indexOf(u.role)<0)return 'Your role cannot propose or approve sales targets';
+  if(['Super admin','Management / HO','Branch / depot manager'].indexOf(u.role)<0)return 'Your role cannot propose or approve sales targets';
   if(u.role==='Branch / depot manager'&&(!x.plant_code||!holdsPlant(u,x.plant_code)))return 'A Branch manager proposes targets for own plants only';
   return '';
 }
-function proposerOf(x){var rv=(x.revisions||[]).filter(function(r){return r.status==='Draft'}).slice(-1)[0];return rv?rv.by:''}
-async function advancePot(id){
-  var x=S.potential.find(function(p){return p._id===id});if(!x)return;var u=effUser();
-  var g=planGuard(x);if(g){toast(g);return}
-  if(isPlanLocked(x.fy_quarter)){toast('That quarter is locked');return}
-  var nx={Draft:'Discussed',Discussed:'Approved'}[x.status];if(!nx){toast(x.status==='Approved'?'Use Lock quarter to freeze approved targets':'Nothing further');return}
-  var last=(x.revisions||[]).slice(-1)[0]||{};
-  if(nx==='Discussed'){var lastDraft=(x.revisions||[]).filter(function(r){return r.status==='Draft'}).slice(-1)[0]||{};
-    if(!lastDraft.reason||!lastDraft.discussion_date||!lastDraft.participants){toast('Discussed needs a reason, a discussion date and the participants. Save a revision with all three first.');return}}
+/* the proposer is whoever last saved a Draft; a "returned" Draft written by the approver does not make the approver the proposer */
+function proposerOf(x){var rv=(x.revisions||[]).filter(function(r){return r.status==='Draft'&&!r.returned}).slice(-1)[0];return rv?rv.by:''}
+/* Draft to Discussed ("Proposed" on the page) to Approved. Returns {err} or {doc,nx}; the caller writes the document. */
+function advanceDoc(x,u){
+  var g=planGuard(x);if(g)return {err:g};
+  if(isPlanLocked(x.fy_quarter))return {err:'That quarter is locked'};
+  var nx={Draft:'Discussed',Discussed:'Approved'}[x.status];if(!nx)return {err:x.status==='Approved'?'Use Lock quarter to freeze approved targets':'Nothing further'};
+  if(nx==='Discussed'){var lastDraft=(x.revisions||[]).filter(function(r){return r.status==='Draft'&&!r.returned}).slice(-1)[0]||{};
+    if(!lastDraft.reason||!lastDraft.discussion_date||!lastDraft.participants)return {err:'Discussed needs a reason, a discussion date and the participants. Save a revision with all three first.'}}
   if(nx==='Approved'){
-    if(['Super admin','Management / HO'].indexOf(u.role)<0){toast('Approval is by SP Sir or a Management / HO user');return}
-    if(proposerOf(x)===u.email){toast('The proposer cannot approve their own revision');return}
-    if(x.share_pct===''||x.share_pct==null){toast('Set a share % before approval');return}
+    if(['Super admin','Management / HO'].indexOf(u.role)<0)return {err:'Approval is by SP Sir or a Management / HO user'};
+    if(proposerOf(x)===u.email)return {err:'The proposer cannot approve their own revision'};
+    if(x.share_pct===''||x.share_pct==null)return {err:'Set a share % before approval'};
   }
   var revs=(x.revisions||[]).concat([{n:x.rev||1,at:nowISO(),by:u.email,status:nx,reason:'Status change',discussion_date:'',participants:'',change:x.status+' to '+nx}]);
   var doc=Object.assign({},x,{status:nx,revisions:revs.slice(-40)});delete doc._id;
   if(nx==='Approved'){var ap={potential_value_inr:+x.potential_value_inr||0,potential_qty_sheets:+x.potential_qty_sheets||0,potential_qty_sqft:+x.potential_qty_sqft||0,share_pct:+x.share_pct,rev:x.rev||1,by:u.email,at:nowISO()};doc.approved=ap;if(!doc.original)doc.original=ap}
-  await dset('potential/'+id,doc);closeDlg();toast('Marked '+nx);
+  return {doc:doc,nx:nx};
 }
 function senseHtml(x){
   if(noData()||!x.plant_code)return '';
@@ -83,7 +84,7 @@ function toolsHtml(){
    +'<div class="kpis"><div class="kpi"><small>Roll-up documents</small><b>'+fmtN(rc)+'</b><small>'+(miss?miss+' plant-months still to build':'all plant-months have one')+'</small></div><div class="kpi"><small>Rules engine</small><b style="font-size:13px;font-family:var(--font)">'+esc(S.engStatus||'not run yet')+'</b></div></div>'
    +'<div class="row"><button class="btn" data-act="rb-run"'+(S.rbBusy?' disabled':'')+'>Rebuild roll-ups now</button><button class="btn" data-act="rules-run">Run the rules now</button></div>'
    +'<p class="note">Roll-ups are the small per plant × month summaries every business page reads. They are written on each upload; this rebuilds any that are missing (for example data loaded earlier).</p>'
-   +'<h3 style="margin:8px 0 0;font-size:13px">Test clock (this browser only)</h3><div class="row"><div class="fld"><label for="tc-d">Pretend today is</label><input id="tc-d" type="date" class="in" value="'+TODAY()+'"></div><button class="btn" data-act="clock-set">Set</button><button class="btn" data-act="clock-reset">Use the real date</button></div><p class="note">For the escalation walk-through: set a date, open Action Center, and the next ladder step is drafted. The real date is '+fmtDate(realToday())+'. The clock never changes stored data other than the drafts it causes.</p></section>';
+   +'<h3 style="margin:8px 0 0;font-size:13px">Test clock (this browser only)</h3><div class="row"><div class="fld"><label for="tc-d">Pretend today is</label><input id="tc-d" type="date" class="in" value="'+TODAY()+'"></div><button class="btn" data-act="clock-set">Set</button><button class="btn" data-act="clock-reset">Use the real date</button></div><p class="note">For the escalation walk-through: set a date, open Action Center, and the next ladder step is drafted. The real date is '+fmtDate(realToday())+'. The clock never changes stored data other than the drafts it causes.</p></section>'+(typeof fbHtml==='function'?fbHtml():'');
 }
 function missingRolls(){
   var out=[];Object.keys(S.cells).forEach(function(cid){var c=S.cells[cid];if(c.entity!=='INV')return;Object.keys(c.plants||{}).forEach(function(p){var id=p+'-'+c.ym,r=S.rollDocs[id];if(!r||r.src!==c.plants[p].at)out.push({p:p,ym:c.ym,info:c.plants[p],id:id})})});

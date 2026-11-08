@@ -46,11 +46,11 @@ var DEPT_PAGES={Sales:['overview','sales','team'],CRR:['sales','team'],Accounts:
 function pagesFor(u){
   var base=['today'];if(!u)return [];
   var r=u.role;
-  if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','intake','admin'];
-  if(r==='Management / HO')return ['overview','sales','receivables','inventory','today','actions','team','intake','admin'];
-  if(r==='HOD'){var p=DEPT_PAGES[u.department]||DEPT_PAGES.Sales;return p.filter(function(x){return x!=='sales'||true}).concat(['today','actions','admin'])}
-  if(r==='Branch / depot manager')return ['overview','sales','receivables','inventory','today','actions','team','admin'];
-  if(r==='Sales executive')return ['sales','today','actions','team'];
+  if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake','admin'];
+  if(r==='Management / HO')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake'];
+  if(r==='HOD'){var p=DEPT_PAGES[u.department]||DEPT_PAGES.Sales;return p.filter(function(x){return x!=='sales'||true}).concat(['today','actions','targets'])}
+  if(r==='Branch / depot manager')return ['overview','sales','receivables','inventory','today','actions','team','targets'];
+  if(r==='Sales executive')return ['sales','today','actions','team','targets'];
   if(r==='Coordinator (sales / CRR)')return ['sales','today','actions','team'];
   if(r==='Accounts')return ['receivables','today','actions','team'];
   if(r==='Plant')return ['inventory','today','actions','team'];
