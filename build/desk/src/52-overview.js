@@ -189,14 +189,14 @@ function pageOverview(){
      +oxBul({act:o.sh,tgt:x.pq.tgt,pot:x.pq.pot,last:lastG,band:x.ach!=null?oxBand(x.ach):null,aria:x.g+' '+oxLakh(o.sh)+' lakh sheets'})+'</div>'}).join('')
    +'<p class="note" style="margin:0">Sheets. Bar length = lakh sheets against group potential (grey track); colour = Ach band; tick = target; dashed = Last Qtr.</p></section>';
   /* thickness and brand splits (D55, D64) */
-  h+=oxSplitCard('thk',ctx)+oxSplitCard('brand',ctx);
+  h+=oxSafe('Thickness split',function(){return oxSplitCard('thk',ctx)})+oxSafe('Brand split',function(){return oxSplitCard('brand',ctx)});
   /* zones and plants */
   var withTgt=plants.filter(function(x){return x.v!=null}).sort(function(a,b){return a.v-b.v}),rk=[];
   if(withTgt.length){var behindL=withTgt.filter(function(x){return x.v<0}).slice(0,4),aheadL=withTgt.filter(function(x){return x.v>=0}).slice(-4);rk=behindL.concat(aheadL)}/* each plant at most once */
   var mxv=Math.max.apply(null,rk.map(function(x){return Math.abs(x.v)}).concat([1]));
   h+='<section class="ox-card ox-t6"><h2>Zones and plants'+oxDrill('branchsh')+'</h2>'
    +(zones.length?'<div class="ox-zones">'+zones.map(function(x){var lastZ=res.prior?(x.o.bothNet?x.o.Psh:x.o.Psh0):null;return '<div class="ox-zone"'+oxTip(x.z+' (lakh sheets) · Target '+(x.pq.tgt>0?oxLakh(x.pq.tgt):'not loaded')+' · Actual '+oxLakh(x.o.sh)+(x.ach!=null?' · Ach '+oxPct(x.ach)+'%':'')+(lastZ!=null?' · Last Qtr '+oxLakh(lastZ):''))+'><small>'+esc(x.z)+'</small>'+(x.ach!=null?'<b>'+oxPct(x.ach,0)+'%</b>':'<b class="ox-nl" style="font-size:13px">Ach: not loaded</b>')+'<div class="ox-bul">'+'<div class="f '+(x.ach!=null?'b'+oxBand(x.ach):'')+'" style="width:'+(x.ach!=null?Math.min(x.ach,100):Math.min(100,x.o.sh/(Math.max.apply(null,zones.map(function(z){return z.o.sh}))||1)*100))+'%;'+(x.ach!=null?'':'background:var(--act)')+'"></div></div>'+(x.ach!=null?oxBandChip(x.ach):'<span class="ox-chip nl">'+oxLakh(x.o.sh)+' lakh</span>')+oxQoqChip(x.q)+'</div>'}).join('')+'</div>'
-     :'<div class="ox-empty sm"><span class="ox-nl">Zones not set</span><span class="note">Zone tiles appear once plants carry a zone: Admin › Plants › Set zones from sales (needs sales loaded with v44 or later), or type the zone in the plant master.</span></div>')
+     :(DS.dimBusy&&plantsIn.some(function(p){return !zoneMasterOf(p)})?'<div class="ox-empty sm" role="status"><span class="ox-nl">Reading zones from sales lines…</span><span class="note">Zone tiles appear when the last 12 months of sales detail have been read.</span></div>':'<div class="ox-empty sm"><span class="ox-nl">Zones not set</span><span class="note">Zone tiles appear once plants carry a zone: Admin › Plants › Set zones from sales (needs sales loaded with v44 or later), or type the zone in the plant master.</span></div>'))
    +'<h2 style="margin-top:4px">Furthest behind and ahead (variance, thousand sheets)</h2>'
    +(rk.length?rk.map(function(x){var neg=x.v<0,w=Math.abs(x.v)/mxv*50,b=oxBand(x.ach);return '<div class="ox-rk"'+oxTip(plantShort(x.p)+' (thousand sheets) · Target '+oxK(x.pq.tgt)+' · Actual '+oxK(x.o.sh)+' · Var '+oxSgn(x.v,oxK(Math.abs(x.v)))+' · Ach '+oxPct(x.ach)+'%')+'><span class="nm">'+esc(plantShort(x.p))+'</span><div class="ox-div"><i style="'+(neg?'right:50%':'left:50%')+';width:'+w.toFixed(1)+'%;background:var(--b'+b+');border:2px solid var(--b'+b+'d)"></i></div><span class="v">'+(neg?'▼ −':'▲ +')+oxK(Math.abs(x.v))+' · '+oxPct(x.ach,0)+'%</span></div>'}).join('')
      :'<div class="ox-empty"><b>Ranking needs targets</b><span>Without a sheet target there is no variance to rank. Until then, the Branch table lists plants by ₹ actual and QoQ %.</span></div>')
@@ -207,8 +207,9 @@ function pageOverview(){
      :'<div class="ox-empty sm"><b>Nothing due.</b> You are clear for today.</div>')
    +'<p class="note" style="margin:0">Each action: one owner, one due date, one next step. Responses happen in the page. Alerts are listed in Today.</p></section>';
   /* branch rating (D55, D64): sales 50 / collections 30 / stock days 20, informational only */
-  var colW=col.have?res.cur:(showQ?wins(qMonths(showQ.q)):null),RT=ratingRows(plants,res,colW,inv);
-  h+=oxRatingCard(RT,res,colW?(col.have?res.label:qLabel(showQ.q)):'');
+  var colW=col.have?res.cur:(showQ?wins(qMonths(showQ.q)):null),RT={rows:[],basis:'qoq'};
+  try{RT=ratingRows(plants,res,colW,inv)}catch(e){RT=null}
+  h+=RT?oxSafe('Branch rating',function(){return oxRatingCard(RT,res,colW?(col.have?res.label:qLabel(showQ.q)):'')}):oxSafe('Branch rating',function(){throw new Error('rating could not be computed')});
   h+='</div>';
   /* detail tables behind the Table links: columns unchanged */
   var gr=distinct('group').map(function(g){return {label:'<b>'+esc(g)+'</b> ›',o:figs({group:g},ctx),attrs:' data-act="ov-group" data-v="'+esc(g)+'"'}});
@@ -228,9 +229,9 @@ function pageOverview(){
   h+=det('groupsh','Product group, lakh sheets',groupSh);
   h+=det('branchsh','Zones and plants, lakh sheets',branchSh);
   h+=det('trendsh','Quarterly trend, lakh sheets',trendSh);
-  h+=det('thk','Thickness split, '+res.label,oxSplitTable('thk',ctx));
-  h+=det('brand','Brand split, '+res.label,oxSplitTable('brand',ctx));
-  h+=det('rating','Branch rating, all branches',oxRatingTable(RT));
+  h+=det('thk','Thickness split, '+res.label,oxSafe('Thickness table',function(){return oxSplitTable('thk',ctx)}));
+  h+=det('brand','Brand split, '+res.label,oxSafe('Brand table',function(){return oxSplitTable('brand',ctx)}));
+  h+=det('rating','Branch rating, all branches',RT?oxSafe('Branch rating table',function(){return oxRatingTable(RT)}):'');
   h+=det('group','Product group · '+res.label+' vs '+(res.priorLabel||''),stdTable('Product group',gr.filter(matchSearch),tot)+tableNote(ctx));
   h+=det('branch','Branch · '+res.label,stdTable('Branch',br.filter(matchSearch),tot)+tableNote(ctx,'Drill-down stops at the SAP document (decision D9).'));
   h+=det('trendrs','Quarterly trend in rupees, with drill',trendCard('Quarters since '+qLabel(histStart())+' · Sales',{},ctx,undefined,'ov')+drillPanel(ctx));

@@ -7,7 +7,7 @@ const waitToast=(page,re)=>page.waitForFunction((s)=>document.querySelector('#to
 {const {page}=await open(browser);await page.waitForTimeout(800);await page.evaluate(()=>{location.hash='#/intake'});await page.waitForTimeout(500);
  await page.click('[data-act="demo-load"]');await waitToast(page,'Demo data loaded');await page.waitForTimeout(3000);
  const a=await page.evaluate(()=>{const s=window.__mockStore(),d=window.__dbg;return {sm:s['salesmaster/main']&&s['salesmaster/main'].demo,im:s['itemmeta/main']&&s['itemmeta/main'].demo,rate:d.matchStats().rate,n:d.S.salesMaster&&d.S.salesMaster.n,ver:document.querySelector('.brand small').textContent}});
- ok('header says desk-v1.0',a.ver==='desk-v1.0',a.ver);
+ ok('header says v44 (D5)',a.ver==='v44',a.ver);
  ok('demo loads demo sales and item masters',a.sm===true&&a.im===true,JSON.stringify(a));
  ok('match rate meaningful (6 of 7 names)',a.rate>80&&a.rate<100,a.rate);
  await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(500);await page.click('[data-t="semp"]');await page.waitForTimeout(500);

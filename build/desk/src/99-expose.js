@@ -3,3 +3,4 @@ window.__dbg={loadItemIdx:loadItemIdx,stockDays:stockDays,dailySheets:dailySheet
 Object.assign(window.__dbg,{tpModel:tpModel,tpTemplateCsv:tpTemplateCsv,tpSave:tpSave,advanceDoc:advanceDoc,proposerOf:proposerOf,planGuard:planGuard,phasingFor:phasingFor,leafTgt:leafTgt,masterUpload:masterUpload,pagesFor:pagesFor,isPlanLocked:isPlanLocked});
 Object.assign(window.__dbg,{loadDim:loadDim,dimAgg:dimAgg,dimState:dimState,dimKeyOf:dimKeyOf,ratingCalc:ratingCalc,ratingRows:ratingRows,ratingBasis:ratingBasis,ratingStars:ratingStars,zoneFromLines:zoneFromLines,zoneOfPlant:zoneOfPlant,zoneCanon:zoneCanon,zonesFromSales:zonesFromSales,setZonesFromSales:setZonesFromSales,oxSplitData:oxSplitData});
 Object.assign(window.__dbg,{oxRatingCard:oxRatingCard,oxRatingRow:oxRatingRow,oxCollBars:oxCollBars,oxSplitCard:oxSplitCard,zonesPreviewHtml:zonesPreviewHtml,zoneMonthsOf:zoneMonthsOf,dimKick:dimKick});
+Object.assign(window.__dbg,{oxSafe:oxSafe,oxRatingTable:oxRatingTable});
