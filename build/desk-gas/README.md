@@ -1,21 +1,25 @@
 # Performance Desk on Google Apps Script
 
-Three files: `Desk-Code.gs.txt` (server), `Desk-Index.txt` (the whole page), `appsscript.json.txt` (settings).
-Two files are used because Apps Script keeps server code (`.gs`) and page (`.html`) apart. Only `Desk-Index.txt` changes between Desk versions.
+Files: `Desk-Code.gs.txt` (server), `appsscript.json.txt` (settings) and the page, which is cut into numbered parts `Desk-Index.txt`, `Desk-Index2.txt`, `Desk-Index3.txt` ... (the Apps Script editor cuts a single file off at about 1 MB when saving, so no part is over 700 KB).
+The server joins the parts in order. Only the page parts change between Desk versions (Code.gs changes too whenever the number of parts or a checksum changes, so paste it every time).
+
+### The page files (this build)
+Create one **HTML** file in the editor for each row, named exactly as shown (no `.html`), select all, paste the matching `.txt`, **Save**. Then check each file: click in it, press Ctrl+End, and the last line must be the text in the last column. If it is not, the save cut it off: select all, delete, paste again.
+<!--@@PARTS_TABLE@@-->
+If a part is missing, cut short or from another version, the Web app shows "The Desk page is not fully installed" and names the file, instead of a blank page.
 
 ## First time (as data@virgoasia.com)
 1. Go to script.google.com, **New project**. Name it "Virgo Desk".
 2. Project Settings (gear): tick **Show "appsscript.json" manifest file**. Open `appsscript.json`, replace everything with `appsscript.json.txt`.
 3. Open `Code.gs`, select all, paste `Desk-Code.gs.txt`.
-4. **+ Add a file > HTML**, name it exactly `Index`. Select all, paste `Desk-Index.txt`. (It is about 1.4 MB; the editor may take a minute.)
+4. **+ Add a file > HTML** for each page part: `Index`, `Index2`, `Index3` ... (table above). Paste each `Desk-Index*.txt` into its file, save, and check its last line.
 5. In the toolbar pick the function **setup** and press **Run** (only the project owner or a Super admin can run it; it is refused for anyone else). Accept the permission prompt (Google Sheets and your email address). This creates the database spreadsheet "Virgo Desk database (do not edit)" in your Drive, once. It is safe to run again.
 6. **Deploy > New deployment > Web app.** Execute as: **Me**. Who has access: **Anyone in virgoasia.com**. Deploy.
 7. Copy the **Web app URL** (ends `/exec`) and open it as yourself. Then add the other users in Admin > Users.
 
 ## Every later Desk version (same link)
-1. Open the project, open `Index`, select all, paste the new `Desk-Index.txt`. Save.
+1. Open the project. Paste the new `Desk-Code.gs.txt` into `Code.gs`, and each `Desk-Index*.txt` into its file (`Index`, `Index2` ...; add a new HTML file if there are more parts than before; delete extra files if there are fewer). Save each and check its last line (table above).
 2. **Deploy > Manage deployments > pencil > Version: New version > Deploy.** The `/exec` URL does not change.
-Paste `Desk-Code.gs.txt` the same way only if it was re-issued.
 
 ## Moving the data from claude.ai (once, on your own computer)
 **Cutover rule: no uploads and no edits on the claude.ai Desk between Download and Restore.** Anything changed after the download is not in the backup. Tell the team to stay out until the restore is verified.
@@ -36,7 +40,7 @@ Paste `Desk-Code.gs.txt` the same way only if it was re-issued.
 
 ## SAP S/4HANA feed (read only, from 1 Oct 2026)
 Super admin or project owner only. Functions are run from the editor toolbar (pick the function, Run). Nothing is ever written to SAP; data to 30 Sep 2026 is never touched.
-1. **Re-paste** `Desk-Code.gs.txt`, `appsscript.json.txt` and `Desk-Index.txt`, make a New version, run `setup` again and allow the two new permissions (call an outside service; create a trigger).
+1. **Re-paste** `Desk-Code.gs.txt`, `appsscript.json.txt` and every `Desk-Index*.txt` part, make a New version, run `setup` again and allow the two new permissions (call an outside service; create a trigger).
 2. **Script properties** (Project Settings > Script properties): `SAP_BASE_URL` (https address only), `SAP_USER`, `SAP_PASSWORD`; optional `SAP_COMPANY_CODE` (default 1000), `CANCEL_MODE` (`exclude` default, or `mirror`), `SAP_BILLING_SHAPE` (`A` or `B`; normally left empty, `sapVerifyMetadata` chooses). They are read only by the server; they are not in the code, the sheet, the backup, the logs or the page.
 3. `sapVerifyMetadata`: reads `$metadata` of the billing, product and customer services and reports ok or GAP per entity set and field.
 4. `sapShadowRun`: reads October 2026, compares documents, lines, sheets, sq ft and value per plant-month with what is loaded, and writes nothing. Tolerance: value within Rs 1, sq ft within 4 (rounding).

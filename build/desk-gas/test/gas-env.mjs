@@ -61,13 +61,15 @@ export function makeEnv(opts = {}) {
     UrlFetchApp: { fetch(url, o) { if (!opts.fetch) throw new Error('UrlFetchApp is not available in this test'); const r = opts.fetch(url, o, state); return { getResponseCode() { return r.code; }, getContentText() { return r.body; }, getHeaders() { return r.headers || {}; } }; } },
     HtmlService: {
       XFrameOptionsMode: { DEFAULT: 'DEFAULT' },
-      createHtmlOutputFromFile() { return { getContent() { return fs.readFileSync(opts.indexFile || path.join(here, '../out/Desk-Index.txt'), 'utf8'); } }; },
+      createHtmlOutputFromFile(name) { return { getContent() { // opts.htmlFiles = { Index: text, Index2: text ... } overrides the built parts; a missing name throws like Apps Script
+        if (opts.htmlFiles) { if (!(name in opts.htmlFiles)) throw new Error('Unknown file: ' + name); return opts.htmlFiles[name]; }
+        const f = path.join(here, '../out/Desk-' + name + '.txt'); if (!fs.existsSync(f)) throw new Error('Unknown file: ' + name); return fs.readFileSync(f, 'utf8'); } }; },
       createHtmlOutput(h) { const o = { html: h, title: null, meta: [], setTitle(t) { o.title = t; return o; }, addMetaTag(a, b) { o.meta.push([a, b]); return o; }, setXFrameOptionsMode() { return o; } }; return o; },
     },
   };
   vm.createContext(ctx);
-  vm.runInContext(fs.readFileSync(path.join(here, '../src/Code.gs.js'), 'utf8'), ctx, { filename: 'Code.gs' });
-  vm.runInContext(fs.readFileSync(path.join(here, '../src/sap.gs.js'), 'utf8'), ctx, { filename: 'sap.gs' });
+  // the built Code.gs (page manifest filled in by build-gas.mjs) joined with sap.gs, exactly as pasted into the editor
+  vm.runInContext(fs.readFileSync(opts.codeFile || path.join(here, '../out/Desk-Code.gs.txt'), 'utf8'), ctx, { filename: 'Code.gs' });
   function storedAll() { // {col/id: json} using the same rule as the server: newest token with all parts
     const out = {};
     Object.keys(sheets).filter(n => n.startsWith('c_')).forEach(n => {
