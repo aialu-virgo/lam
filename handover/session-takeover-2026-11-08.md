@@ -55,4 +55,4 @@ Backup → restore with Replace everything on `/exec` (not confirmed done); Peop
 - claude.ai Desk: the parallel session published version 48 at ~18:44 IST from origin/m8-dashboard (our merge + v44 + My Dashboard). Not republished by us (D94). origin/m8-dashboard merged into this branch (0e893b5).
 - Next Apps Script files must wait for the parallel session's My Dashboard QA (it adds dashroles/dashlayouts collections to Code.gs).
 - Open: engBlock timeout + "rules paused" notice (engineer, due 19:30); Vijay's sapShadowRun still running; publishing order agreed: each session tells the other before publishing.
-- Decision numbering: parallel session's m8-gcp uses its own D73/D74; anything new from either side starts at D95.
+- Decision numbering: parallel session moves its entries to D95–D97. From now on this session uses D100–D149, the parallel session D150+.
