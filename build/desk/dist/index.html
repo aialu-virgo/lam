@@ -351,6 +351,76 @@ details.tp-row[open]>summary{background:color-mix(in srgb,var(--brand-soft) 45%,
 .ox-chip.sm{font-size:11px;padding:2px 8px;font-weight:600}
 .ox-sub3{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);font-weight:800;margin:6px 0 0}
 .ox-zone .ox-chip{white-space:normal}
+/* ===== My Dashboard (dsh-) ===== */
+.dsh .dsh-ctl{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end;border-style:solid}
+.dsh-bar1,.dsh-bar2,.dsh-bar3{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:flex-end}.dsh-bar1{align-items:center}
+.dsh-bar .fld{margin:0;min-width:130px}
+.dsh-note{flex-basis:100%;font-size:12.5px;border:1px solid var(--line);border-left:4px solid var(--orange);border-radius:10px;padding:6px 10px;background:var(--card)}.dsh-note.ok{border-left-color:var(--green)}.dsh-note.err{border-left-color:var(--red)}
+.dsh-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:stretch}
+.dsh-card{gap:10px;position:relative;grid-column:span 1;container-type:inline-size}
+.dsh-card[data-sp="2"]{grid-column:span 2}.dsh-card[data-sp="3"]{grid-column:span 3}.dsh-card[data-sp="4"]{grid-column:span 4}
+@media(max-width:1100px){.dsh-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dsh-card[data-sp="3"],.dsh-card[data-sp="4"]{grid-column:span 2}}
+@media(max-width:620px){.dsh-grid{grid-template-columns:minmax(0,1fr)}.dsh-card[data-sp]{grid-column:span 1}.dsh-w,.dsh-grip{display:none!important}}
+.dsh-h{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.dsh-h h2{flex:1;min-width:0;justify-content:flex-start;gap:6px 8px}.dsh-h h2>span:first-child{overflow-wrap:anywhere}
+.dsh-ic{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;background:var(--brand-soft);color:var(--brand-ink);flex:none}.dsh-ic svg{width:15px;height:15px}
+.dsh-f{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:11px;color:var(--ink3);border-top:1px solid var(--line);padding-top:6px}
+.dsh-f .demo{background:var(--orange-soft);color:var(--orange)}
+.dsh-card.editing{outline:2px dashed var(--ink3);outline-offset:2px}
+.dsh-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.dsh-hd{touch-action:none;cursor:grab;border:1px solid var(--line);background:var(--bg);border-radius:8px;min-width:36px;min-height:34px;font-size:16px;letter-spacing:-2px;color:var(--ink2)}.dsh-hd:active{cursor:grabbing}
+.dsh-w{display:inline-flex;gap:2px}.dsh-w .btn[aria-pressed="true"]{background:var(--brand);color:#fff;border-color:var(--brand)}
+.dsh-ud{min-width:36px;min-height:34px}
+.dsh-grip{position:absolute;right:4px;bottom:4px;width:18px;height:18px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 50%,var(--ink3) 50% 58%,transparent 58% 72%,var(--ink3) 72% 80%,transparent 80%);border-radius:0 0 12px 0}
+.dsh-ph{border:2px dashed var(--brand);border-radius:18px;background:var(--brand-soft);opacity:.6;grid-column:span 1}.dsh-ph[data-sp="2"]{grid-column:span 2}.dsh-ph[data-sp="3"]{grid-column:span 3}.dsh-ph[data-sp="4"]{grid-column:span 4}
+@media(max-width:1100px){.dsh-ph[data-sp="3"],.dsh-ph[data-sp="4"]{grid-column:span 2}}@media(max-width:620px){.dsh-ph{grid-column:span 1}}
+.dsh-ghost{opacity:.88;box-shadow:0 12px 36px rgba(0,0,0,.28);transform:rotate(.6deg)}
+.dsh-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.dsh-tile{font:inherit;text-align:left;cursor:pointer;border:1px solid var(--line);border-left:5px solid var(--ink3);border-radius:12px;padding:8px 10px;background:var(--card);color:var(--ink);display:flex;flex-direction:column;gap:3px;min-width:0}
+.dsh-tile.nodrill{cursor:default}
+.dsh-tile small{font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);overflow-wrap:anywhere}.dsh-tile b{font-size:19px;overflow-wrap:anywhere}
+.dsh-tile.b1{background:color-mix(in srgb,var(--b1) 38%,var(--card));border-left-color:var(--b1d)}.dsh-tile.b2{background:color-mix(in srgb,var(--b2) 38%,var(--card));border-left-color:var(--b2d)}.dsh-tile.b3{background:color-mix(in srgb,var(--b3) 38%,var(--card));border-left-color:var(--b3d)}.dsh-tile.b4{background:color-mix(in srgb,var(--b4) 38%,var(--card));border-left-color:var(--b4d)}
+.dsh-tile svg{width:100%;height:26px}
+.dsh-lb{font:inherit;background:none;border:0;padding:0;color:var(--ink);cursor:pointer;text-align:left;font-weight:700;overflow-wrap:anywhere}.dsh-lb:hover{color:var(--brand-ink);text-decoration:underline}
+.dsh-row{display:grid;gap:4px;padding:6px 0;border-top:1px solid var(--line)}.dsh-row:first-child{border-top:0}.dsh-row .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.dsh-bars{display:grid;gap:6px}.dsh-bars .dsh-bar{display:grid;grid-template-columns:minmax(70px,26%) minmax(0,1fr) auto;gap:4px 8px;align-items:center;font-size:12.5px;border:0;background:none;padding:0}.dsh-bars .dsh-bar .q{grid-column:2/4}
+.dsh-rk{display:grid;grid-template-columns:22px minmax(70px,28%) minmax(0,1fr) auto;gap:4px 8px;align-items:center;font-size:12.5px;padding:3px 0}.dsh-rk .q{grid-column:2/5}
+.dsh-g{cursor:pointer}
+.dsh-dn{display:grid;grid-template-columns:140px minmax(0,1fr);gap:12px;align-items:center}.dsh-donut{width:140px;height:140px}
+@container (max-width:340px){.dsh-dn{grid-template-columns:minmax(0,1fr)}.dsh-donut{margin:0 auto}}
+.dsh-dl{display:grid;gap:3px;font-size:12.5px}.dsh-dl>div{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.dsh-hm{display:grid;gap:2px;overflow-x:auto;max-width:100%}.dsh-hm .hr{display:grid;grid-template-columns:minmax(84px,18%) repeat(var(--cols),minmax(38px,1fr));gap:2px;align-items:stretch;min-width:max-content}
+.dsh-hm .hh span{text-align:center;color:var(--ink3)}.dsh-hm .c{font-size:10px;text-align:center;padding:5px 2px;border-radius:4px;font-family:var(--mono);color:var(--ink)}.dsh-hm .c.nl{border:1.5px dashed var(--ink3);color:var(--ink3)}
+.dsh-hm .c.pt{background-image:repeating-linear-gradient(45deg,transparent 0 4px,rgba(128,128,128,.28) 4px 6px)}
+.dsh-hm .nm{position:sticky;left:0;background:var(--card);font-size:12px;display:flex;align-items:center;padding-right:4px}
+.dsh-hat{background-image:repeating-linear-gradient(45deg,transparent 0 4px,rgba(128,128,128,.25) 4px 6px)}
+.dsh-big{font-size:38px}
+.dsh-tw{max-width:100%;overflow-x:auto}
+.dsh-cr{margin:0}
+.dsh-dlg{max-width:min(1100px,96vw)!important;width:100%}
+.dsh-bgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:820px){.dsh-bgrid{grid-template-columns:minmax(0,1fr)}.dsh-prev{order:-1}}
+.dsh-form{display:grid;gap:10px;min-width:0}.dsh-prevcard .dsh-card{grid-column:auto}
+.dsh-prev{position:sticky;top:0;min-width:0}
+.dsh-fs{border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:grid;gap:8px;min-width:0}.dsh-fs legend{font-size:11.5px;font-weight:800;color:var(--ink2);padding:0 4px}
+.dsh-frow{display:grid;grid-template-columns:130px minmax(0,1fr) auto;gap:6px;align-items:start}
+@media(max-width:480px){.dsh-frow{grid-template-columns:minmax(0,1fr)}}
+.dsh-per{display:flex;flex-wrap:wrap;gap:8px}.dsh-per .fld{min-width:130px;margin:0}
+.dsh-vis{display:flex;flex-wrap:wrap;gap:6px}.dsh-vc{border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-size:12.5px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;min-height:34px}.dsh-vc.on{border-color:var(--brand);background:var(--brand-soft)}.dsh-vc.off{opacity:.45;cursor:not-allowed}
+.dsh-opt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.dsh-libbar{display:grid;gap:8px;margin-bottom:8px}.dsh-mods{display:flex;flex-wrap:wrap;gap:6px}.dsh-mods .chip{cursor:pointer}.dsh-mods .chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.dsh-liblist{max-height:60vh;overflow:auto;padding-right:4px}
+.dsh-lh{display:flex;gap:8px;align-items:center;margin:12px 0 6px;font-size:13px}
+.dsh-lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.dsh-le{border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:6px;align-content:start;background:var(--card)}.dsh-le.lock{opacity:.6}
+.dsh-seg{margin:6px 0 10px}
+.dsh-hero .ox-big{font-size:40px}
+
+.dsh-card .dsh-b{flex:1}.dsh-f{margin-top:auto}
+@container (max-width:330px){.dsh-big,.dsh-hero .ox-big{font-size:28px}.dsh-hero{grid-template-columns:minmax(0,1fr)!important;gap:10px}.ox-tile-big{font-size:22px}}
+@container (max-width:240px){.dsh-big,.dsh-hero .ox-big{font-size:24px}}
+
+.dsh-h{flex-wrap:wrap}.dsh-h .ox-drill{flex:none}
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -1790,7 +1860,7 @@ function spOk(sc,name){
 }
 /* what a role may open (role-matrix.md, department table) */
 var DEPT_PAGES={Sales:['overview','sales','team'],CRR:['sales','team'],Accounts:['receivables','team'],Plant:['inventory','team'],HO:['overview','sales','receivables','inventory','team']};
-function pagesFor(u){
+function pagesFor0(u){
   var base=['today'];if(!u)return [];
   var r=u.role;
   if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake','admin','geography'];
@@ -3455,6 +3525,1354 @@ function oxCollBars(cser){
 
 /* one card failing never takes the Overview down: it is replaced by a small notice naming the card */
 function oxSafe(name,fn){try{return fn()}catch(e){return '<section class="ox-card ox-h"><h2>'+esc(name)+'</h2><div class="ox-empty"><b>This card could not be drawn</b><span>'+esc((e&&e.message)||String(e))+'. The rest of the Overview is unaffected.</span></div></section>'}}
+
+/* ---- src/54-dash1-data.js ---- */
+/* ================= My Dashboard, part 1: measures, breakdowns, periods, sources (built 8 Nov 2026) =================
+ * A card is saved data: {id,title,measure,base,by,filters[],period,visual,n,dir,sortBy,span,drill[]}. dRun (part 2) answers it from the Desk's own aggregates
+ * (roll-ups DS.pg/DS.spk, detail chunks DS.dim, customer chunks DS.cust, credit notes, collections, receivables, stock, plans, actions), never from raw lines.
+ * Row-level access: every source below is read through SC() / plantInScope() / the scoped DS maps, so a card cannot show more than the viewer's scope.
+ * Rules: sheets first; QoQ only (resolvePeriod shifts by three months, nothing else); Ach/Share above 300% = Check; partial and not loaded are never zero. No LLM. */
+var DASH={rc:{},rcSig:'',sig:'',pend:{},dvTick:0};
+var D_SEP='\u0001';
+/* ---- small helpers ---- */
+function dV(v,st,x){var o={v:v,st:st||(v==null?'nolod':'ok')};if(x)for(var k in x)o[k]=x[k];return o}
+function dMed(a){a=a.slice().sort(function(x,y){return x-y});var n=a.length;return n?(n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2):null}
+function dSetOf(a){return new Set(a)}
+function dInter(a,pred){var o=new Set();a.forEach(function(x){if(pred(x))o.add(x)});return o}
+/* data fingerprint: anything that can change a figure changes this string, so cached results are never stale */
+function dDataSig(){
+  var up=S.uploads&&S.uploads[0],act=0;
+  (S.actions||[]).forEach(function(a){act+=(a.status?a.status.length:0)+(a.due?(a.due.charCodeAt(9)||0):0)+(a.done_at?7:0)});
+  var zs=0;S.plants.forEach(function(p){zs+=(p.zone||'').length*3+(p.state||'').length});
+  return [DS.ver,DS.custVer,DS.dimVer,S.potVer,Object.keys(S.cells).length,S.cellsSigTick||0,S.uploads.length,up&&up.at,S.coll.length,S.stockAsOf,S.recvAsOf,(S.recv||[]).length,(S.cnRaw||[]).length,(S.actions||[]).length,act,(S.followups||[]).length,S.plants.length,zs,(S.phasing||[]).length,S.itemMeta?1:0,TODAY(),scopeSig(SC()),S.viewAs||'',DASH.dvTick,typeof GEO!=='undefined'?GEO.ver:0,DS.status==='ready'?1:0].join('|');
+}
+function dBump(){DASH.rc={};DASH.dvTick++;if(S.dash)S.dash.html={};S.lastHtml='';schedule()}
+function dMemo(key,fn){var sig=dDataSig();if(DASH.rcSig!==sig){DASH.rc={};DASH.rcSig=sig}var h=DASH.rc[key];if(h!==undefined)return h;h=fn();DASH.rc[key]=h;return h}
+
+/* ---- scope, plants, zones, states ---- */
+function dScope(){
+  return dMemo('scope',function(){
+    var sc=SC(),all=distinct('plant').filter(function(p){return plantInScope(sc,p)}),pm={};
+    S.plants.forEach(function(p){pm[p.plant_code]=p});
+    return {sc:sc,plants:all,own:sc.sp?ownKey():null,pm:pm};
+  });
+}
+function dZone(p){var z=zoneOfPlant(p).z;return z||'No zone'}
+function dState(p){var pl=dScope().pm[p],raw=pl&&pl.state?String(pl.state).trim():'';if(!raw)return 'No state';var c=stateCode(raw);return c?stateName(c):raw}
+
+/* ---- periods: card period -> resolvePeriod (QoQ is the only comparison, three months back) ---- */
+function dPerSpec(p){
+  p=p||{k:'follow'};if(p.k==='follow')p=(S.dash&&S.dash.per)||{k:'QTD'};
+  var cq=curQuarterKey();
+  if(p.k==='MTD')return {mode:'MTD',m:p.m||TODAY().slice(0,7)};
+  if(p.k==='Q')return {mode:'QTD',q:p.q||prevQ(cq)};
+  if(p.k==='FY')return {mode:'YTD',q:p.q||cq};
+  if(p.k==='CUSTOM')return {mode:'CUSTOM',from:p.from,to:p.to};
+  return {mode:'QTD',q:cq};
+}
+function dRes(p){
+  var spec=dPerSpec(p);
+  return dMemo('res'+JSON.stringify(spec),function(){
+    var res=resolvePeriod(spec,TODAY());
+    if(res.mode==='YTD'){res.qCur=res.latestCur;res.qPrior=res.latestPrior;res.qNote='latest quarter '+qLabel(res.q)+' against '+qLabel(prevQ(res.q))}
+    else{res.qCur=res.cur;res.qPrior=res.prior;res.qNote=res.priorLabel}
+    res.qCurMonths=res.qCur.filter(function(x){return x.frac>0}).map(function(x){return x.ym});
+    res.qPriorMonths=(res.qPrior||[]).filter(function(x){return x.frac>0}).map(function(x){return x.ym});
+    res.endYm=res.curMonths.length?res.curMonths[res.curMonths.length-1]:TODAY().slice(0,7);
+    return res;
+  });
+}
+/* the seven quarters behind sparklines, stacked bars and trend lines (closed quarters since history start + the current one, to date) */
+function dQuarters(){
+  return dMemo('qs',function(){
+    var cur=curQuarterKey(),qs=closedQuarters().concat([cur]).slice(-7);
+    return qs.map(function(q){var ms=qMonths(q),isCur=q===cur,N=isCur?wdBetween(ms[0]+'-01',TODAY()):Infinity;
+      return {q:q,label:qLabel(q),months:ms,isCur:isCur,w:isCur?walk(ms,N):wins(ms)}});
+  });
+}
+function dPriorW(q,isCur){var pq=prevQ(q),ms=qMonths(pq),N=isCur?wdBetween(qMonths(q)[0]+'-01',TODAY()):Infinity;return isCur?walk(ms,N):wins(ms)}
+function dMonths8(res){
+  var end=res.endYm,tYm=TODAY().slice(0,7);if(end>tYm)end=tYm;
+  return ymRange(shiftYm(end,-7),end).filter(function(m){return m>=histLoYm()});
+}
+
+/* ---- filters: card filters + drill-down steps, intersected with the viewer's scope ---- */
+function dFilt(card){
+  var SCP=dScope(),F={plants:new Set(SCP.plants),groups:null,thk:null,brand:null,cust:null,sp:SCP.own,spPick:null};
+  (card.filters||[]).concat(card.drill||[]).forEach(function(f){
+    if(!f||!f.dim||!f.vals||!f.vals.length)return;var vs=f.vals.map(String);
+    if(f.dim==='plant')F.plants=dInter(F.plants,function(p){return vs.indexOf(p)>=0});
+    else if(f.dim==='zone')F.plants=dInter(F.plants,function(p){return vs.indexOf(dZone(p))>=0});
+    else if(f.dim==='state')F.plants=dInter(F.plants,function(p){return vs.indexOf(dState(p))>=0});
+    else if(f.dim==='group')F.groups=F.groups?dInter(F.groups,function(g){return vs.indexOf(g)>=0}):dSetOf(vs);
+    else if(f.dim==='thickness')F.thk=dSetOf(vs);
+    else if(f.dim==='brand')F.brand=dSetOf(vs);
+    else if(f.dim==='customer')F.cust=dSetOf(vs);
+    else if(f.dim==='salesperson'){if(SCP.own==null)F.spPick=vs[0]}
+  });
+  if(F.spPick&&SCP.own==null)F.sp=F.spPick;
+  return F;
+}
+function dBaseM(F){return {plants:F.plants,groups:F.groups,sp:F.sp,thk:F.thk,brand:F.brand,cust:F.cust}}
+function dMk(m,over){var o={};for(var k in m)o[k]=m[k];if(over)for(var j in over)o[j]=over[j];return o}
+function dSKey(s){return s?Array.from(s).sort().join(','):''}
+function dMKey(m){return dSKey(m.plants)+'#'+dSKey(m.groups)+'#'+(m.sp||'')+'#'+dSKey(m.thk)+'#'+dSKey(m.brand)+'#'+dSKey(m.cust)}
+function dWKey(w){return wins(w).map(function(x){return x.ym+':'+(Math.round(x.frac*1000)/1000)}).join(',')}
+function dMonthsOf(w){return wins(w).filter(function(x){return x.frac>0}).map(function(x){return x.ym})}
+
+/* ---- sales: roll-up path, detail-chunk path (thickness, brand), customer-chunk path ---- */
+function dNeedDetail(kind,m,w){
+  var ms=dMonthsOf(w),key=kind+'|'+dSKey(m.plants)+'|'+ms.join(',')+'|'+DS.sig+'|'+(kind==='cust'?DS.custVer:DS.dimVer);
+  if(DASH.pend[key])return;DASH.pend[key]=1;
+  var job;try{job=kind==='dim'?loadDim(m.plants,ms):loadCust(m.plants,ms)}catch(e){job=null}
+  Promise.resolve(job).then(function(){dBump()},function(){dBump()});
+}
+function dDimMap(m,w){
+  return dMemo('dm'+dMKey(dMk(m,{thk:null,brand:null,cust:null}))+'|'+dWKey(w),function(){
+    var st=dimState(m.plants,w),out={map:null,st:st};
+    if(!st.have)return out;
+    if(!st.ready){dNeedDetail('dim',m,w);return out}
+    var sc=SC();out.map=new Map();
+    wins(w).forEach(function(x){if(!(x.frac>0))return;var c=S.cells['INV_'+x.ym];if(!c)return;
+      Object.keys(c.plants||{}).forEach(function(p){if(!plantInScope(sc,p)||(m.plants&&!m.plants.has(p)))return;
+        var d=DS.dim[p+D_SEP+x.ym];if(!d||d.at!==c.plants[p].at)return;
+        d.rows.forEach(function(r){if(m.groups&&!m.groups.has(r[2]))return;var k=r[0]+D_SEP+r[1],o=out.map.get(k);if(!o){o={thk:r[0],brand:r[1],n:0,sh:0,sq:0,l:0};out.map.set(k,o)}
+          o.n+=r[7]*x.frac;o.sh+=r[5]*x.frac;o.sq+=r[6]*x.frac;o.l+=r[4]*x.frac})})});
+    return out;
+  });
+}
+function dCustMap(m,w){
+  return dMemo('cm'+dMKey(dMk(m,{thk:null,brand:null,cust:null}))+'|'+dWKey(w),function(){
+    var yms=dMonthsOf(w);
+    if(!custLoaded(yms,m.plants)){dNeedDetail('cust',m,w);return {map:null,loading:true}}
+    var gs=m.groups?Array.from(m.groups):[undefined],out=new Map();
+    gs.forEach(function(g){
+      custAgg({plants:m.plants,group:g,sp:m.sp==null?undefined:m.sp},w).forEach(function(v,k){var o=out.get(k);if(!o){o={code:k,name:v.name,n:0,sh:0,sq:0,d:0};out.set(k,o)}o.n+=v.n;o.sh+=v.sh;o.sq+=v.sq;o.d+=v.d});
+    });
+    return {map:out};
+  });
+}
+function dSales(m,w){
+  w=wins(w);
+  return dMemo('s'+dMKey(m)+'|'+dWKey(w),function(){
+    if(m.cust){
+      var cm=dCustMap(dMk(m,{cust:null}),w);if(cm.loading)return {st:'loading'};
+      var acc={n:0,sh:0,sq:0,l:0,d:0};m.cust.forEach(function(c){var o=cm.map.get(c);if(o){acc.n+=o.n;acc.sh+=o.sh;acc.sq+=o.sq;acc.d+=o.d}});
+      return {st:'ok',raw:acc,net:null,detail:'cust'};
+    }
+    if((m.thk||m.brand)&&m.sp!=null)return {st:'na',why:'Thickness and brand detail is held by plant, not by person, so it is not shown for one salesperson'};
+    if(m.thk||m.brand){
+      var dm=dDimMap(dMk(m,{thk:null,brand:null}),w);
+      if(!dm.st.have)return {st:'nodetail',total:dm.st.total};
+      if(!dm.map)return {st:'loading'};
+      var a2={n:0,sh:0,sq:0,l:0,d:0};dm.map.forEach(function(o){if(m.thk&&!m.thk.has(o.thk))return;if(m.brand&&!m.brand.has(o.brand))return;a2.n+=o.n;a2.sh+=o.sh;a2.sq+=o.sq;a2.l+=o.l});
+      return {st:'ok',raw:a2,net:null,detail:'dim',partialDetail:dm.st.complete?null:{have:dm.st.have,total:dm.st.total}};
+    }
+    var gs=m.groups?Array.from(m.groups):[undefined],raw={n:0,sh:0,sq:0,l:0,d:0},net=m.sp==null?{n:0,sh:0,sq:0}:null,unc=[],cnv=0;
+    gs.forEach(function(g){
+      var a=sumF({plants:m.plants,group:g,sp:m.sp==null?undefined:m.sp},w);raw.n+=a.n;raw.sh+=a.sh;raw.sq+=a.sq;raw.l+=a.l;raw.d+=a.d;
+      if(net){var cn=cnFor({plants:m.plants,group:g},w);if(cn.covered){net.n+=a.n-cn.value;net.sh+=a.sh-cn.sheets;net.sq+=a.sq-cn.sqft;cnv+=cn.value}else{net=null;unc=cn.uncovered}}
+    });
+    return {st:'ok',raw:raw,net:net,cnValue:net?cnv:null,unc:unc};
+  });
+}
+/* months of the window with sales loaded for every plant of the member: partial / not loaded flags, never a zero */
+function dSalesCov(m,w){
+  var ms=dMonthsOf(w);if(!ms.length)return {k:0,n:0,any:false};
+  var plants=m.plants&&m.plants.size?m.plants:null,k=ms.filter(function(x){return monthLoaded(x,plants)}).length;
+  return {k:k,n:ms.length,any:anyMonthData(ms,plants)};
+}
+
+/* ---- collections: one index of plant-month receipts per data signature ---- */
+function dCollIdx(){
+  return dMemo('collidx',function(){
+    var ix={},sc=SC();S.coll.forEach(function(d){if(!d.ym||!plantInScope(sc,d.plant)||d.total==null)return;ix[d.plant+D_SEP+d.ym]={rec:+d.total||0,plan:d.plan!=null?+d.plan:null,rows:d.rows||[]}});return ix;
+  });
+}
+function dColl(m,w){
+  var ix=dCollIdx(),rec=0,plan=0,have=0,planHave=0,tot=0;w=wins(w);
+  w.forEach(function(x){if(!(x.frac>0))return;m.plants.forEach(function(p){tot++;var d=ix[p+D_SEP+x.ym];if(d){have++;rec+=d.rec*x.frac;if(d.plan!=null){plan+=d.plan*x.frac;planHave++}}})});
+  return {rec:rec,plan:planHave&&planHave===have?plan:null,have:have,total:tot};
+}
+function dCN(m,w){
+  var gs=m.groups?Array.from(m.groups):[undefined],val=0,sh=0,cov=true,unc=[],any=false;
+  gs.forEach(function(g){var c=cnFor({plants:m.plants,group:g},w);if(c.covered){val+=c.value;sh+=c.sheets}else{cov=false;unc=c.uncovered}if(c.anyLoaded)any=true});
+  return {covered:cov,value:val,sheets:sh,unc:unc,any:any};
+}
+function dStockL(){
+  return dMemo('stockL',function(){
+    var sc=stockScopeSnap();if(!sc||!Object.keys(sc.plants).length)return null;
+    return {sn:sc.snap,L:invLines({f:{}},{as_of:sc.snap.as_of,plants:sc.plants})};
+  });
+}
+function dStock(m){
+  var S0=dStockL();if(!S0)return null;
+  var sh=0,val=0,hasV=false,dn=0,dd=0,n=0;
+  S0.L.forEach(function(x){if(m.plants&&!m.plants.has(x.plant))return;if(m.groups&&!m.groups.has(x.group))return;n++;sh+=x.sheets;if(x.value!=null){val+=x.value;hasV=true}if(x.days!=null){dn+=x.days*x.sheets;dd+=x.sheets}});
+  return {sheets:sh,value:hasV?val:null,days:dd>0?dn/dd:null,n:n,asOf:S0.sn.as_of};
+}
+function dRecvItems(){return dMemo('recvit',function(){return recvItems(null)})}
+function dRecv(m){
+  var t=S.recvAsOf||TODAY(),b=[0,0,0,0],nd=0,tot=0,over=0,n=0,custs=new Map();
+  dRecvItems().forEach(function(x){if(m.plants&&!m.plants.has(x.plant))return;if(m.cust&&!m.cust.has(x.cust))return;n++;var od=diffDays(t,x.due);tot+=x.open;
+    var c=custs.get(x.cust);if(!c){c={code:x.cust,name:x.name,open:0};custs.set(x.cust,c)}c.open+=x.open;
+    if(od<=0){nd+=x.open;return}if(od<=30)b[0]+=x.open;else if(od<=60)b[1]+=x.open;else if(od<=90)b[2]+=x.open;else b[3]+=x.open;if(od>CFG.overdue_share_days)over+=x.open});
+  return {have:n>0,b:b,notDue:nd,total:tot,overShare:tot>0?over/tot*100:null,custs:custs,asOf:t};
+}
+function dActs(m){
+  var u=effUser(),n=dScope().plants.length;
+  return myActions(u).filter(function(a){if(a.status==='Cancelled')return false;if(a.plant){if(m.plants&&!m.plants.has(String(a.plant)))return false}else if(m.plants&&m.plants.size<n)return false;return true});
+}
+function dActCalc(kind,m){
+  var l=dActs(m),today=TODAY();
+  if(kind==='open')return l.filter(function(a){return LIVE_ST.indexOf(a.status)>=0}).length;
+  if(kind==='overdue')return l.filter(function(a){return LIVE_ST.indexOf(a.status)>=0&&a.due&&diffDays(a.due,today)<0}).length;
+  if(kind==='fu'){var ids={};l.forEach(function(a){ids[a.id]=1});return (S.followups||[]).filter(function(f){return ids[f.action_id]&&f.status!=='Sent'&&f.status!=='Dismissed'}).length}
+  if(kind==='closure'){var dn=l.filter(function(a){return a.done_at}),ot=dn.filter(function(a){return a.done_at.slice(0,10)<=a.due});return dn.length?ot.length/dn.length*100:null}
+  return null;
+}
+
+/* =============== measure registry =============== */
+/* kind: sales | plan | coll | recv | cn | stock | rating | person | bench | act | dh. unit: sh | inr | pct | n | days | score.
+ * lower: lower is better. add: adds up across members (donut, stacked, share-of-total allowed). snap: month-end snapshot, no period. dims: allowed breakdowns. */
+var D_SALES_DIMS=['none','month','quarter','fy','plant','zone','state','group','thickness','brand','customer','salesperson'];
+var D_PLAN_DIMS=['none','month','quarter','plant','zone','state','group'];
+var D_COLL_DIMS=['none','month','quarter','fy','plant','zone','state','customer'];
+var D_PLANT_DIMS=['none','plant','zone','state'];
+var D_BN_DIMS=['plant','zone','state','group','salesperson'];
+var MEAS={
+ sheets:{mod:'Sales',label:'Sheets',unit:'sh',kind:'sales',add:true,dims:D_SALES_DIMS,tgt:true,src:'cells/ and roll/ sheets (net of credit notes when loaded for every plant, else invoiced)'},
+ value_inv:{mod:'Sales',label:'Value invoiced',unit:'inr',kind:'sales',f:'n',add:true,dims:D_SALES_DIMS,src:'cells/ and roll/ invoiced value, external customers only'},
+ value_net:{mod:'Sales',label:'Value, net of credit notes',unit:'inr',kind:'sales',f:'n',net:true,add:true,dims:['none','month','quarter','fy','plant','zone','state','group'],src:'roll/ invoiced less creditnotes/ (needs credit notes for every plant and month)'},
+ qty_sqft:{mod:'Sales',label:'Quantity (sq ft)',unit:'sq',kind:'sales',f:'sq',add:true,dims:D_SALES_DIMS,src:'roll/ sq ft of the items sold'},
+ lines:{mod:'Sales',label:'Invoice lines',unit:'n',kind:'sales',f:'l',add:true,dims:D_SALES_DIMS,src:'roll/ line count'},
+ avgprice:{mod:'Sales',label:'Average price per sheet',unit:'inr1',kind:'sales',ratio:true,dims:D_SALES_DIMS,src:'invoiced value ÷ sheets'},
+ target:{mod:'Planning',label:'Target (sheets)',unit:'sh',kind:'plan',pf:'tgt',add:true,dims:D_PLAN_DIMS,src:'potential/ approved target in sheets, phased by phasing/'},
+ ach:{mod:'Planning',label:'Achievement % of target',unit:'pct',kind:'plan',ratio:true,dims:D_PLAN_DIMS,tgt:true,src:'sheets ÷ approved sheet target (Check target above 300%)'},
+ potential:{mod:'Planning',label:'Market potential (sheets)',unit:'sh',kind:'plan',pf:'pot',add:true,dims:D_PLAN_DIMS,src:'potential/ approved potential in sheets, pro-rated by working days'},
+ share:{mod:'Planning',label:'Share of potential',unit:'pct',kind:'plan',ratio:true,dims:D_PLAN_DIMS,src:'sheets ÷ market potential (Check potential above 300%)'},
+ gap:{mod:'Planning',label:'Gap to target (sheets still to go)',unit:'sh',kind:'plan',lower:true,dims:D_PLAN_DIMS,src:'approved sheet target less sheets so far (negative = ahead of target)'},
+ phasing:{mod:'Planning',label:'Target phasing by month',unit:'sh',kind:'plan',pf:'tgt',add:true,dims:['month'],fixedBy:'month',src:'potential/ target x phasing/ percentages per month'},
+ coll:{mod:'Collections',label:'Collected',unit:'inr',kind:'coll',add:true,dims:D_COLL_DIMS,src:'collections/ receipts (Incoming Payment Report)'},
+ coll_eff:{mod:'Collections',label:'Collection efficiency',unit:'pct',kind:'coll',ratio:true,dims:['none','month','quarter','plant','zone','state'],src:'collected ÷ invoiced in the same period (a ratio, not an achievement)'},
+ recv_out:{mod:'Receivables',label:'Outstanding',unit:'inr',kind:'recv',snap:true,add:true,dims:['none','plant','zone','state','customer','ageing'],lower:true,src:'receivables/ open items on the latest snapshot'},
+ recv_over:{mod:'Receivables',label:'Overdue share',unit:'pct',kind:'recv',snap:true,ratio:true,lower:true,dims:['none','plant','zone','state'],src:'open items past due by more than the Settings days ÷ total open'},
+ recv_age:{mod:'Receivables',label:'Ageing buckets',unit:'inr',kind:'recv',snap:true,add:true,dims:['ageing'],fixedBy:'ageing',lower:true,src:'receivables/ days past due: 0-30, 31-60, 61-90, 90+'},
+ cn_value:{mod:'Credit notes',label:'Credit notes (value)',unit:'inr',kind:'cn',add:true,lower:true,dims:['none','month','quarter','fy','plant','zone','state','group'],src:'creditnotes/ value by plant, month and group'},
+ cn_ratio:{mod:'Credit notes',label:'Credit-note ratio',unit:'pct',kind:'cn',ratio:true,lower:true,dims:['none','month','quarter','plant','zone','state','group'],src:'credit notes ÷ invoiced value'},
+ stock_sh:{mod:'Inventory',label:'Stock (sheets)',unit:'sh',kind:'stock',snap:true,add:true,dims:['none','plant','zone','state','group'],src:'stock/ latest snapshot, sheets on hand'},
+ stock_val:{mod:'Inventory',label:'Stock value',unit:'inr',kind:'stock',snap:true,add:true,dims:['none','plant','zone','state','group'],src:'stock/ latest snapshot, value'},
+ stock_days:{mod:'Inventory',label:'Stock days',unit:'days',kind:'stock',snap:true,ratio:true,lower:true,dims:['none','plant','zone','state','group'],src:'stock sheets ÷ sheets sold per day over the 90 days before the snapshot'},
+ rating:{mod:'Rating',label:'Branch rating score',unit:'score',kind:'rating',ratio:true,dims:['plant'],fixedBy:'plant',src:'weighted percentile rank: sales 50, collections 30, stock days 20 (informational only)'},
+ person:{mod:'Rating',label:'Person scorecard',unit:'sh',kind:'person',add:true,dims:['salesperson'],fixedBy:'salesperson',src:'sheets, QoQ and share per salesperson (no Ach % until person plans exist)'},
+ bench_rank:{mod:'Benchmarking',label:'Rank',unit:'rank',kind:'bench',bench:'rank',dims:D_BN_DIMS,src:'rank among peers on the base measure'},
+ bench_pct:{mod:'Benchmarking',label:'Percentile',unit:'pctl',kind:'bench',bench:'pct',dims:D_BN_DIMS,src:'percentile among peers on the base measure'},
+ bench_best:{mod:'Benchmarking',label:'Gap to best',unit:'base',kind:'bench',bench:'best',dims:D_BN_DIMS,src:'member minus the best peer'},
+ bench_med:{mod:'Benchmarking',label:'Gap to median',unit:'base',kind:'bench',bench:'med',dims:D_BN_DIMS,src:'member minus the median peer'},
+ bench_idx:{mod:'Benchmarking',label:'Index vs average (100 = average)',unit:'idx',kind:'bench',bench:'idx',dims:D_BN_DIMS,src:'member ÷ average of peers x 100'},
+ act_open:{mod:'Actions',label:'Open actions',unit:'n',kind:'act',a:'open',add:true,lower:true,dims:D_PLANT_DIMS,src:'actions/ live statuses in your scope'},
+ act_over:{mod:'Actions',label:'Overdue actions',unit:'n',kind:'act',a:'overdue',add:true,lower:true,dims:D_PLANT_DIMS,src:'actions/ live and past their due date'},
+ act_fu:{mod:'Actions',label:'Follow-ups pending',unit:'n',kind:'act',a:'fu',add:true,lower:true,dims:D_PLANT_DIMS,src:'followups/ drafts not yet sent or dismissed'},
+ act_close:{mod:'Actions',label:'On-time closure %',unit:'pct',kind:'act',a:'closure',ratio:true,dims:D_PLANT_DIMS,src:'actions/ closed by the due date ÷ closed'},
+ dh_cov:{mod:'Data health',label:'Coverage',unit:'pct',kind:'dh',dims:['none'],src:'coverage grid: loaded plant-months for the last four quarters'},
+ dh_last:{mod:'Data health',label:'Last upload',unit:'text',kind:'dh',dims:['none'],src:'uploads/ latest successful load per SAP export'},
+ dh_rej:{mod:'Data health',label:'Rejected rows',unit:'n',kind:'dh',lower:true,add:true,dims:['none'],src:'uploads/ rows skipped at validation'}
+};
+Object.keys(MEAS).forEach(function(k){MEAS[k].id=k});
+var D_MODS=['Sales','Planning','Collections','Receivables','Credit notes','Inventory','Rating','Benchmarking','Actions','Data health'];
+var D_MOD_ICON={Sales:'<path d="M3 20h18M6 16l4-5 4 3 5-7"/>',Planning:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',Collections:'<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',Receivables:'<path d="M7 4h10M7 9h10M7 4c5 0 5 5 0 5l7 11"/>','Credit notes':'<path d="M9 14l-4-4 4-4M5 10h9a5 5 0 0 1 0 10h-3"/>',Inventory:'<path d="M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4"/>',Rating:'<path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.6 19.7l1.1-6.1L3.2 9.4l6.1-.8z"/>',Benchmarking:'<path d="M5 20V10M12 20V4M19 20v-7"/>',Actions:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>','Data health':'<path d="M3 12h4l3-8 4 16 3-8h4"/>'};
+var D_BY={none:'None (total)',month:'Month',quarter:'Quarter',fy:'Financial year',plant:'Plant',zone:'Zone',state:'State (of the plant)',group:'Product group',thickness:'Thickness',brand:'Brand',item:'Item',customer:'Customer',salesperson:'Salesperson',ageing:'Ageing bucket'};
+var D_VIS={kpi:'KPI tile',bullet:'Bullet vs target',bar:'Bar',stacked:'Stacked bar (7 quarters)',line:'Line trend',donut:'Donut',ranked:'Ranked top / bottom',heat:'Heatmap (member x month)',table:'Table with drill-down',multiples:'Small multiples',bench:'Benchmark vs best and median',coverage:'Coverage grid'};
+var D_PERK={follow:'Follow the dashboard',MTD:'Month',Q:'Quarter',QTD:'Quarter to date (current)',FY:'Financial year',CUSTOM:'Custom range'};
+var D_FILTER_DIMS=['plant','zone','state','group','thickness','brand','customer','salesperson'];
+
+function dMeas(card){return MEAS[card.measure]||null}
+function dBaseMeas(card){var m=dMeas(card);return m&&m.kind==='bench'?(MEAS[card.base]&&MEAS[card.base].kind!=='bench'?MEAS[card.base]:MEAS.sheets):m}
+/* what a role may use (design/dashboard-builder-spec.md section 7) */
+function dRoleOk(role,m){
+  role=role||effRole();var k=m.kind;
+  if(role==='Super admin'||role==='Management / HO'||role==='HOD')return true;
+  if(role==='Branch / depot manager')return k!=='dh';
+  if(role==='Sales executive'||role==='Coordinator (sales / CRR)')return k==='sales'||k==='act';
+  if(role==='Accounts')return ['coll','recv','cn','act'].indexOf(k)>=0||(k==='sales'&&(m.id==='value_inv'||m.id==='value_net'));
+  if(role==='Plant')return k==='stock'||k==='act'||(k==='sales'&&(m.id==='sheets'||m.id==='qty_sqft'));
+  return k==='sales'||k==='act';
+}
+function dRoleWhy(role,m){return m.kind==='rating'?'Branch rating is for Management, HOD and Branch managers':m.kind==='dh'?'Data health is for Super admin, Management and HOD':'Outside the '+role+' role'}
+function dDimOk(card,by){
+  var m=dMeas(card);if(!m)return false;if(m.dims.indexOf(by)<0)return false;
+  if(m.kind==='bench'){var b=dBaseMeas(card);return b.dims.indexOf(by)>=0}
+  return true;
+}
+function dByWhy(card,by){var m=dMeas(card);if(by==='item')return 'Item-level sales are not stored in the roll-ups or detail chunks (thickness and brand are); the SAP documents list shows items';return m&&m.dims.indexOf(by)<0?'Not available for '+m.label:''}
+
+/* ---- member lists per breakdown ---- */
+function dMembers(card,F,res){
+  var by=card.by||'none',base=dBaseM(F),SCP=dScope(),out=[];
+  if(by==='none')return [{k:'all',label:'All'+(F.plants.size<SCP.plants.length?' (filtered)':''),m:base,dim:null}];
+  if(by==='plant')Array.from(F.plants).sort().forEach(function(p){out.push({k:p,label:plantShort(p),m:dMk(base,{plants:dSetOf([p])}),dim:'plant'})});
+  else if(by==='zone'||by==='state'){var fn=by==='zone'?dZone:dState,g={};F.plants.forEach(function(p){(g[fn(p)]=g[fn(p)]||[]).push(p)});Object.keys(g).sort().forEach(function(z){out.push({k:z,label:z,m:dMk(base,{plants:dSetOf(g[z])}),dim:by})})}
+  else if(by==='group'){GROUPS.filter(function(g){return !F.groups||F.groups.has(g)}).forEach(function(g){out.push({k:g,label:g,m:dMk(base,{groups:dSetOf([g])}),dim:'group'})})}
+  else if(by==='salesperson'){if(SCP.own!=null)out.push({k:SCP.own,label:SCP.own,m:base,dim:'salesperson'});else distinct('sp').forEach(function(s){if(F.spPick&&F.spPick!==s)return;out.push({k:s,label:s,m:dMk(base,{sp:s}),dim:'salesperson'})})}
+  else if(by==='thickness'||by==='brand'){
+    var dm=dDimMap(dMk(base,{thk:null,brand:null,cust:null}),res.cur),key=by==='thickness'?'thk':'brand',tot={};
+    if(dm.map)dm.map.forEach(function(o){tot[o[key]]=(tot[o[key]]||0)+o.sh});
+    Object.keys(tot).sort(function(a,b){return tot[b]-tot[a]}).forEach(function(l){if(F[key]&&!F[key].has(l))return;var ov={};ov[key]=dSetOf([l]);out.push({k:l,label:l,m:dMk(base,ov),dim:by})});
+  }
+  else if(by==='customer'){
+    var m0=dMeas(card);
+    if(m0.kind==='sales'){var cm=dCustMap(dMk(base,{cust:null,thk:null,brand:null}),res.cur);if(cm.map)Array.from(cm.map.values()).sort(function(a,b){return b.n-a.n}).slice(0,300).forEach(function(o){if(F.cust&&!F.cust.has(o.code))return;out.push({k:o.code,label:custName(o.code,o.name)||o.code,m:dMk(base,{cust:dSetOf([o.code])}),dim:'customer'})})}
+    else if(m0.kind==='recv'){Array.from(dRecv(base).custs.values()).sort(function(a,b){return b.open-a.open}).slice(0,300).forEach(function(o){out.push({k:o.code,label:custName(o.code,o.name)||o.code,m:dMk(base,{cust:dSetOf([o.code])}),dim:'customer'})})}
+    else if(m0.kind==='coll'){var tt={},ix=dCollIdx();Object.keys(ix).forEach(function(kk){if(!F.plants.has(kk.split(D_SEP)[0]))return;ix[kk].rows.forEach(function(r){tt[r[2]]=(tt[r[2]]||0)+r[3]})});Object.keys(tt).sort(function(a,b){return tt[b]-tt[a]}).slice(0,300).forEach(function(c){out.push({k:c,label:custName(c,'')||c,m:dMk(base,{cust:dSetOf([c])}),dim:'customer'})})}
+  }
+  else if(by==='ageing'){['0–30 days','31–60 days','61–90 days','90+ days'].forEach(function(l,i){out.push({k:String(i),label:l,m:base,dim:'ageing',bucket:i})})}
+  else if(by==='month'){dMonths8(res).forEach(function(ym){out.push({k:ym,label:ymLabel(ym),m:base,dim:'month',w:[{ym:ym,frac:1}],pw:[{ym:priorQuarterMonth(ym),frac:1}],partial:ym===TODAY().slice(0,7)})})}
+  else if(by==='quarter'){dQuarters().forEach(function(q,i){out.push({k:q.q,label:q.label+(q.isCur?' to date':''),m:base,dim:'quarter',w:q.w,pw:dPriorW(q.q,q.isCur),partial:q.isCur})})}
+  else if(by==='fy'){
+    var fys={},cq=curQuarterKey();closedQuarters().concat([cq]).forEach(function(q){var fy=q.slice(0,4);(fys[fy]=fys[fy]||[]).push(q)});
+    Object.keys(fys).sort().forEach(function(fy){var ms=[];fys[fy].forEach(function(q){ms=ms.concat(qMonths(q))});var isc=fys[fy].indexOf(cq)>=0,N=isc?wdBetween(ms[0]+'-01',TODAY()):Infinity;out.push({k:fy,label:fy+(isc?' so far':''),m:base,dim:'fy',w:walk(ms,N),pw:null,partial:isc})});
+  }
+  return out;
+}
+
+/* =============== the value of a measure for a member over a window =============== */
+function dValOne(meas,mem,w){
+  var m=mem.m,k=meas.kind;
+  if(k==='sales'){
+    var a=dSales(m,w);if(a.st!=='ok')return dV(null,a.st,{total:a.total});
+    var cov=dSalesCov(m,w),extra={cov:cov,partialDetail:a.partialDetail,basis:a.net?'Net':'Invoiced'};
+    if(!cov.any&&!a.detail)return dV(null,'nolod',extra);
+    if(meas.net){if(!a.net)return dV(null,'nocn',{unc:a.unc,cov:cov});return dV(a.net.n,'ok',extra)}
+    if(meas.ratio){var sh0=a.net?a.net.sh:a.raw.sh,n0=a.raw.n;return dV(sh0>0?n0/sh0:null,'ok',extra)}
+    var f=meas.f||'sh',src=(f==='n'||f==='l')?a.raw:(a.net||a.raw);
+    return dV(src[f],'ok',extra);
+  }
+  if(k==='plan'){
+    if(m.sp!=null||m.thk||m.brand||m.cust)return dV(null,'noplan',{why:'Targets and potential are set by plant and product group, not by person, customer, thickness or brand'});
+    var gs=m.groups?Array.from(m.groups):[undefined],pot=0,tgt=0,any=false;
+    gs.forEach(function(g){var P=planQtyF({plants:m.plants,group:g},w);if(P.any){any=true;pot+=P.pot;tgt+=P.tgt}});
+    if(meas.id==='target'||meas.id==='phasing')return any&&tgt>0?dV(tgt,'ok'):dV(null,'noplan');
+    if(meas.id==='potential')return any&&pot>0?dV(pot,'ok'):dV(null,'nopot');
+    var s=dSales(m,w);if(s.st!=='ok')return dV(null,s.st);var sh=s.net?s.net.sh:s.raw.sh,cv=dSalesCov(m,w);
+    if(meas.id==='gap')return tgt>0&&cv.any?dV(tgt-sh,'ok',{cov:cv,tgt:tgt,act:sh}):dV(null,tgt>0?'nolod':'noplan');
+    if(meas.id==='ach'){if(!(tgt>0))return dV(null,'noplan');var a2=sh/tgt*100;return achCap(a2)?dV(null,'check',{raw:a2,what:'target',cov:cv}):dV(a2,'ok',{cov:cv,tgt:tgt,act:sh})}
+    if(meas.id==='share'){if(!(pot>0))return dV(null,'nopot');var s2=sh/pot*100;return achCap(s2)?dV(null,'check',{raw:s2,what:'potential',cov:cv}):dV(s2,'ok',{cov:cv,pot:pot,act:sh})}
+    return dV(null,'na');
+  }
+  if(k==='coll'){
+    if(m.groups||m.thk||m.brand||m.sp!=null)return dV(null,'na',{why:'Receipts carry no product group or salesperson'});
+    var cc=dColl(m,w);if(!cc.have)return dV(null,'nolod');
+    var ex={cov:{k:cc.have,n:cc.total},plan:cc.plan};
+    if(meas.id==='coll_eff'){var iv=sumF({plants:m.plants},w).n;if(!(iv>0))return dV(null,'nolod');return dV(cc.rec/iv*100,'ok',ex)}
+    if(m.cust){var t=0,ix=dCollIdx();wins(w).forEach(function(x){if(!(x.frac>0))return;m.plants.forEach(function(p){var d=ix[p+D_SEP+x.ym];if(d)d.rows.forEach(function(r){if(m.cust.has(r[2]))t+=r[3]*x.frac})})});return dV(t,'ok',ex)}
+    return dV(cc.rec,'ok',ex);
+  }
+  if(k==='cn'){
+    if(m.thk||m.brand||m.cust||m.sp!=null)return dV(null,'na',{why:'Credit notes are stored by plant, month and product group'});
+    var cn=dCN(m,w);if(!cn.covered)return dV(null,cn.any?'partial':'nocn',{unc:cn.unc});
+    if(meas.id==='cn_ratio'){var iv2=0;(m.groups?Array.from(m.groups):[undefined]).forEach(function(g){iv2+=sumF({plants:m.plants,group:g},w).n});return iv2>0?dV(cn.value/iv2*100,'ok'):dV(null,'nolod')}
+    return dV(cn.value,'ok');
+  }
+  return dV(null,'na');
+}
+function dSnap(meas,mem){
+  var m=mem.m,k=meas.kind;
+  if(k==='stock'){var s=dStock(m);if(!s||!s.n)return dV(null,'nolod');if(meas.id==='stock_sh')return dV(s.sheets,'ok',{asOf:s.asOf});if(meas.id==='stock_val')return s.value==null?dV(null,'nolod'):dV(s.value,'ok',{asOf:s.asOf});return s.days==null?dV(null,'nolod'):dV(s.days,'ok',{asOf:s.asOf})}
+  if(k==='recv'){var r=dRecv(m);if(!r.have)return dV(null,'nolod');
+    if(meas.id==='recv_over')return r.overShare==null?dV(null,'nolod'):dV(r.overShare,'ok',{asOf:r.asOf});
+    if(mem.dim==='ageing')return dV(r.b[mem.bucket],'ok',{asOf:r.asOf});
+    return dV(r.total,'ok',{asOf:r.asOf,notDue:r.notDue,buckets:r.b});}
+  if(k==='act'){var v=dActCalc(meas.a,m);return v==null?dV(null,'noplan'):dV(v,'ok')}
+  return dV(null,'na');
+}
+
+/* ---- src/54-dash2-run.js ---- */
+/* ================= My Dashboard, part 2: the query engine (members x windows -> rows) ================= */
+function dIsPP(meas){return !!meas.ratio&&(meas.unit==='pct'||meas.unit==='days'||meas.unit==='score')}
+/* quarter on quarter for one member. Sales: Net with Net only when credit notes are loaded for both quarters, else invoiced with invoiced (D40). Ratios: change in points. */
+function dPair(meas,mem,wq,wp){
+  var m=mem.m;
+  if(!wp)return {v:null,state:'none',txt:mem.dim==='fy'?'FY is read quarter by quarter':'no prior quarter'};
+  if(preHist(dMonthsOf(wp)))return {v:null,state:'nohist',txt:'No prior quarter loaded'};
+  if(meas.kind==='sales'){
+    var a=dSales(m,wq),p=dSales(m,wp);
+    if(a.st==='loading'||p.st==='loading')return {v:null,state:'loading',txt:'reading detail'};
+    if(a.st!=='ok'||p.st!=='ok')return {v:null,state:'incomplete',txt:'no prior detail'};
+    var both=!!(a.net&&p.net);if(meas.net&&!both)return {v:null,state:'incomplete',txt:'credit notes not loaded'};
+    var useNet=both;
+    var g=function(o){
+      if(meas.ratio){var s=useNet?o.net.sh:o.raw.sh;return s>0?o.raw.n/s:null}
+      var f=meas.f||'sh';if(f==='n'&&meas.net)return o.net.n;if(f==='n'||f==='l')return o.raw[f];return (useNet?o.net:o.raw)[f];
+    };
+    var ca=dSalesCov(m,wq),cp=dSalesCov(m,wp),inc=!(ca.k===ca.n&&cp.k===cp.n&&ca.n>0&&cp.n>0);
+    return qoqOf(g(a),g(p),{incomplete:inc});
+  }
+  var c=dValOne(meas,mem,wq),q=dValOne(meas,mem,wp);
+  if(c.v==null||q.v==null)return {v:null,state:'incomplete',txt:(c.st==='ok'||c.st==null)?'prior quarter not loaded':'not loaded'};
+  var cc=c.cov,pc=q.cov;if(cc&&pc&&(cc.k<cc.n||pc.k<pc.n))return {v:null,state:'incomplete',txt:'incomplete history'};
+  if(dIsPP(meas))return {v:c.v-q.v,state:'ok',pp:true,txt:(c.v-q.v>=0?'+':'−')+Math.abs(c.v-q.v).toFixed(1)+(meas.unit==='days'?' days':' pts')};
+  return qoqOf(c.v,q.v,{});
+}
+function dSeries(meas,mem){
+  return dQuarters().map(function(q){
+    var r=dValOne(meas,mem,q.w);
+    var part=!!(r.cov&&r.cov.n&&r.cov.k<r.cov.n&&r.v!=null);
+    return {q:q.q,label:q.label,v:r.st==='ok'?r.v:null,st:r.st,isCur:q.isCur,partial:part||q.isCur&&r.st==='ok'};
+  });
+}
+function dMonthSeries(meas,mem,months){
+  var tYm=TODAY().slice(0,7);
+  return months.map(function(ym){var r=dValOne(meas,mem,[{ym:ym,frac:1}]);return {ym:ym,v:r.st==='ok'?r.v:null,st:r.st,partial:ym===tYm}});
+}
+/* band of a row: Ach % for sheets and the Ach measure, plan ÷ actual for stock days, collected ÷ plan for collections */
+function dBandOf(meas,row){
+  if(meas.id==='ach')return row.v!=null?oxBand(row.v):null;
+  if(row.ach!=null)return oxBand(row.ach);
+  return null;
+}
+function dPlanOf(meas,mem,res,row){
+  /* target, potential and Ach for sheets-like measures over the card's window */
+  if(meas.id==='sheets'&&mem.m.sp==null&&!mem.m.thk&&!mem.m.brand&&!mem.m.cust&&!mem.w){
+    var gs=mem.m.groups?Array.from(mem.m.groups):[undefined],tgt=0,pot=0,any=false;
+    gs.forEach(function(g){var P=planQtyF({plants:mem.m.plants,group:g},res.cur);if(P.any){any=true;tgt+=P.tgt;pot+=P.pot}});
+    if(any){row.tgt=tgt>0?tgt:null;row.pot=pot>0?pot:null;
+      if(tgt>0&&row.v!=null){var a=row.v/tgt*100;if(achCap(a)){row.check='target'}else row.ach=a}
+      if(pot>0&&row.v!=null){var s=row.v/pot*100;if(achCap(s))row.checkPot=true;else row.share=s}}
+  }else if(meas.id==='coll'&&row.x&&row.x.plan>0&&row.v!=null){row.tgt=row.x.plan;row.ach=row.v/row.x.plan*100;if(achCap(row.ach)){row.ach=null;row.check='target'}}
+  else if(meas.id==='stock_days'&&row.v!=null&&CFG.stock_days_target>0){var al=achLower(row.v,CFG.stock_days_target);row.tgt=CFG.stock_days_target;row.ach=al.ach}
+}
+function dCompute(meas,members,res){
+  return members.map(function(mem){
+    var row={k:mem.k,label:mem.label,dim:mem.dim,mem:mem,partialTime:mem.partial};
+    if(meas.snap){var r=dSnap(meas,mem);row.v=r.v;row.st=r.st;row.x=r;row.q={v:null,state:'none',txt:'no prior snapshot'};dPlanOf(meas,mem,res,row);return row}
+    var wc=mem.w||res.cur,wq=mem.w||res.qCur,wp=mem.w?mem.pw:res.qPrior;
+    var cur=dValOne(meas,mem,wc);row.v=cur.v;row.st=cur.st;row.x=cur;
+    if(cur.st==='check'){row.check=cur.what}
+    row.q=dPair(meas,mem,wq,wp);
+    dPlanOf(meas,mem,res,row);
+    if(cur.st==='ok'&&meas.kind==='sales'&&cur.cov&&cur.cov.k<cur.cov.n)row.partial=cur.cov;
+    return row;
+  });
+}
+/* sorting: value or QoQ, top (best first) or bottom */
+function dSortRows(rows,card,meas){
+  var sb=card.sortBy||'value',dir=card.dir||'top',lower=!!meas.lower;
+  var key=function(r){var x=sb==='qoq'?(r.q&&r.q.state==='ok'?r.q.v:null):r.v;return x};
+  var arr=rows.slice();
+  arr.sort(function(a,b){
+    if(sb==='label')return a.label<b.label?-1:a.label>b.label?1:0;
+    var x=key(a),y=key(b);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;
+    var asc=(lower&&sb!=='qoq')?(dir==='top'):(dir==='bottom');
+    return asc?x-y:y-x;
+  });
+  return arr;
+}
+function dRankPct(vals,v,hi){
+  var n=vals.length;if(n<2)return null;var w=0,t=0;
+  vals.forEach(function(o){if(o===v)return;if(hi?o<v:o>v)w++;else if(o===v)t++});
+  return (w+.5*t)/(n-1)*100;
+}
+function dBench(rows,bm,lower){
+  var vals=rows.filter(function(r){return r.v!=null}).map(function(r){return r.v});
+  var best=vals.length?(lower?Math.min.apply(null,vals):Math.max.apply(null,vals)):null,med=dMed(vals),avg=vals.length?vals.reduce(function(a,b){return a+b},0)/vals.length:null;
+  var sorted=rows.filter(function(r){return r.v!=null}).sort(function(a,b){return lower?a.v-b.v:b.v-a.v});
+  rows.forEach(function(r){
+    r.bv=r.v;r.bench={best:best,med:med,avg:avg,n:vals.length};
+    if(r.v==null){r.rank=null;r.pctl=null;return}
+    r.rank=sorted.indexOf(r)+1;r.pctl=dRankPct(vals,r.v,!lower);
+    r.gapBest=r.v-best;r.gapMed=med==null?null:r.v-med;r.idx=avg>0?r.v/avg*100:null;
+  });
+  return {best:best,med:med,avg:avg,n:vals.length};
+}
+/* ---- data health ---- */
+var D_ENT=[['INV','Sales (invoices)'],['CN','Credit notes'],['CL','Collections'],['RC','Receivables'],['ST','Stock']];
+function dDh(card,meas){
+  var qs=gridQuarters().list.slice(-4),R={rows:[],cov:[],qs:qs};
+  D_ENT.forEach(function(e){var cells=qs.map(function(q){var c=covStatus(e[0],q);return {q:q,st:c.st,detail:c.detail}});R.cov.push({ent:e[0],label:e[1],cells:cells})});
+  var tot=0,ok=0;R.cov.forEach(function(r){r.cells.forEach(function(c){tot++;if(c.st==='ok')ok++})});
+  R.pct=tot?ok/tot*100:null;
+  var ups=S.uploads.filter(function(u){return u.status==='Loaded'||u.status==='Undone'&&0});
+  D_ENT.forEach(function(e){
+    var l=ups.filter(function(u){return u.entity===e[0]}).sort(function(a,b){return a.at<b.at?1:-1})[0];
+    R.rows.push({k:e[0],label:e[1],up:l||null,v:meas.id==='dh_rej'?(l?(+l.rejected||0):null):(l?l.at:null),read:l?(+l.read||0):null});
+  });
+  R.last=ups.length?ups.reduce(function(a,u){return a>u.at?a:u.at},''):'';
+  R.rej=R.rows.reduce(function(a,r){return a+(r.v&&meas.id==='dh_rej'?r.v:0)},0);
+  return R;
+}
+/* ---- rating (informational only) ---- */
+function dRating(card,F,res,members){
+  var SCP=dScope();
+  if(SCP.own!=null)return {err:'Branch rating is not available to a Sales executive'};
+  var ctx={sc:SCP.sc,f:{plant:'',group:''},res:res,plants:F.plants,base:{sp:undefined,group:undefined}};
+  var plants=members.map(function(mem){var p=mem.k,o=figs({plant:p,plants:undefined},ctx,{noTrend:true}),pq=planQtyF({plants:undefined,plant:p},res.cur);
+    return {p:p,o:o,pq:pq,ach:oxAchV(o.sh,pq.tgt),ck:oxAchCk(o.sh,pq.tgt)}});
+  var colHave=false;try{colHave=collMonths(F.plants,res.cur).have}catch(e){}
+  var inv=null;try{inv=invSummary(ctx)}catch(e){}
+  var RT=ratingRows(plants,res,colHave?res.cur:null,inv);
+  var byId={};RT.rows.forEach(function(b){byId[b.id]=b});
+  return {RT:RT,byId:byId,basis:RT.basis};
+}
+function dRun(card){
+  var key='run|'+[card.measure,card.base||'',card.by||'',JSON.stringify(card.filters||[]),JSON.stringify(card.drill||[]),JSON.stringify(card.period||{}),card.visual,card.n||'',card.dir||'',card.sortBy||''].join('|');
+  return dMemo(key,function(){try{return dRun0(card)}catch(e){return {err:(e&&e.message)||String(e)}}});
+}
+function dRun0(card){
+  var meas=dMeas(card);if(!meas)return {err:'This card uses a measure that no longer exists ('+card.measure+')'};
+  var role=effRole();if(!dRoleOk(role,meas))return {locked:true,why:dRoleWhy(role,meas),meas:meas};
+  var res=dRes(card.period),F=dFilt(card),by=meas.fixedBy||card.by||'none';
+  var c2=Object.assign({},card,{by:by});
+  var R={meas:meas,by:by,res:res,F:F,src:meas.src,rows:[],notes:[],card:card,unit:meas.unit,lower:!!meas.lower};
+  if(!dDimOk(c2,by))return Object.assign(R,{err:'This measure cannot be broken down by '+D_BY[by]});
+  if(meas.kind==='dh'){R.dh=dDh(card,meas);R.rows=R.dh.rows;R.noPeriod=true;return R}
+  var SCP=dScope();
+  if(!SCP.plants.length&&!DS.plants.length)return Object.assign(R,{empty:'No sales data in your scope yet.'});
+  if(F.plants.size===0)return Object.assign(R,{empty:'No plant in your scope matches the filters of this card.'});
+  if((by==='thickness'||by==='brand')&&F.sp!=null)return Object.assign(R,{empty:'Thickness and brand detail is held by plant, not by person, so it is not shown to a Sales executive.'});
+  var members=dMembers(c2,F,res);R.members=members;
+  if(!members.length&&(by==='customer'||by==='thickness'||by==='brand')){
+    var base0=dMk(dBaseM(F),{cust:null,thk:null,brand:null});
+    if(by==='customer'&&dMeas(c2).kind==='sales'){var cm0=dCustMap(base0,res.cur);if(cm0.loading)return Object.assign(R,{pending:'loading'})}
+    if(by!=='customer'){var dm0=dDimMap(dMk(base0,{}),res.cur);if(!dm0.st.have)return Object.assign(R,{pending:'nodetail',detailTotal:dm0.st.total});if(!dm0.map)return Object.assign(R,{pending:'loading'})}
+  }
+  var bm=meas;
+  if(meas.kind==='bench')bm=dBaseMeas(card),R.baseMeas=bm;
+  R.timeDim=['month','quarter','fy'].indexOf(by)>=0;
+  R.snap=!!bm.snap;
+  if(meas.kind==='rating'){
+    var rt=dRating(card,F,res,members);if(rt.err)return Object.assign(R,{err:rt.err});
+    R.rating=rt;
+    members.forEach(function(mem){var b=rt.byId[mem.k];R.rows.push({k:mem.k,label:mem.label,dim:'plant',v:b&&b.score!=null?b.score:null,st:b&&b.score!=null?'ok':'norate',rb:b||null,q:{v:null,state:'none',txt:'—'}})});
+    R.total=null;R.noQoq=true;return R;
+  }
+  var rows;
+  if(meas.kind==='person'){
+    rows=dCompute(MEAS.sheets,members,res);
+    var tot=0;rows.forEach(function(r){if(r.v!=null)tot+=r.v});
+    rows.forEach(function(r){r.share=tot>0&&r.v!=null?r.v/tot*100:null;var u=userBySp(r.k);r.user=u?u.name:'';
+      if(u){var st=actionStats(u,res.q||curQuarterKey());r.closure=st.done>0?st.onTime/st.done*100:null;r.closureN=st.done}});
+    R.rows=dSortRows(rows,card,MEAS.sheets);R.totalSheets=tot;R.baseMeas=MEAS.sheets;R.noPlanNote='Salesperson targets are not set, so there is no Ach % here: sheets, QoQ and share only.';
+    R.total=null;return R;
+  }
+  rows=dCompute(bm,members,res);
+  if(meas.kind==='bench'){R.stats=dBench(rows,meas.bench,!!bm.lower);R.unitBase=bm.unit;R.lower=!!bm.lower}
+  /* a total on the same basis (never a sum of rounded parts, never an average of ratios) */
+  if(by!=='none'&&!R.timeDim&&meas.kind!=='bench'){
+    var tm=[{k:'all',label:'Total',m:dBaseM(F),dim:null}];R.total=dCompute(bm,tm,res)[0];
+  }else if(by==='none')R.total=rows[0];
+  R.rows=rows;R.sortedRows=dSortRows(rows,card,bm);
+  /* partial / not loaded roll-up of states */
+  var st={};rows.forEach(function(r){st[r.st]=(st[r.st]||0)+1});R.stateCount=st;
+  R.loading=!!(st.loading);R.nodetail=!!(st.nodetail);
+  return R;
+}
+/* series and monthly values are computed only for the members a visual draws */
+function dNeedSeries(R,n){
+  var bm=R.baseMeas||R.meas;if(bm.snap||R.timeDim)return;
+  var list=(R.sortedRows||R.rows).slice(0,n);
+  list.forEach(function(r){if(!r.series&&r.mem)r.series=dSeries(bm,r.mem)});
+  if(R.total&&!R.total.series)R.total.series=dSeries(bm,R.total.mem);
+}
+function dNeedMonths(R,n){
+  var bm=R.baseMeas||R.meas;if(bm.snap||R.timeDim)return null;
+  var months=dMonths8(R.res),list=(R.sortedRows||R.rows).slice(0,n);
+  list.forEach(function(r){if(!r.ms&&r.mem)r.ms=dMonthSeries(bm,r.mem,months)});
+  return months;
+}
+/* which visuals fit this card, and why a visual is greyed out */
+function dVisFit(card){
+  var meas=dMeas(card),out={};Object.keys(D_VIS).forEach(function(v){out[v]=''});
+  if(!meas)return out;
+  var by=meas.fixedBy||card.by||'none',bm=meas.kind==='bench'?dBaseMeas(card):meas,time=['month','quarter','fy'].indexOf(by)>=0;
+  if(meas.kind==='dh'){Object.keys(D_VIS).forEach(function(v){out[v]=(v==='coverage'?(meas.id==='dh_cov'?'':'Coverage grid is for the Coverage measure'):(v==='kpi'||v==='table')?'':'Data health measures use the coverage grid, a tile or a table')});return out}
+  out.coverage='Coverage grid is for data health';
+  var windowed=['sales','plan','coll','cn'].indexOf(bm.kind)>=0&&!bm.snap&&meas.kind!=='bench'&&meas.id!=='phasing',special=meas.kind==='rating'||meas.kind==='person';
+  if(by==='none'){['bar','ranked','donut','stacked','heat','multiples','bench'].forEach(function(v){out[v]='Needs a breakdown'})}
+  if(!(bm.tgt||bm.id==='coll')||meas.kind==='bench'||special)out.bullet='This measure has no target';
+  if(!(meas.add&&windowed)&&!out.stacked)out.stacked=bm.snap?'Not available for a snapshot measure':'Stacked bars are for measures that add up, read over 7 quarters';
+  if(time&&!out.stacked)out.stacked='A time breakdown is a series: use bar or line';
+  if(!meas.add&&!out.donut)out.donut='Ratios do not add to a whole';
+  if(time&&!out.donut)out.donut='A time breakdown is a series: use bar or line';
+  if(meas.kind==='person'||meas.kind==='rating'){out.stacked='Not available';out.line='Not available';out.heat='Not available'}
+  if(!windowed&&meas.id!=='phasing'&&!out.line)out.line=bm.snap?'Needs a measure read over time (not a snapshot)':'Not available for this measure';
+  if(!out.line&&meas.id!=='phasing'&&by!=='none'&&time)out.line='';
+  if(!windowed&&!out.heat)out.heat=bm.snap?'Needs a measure read over time (not a snapshot)':'Not available for this measure';
+  if(time&&!out.heat)out.heat='The heatmap already runs over months';
+  if(meas.id==='phasing'){out.line='';out.heat='The heatmap already runs over months'}
+  if(time){out.ranked='A time breakdown is a series: use bar, line or table';out.multiples='A time breakdown is a series: use bar, line or table';out.bench='Benchmarks compare members, not months'}
+  if(meas.kind==='rating'||meas.kind==='person'){out.multiples='Not available';out.bench='Not available'}
+  if(meas.kind==='bench'){out.multiples=out.multiples||'Not available'}
+  return out;
+}
+function dAutoVisual(card){
+  var meas=dMeas(card);if(!meas)return 'table';var fit=dVisFit(card),by=meas.fixedBy||card.by||'none';
+  var pref=meas.kind==='dh'?['coverage','kpi']:meas.kind==='bench'?['bench','ranked','table']:meas.kind==='rating'||meas.kind==='person'?['table','ranked']:meas.kind==='plan'&&by==='month'?['line','bar']:
+    by==='none'?['kpi','bullet']:['month','quarter','fy'].indexOf(by)>=0?['bar','line','table']:['bar','ranked','table'];
+  for(var i=0;i<pref.length;i++)if(!fit[pref[i]])return pref[i];
+  return 'table';
+}
+
+/* ---- src/54-dash3-viz.js ---- */
+/* ================= My Dashboard, part 3: visuals (infographic style, same tokens and band colours as the Overview, D51) ================= */
+var D_COL=['var(--g1)','var(--g2)','var(--g3)','var(--g4)','var(--orange)','var(--ink3)'];
+function dFmt(unit,v,base){
+  if(v==null||isNaN(v))return '—';
+  switch(unit){
+    case 'sh':return Math.abs(v)>=100000?oxLakh(v)+' lakh sheets':fmtN(Math.round(v))+' sheets';
+    case 'inr':return fmtMoney(v);
+    case 'inr1':return '₹'+fmtN(Math.round(v));
+    case 'sq':return fmtN(Math.round(v))+' sq ft';
+    case 'pct':return v.toFixed(1)+'%';
+    case 'n':return fmtN(Math.round(v));
+    case 'days':return Math.round(v)+' days';
+    case 'score':return Math.round(v)+' / 100';
+    case 'rank':return '#'+v;
+    case 'pctl':return 'P'+Math.round(v);
+    case 'idx':return Math.round(v);
+    default:return String(Math.round(v*100)/100);
+  }
+}
+function dFmtS(unit,v){/* short, for bars and axes */
+  if(v==null||isNaN(v))return '—';
+  if(unit==='sh')return Math.abs(v)>=100000?oxLakh(v)+' L':fmtN(Math.round(v));
+  if(unit==='inr')return fmtMoney(v).replace(' Cr',' Cr').replace(' L',' L');
+  if(unit==='pct')return v.toFixed(1)+'%';
+  return dFmt(unit,v);
+}
+function dUnit(R){return R.meas.unit==='base'?(R.baseMeas?R.baseMeas.unit:'n'):R.meas.unit}
+function dFmtV(R,v){var u=dUnit(R);if(R.meas.unit==='base'&&v!=null)return (v>0?'+':v<0?'−':'')+dFmt(u,Math.abs(v));return dFmt(u,v)}
+function dFmtVS(R,v){var u=dUnit(R);if(R.meas.unit==='base'&&v!=null)return (v>0?'+':v<0?'−':'')+dFmtS(u,Math.abs(v));return dFmtS(u,v)}
+function dQoqChip(q,lower,label){
+  label=label||'QoQ';
+  if(q&&q.state==='ok'){var up=q.v>=0,good=lower?!up:up;
+    var txt=q.pp?q.txt:Math.abs(q.v).toFixed(1)+'%';
+    return '<span class="ox-chip '+(good?'ok':'bad')+'">'+(up?'▲ ':'▼ ')+(q.pp?txt.replace(/^[+−]/,function(c){return c}):(up?'+':'−')+txt)+' '+label+'</span>';
+  }
+  return '<span class="ox-chip nl">'+label+' · '+esc((q&&q.txt)||'—')+'</span>';
+}
+function dBandChipOf(row){
+  if(row.check)return '<span class="ox-chip warn">'+(row.check==='potential'?'Check potential':'Check target')+'</span>';
+  if(row.ach!=null)return oxBandChip(row.ach);
+  return '';
+}
+function dBandCls(row,meas){var b=dBandOf(meas,row);return b?' b'+b:''}
+function dFirstLoaded(){var ms=Object.keys(S.cells).filter(function(k){return S.cells[k].entity==='INV'}).map(function(k){return S.cells[k].ym}).sort();return ms.length?ymLabel(ms[0]):''}
+function dStMsg(r,R){
+  var st=r.st,x=r.x||{};
+  if(st==='loading')return 'Reading the stored detail…';
+  if(st==='nodetail')return 'Not loaded: these months carry no thickness or brand detail. Reload them in Data Intake › Sales';
+  if(st==='nocn')return 'Credit notes are not loaded for '+(x.unc&&x.unc.length?cnUncText(x.unc):'every plant and month in this period');
+  if(st==='partial')return 'Credit notes are loaded for only some plants or months';
+  if(st==='noplan')return x.why||'Target not set for this selection';
+  if(st==='nopot')return 'Potential not set for this selection';
+  if(st==='check')return x.what==='potential'?'Check potential: share is above '+ACH_MAX+'%':'Check target: achievement is above '+ACH_MAX+'%';
+  if(st==='na')return x.why||'Not available for this selection';
+  if(st==='norate')return 'Not rated: no measure could be ranked';
+  var fl=dFirstLoaded();
+  return 'Not loaded for this period'+(fl?'. Sales are loaded from '+fl:'');
+}
+function dEmpty(title,msg){return '<div class="ox-empty"><b>'+esc(title)+'</b><span>'+esc(msg)+'</span></div>'}
+function dNoVal(r,R){return '<span class="ox-nl" title="'+esc(dStMsg(r,R))+'">'+esc(r.st==='check'?(r.check==='potential'?'Check potential':'Check target'):r.st==='loading'?'reading…':r.st==='noplan'?'no target':r.st==='nopot'?'no potential':r.st==='nocn'?'credit notes not loaded':'not loaded')+'</span>'}
+function dPartialChip(r){var p=r.partial;return p?'<span class="ox-chip nl dsh-hat" '+oxTip('Partial: '+p.k+' of '+p.n+' months loaded for every plant in this selection')+'>partial '+p.k+' of '+p.n+' months</span>':''}
+function dDrillAttr(R,r){return r.dim?' data-act="d-drill" data-c="'+esc(R.card.id)+'" data-k="'+esc(r.k)+'"':''}
+function dLabelBtn(R,r){return r.dim?'<button class="dsh-lb" data-act="d-drill" data-c="'+esc(R.card.id)+'" data-k="'+esc(r.k)+'" title="Drill into '+esc(r.label)+'">'+esc(r.label)+' ›</button>':'<span>'+esc(r.label)+'</span>'}
+function dSecondary(R,row){
+  /* sheets are primary; the rupee value is the second line (D51) */
+  if(R.meas.id!=='sheets'||!row.mem)return '';
+  var a=dSales(row.mem.m,row.mem.w||R.res.cur);if(a.st!=='ok')return '';
+  return '<p class="ox-sec mono">'+fmtMoney(a.net?a.net.n:a.raw.n)+' <span class="ox-unit">'+(a.net?'net value':'invoiced value')+'</span></p>';
+}
+function dSpark(series,key){return oxSpark((series||[]).map(function(s){return s.v}))}
+function dTip(R,r){
+  var t=r.label+' · '+(r.v==null?dStMsg(r,R):dFmtV(R,r.v));
+  if(r.tgt!=null&&R.meas.unit==='sh')t+=' · target '+dFmt('sh',r.tgt);
+  if(r.ach!=null)t+=' · Ach '+oxPct(r.ach)+'%';
+  if(r.q&&r.q.state==='ok')t+=' · QoQ '+(r.q.pp?r.q.txt:(r.q.v>=0?'+':'−')+Math.abs(r.q.v).toFixed(1)+'%');
+  else if(r.q)t+=' · QoQ '+(r.q.txt||'—');
+  return t;
+}
+/* ---- visuals ---- */
+function dvKpi(R,card){
+  var rows=R.sortedRows||R.rows,bm=R.baseMeas||R.meas;
+  if(R.by==='none'||rows.length===1&&!R.members[0].dim){
+    var r=R.total||rows[0];dNeedSeries(R,1);
+    var h='<div class="ox-hero dsh-hero"><div'+oxTip(dTip(R,r))+'>';
+    if(r.v==null)h+='<div class="ox-big"><span class="ox-nl dsh-nl">'+esc(r.st==='check'?(r.check==='potential'?'Check potential':'Check target'):'Not loaded')+'</span></div><p class="note" style="margin:6px 0 0">'+esc(dStMsg(r,R))+'</p>';
+    else{
+      var u=dUnit(R),big=u==='sh'?(Math.abs(r.v)>=100000?oxLakh(r.v)+'<span class="ox-unit"> lakh sheets</span>':fmtN(Math.round(r.v))+'<span class="ox-unit"> sheets</span>'):u==='inr'?esc(fmtMoney(r.v)):esc(dFmt(u,r.v));
+      h+='<div class="ox-big dsh-big">'+big+'</div><div class="ox-row" style="margin-top:6px">'+(R.snap?'<span class="ox-chip nl">as on '+esc(fmtDate((r.x&&r.x.asOf)||S.stockAsOf||S.recvAsOf||TODAY()))+'</span>':dQoqChip(r.q,R.lower))+dBandChipOf(r)+dPartialChip(r)+'</div>'+dSecondary(R,r);
+    }
+    h+='</div><div>';
+    if(r.v!=null&&r.tgt>0)h+=oxBul({act:r.v,tgt:r.tgt,pot:r.pot,band:r.ach!=null?oxBand(r.ach):null,aria:'Actual '+dFmtV(R,r.v)+', target '+dFmtV(R,r.tgt)})+'<p class="note" style="margin:6px 0 0">'+(r.ach!=null?OX_MARK[oxBand(r.ach)]+' '+OX_LBL[oxBand(r.ach)]+' · '+oxPct(r.ach)+'% of '+dFmtS(R.meas.unit,r.tgt)+' target':'Check target')+'</p>';
+    else if(r.v!=null&&bm.tgt)h+='<div class="ox-bul nl"></div><p class="note ox-nl" style="margin:6px 0 0">Target not loaded: no scale to draw against</p>';
+    if(r.series&&!R.snap)h+='<div class="ox-row" style="margin-top:8px">'+dSpark(r.series)+'<span class="note">7 quarters'+(r.series.some(function(s){return s.v==null})?', gaps = not loaded':'')+'</span></div>';
+    return h+'</div></div>';
+  }
+  /* breakdown: tile grid */
+  var list=rows.slice(0,card.n&&card.n>0?Math.min(card.n,24):12);dNeedSeries(R,list.length);
+  return '<div class="dsh-tiles">'+list.map(function(r){
+    return '<button class="dsh-tile'+dBandCls(r,bm)+(r.dim?'':' nodrill')+'"'+dDrillAttr(R,r)+oxTip(dTip(R,r))+'><small>'+esc(r.label)+'</small><b class="mono">'+(r.v==null?dNoVal(r,R):esc(dFmtVS(R,r.v)))+'</b><span class="ox-row">'+(R.snap||R.noQoq?'':dQoqChip(r.q,R.lower))+(r.ach!=null?'<span class="ox-chip sm">'+oxPct(r.ach,0)+'%</span>':'')+'</span>'+(r.series&&!R.snap?dSpark(r.series):'')+'</button>';
+  }).join('')+'</div>'+(rows.length>list.length?'<p class="note" style="margin:6px 0 0">Showing '+list.length+' of '+rows.length+'. Edit the card to show more, or use the table.</p>':'');
+}
+function dvBullet(R,card){
+  var rows=(R.sortedRows||R.rows).slice(0,card.n||8),bm=R.baseMeas||R.meas;
+  var mx=Math.max.apply(null,rows.map(function(r){return Math.max(r.v||0,r.tgt||0)}).concat([1]));
+  return rows.map(function(r){
+    var h='<div class="dsh-row"><div class="h">'+dLabelBtn(R,r)+'<span class="mono">'+(r.v==null?dNoVal(r,R):'<b>'+esc(dFmtVS(R,r.v))+'</b>'+(r.tgt>0?' <span class="note">of '+esc(dFmtVS(R,r.tgt))+'</span>':''))+'</span></div>';
+    if(r.v!=null&&r.tgt>0)h+=oxBul({act:r.v,tgt:r.tgt,pot:Math.max(mx,r.tgt)*1.0,band:r.ach!=null?oxBand(r.ach):null,aria:dTip(R,r)});
+    else h+='<div class="ox-bul nl" role="img" aria-label="'+esc(dStMsg(r,R))+'"></div>';
+    return h+'<div class="ox-row">'+dBandChipOf(r)+(R.snap?'':dQoqChip(r.q,R.lower))+dPartialChip(r)+(r.tgt>0||r.v==null?'':'<span class="ox-chip nl">no target</span>')+'</div></div>';
+  }).join('')||dEmpty('Nothing to draw','No members in scope.');
+}
+function dvBar(R,card){
+  var bm=R.baseMeas||R.meas;
+  if(R.timeDim){
+    var rows=R.rows,W=Math.max(240,rows.length*38),H=120,vals=rows.map(function(r){return r.v}).filter(function(v){return v!=null}),mx=Math.max.apply(null,vals.concat([1])),sl=W/rows.length;
+    var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(R.meas.label+' by '+D_BY[R.by]+': '+rows.map(function(r){return r.label+' '+(r.v==null?'not loaded':dFmtVS(R,r.v))}).join(', '))+'"><defs><pattern id="dh'+esc(R.card.id)+'" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--act)" opacity=".35"/><rect width="2.5" height="6" fill="var(--act)"/></pattern></defs>';
+    rows.forEach(function(r,i){var bx=i*sl+5,w=sl-10,tip=dTip(R,r)+(r.partialTime?' · to date (partial)':'');
+      s+='<g'+oxTip(tip)+(r.dim?' class="dsh-g" data-act="d-drill" data-c="'+esc(R.card.id)+'" data-k="'+esc(r.k)+'"':'')+'>';
+      if(r.v==null)s+='<rect x="'+bx.toFixed(1)+'" y="40" width="'+w.toFixed(1)+'" height="40" rx="3" fill="none" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+(bx+w/2).toFixed(1)+'" y="64" text-anchor="middle" style="font-size:8px">n/l</text>';
+      else{var h=Math.max(1,r.v/mx*70);s+='<rect x="'+bx.toFixed(1)+'" y="'+(88-h).toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="'+(r.partialTime?'url(#dh'+esc(R.card.id)+')':'var(--act)')+'"/><text x="'+(bx+w/2).toFixed(1)+'" y="'+(84-h).toFixed(1)+'" text-anchor="middle" style="font-size:9px;font-weight:700;fill:var(--ink)">'+esc(dFmtVS(R,r.v))+'</text>'}
+      s+='<text x="'+(bx+w/2).toFixed(1)+'" y="104" text-anchor="middle" class="st" style="font-size:9px">'+esc(r.label.replace(' to date','*').replace(' so far','*').replace(/ FY/,' ·'))+'</text></g>';});
+    return s+'</svg><p class="note" style="margin:0">'+(rows.some(function(r){return r.partialTime})?'* to date, hatched = partial. ':'')+'n/l = not loaded.</p>';
+  }
+  var list=(R.sortedRows||R.rows).slice(0,card.n||10),mx2=Math.max.apply(null,list.map(function(r){return Math.max(r.v||0,r.tgt||0)}).concat([1]));
+  return '<div class="dsh-bars">'+list.map(function(r,i){
+    var b=dBandOf(bm,r),pc=r.v==null?0:Math.max(1,r.v/mx2*100),tg=r.tgt>0?Math.min(100,r.tgt/mx2*100):null;
+    return '<div class="dsh-bar"'+oxTip(dTip(R,r))+'><span class="nm">'+dLabelBtn(R,r)+'</span><div class="ox-bul"><div class="f'+(b?' b'+b:'')+'" style="width:'+pc.toFixed(1)+'%"></div>'+(tg!=null?'<div class="tg" style="left:'+tg.toFixed(1)+'%"></div>':'')+'</div><span class="mono v">'+(r.v==null?dNoVal(r,R):esc(dFmtVS(R,r.v)))+'</span>'+(R.snap||R.noQoq?'':'<span class="q">'+dQoqChip(r.q,R.lower)+'</span>')+'</div>';
+  }).join('')+'</div>'+((R.sortedRows||R.rows).length>list.length?'<p class="note" style="margin:6px 0 0">Top '+list.length+' of '+(R.rows.length)+'. Edit the card to change N.</p>':'');
+}
+function dvStacked(R,card){
+  var bm=R.baseMeas||R.meas,rows=(R.sortedRows||R.rows).filter(function(r){return r.v!=null&&r.v>0}).slice(0,6);dNeedSeries(R,6);
+  if(!rows.length)return dEmpty('Nothing to stack','No member has a value in this period.');
+  var qs=dQuarters(),n=qs.length,tot=R.total&&R.total.series,W=Math.max(260,n*44),H=140,sl=W/n;
+  var colMax=0,cols=qs.map(function(q,i){var segs=rows.map(function(r){var v=r.series&&r.series[i].v;return v==null?null:v}),sum=segs.reduce(function(a,b){return a+(b||0)},0),t=tot&&tot[i].v,other=t!=null&&t>sum?t-sum:0,loaded=segs.some(function(v){return v!=null});colMax=Math.max(colMax,sum+other);return {segs:segs,other:other,sum:sum,loaded:loaded,q:q}});
+  var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(R.meas.label+' by '+D_BY[R.by]+', stacked, 7 quarters')+'">';
+  cols.forEach(function(c,i){var bx=i*sl+6,w=sl-12,y=108;
+    if(!c.loaded){s+='<rect x="'+bx.toFixed(1)+'" y="50" width="'+w.toFixed(1)+'" height="56" rx="3" fill="none" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+(bx+w/2).toFixed(1)+'" y="82" text-anchor="middle" style="font-size:8px">n/l</text>'}
+    else{
+      rows.forEach(function(r,k){var v=c.segs[k];if(!v)return;var h=v/colMax*84;y-=h;s+='<rect x="'+bx.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+Math.max(h,0.5).toFixed(1)+'" fill="'+D_COL[k]+'" stroke="var(--card)" stroke-width=".8"'+oxTip(c.q.label+' · '+r.label+' · '+dFmtV(R,v))+'/>'});
+      if(c.other>0){var h2=c.other/colMax*84;y-=h2;s+='<rect x="'+bx.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+h2.toFixed(1)+'" fill="var(--track)" stroke="var(--ink3)" stroke-width=".8" stroke-dasharray="3 2"'+oxTip(c.q.label+' · other members · '+dFmtV(R,c.other))+'/>'}
+      s+='<text x="'+(bx+w/2).toFixed(1)+'" y="'+(y-4).toFixed(1)+'" text-anchor="middle" style="font-size:9px;font-weight:700;fill:var(--ink)">'+esc(dFmtVS(R,c.sum+c.other))+'</text>';
+    }
+    s+='<text x="'+(bx+w/2).toFixed(1)+'" y="126" text-anchor="middle" class="st" style="font-size:9px">'+esc(c.q.label.replace(' FY',' ·')+(c.q.isCur?'*':''))+'</text>';});
+  s+='</svg><div class="ox-legend">'+rows.map(function(r,k){return '<span><i class="sw" style="background:'+D_COL[k]+'"></i>'+esc(r.label)+'</span>'}).join('')+'<span><i class="sw" style="background:var(--track);border:1px dashed var(--ink3)"></i>Other</span></div><p class="note" style="margin:0">* quarter to date. n/l = not loaded. Top 6 members of '+R.rows.length+'; the rest is "Other".</p>';
+  return s;
+}
+function dvLine(R,card){
+  var bm=R.baseMeas||R.meas,lines=[],labels,xs;
+  if(R.timeDim){labels=R.rows.map(function(r){return r.label});lines=[{name:R.meas.label,vals:R.rows.map(function(r){return r.v}),color:'var(--act)',partialLast:R.rows.length&&R.rows[R.rows.length-1].partialTime}]}
+  else{
+    labels=dQuarters().map(function(q){return q.label.replace(' FY',' ·')+(q.isCur?'*':'')});
+    if(R.by==='none'){dNeedSeries(R,1);var t=R.total||R.rows[0];lines=[{name:R.meas.label,vals:(t.series||[]).map(function(s){return s.v}),color:'var(--act)',partialLast:true}]}
+    else{var top=(R.sortedRows||R.rows).filter(function(r){return r.v!=null}).slice(0,Math.min(card.n||5,6));dNeedSeries(R,top.length);top.forEach(function(r,i){lines.push({name:r.label,vals:(r.series||[]).map(function(s){return s.v}),color:D_COL[i],partialLast:true})})}
+  }
+  var all=[];lines.forEach(function(l){l.vals.forEach(function(v){if(v!=null)all.push(v)})});
+  if(all.length<2)return dEmpty('Not enough history','A line needs at least two loaded points. Shown as not loaded, never as zero.');
+  var mn=Math.min.apply(null,all.concat([0])),mx=Math.max.apply(null,all),n=labels.length,W=300,H=140,px=function(i){return 30+i*((W-60)/Math.max(1,n-1))},py=function(v){return 14+(1-(v-mn)/Math.max(1e-9,mx-mn))*(H-46)};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(R.meas.label+' trend: '+lines.map(function(l){return l.name}).join(', '))+'">';
+  lines.forEach(function(l){var seg=[],prev=null;
+    l.vals.forEach(function(v,i){if(v==null){seg.push(null);return}seg.push([px(i),py(v)])});
+    var run=[];seg.forEach(function(p,i){if(p)run.push(p);if(!p||i===seg.length-1){if(run.length>1)s+='<polyline points="'+run.map(function(q){return q[0].toFixed(1)+','+q[1].toFixed(1)}).join(' ')+'" fill="none" stroke="'+l.color+'" stroke-width="2.2"/>';run=[]}});
+    l.vals.forEach(function(v,i){if(v==null)return;var last=i===l.vals.length-1&&l.partialLast;s+='<circle cx="'+px(i).toFixed(1)+'" cy="'+py(v).toFixed(1)+'" r="'+(last?4:3)+'" fill="'+(last?'var(--card)':l.color)+'" stroke="'+l.color+'" stroke-width="2"'+oxTip(l.name+' · '+labels[i]+' · '+dFmtV(R,v))+' tabindex="0"/>';
+      if(lines.length===1&&n<=8)s+='<text x="'+px(i).toFixed(1)+'" y="'+(py(v)-8).toFixed(1)+'" text-anchor="middle" style="font-size:8.5px;font-weight:700;fill:var(--ink)">'+esc(dFmtVS(R,v))+'</text>'});
+  });
+  labels.forEach(function(l,i){s+='<text x="'+px(i).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" class="st" style="font-size:8.5px">'+esc(l)+'</text>'});
+  s+='</svg>';
+  if(lines.length>1)s+='<div class="ox-legend">'+lines.map(function(l){return '<span><i class="sw" style="background:'+l.color+'"></i>'+esc(l.name)+'</span>'}).join('')+'</div>';
+  return s+'<p class="note" style="margin:0">Hollow point = quarter to date. Gaps = not loaded.</p>';
+}
+function dvDonut(R,card){
+  var rows=(R.sortedRows||R.rows).filter(function(r){return r.v!=null&&r.v>0}),top=rows.slice(0,6),rest=rows.slice(6),oth=rest.reduce(function(a,r){return a+r.v},0),tot=rows.reduce(function(a,r){return a+r.v},0);
+  if(!rows.length)return dEmpty('Nothing to split','No member has a value in this period.');
+  var parts=top.map(function(r,i){return {label:r.label,v:r.v,c:D_COL[i],r:r}});if(oth>0)parts.push({label:'Other ('+rest.length+')',v:oth,c:'var(--track)',r:null});
+  var C=2*Math.PI*40,off=0,s='<svg viewBox="0 0 120 120" class="dsh-donut" role="img" aria-label="'+esc(R.meas.label+' by '+D_BY[R.by]+': '+parts.map(function(p){return p.label+' '+(p.v/tot*100).toFixed(1)+'%'}).join(', '))+'"><g transform="rotate(-90 60 60)">';
+  parts.forEach(function(p){var len=p.v/tot*C;s+='<circle cx="60" cy="60" r="40" fill="none" stroke="'+p.c+'" stroke-width="18" stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" stroke-dashoffset="'+(-off).toFixed(2)+'"'+oxTip(p.label+' · '+dFmtV(R,p.v)+' · '+(p.v/tot*100).toFixed(1)+'% of the total')+(p.r&&p.r.dim?' class="dsh-g" data-act="d-drill" data-c="'+esc(R.card.id)+'" data-k="'+esc(p.r.k)+'"':'')+'/>';off+=len});
+  s+='</g><text x="60" y="58" text-anchor="middle" style="font-size:11px;font-weight:800;fill:var(--ink)">'+esc(dFmtVS(R,tot))+'</text><text x="60" y="71" text-anchor="middle" style="font-size:7px">total</text></svg>';
+  var partial=R.nodetail||(R.rows.some(function(r){return r.x&&r.x.partialDetail}));
+  return '<div class="dsh-dn">'+s+'<div class="dsh-dl">'+parts.map(function(p){return '<div>'+(p.r&&p.r.dim?'<button class="dsh-lb" data-act="d-drill" data-c="'+esc(R.card.id)+'" data-k="'+esc(p.r.k)+'">':'<span>')+'<i class="sw" style="background:'+p.c+'"></i>'+esc(p.label)+(p.r&&p.r.dim?' ›</button>':'</span>')+'<b class="mono">'+(p.v/tot*100).toFixed(1)+'%</b></div>'}).join('')+'</div></div>'+(partial?'<p class="note" style="margin:0"><b>Loaded plants only.</b> Some plant-months carry no item detail; shares are of the loaded plants.</p>':'');
+}
+function dvRanked(R,card){
+  var bm=R.baseMeas||R.meas,all=R.sortedRows||R.rows,n=card.n||5,dir=card.dir||'top';
+  if(R.meas.kind==='rating'&&R.rating){
+    var rated=R.rating.RT.rows.filter(function(b){return b.score!=null}).sort(function(a,b){return dir==='bottom'?a.score-b.score:b.score-a.score});
+    if(rated.length<2)return dEmpty('Needs at least 2 branches','The rating ranks branches against each other. Shown as not rated, never as a star.')+dRatingNote();
+    return rated.slice(0,n).map(function(b,i){return oxRatingRow(b,dir==='bottom'?rated.length-i:i+1,R.rating.basis)}).join('')+dRatingNote();
+  }
+  var list=all.filter(function(r){return r.v!=null}).slice(0,n);
+  if(!list.length)return dEmpty('Nothing to rank',all.length?dStMsg(all[0],R):'No members in scope.');
+  var mx=Math.max.apply(null,list.map(function(r){return Math.abs(r.v)}).concat([1]));
+  return list.map(function(r,i){var b=dBandOf(bm,r);
+    return '<div class="dsh-rk"'+oxTip(dTip(R,r))+'><b class="mono rk">'+(i+1)+'</b><span class="nm">'+dLabelBtn(R,r)+'</span><div class="ox-bul"><div class="f'+(b?' b'+b:'')+'" style="width:'+Math.max(2,Math.abs(r.v)/mx*100).toFixed(1)+'%"></div></div><span class="mono v">'+esc(dFmtVS(R,r.v))+'</span><span class="q">'+(R.snap||R.noQoq?'':dQoqChip(r.q,R.lower))+'</span></div>'}).join('')
+   +'<p class="note" style="margin:6px 0 0">'+(dir==='bottom'?'Bottom ':'Top ')+list.length+' of '+all.length+', by '+(card.sortBy==='qoq'?'QoQ %':'value')+(R.lower?' (lower is better)':'')+'.</p>';
+}
+function dRatingNote(){return '<p class="note" style="margin:6px 0 0"><b>Informational only.</b> Not for incentives or disciplinary action; those are SP Sir\'s decision alone.</p>'}
+function dvHeat(R,card){
+  var bm=R.baseMeas||R.meas,list=(R.sortedRows||R.rows).filter(function(r){return r.v!=null}).slice(0,card.n&&card.n>=5?Math.min(card.n,30):15),months=dNeedMonths(R,list.length);
+  if(!list.length)return dEmpty('Nothing to draw','No member has a value in this period.');
+  var mx=0;list.forEach(function(r){(r.ms||[]).forEach(function(c){if(c.v!=null&&c.v>mx)mx=c.v})});
+  var h='<div class="dsh-hm" style="--cols:'+months.length+'"><div class="hr hh"><span></span>'+months.map(function(m){return '<span class="mono" style="font-size:10px">'+esc(MON[+m.slice(5,7)-1]+' '+m.slice(2,4))+(m===TODAY().slice(0,7)?'*':'')+'</span>'}).join('')+'</div>';
+  list.forEach(function(r){
+    h+='<div class="hr"><span class="nm">'+dLabelBtn(R,r)+'</span>'+(r.ms||[]).map(function(c){
+      if(c.v==null)return '<span class="c nl"'+oxTip(r.label+' · '+ymLabel(c.ym)+' · not loaded')+'>n/l</span>';
+      var pc=mx>0?Math.max(6,c.v/mx*80):6;
+      return '<span class="c'+(c.partial?' pt':'')+'" style="background:color-mix(in srgb,var(--act) '+pc.toFixed(0)+'%,var(--card))"'+oxTip(r.label+' · '+ymLabel(c.ym)+' · '+dFmtV(R,c.v)+(c.partial?' (month to date)':''))+'>'+esc(dFmtVS(R,c.v))+'</span>'}).join('')+'</div>';
+  });
+  return h+'</div><p class="note" style="margin:6px 0 0">Darker = higher. * month to date. n/l = not loaded, never zero. '+list.length+' of '+R.rows.length+' members.</p>';
+}
+function dvTable(R,card){
+  if(R.meas.kind==='rating'&&R.rating)return oxRatingTable(R.rating.RT)+dRatingNote();
+  var bm=R.baseMeas||R.meas,all=R.sortedRows||R.rows,lim=S.dash.more[R.card.id]?300:(card.n&&card.n>0?Math.max(card.n,5):12),list=all.slice(0,lim);
+  var tot=R.total&&R.total.v,hasT=all.some(function(r){return r.tgt!=null}),hasShare=bm.add&&R.by!=='none'&&!R.timeDim&&tot>0;
+  var person=R.meas.kind==='person',bench=R.meas.kind==='bench';
+  var h='<div class="tw dsh-tw"><table class="std"><thead><tr><th>'+esc(D_BY[R.by]||'Member')+'</th>'+(person?'<th>Person</th>':'')+'<th class="num">'+esc(R.meas.label)+'</th>'+(R.snap||R.noQoq?'':'<th class="num">QoQ</th>')+(hasT?'<th class="num">Target</th><th class="num">Ach %</th>':'')+((hasShare||person)?'<th class="num">Share</th>':'')+(person?'<th class="num">On-time closure</th>':'')+(bench?'<th class="num">Best</th><th class="num">Median</th><th class="num">Rank</th><th class="num">Pctl</th>':'')+'</tr></thead><tbody>';
+  list.forEach(function(r){
+    h+='<tr'+(r.dim?' class="clk" data-act="d-drill" data-c="'+esc(R.card.id)+'" data-k="'+esc(r.k)+'"':'')+'><td><b>'+esc(r.label)+'</b>'+(r.dim?' ›':'')+'</td>'+(person?'<td>'+esc(r.user||'')+'</td>':'')+'<td class="num">'+(r.v==null?dNoVal(r,R):esc(dFmtV(R,r.v)))+(r.partial?' '+dPartialChip(r):'')+'</td>'
+     +(R.snap||R.noQoq?'':'<td class="num">'+(r.q&&r.q.state==='ok'?'<span class="'+((r.q.v>=0)!==!!R.lower?'up':'dn')+'">'+esc(r.q.pp?r.q.txt:fmtPct(r.q.v,true))+'</span>':'<span class="note">'+esc((r.q&&r.q.txt)||'—')+'</span>')+'</td>')
+     +(hasT?'<td class="num">'+(r.tgt!=null?esc(dFmtVS(R,r.tgt)):'<span class="ox-nl">not set</span>')+'</td><td class="num">'+(r.check?'<b class="a-orange">Check target</b>':r.ach!=null?'<b>'+oxPct(r.ach)+'%</b>':'<span class="note">—</span>')+'</td>':'')
+     +((hasShare||person)?'<td class="num">'+(person?(r.share!=null?r.share.toFixed(1)+'%':'—'):(r.v!=null&&tot>0?(r.v/tot*100).toFixed(1)+'%':'—'))+'</td>':'')
+     +(person?'<td class="num">'+(r.closure!=null?r.closure.toFixed(0)+'% <span class="note">of '+r.closureN+'</span>':'<span class="note">—</span>')+'</td>':'')
+     +(bench?'<td class="num">'+esc(dFmtS(dUnit(R),R.stats&&R.stats.best))+'</td><td class="num">'+esc(dFmtS(dUnit(R),R.stats&&R.stats.med))+'</td><td class="num">'+(r.rank||'—')+'</td><td class="num">'+(r.pctl!=null?'P'+Math.round(r.pctl):'—')+'</td>':'')+'</tr>';
+  });
+  if(R.total&&R.by!=='none'&&!bench&&!person)h+='<tr class="tot"><td>Total</td><td class="num">'+(R.total.v==null?'—':esc(dFmtV(R,R.total.v)))+'</td>'+(R.snap||R.noQoq?'':'<td class="num">'+(R.total.q&&R.total.q.state==='ok'?esc(R.total.q.pp?R.total.q.txt:fmtPct(R.total.q.v,true)):'<span class="note">'+esc((R.total.q&&R.total.q.txt)||'—')+'</span>')+'</td>')+(hasT?'<td class="num">'+(R.total.tgt!=null?esc(dFmtVS(R,R.total.tgt)):'—')+'</td><td class="num">'+(R.total.ach!=null?oxPct(R.total.ach)+'%':'—')+'</td>':'')+(hasShare?'<td class="num">100%</td>':'')+'</tr>';
+  h+='</tbody></table></div>';
+  if(all.length>list.length)h+='<button class="btn sm" data-act="d-more" data-c="'+esc(R.card.id)+'">Show all '+all.length+'</button>';
+  if(person&&R.noPlanNote)h+='<p class="note" style="margin:6px 0 0">'+esc(R.noPlanNote)+'</p>';
+  return h;
+}
+function dvMultiples(R,card){
+  var bm=R.baseMeas||R.meas,list=(R.sortedRows||R.rows).slice(0,card.n&&card.n>=4?Math.min(card.n,24):12);dNeedSeries(R,list.length);
+  if(!list.length)return dEmpty('Nothing to draw','No members in scope.');
+  return '<div class="dsh-tiles ms">'+list.map(function(r){
+    return '<button class="dsh-tile'+dBandCls(r,bm)+(r.dim?'':' nodrill')+'"'+dDrillAttr(R,r)+oxTip(dTip(R,r))+'><small>'+esc(r.label)+'</small><b class="mono">'+(r.v==null?dNoVal(r,R):esc(dFmtVS(R,r.v)))+'</b><span class="ox-row">'+(R.snap?'':dQoqChip(r.q,R.lower))+(r.ach!=null?'<span class="ox-chip sm">'+OX_MARK[oxBand(r.ach)]+' '+oxPct(r.ach,0)+'%</span>':'')+'</span>'+(r.series&&!R.snap?dSpark(r.series):'<span class="note">no history</span>')+'</button>';
+  }).join('')+'</div>'+((R.rows.length>list.length)?'<p class="note" style="margin:6px 0 0">Showing '+list.length+' of '+R.rows.length+' members.</p>':'');
+}
+function dvBench(R,card){
+  var list=(R.sortedRows||R.rows).filter(function(r){return r.v!=null}),bm=R.baseMeas||R.meas;
+  if(list.length<2)return dEmpty('Needs at least 2 members','A benchmark compares members with each other. '+(list.length?'Only one member has a value here.':'No member has a value.'))+(R.meas.kind==='bench'?'':'');
+  var st=R.stats||dBench(R.rows,'x',!!bm.lower),n=card.n&&card.n>=5?Math.min(card.n,30):15,vals=list.map(function(r){return r.bv!=null?r.bv:r.v});
+  /* a bench measure reads value, the base value is what the track shows */
+  var bvOf=function(r){return r.bv!=null?r.bv:r.v},mx=Math.max.apply(null,vals.concat([st.best||0,1])),pos=function(v){return Math.max(0,Math.min(100,v/mx*100))};
+  var bu=R.meas.kind==='bench'?(R.baseMeas.unit):R.meas.unit;
+  var ordered=list.slice().sort(function(a,b){return bm.lower?bvOf(a)-bvOf(b):bvOf(b)-bvOf(a)}).slice(0,n);
+  var h='<div class="ox-legend"><span><i class="k-tg" style="display:inline-block"></i>Best '+esc(dFmtS(bu,st.best))+'</span><span><i class="k-run" style="display:inline-block"></i>Median '+esc(dFmtS(bu,st.med))+'</span><span>'+st.n+' members'+(bm.lower?' · lower is better':'')+'</span></div>';
+  ordered.forEach(function(r){var v=bvOf(r),b=oxBand(100);
+    h+='<div class="dsh-row"'+oxTip(r.label+' · '+dFmt(bu,v)+' · rank '+r.rank+' of '+st.n+' · percentile '+Math.round(r.pctl)+' · gap to best '+dFmtS(bu,r.gapBest)+' · gap to median '+dFmtS(bu,r.gapMed)+' · index '+Math.round(r.idx||0))+'><div class="h">'+dLabelBtn(R,r)+'<span class="mono"><b>'+esc(dFmtS(bu,v))+'</b> <span class="note">#'+r.rank+' · P'+Math.round(r.pctl)+'</span></span></div>'
+     +'<div class="ox-bul"><div class="f" style="width:'+pos(v).toFixed(1)+'%"></div><div class="lq" style="left:'+pos(st.med).toFixed(1)+'%"></div><div class="tg" style="left:'+pos(st.best).toFixed(1)+'%"></div></div>'
+     +'<div class="ox-row"><span class="note">'+(r.gapMed==null?'':(r.gapMed>=0?'+':'−')+esc(dFmtS(bu,Math.abs(r.gapMed)))+' vs median')+(r.gapBest!=null&&r.gapBest!==0?' · '+(r.gapBest>=0?'+':'−')+esc(dFmtS(bu,Math.abs(r.gapBest)))+' vs best':' · best')+'</span></div></div>'});
+  if(R.meas.kind==='bench'&&R.meas.bench!=='rank'){h+='<p class="note" style="margin:6px 0 0">Showing the base measure ('+esc(R.baseMeas.label)+') against the best and median; the measure chosen ('+esc(R.meas.label)+') is in the tooltip and table.</p>'}
+  return h;
+}
+function dvCoverage(R,card){
+  var dh=R.dh,st={ok:['b4','Loaded','●'],part:['b3','Partial','◐'],miss:['b1','Missing','○']};
+  var h='<div class="tw"><table class="std dsh-cov"><thead><tr><th>Export</th>'+dh.qs.map(function(q){return '<th>'+esc(qLabel(q))+'</th>'}).join('')+'<th>Last loaded</th></tr></thead><tbody>';
+  dh.cov.forEach(function(r){var row=dh.rows.find(function(x){return x.k===r.ent});
+    h+='<tr><td><b>'+esc(r.label)+'</b></td>'+r.cells.map(function(c){var s=st[c.st]||st.miss;return '<td><span class="ox-chip '+s[0]+'">'+s[2]+' '+s[1]+'</span></td>'}).join('')+'<td class="note">'+(row&&row.up?esc(istStr(row.up.at)):'<span class="ox-nl">never</span>')+'</td></tr>'});
+  return h+'</tbody></table></div><p class="note" style="margin:6px 0 0">Loaded = at least 90% of plants in every month; partial = some; missing = none. Same grid as Data Intake.</p>';
+}
+function dvDhTile(R,card){
+  var dh=R.dh,id=R.meas.id;
+  if(id==='dh_cov')return '<div class="ox-big dsh-big">'+(dh.pct==null?'—':dh.pct.toFixed(0)+'%')+'</div><p class="note">of the export-quarters in the last four quarters are fully loaded.</p>'+dvCoverage(R,card);
+  if(id==='dh_last')return '<div class="ox-tile-big">'+(dh.last?esc(istStr(dh.last)):'<span class="ox-nl">No upload yet</span>')+'</div><p class="note" style="margin:0">Most recent successful load (IST).</p><div class="tw"><table class="std"><thead><tr><th>Export</th><th>Last loaded</th><th>By</th></tr></thead><tbody>'+dh.rows.map(function(r){return '<tr><td>'+esc(r.label)+'</td><td>'+(r.up?esc(istStr(r.up.at)):'<span class="ox-nl">never</span>')+'</td><td class="note">'+esc(r.up?r.up.by||'':'')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  return '<div class="ox-big dsh-big">'+fmtN(dh.rej)+'<span class="ox-unit"> rows skipped</span></div><p class="note">In the latest load of each export.</p><div class="tw"><table class="std"><thead><tr><th>Export</th><th class="num">Skipped</th><th class="num">Read</th></tr></thead><tbody>'+dh.rows.map(function(r){return '<tr><td>'+esc(r.label)+'</td><td class="num">'+(r.up?fmtN(r.v):'<span class="ox-nl">n/l</span>')+'</td><td class="num">'+(r.up?fmtN(r.read):'')+'</td></tr>'}).join('')+'</tbody></table></div>';
+}
+var D_DRAW={kpi:dvKpi,bullet:dvBullet,bar:dvBar,stacked:dvStacked,line:dvLine,donut:dvDonut,ranked:dvRanked,heat:dvHeat,table:dvTable,multiples:dvMultiples,bench:dvBench,coverage:dvCoverage};
+/* effective card = saved card + this session's drill-down steps (never saved) */
+function dEff(card){
+  var d=S.dash.dr[card.id];if(!d)return card;
+  var o=Object.assign({},card);if(d.by)o.by=d.by;o.drill=(card.drill||[]).concat(d.stack||[]);if(d.period)o.period=d.period;
+  if(d.by&&!MEAS[o.measure].fixedBy){var fit=dVisFit(o);if(fit[o.visual])o.visual=dAutoVisual(o)}
+  return o;
+}
+function dBodyHtml(card){
+  var eff=dEff(card),R=dRun(eff);
+  if(R.err)return '<div class="ox-empty"><b>This card could not be drawn</b><span>'+esc(R.err)+'</span></div>';
+  if(R.locked)return '<div class="ox-empty"><b>Locked for your role</b><span>'+esc(R.why)+'. Row-level access applies to every card.</span></div>';
+  if(R.empty)return dEmpty('Nothing to show',R.empty);
+  if(R.pending==='loading')return '<div class="ox-empty"><b>Reading the stored detail…</b><span>Customer, thickness and brand detail is read from the stored chunks for the plants in your scope. It appears here when read.</span></div>';
+  if(R.pending==='nodetail')return '<div class="ox-empty"><b>Not loaded</b><span>These months carry no thickness or brand detail ('+(R.detailTotal||0)+' plant-months). Reload them in Data Intake › Sales. Shown as not loaded, never as zero.</span></div>';
+  var vis=eff.visual||dAutoVisual(eff);
+  if(R.meas.kind==='dh'){return dvDhTile(R,eff)}
+  /* nothing loaded at all for this card */
+  var allNo=R.rows.length&&R.rows.every(function(r){return r.v==null&&r.st!=='check'});
+  if(allNo&&R.meas.kind!=='rating'){
+    var r0=R.rows[0],ld=R.loading;
+    return '<div class="ox-empty"><b>'+(ld?'Reading the stored detail…':'Not loaded')+'</b><span>'+esc(dStMsg(r0,R))+'. Shown as not loaded, never as zero.</span></div>';
+  }
+  var fn=D_DRAW[vis]||dvTable,h;
+  try{h=fn(R,eff)}catch(e){h='<div class="ox-empty"><b>This visual could not be drawn</b><span>'+esc((e&&e.message)||e)+'</span></div>'}
+  if(R.loading)h='<div class="ox-row"><span class="ox-chip nl">Reading detail…</span></div>'+h;
+  return h;
+}
+
+/* ---- src/54-dash4-lib.js ---- */
+/* ================= My Dashboard, part 4: card library, role defaults, caps, layout model ================= */
+var D_CAP={'Super admin':12,'Management / HO':12,'HOD':10,'Branch / depot manager':8,'Sales executive':6,'Accounts':6,'Plant':6,'Coordinator (sales / CRR)':6};
+function dCapFor(role){return D_CAP[role]||6}
+/* library: id, module, title, one line, saved-card spec. A spec is plain data; the page draws it by rules. */
+var D_LIB=[
+ {id:'sales_sheets',mod:'Sales',title:'Sheets against target',desc:'Sheets, target tick, band, QoQ and a 7-quarter sparkline',s:{measure:'sheets',by:'none',visual:'kpi',span:2}},
+ {id:'sales_net',mod:'Sales',title:'Net sales (₹)',desc:'Value net of credit notes, QoQ',s:{measure:'value_net',by:'none',visual:'kpi',span:1}},
+ {id:'sales_inv',mod:'Sales',title:'Value invoiced (₹)',desc:'Invoiced value, external customers',s:{measure:'value_inv',by:'none',visual:'kpi',span:1}},
+ {id:'sales_zone',mod:'Sales',title:'Sheets by zone',desc:'One tile per zone with band tint and sparkline',s:{measure:'sheets',by:'zone',visual:'kpi',span:2}},
+ {id:'sales_thk',mod:'Sales',title:'Thickness split',desc:'Share of sheets by thickness',s:{measure:'sheets',by:'thickness',visual:'donut',span:2}},
+ {id:'sales_brand',mod:'Sales',title:'Brand split',desc:'Sheets by brand, top 8',s:{measure:'sheets',by:'brand',visual:'bar',n:8,span:2}},
+ {id:'sales_mix',mod:'Sales',title:'Product-group mix by quarter',desc:'Sheets by group, stacked over 7 quarters',s:{measure:'sheets',by:'group',visual:'stacked',span:2}},
+ {id:'sales_trend',mod:'Sales',title:'Sheets trend, 7 quarters',desc:'Line of sheets per quarter, current quarter to date',s:{measure:'sheets',by:'none',visual:'line',span:2}},
+ {id:'sales_heat',mod:'Sales',title:'Plant by month heatmap',desc:'Sheets, plant x last 8 months',s:{measure:'sheets',by:'plant',visual:'heat',n:15,span:4}},
+ {id:'sales_cust',mod:'Sales',title:'Top 5 customers',desc:'Invoiced value by customer, ranked',s:{measure:'value_inv',by:'customer',visual:'ranked',n:5,span:2}},
+ {id:'sales_state',mod:'Sales',title:'Sheets by state',desc:'State of the plant, with QoQ',s:{measure:'sheets',by:'state',visual:'table',span:2}},
+ {id:'sales_price',mod:'Sales',title:'Average price per sheet',desc:'Invoiced value ÷ sheets',s:{measure:'avgprice',by:'none',visual:'kpi',span:1}},
+ {id:'plan_ach',mod:'Planning',title:'Achievement by plant',desc:'Ach % of sheet target, band-coloured',s:{measure:'ach',by:'plant',visual:'bar',n:12,span:2}},
+ {id:'plan_share',mod:'Planning',title:'Share of potential by plant',desc:'Sheets ÷ market potential',s:{measure:'share',by:'plant',visual:'bar',n:12,span:2}},
+ {id:'plan_phase',mod:'Planning',title:'Target phasing',desc:'Monthly target from the phasing percentages',s:{measure:'phasing',by:'month',visual:'line',span:2}},
+ {id:'plan_gap',mod:'Planning',title:'Gap to target',desc:'Sheets still to go, by plant (furthest first)',s:{measure:'gap',by:'plant',visual:'ranked',n:8,dir:'bottom',span:2}},
+ {id:'plan_pvt',mod:'Planning',title:'Potential, target and actual by zone',desc:'Bullet per zone: actual, target tick, potential track',s:{measure:'sheets',by:'zone',visual:'bullet',span:2}},
+ {id:'coll_kpi',mod:'Collections',title:'Collections (₹)',desc:'Collected in the period, QoQ',s:{measure:'coll',by:'none',visual:'kpi',span:1}},
+ {id:'coll_eff',mod:'Collections',title:'Collection efficiency by plant',desc:'Collected ÷ invoiced',s:{measure:'coll_eff',by:'plant',visual:'bar',n:12,span:2}},
+ {id:'coll_zone',mod:'Collections',title:'Collections by zone',desc:'Small multiples with sparkline',s:{measure:'coll',by:'zone',visual:'multiples',span:2}},
+ {id:'recv_age',mod:'Receivables',title:'Receivables ageing',desc:'Open items by days past due',s:{measure:'recv_age',by:'ageing',visual:'bar',span:2}},
+ {id:'recv_top',mod:'Receivables',title:'Top 5 receivable customers',desc:'Outstanding by customer',s:{measure:'recv_out',by:'customer',visual:'ranked',n:5,span:2}},
+ {id:'stock_kpi',mod:'Inventory',title:'Stock on hand',desc:'Sheets in stock on the latest snapshot',s:{measure:'stock_sh',by:'none',visual:'kpi',span:1}},
+ {id:'stock_val',mod:'Inventory',title:'Stock value',desc:'Value on the latest snapshot',s:{measure:'stock_val',by:'none',visual:'kpi',span:1}},
+ {id:'stock_days',mod:'Inventory',title:'Stock days by plant',desc:'Lower is better; bar colour = plan ÷ actual',s:{measure:'stock_days',by:'plant',visual:'bar',n:12,span:2}},
+ {id:'cn_kpi',mod:'Credit notes',title:'Credit-note ratio',desc:'Credit notes ÷ invoiced value',s:{measure:'cn_ratio',by:'none',visual:'kpi',span:1}},
+ {id:'cn_plant',mod:'Credit notes',title:'Credit-note ratio by plant',desc:'Lower is better',s:{measure:'cn_ratio',by:'plant',visual:'bar',n:12,span:2}},
+ {id:'bn_plant',mod:'Benchmarking',title:'Plant vs plant (Ach %)',desc:'Each plant against the best and the median',s:{measure:'bench_pct',base:'ach',by:'plant',visual:'bench',span:2}},
+ {id:'bn_zone',mod:'Benchmarking',title:'Zone vs zone (sheets)',desc:'Zones against the best and the median',s:{measure:'bench_idx',base:'sheets',by:'zone',visual:'bench',span:2}},
+ {id:'bn_coll',mod:'Benchmarking',title:'Collections vs best and median',desc:'Collection efficiency by plant',s:{measure:'bench_pct',base:'coll_eff',by:'plant',visual:'bench',span:2}},
+ {id:'bn_stock',mod:'Benchmarking',title:'Stock days vs best and median',desc:'Lowest stock days is best',s:{measure:'bench_pct',base:'stock_days',by:'plant',visual:'bench',span:2}},
+ {id:'bn_movers',mod:'Benchmarking',title:'QoQ movers',desc:'Plants ranked by sheets QoQ %',s:{measure:'sheets',by:'plant',visual:'ranked',n:5,sortBy:'qoq',dir:'top',span:2}},
+ {id:'rate_branch',mod:'Rating',title:'Branch rating',desc:'Stars from sales 50, collections 30, stock days 20. Informational only',s:{measure:'rating',by:'plant',visual:'table',span:4}},
+ {id:'rate_person',mod:'Rating',title:'Person scorecard',desc:'Sheets, QoQ, share and on-time closure per salesperson',s:{measure:'person',by:'salesperson',visual:'table',n:12,span:4}},
+ {id:'act_open',mod:'Actions',title:'Open actions',desc:'Live actions in your scope',s:{measure:'act_open',by:'none',visual:'kpi',span:1}},
+ {id:'act_over',mod:'Actions',title:'Overdue actions',desc:'Past their due date',s:{measure:'act_over',by:'none',visual:'kpi',span:1}},
+ {id:'act_fu',mod:'Actions',title:'Follow-ups waiting',desc:'Drafts a person still has to send',s:{measure:'act_fu',by:'none',visual:'kpi',span:1}},
+ {id:'act_close',mod:'Actions',title:'On-time closure by plant',desc:'Closed by the due date ÷ closed',s:{measure:'act_close',by:'plant',visual:'bar',n:10,span:2}},
+ {id:'dh_cov',mod:'Data health',title:'Data coverage',desc:'Export x quarter grid: loaded, partial, missing',s:{measure:'dh_cov',by:'none',visual:'coverage',span:4}},
+ {id:'dh_last',mod:'Data health',title:'Last uploads',desc:'When each SAP export was last loaded',s:{measure:'dh_last',by:'none',visual:'kpi',span:2}},
+ {id:'dh_rej',mod:'Data health',title:'Rejected rows',desc:'Rows skipped in the latest loads',s:{measure:'dh_rej',by:'none',visual:'kpi',span:2}}
+];
+function dLibById(id){return D_LIB.find(function(x){return x.id===id})||null}
+function dLibLocked(e,role){var m=MEAS[e.s.measure];if(!m)return 'Unknown measure';if(!dRoleOk(role,m))return dRoleWhy(role,m);if(m.kind==='bench'&&e.s.base&&MEAS[e.s.base]&&!dRoleOk(role,MEAS[e.s.base]))return dRoleWhy(role,MEAS[e.s.base]);return ''}
+/* built-in role defaults (used until a Super admin publishes one); never more than the role's cap */
+var D_DEFAULTS={
+ 'Super admin':['sales_sheets','sales_net','coll_kpi','stock_kpi','sales_zone','sales_trend','plan_ach','coll_eff','bn_plant','rate_branch','sales_thk','sales_brand'],
+ 'Management / HO':['sales_sheets','sales_net','coll_kpi','stock_kpi','sales_zone','sales_trend','plan_ach','coll_eff','bn_plant','rate_branch','sales_thk','sales_brand'],
+ 'HOD':['sales_sheets','sales_zone','sales_trend','plan_ach','sales_thk','sales_brand','bn_movers','bn_plant','act_open','act_over'],
+ 'Branch / depot manager':['sales_sheets','sales_mix','sales_trend','sales_thk','coll_kpi','stock_kpi','recv_age','act_open'],
+ 'Sales executive':['sales_sheets','sales_trend','sales_cust','sales_mix','act_open','act_over'],
+ 'Coordinator (sales / CRR)':['sales_sheets','sales_cust','sales_mix','sales_trend','act_open','act_over'],
+ 'Accounts':['coll_kpi','coll_eff','recv_age','recv_top','cn_kpi','sales_net'],
+ 'Plant':['stock_kpi','stock_days','sales_sheets','sales_trend','act_open','act_over']
+};
+function dUid(){return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function dSan(c){
+  /* whitelist and clamp: a saved layout is data from a database, never trusted as code */
+  if(!c||typeof c!=='object')return null;
+  var meas=String(c.measure||'');if(!MEAS[meas])return null;
+  var o={id:/^[A-Za-z0-9_-]{1,40}$/.test(c.id||'')?c.id:dUid(),lib:c.lib&&dLibById(c.lib)?c.lib:undefined,title:String(c.title||'').slice(0,80),measure:meas,base:MEAS[c.base]&&MEAS[c.base].kind!=='bench'?c.base:'sheets',
+    by:D_BY[c.by]&&c.by!=='item'?c.by:'none',filters:[],period:{k:'follow'},visual:D_VIS[c.visual]?c.visual:'',n:Math.max(0,Math.min(50,parseInt(c.n,10)||0)),dir:c.dir==='bottom'?'bottom':'top',sortBy:['value','qoq','label'].indexOf(c.sortBy)>=0?c.sortBy:'value',span:Math.max(1,Math.min(4,parseInt(c.span,10)||1))};
+  (Array.isArray(c.filters)?c.filters:[]).slice(0,3).forEach(function(f){if(f&&D_FILTER_DIMS.indexOf(f.dim)>=0&&Array.isArray(f.vals)){var v=f.vals.map(function(x){return String(x).slice(0,60)}).filter(Boolean).slice(0,40);if(v.length)o.filters.push({dim:f.dim,vals:v})}});
+  var p=c.period;if(p&&D_PERK[p.k]){o.period={k:p.k};['m','q','from','to'].forEach(function(k){if(p[k]&&/^[A-Za-z0-9-]{4,8}$/.test(String(p[k])))o.period[k]=String(p[k])})}
+  if(!o.visual)o.visual=dAutoVisual(o);
+  if(MEAS[meas].fixedBy)o.by=MEAS[meas].fixedBy;
+  return o;
+}
+function dSanList(l){var out=[],seen={};(Array.isArray(l)?l:[]).slice(0,60).forEach(function(c){var x=dSan(c);if(x){while(seen[x.id])x.id=dUid();seen[x.id]=1;out.push(x)}});return out}
+function dFromLib(id){var e=dLibById(id);if(!e)return null;var c=Object.assign({id:dUid(),lib:id,title:e.title,filters:[],period:{k:'follow'},n:0,dir:'top',sortBy:'value'},e.s);return dSan(c)}
+function dBuiltin(role){return (D_DEFAULTS[role]||D_DEFAULTS['Coordinator (sales / CRR)']).map(dFromLib).filter(Boolean)}
+function dCardTitle(c){var m=MEAS[c.measure];return c.title||(m?m.label+(c.by&&c.by!=='none'?' by '+D_BY[c.by].toLowerCase():''):'Card')}
+function dDefTitle(c){var m=MEAS[c.measure];return m?m.label+(c.by&&c.by!=='none'?' by '+D_BY[c.by].toLowerCase():''):'Card'}
+function dClone(x){return JSON.parse(JSON.stringify(x))}
+
+/* ---- src/54-dash5-ui.js ---- */
+/* ================= My Dashboard, part 5: page, grid, drag and resize, layouts, drill-down ================= */
+S.dash={loaded:false,loading:false,owner:'',cards:[],baseJson:'[]',mine:null,active:'default',pub:null,edit:false,per:{k:'QTD'},html:{},dr:{},more:{},undo:null,builder:null,err:'',msg:''};
+(function(){try{var p=JSON.parse(lsGet('desk-dash-per')||'null');if(p&&D_PERK[p.k]&&p.k!=='follow')S.dash.per=p}catch(e){}})();
+function pagesFor(u){var l=pagesFor0(u);if(l.length&&l.indexOf('dashboard')<0)l.splice(Math.min(1,l.length),0,'dashboard');return l}
+function dUserKey(u){u=u||effUser();return 'u_'+slug((u&&u.email)||'owner')}
+function dOwnerKey(){var u=effUser();return u?(u.email||'')+'|'+u.role+'|'+(S.viewAs||''):''}
+function dPersist(patch){
+  /* My layout lives in dashlayouts/u_<email> (page-enforced: a person writes only their own doc); never when previewing as another user */
+  if(readOnly())return Promise.resolve();
+  var u=realUser(),D=S.dash,doc=Object.assign({email:u.email||'',role:u.role,mine:D.mine||[],active:D.active,at:nowISO(),by:whoAmI(),v:1},patch||{});
+  return dset('dashlayouts/'+dUserKey(u),doc);
+}
+async function dLoad(){
+  var D=S.dash,u=effUser();if(!u)return;
+  var ok=dOwnerKey();if(D.owner===ok&&(D.loaded||D.loading))return;
+  D.owner=ok;D.loading=true;D.loaded=false;D.dr={};D.more={};D.err='';
+  var mine=null,active='default',pub=null;
+  try{var s=await dget('dashlayouts/'+dUserKey(u));if(s&&s.exists){var d=s.data();var ml=dSanList(d.mine||d.cards);if(ml.length){mine=ml;active=d.active==='default'?'default':'mine'}}}catch(e){D.err='Could not read your saved layout: '+dbErrText(e)}
+  try{var p=await dget('dashroles/role_'+slug(u.role));if(p&&p.exists){var pl=dSanList(p.data().cards);if(pl.length)pub=pl}}catch(e){}
+  if(D.owner!==ok)return;
+  D.mine=mine;D.pub=pub;D.active=mine&&active==='mine'?'mine':'default';
+  D.cards=D.active==='mine'?dClone(mine):dClone(pub||dBuiltin(u.role));
+  D.baseJson=JSON.stringify(D.cards);D.loaded=true;D.loading=false;D.edit=false;dBump();
+}
+function dDirty(){return JSON.stringify(S.dash.cards)!==S.dash.baseJson}
+function dCardById(id){return S.dash.cards.find(function(c){return c.id===id})||(S.dash.builder&&S.dash.builder.card&&S.dash.builder.card.id===id?S.dash.builder.card:null)}
+function dCanEdit(){return !readOnly()}
+
+/* ---- period controls (header and builder) ---- */
+function dQList(){return closedQuarters().concat([curQuarterKey()]).reverse()}
+function dMList(){var out=[],t=TODAY().slice(0,7),lo=histLoYm();for(var m=t;m>=lo&&out.length<40;m=shiftYm(m,-1))out.push(m);return out}
+function dFyList(){var seen={},out=[];dQList().forEach(function(q){var fy=q.slice(0,4);if(!seen[fy]){seen[fy]=1;out.push({fy:fy,q:q})}});return out}
+function dPerCtl(p,scope,withFollow){
+  p=p||{k:withFollow?'follow':'QTD'};var id='dper-'+scope;
+  var opts=Object.keys(D_PERK).filter(function(k){return withFollow||k!=='follow'});
+  var h='<div class="fld"><label for="'+id+'-k">Period</label><select id="'+id+'-k" class="in" data-dsh="per" data-s="'+scope+'" data-k="k">'+opts.map(function(k){return '<option value="'+k+'"'+(p.k===k?' selected':'')+'>'+esc(D_PERK[k])+'</option>'}).join('')+'</select></div>';
+  var cur=curQuarterKey(),sel=function(key,list,val,lab){return '<div class="fld"><label for="'+id+'-'+key+'">'+lab[0]+'</label><select id="'+id+'-'+key+'" class="in" data-dsh="per" data-s="'+scope+'" data-k="'+key+'">'+list.map(function(x){return '<option value="'+esc(x[0])+'"'+(val===x[0]?' selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></div>'};
+  if(p.k==='MTD')h+=sel('m',dMList().map(function(m){return [m,ymLabel(m)]}),p.m||TODAY().slice(0,7),['Month']);
+  if(p.k==='Q')h+=sel('q',dQList().map(function(q){return [q,qLabel(q)+(q===cur?' (to date)':'')]}),p.q||prevQ(cur),['Quarter']);
+  if(p.k==='FY')h+=sel('q',dFyList().map(function(x){return [x.q,x.fy+(x.q===cur||x.fy===cur.slice(0,4)?' so far':'')]}),p.q||cur,['Financial year']);
+  if(p.k==='CUSTOM'){var ms=dMList().slice().reverse();h+=sel('from',ms.map(function(m){return [m,ymLabel(m)]}),p.from||shiftYm(TODAY().slice(0,7),-1),['From month'])+sel('to',ms.map(function(m){return [m,ymLabel(m)]}),p.to||TODAY().slice(0,7),['To month'])}
+  return h;
+}
+function dPerSet(p,k,v){
+  if(k==='k'){var cur=curQuarterKey(),n={k:v};if(v==='MTD')n.m=TODAY().slice(0,7);if(v==='Q')n.q=prevQ(cur);if(v==='FY')n.q=cur;if(v==='CUSTOM'){n.from=shiftYm(TODAY().slice(0,7),-1);n.to=TODAY().slice(0,7)}return n}
+  var o=Object.assign({},p);o[k]=v;if(o.k==='CUSTOM'&&o.to<o.from)o.to=o.from;return o;
+}
+
+/* ---- the card ---- */
+function dReadLine(card){
+  var meas=MEAS[card.measure];if(!meas)return '';var res=dRes(card.period),by=meas.fixedBy||card.by||'none';
+  var bm=meas.kind==='bench'?(MEAS[card.base]||MEAS.sheets):null;
+  var f=(card.filters||[]).map(function(x){return D_BY[x.dim].toLowerCase()+' '+x.vals.slice(0,3).join(', ')+(x.vals.length>3?' +'+(x.vals.length-3):'')});
+  return meas.label+(bm?' of '+bm.label:'')+(by!=='none'?', by '+D_BY[by]:'')+(f.length?', where '+f.join(' and '):'')+', for '+res.label+(meas.snap?' (latest snapshot, no period)':', compared QoQ with '+(res.qNote||'the previous quarter'))+', drawn as '+(D_VIS[card.visual]||'table').toLowerCase();
+}
+function dCrumbs(card){
+  var d=S.dash.dr[card.id];if(!d||!(d.stack&&d.stack.length||d.period))return '';
+  var h='<div class="crumbs dsh-cr"><button class="chip" data-act="d-crumb" data-c="'+esc(card.id)+'" data-i="0">'+esc(dCardTitle(card))+'</button>';
+  (d.stack||[]).forEach(function(s,i){h+=' › <button class="chip'+(i===d.stack.length-1?' on':'')+'" data-act="d-crumb" data-c="'+esc(card.id)+'" data-i="'+(i+1)+'">'+esc(D_BY[s.dim]+': '+s.val)+'</button>'});
+  if(d.period)h+=' › <span class="chip on">'+esc(dRes(d.period).label)+'</span>';
+  return h+'</div>';
+}
+function dCardHtml(card,opt){
+  opt=opt||{};var D=S.dash,edit=!!(D.edit&&!opt.preview&&dCanEdit()),meas=MEAS[card.measure];
+  var ck=[JSON.stringify(card),dDataSig(),edit,JSON.stringify(D.dr[card.id]||null),D.more[card.id]||'',JSON.stringify(D.per),opt.preview?'p':''].join('#');
+  var hit=D.html[card.id];if(hit&&hit.k===ck)return hit.h;
+  var eff=dEff(card),R=meas?dRun(eff):{err:'Unknown measure'},res=meas?dRes(eff.period):null;
+  var title=dCardTitle(card),ic=meas?'<span class="dsh-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'+(D_MOD_ICON[meas.mod]||'')+'</svg></span>':'';
+  var idx=D.cards.indexOf(card),n=D.cards.length,cid=esc(card.id);
+  var tools='';
+  if(edit){
+    tools='<div class="dsh-tools"><button class="dsh-hd" data-dd="handle" aria-label="Move '+esc(title)+' (drag, or Alt with arrow keys)" title="Drag to move; Alt+arrow keys also move">⋮⋮</button>'
+     +'<button class="btn sm dsh-ud" data-act="d-mv" data-c="'+cid+'" data-d="-1" aria-label="Move up"'+(idx<=0?' disabled':'')+'>↑</button><button class="btn sm dsh-ud" data-act="d-mv" data-c="'+cid+'" data-d="1" aria-label="Move down"'+(idx>=n-1?' disabled':'')+'>↓</button>'
+     +'<span class="dsh-w" role="group" aria-label="Width in columns">'+[1,2,3,4].map(function(w){return '<button class="btn sm" data-act="d-span" data-c="'+cid+'" data-w="'+w+'" aria-pressed="'+(card.span===w)+'" aria-label="Width '+w+' of 4">'+w+'</button>'}).join('')+'</span>'
+     +'<button class="btn sm" data-act="d-edit" data-c="'+cid+'">Edit</button><button class="btn sm" data-act="d-copy" data-c="'+cid+'">Copy</button><button class="btn sm" data-act="d-rm" data-c="'+cid+'">Remove</button></div>';
+  }
+  var chips='';
+  if(res&&meas){chips='<span class="ox-chip sm">'+esc(meas.snap?'latest snapshot':res.label)+'</span>';if(R&&R.rows&&R.rows.some(function(r){return r.partial}))chips+='<span class="ox-chip sm nl dsh-hat">partial</span>'}
+  var actions='';
+  if(meas&&!R.err&&!R.locked&&(meas.kind==='sales')&&!meas.snap)actions+='<button class="ox-drill" data-act="d-docs" data-c="'+cid+'">SAP documents ›</button>';
+  if(meas&&(eff.visual==='ranked')&&!R.err)actions+='<button class="ox-drill" data-act="d-dir" data-c="'+cid+'" '+(dCanEdit()?'':'disabled')+'>'+((card.dir||'top')==='bottom'?'Showing bottom ›':'Showing top ›')+'</button>';
+  var body;try{body=dBodyHtml(card)}catch(e){body='<div class="ox-empty"><b>This card could not be drawn</b><span>'+esc((e&&e.message)||e)+'</span></div>'}
+  var foot='';
+  if(meas&&res){foot='<span>Binds to: '+esc(meas.src)+'</span><span>'+(meas.snap?(R&&R.rows&&R.rows[0]&&R.rows[0].x&&R.rows[0].x.asOf?'As on '+esc(fmtDate(R.rows[0].x.asOf)):'Latest snapshot'):esc(res.label)+' · QoQ with '+esc(res.qNote||'previous quarter'))+'</span>';
+    var basis=R&&R.rows&&R.rows[0]&&R.rows[0].x&&R.rows[0].x.basis;if(basis&&meas.kind==='sales')foot+='<span>Basis: '+esc(basis)+'</span>';
+    if(S.uploads.some(function(u){return u.demo})||S.actions.some(function(a){return a.demo}))foot+='<span class="ox-chip sm demo">DEMO data loaded</span>'}
+  var h='<section class="ox-card dsh-card'+(edit?' editing':'')+'" data-id="'+cid+'" data-sp="'+card.span+'" aria-label="'+esc(title)+'"><header class="dsh-h">'+ic+'<h2><span>'+esc(title)+'</span>'+chips+'</h2>'+actions+'</header>'+tools+dCrumbs(card)+'<div class="dsh-b">'+body+'</div><footer class="dsh-f">'+foot+'</footer>'+(edit?'<span class="dsh-grip" data-dd="grip" aria-hidden="true" title="Drag to resize"></span>':'')+'</section>';
+  D.html[card.id]={k:ck,h:h};return h;
+}
+
+/* ---- the page ---- */
+function dLayoutBar(u){
+  var D=S.dash,cap=dCapFor(u.role),over=D.cards.length>cap,sa=effRole()==='Super admin'&&!readOnly(),ro=!dCanEdit();
+  var res=dRes({k:'follow'});
+  var h='<section class="ox-banner dsh-ctl" aria-label="Dashboard controls"><div class="dsh-bar1"><b>My Dashboard</b><span class="ox-chip sm">'+esc(u.role)+'</span>'
+   +(D.active==='mine'?'<span class="ox-chip sm ok">My layout</span>':'<span class="ox-chip sm nl">'+(D.pub?'Role default (published)':'Role default (built in)')+'</span>')
+   +(dDirty()&&!ro?'<span class="ox-chip sm warn" role="status">Unsaved changes</span>':'')
+   +'<span class="ox-chip sm nl">Compared with: '+esc(res.qNote||res.priorLabel||'previous quarter')+'</span></div>'
+   +'<div class="dsh-bar2">'+dPerCtl(D.per,'hdr',false)+'</div>';
+  if(!ro){
+    h+='<div class="dsh-bar3"><button class="btn sm" data-act="d-edit-toggle" aria-pressed="'+D.edit+'">'+(D.edit?'Done customising':'Customise')+'</button><button class="btn sm pri" data-act="d-add">+ Add card</button>'
+     +'<button class="btn sm" data-act="d-save"'+(dDirty()?'':' disabled')+'>Save layout</button>'
+     +'<button class="btn sm" data-act="d-reset"'+(D.active==='default'&&!dDirty()?' disabled':'')+'>Reset to role default</button>'
+     +(D.mine&&D.active==='default'?'<button class="btn sm" data-act="d-mine">Switch to my layout</button>':'')
+     +(sa?'<button class="btn sm" data-act="d-pub">Publish as role default…</button>':'')+'</div>';
+  }else h+='<div class="dsh-bar3"><span class="note">Previewing another person\'s dashboard: read-only, nothing is saved.</span></div>';
+  if(over)h+='<div class="dsh-note" role="note">This layout has '+D.cards.length+' cards; the usual for a '+esc(u.role)+' is '+cap+'. More is allowed, it is only flagged: fewer cards are easier to act on.</div>';
+  if(D.undo)h+='<div class="dsh-note ok" role="status">Removed "'+esc(dCardTitle(D.undo.card))+'". <button class="btn sm" data-act="d-undo">Undo</button></div>';
+  if(D.err)h+='<div class="dsh-note err" role="alert">'+esc(D.err)+'</div>';
+  return h+'</section>';
+}
+function pageDash(){
+  var D=S.dash,u=effUser();if(!u)return '';
+  if(!D.loaded){dLoad();return '<div class="ox dsh"><div class="ox-empty"><b>Opening your dashboard…</b><span>Reading your saved layout.</span></div></div>'}
+  if(D.dragging&&D.lastPage)return D.lastPage;
+  var ro=!dCanEdit();
+  D.html=D.html||{};
+  var h='<div class="ox dsh'+(D.edit&&!ro?' editing':'')+'" id="dsh">'+dLayoutBar(u);
+  h+='<div class="ox-banner"><b>Bar colour = Ach %</b><span class="ox-bands">'+[1,2,3,4].map(function(b){var r=['','&lt;75','75–&lt;90','90–&lt;100','100+'][b];return '<span><i class="b'+b+'"></i>'+r+' '+OX_MARK[b]+' '+OX_LBL[b]+'</span>'}).join('')+'</span><span class="note">Growth is always against the previous quarter. Partial periods are hatched, never zero.</span></div>';
+  if(!D.cards.length)h+='<div class="ox-empty"><b>No cards yet</b><span>Add a card from the starter library, or build your own.</span></div>';
+  h+='<div class="dsh-grid" id="dsh-grid">'+D.cards.map(function(c){return dCardHtml(c)}).join('')+'</div></div>';
+  D.lastPage=h;return h;
+}
+
+/* ---- actions on the layout ---- */
+function dTouch(){S.dash.html={};S.lastHtml='';schedule()}
+function dMoveTo(id,newIdx){var D=S.dash,i=D.cards.findIndex(function(c){return c.id===id});if(i<0)return;var c=D.cards.splice(i,1)[0];D.cards.splice(Math.max(0,Math.min(D.cards.length,newIdx)),0,c);dTouch()}
+function dFocusHandle(id){setTimeout(function(){var b=document.querySelector('.dsh-card[data-id="'+id+'"] .dsh-hd');if(b)b.focus()},120)}
+async function dSaveLayout(){
+  if(!dCanEdit()){toast('Previewing as another user: nothing can be saved');return}
+  var D=S.dash;
+  try{D.mine=dClone(D.cards);D.active='mine';await dPersist({mine:D.mine,active:'mine'});D.baseJson=JSON.stringify(D.cards);D.err='';toast('Layout saved to your dashboard');dTouch()}
+  catch(e){D.err='Could not save your layout: '+dbErrText(e);dTouch();throw e}
+}
+Object.assign(handlers,{
+ 'd-edit-toggle':function(){S.dash.edit=!S.dash.edit;dTouch()},
+ 'd-add':function(){dBuilderOpen(null,'lib')},
+ 'd-edit':function(t){var c=dCardById(t.getAttribute('data-c'));if(c)dBuilderOpen(c,'build')},
+ 'd-copy':function(t){var D=S.dash,c=dCardById(t.getAttribute('data-c'));if(!c)return;var n=dClone(c);n.id=dUid();n.title=(c.title||dDefTitle(c))+' (copy)';D.cards.splice(D.cards.indexOf(c)+1,0,n);dTouch()},
+ 'd-rm':function(t){var D=S.dash,id=t.getAttribute('data-c'),i=D.cards.findIndex(function(c){return c.id===id});if(i<0)return;D.undo={card:D.cards[i],index:i};D.cards.splice(i,1);dTouch()},
+ 'd-undo':function(){var D=S.dash;if(!D.undo)return;D.cards.splice(Math.min(D.undo.index,D.cards.length),0,D.undo.card);D.undo=null;dTouch()},
+ 'd-mv':function(t){var D=S.dash,id=t.getAttribute('data-c'),i=D.cards.findIndex(function(c){return c.id===id}),d=+t.getAttribute('data-d');if(i<0)return;dMoveTo(id,i+d);dFocusHandle(id)},
+ 'd-span':function(t){var c=dCardById(t.getAttribute('data-c'));if(c){c.span=+t.getAttribute('data-w');dTouch()}},
+ 'd-save':function(){return dSaveLayout()},
+ 'd-reset':async function(){
+   var D=S.dash,u=effUser();if(!dCanEdit())return;
+   D.cards=dClone(D.pub||dBuiltin(u.role));D.active='default';D.baseJson=JSON.stringify(D.cards);D.dr={};
+   if(D.mine)await dPersist({mine:D.mine,active:'default'});
+   toast('Reset to the role default'+(D.mine?'. Your own layout is kept: use "Switch to my layout"':''));dTouch();
+ },
+ 'd-mine':async function(){var D=S.dash;if(!D.mine)return;D.cards=dClone(D.mine);D.active='mine';D.baseJson=JSON.stringify(D.cards);D.dr={};await dPersist({mine:D.mine,active:'mine'});dTouch()},
+ 'd-pub':function(){
+   if(!superOnly('publish a role default'))return;
+   var roles=ROLES.filter(function(r){return r!=='Super admin'});
+   openDlg('<h3>Publish as role default</h3><p class="note" style="margin:0">Publishes the '+S.dash.cards.length+' cards now on this dashboard as the starting layout for one role. People who saved their own layout keep it; everyone else sees this one. Cards using measures outside that role\'s scope show as locked for them.</p>'
+    +'<div class="fld"><label for="dpub-role">Role</label><select id="dpub-role" class="in">'+roles.map(function(r){return '<option>'+esc(r)+'</option>'}).join('')+'</select></div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="d-pub-go">Publish</button><button class="btn" data-act="dlg-close">Cancel</button></div>');
+ },
+ 'd-pub-go':async function(){
+   if(!superOnly('publish a role default'))return;
+   var role=gv('dpub-role'),cards=dClone(S.dash.cards);
+   try{await dset('dashroles/role_'+slug(role),{role:role,cards:cards,at:nowISO(),by:whoAmI(),v:1});try{await auditW('dashboard default published','',{role:role,cards:cards.length})}catch(e2){}
+     if(role===(effUser()&&effUser().role))S.dash.pub=dSanList(cards);closeDlg();toast('Published as the default for '+role);dTouch()}
+   catch(e){var el=$('#d-err');if(el)el.innerHTML='<div class="banner err">'+esc(dbErrText(e))+'</div>'}
+ },
+ 'd-more':function(t){var id=t.getAttribute('data-c');S.dash.more[id]=1;dTouch()},
+ 'd-dir':function(t){var c=dCardById(t.getAttribute('data-c'));if(c&&dCanEdit()){c.dir=(c.dir||'top')==='bottom'?'top':'bottom';dTouch()}},
+ 'd-drill':function(t,ev){if(ev&&ev.target&&ev.target.closest&&ev.target.closest('.dsh-card.editing')&&ev.target.closest('[data-dd]'))return;return dDrill(t.getAttribute('data-c'),t.getAttribute('data-k'))},
+ 'd-crumb':function(t){var id=t.getAttribute('data-c'),i=+t.getAttribute('data-i'),d=S.dash.dr[id];if(!d)return;
+   if(i<=0)delete S.dash.dr[id];else if(d.stack&&d.stack.length){var by=d.stack[i]?d.stack[i].from:d.by;d.stack=d.stack.slice(0,i);d.by=by}else{d.period=null}
+   var x=S.dash.dr[id];if(x&&!(x.stack&&x.stack.length)&&!x.period)delete S.dash.dr[id];dTouch()},
+ 'd-docs':function(t){return dDocsOpen(t.getAttribute('data-c'))}
+});
+var D_NEXT={zone:'plant',state:'plant',plant:'customer',group:'plant',thickness:'brand',brand:'thickness',salesperson:'customer'};
+function dDrill(cid,k){
+  var card=dCardById(cid);if(!card)return;var eff=dEff(card),R=dRun(eff);if(!R||!R.rows)return;
+  var r=R.rows.find(function(x){return String(x.k)===String(k)});if(!r||!r.dim)return;
+  var D=S.dash,d=D.dr[cid]||(D.dr[cid]={by:null,stack:[]}),meas=R.meas;
+  var curBy=eff.by||R.by;
+  if(['month','quarter','fy'].indexOf(r.dim)>=0){
+    var per=r.dim==='month'?{k:'MTD',m:r.k}:r.dim==='quarter'?{k:'Q',q:r.k}:{k:'FY',q:(function(){var qs=closedQuarters().concat([curQuarterKey()]).filter(function(q){return q.slice(0,4)===r.k});return qs[qs.length-1]})()};
+    d.period=per;d.by=meas.dims.indexOf('plant')>=0&&!meas.fixedBy?'plant':'none';dTouch();return;
+  }
+  var used={};(card.filters||[]).concat(d.stack).forEach(function(f){used[f.dim]=1});used[r.dim]=1;
+  d.stack.push({dim:r.dim,val:r.k,from:curBy});
+  var next=D_NEXT[r.dim];
+  if(next&&(used[next]||!dDimOk(Object.assign({},eff,{by:next}),next)||(next==='customer'&&['sales','recv','coll'].indexOf((R.baseMeas||meas).kind)<0)))next=null;
+  if(!next){/* lowest level: the card is filtered; sales cards offer the SAP documents behind it */
+    d.by='none';if(meas.kind==='sales'&&(meas.f!=='n'||true)){dTouch();toast('Lowest level. "SAP documents" lists the documents behind this card.');return}
+  }else d.by=next;
+  dTouch();
+}
+async function dDocsOpen(cid){
+  var card=dCardById(cid);if(!card)return;var eff=dEff(card),F=dFilt(eff),res=dRes(eff.period),ms=res.curMonths.slice().reverse();
+  if(!ms.length){toast('No loaded month in this period');return}
+  var st=S.dash.docs={cid:cid,ym:ms.find(function(m){return S.cells['INV_'+m]})||ms[0]};
+  var pickCust=F.cust&&F.cust.size===1?Array.from(F.cust)[0]:null;
+  var ctx={sc:SC(),plants:F.plants},spF=F.spPick?spCanon(F.spPick):null;
+  S.dash.docsCtx={ctx:ctx,cust:pickCust,spF:spF,ms:ms};
+  dDocsRender();
+}
+function dDocsRender(){
+  var st=S.dash.docs,c=S.dash.docsCtx;if(!st||!c)return;
+  var html='<h3>SAP documents behind the card</h3><div class="fld"><label for="dd-m">Month</label><select id="dd-m" class="in" data-dsh="docsm">'+c.ms.map(function(m){return '<option value="'+m+'"'+(m===st.ym?' selected':'')+'>'+ymLabel(m)+'</option>'}).join('')+'</select></div><div id="dd-docs">'+docList(c.ctx,st.ym,c.cust,null,c.spF)+'</div><div class="row"><button class="btn" data-act="dlg-close">Close</button></div>';
+  if(!document.getElementById('dd-docs'))openDlg(html);else document.getElementById('dd-docs').innerHTML=docList(c.ctx,st.ym,c.cust,null,c.spF);
+  var tries=0;(function poll(){var el=document.getElementById('dd-docs');if(!el||tries++>60)return;var h=docList(c.ctx,st.ym,c.cust,null,c.spF);if(/Loading documents/.test(h)){setTimeout(poll,400)}else el.innerHTML=h})();
+}
+document.addEventListener('change',function(ev){
+  var t=ev.target,k=t.getAttribute&&t.getAttribute('data-dsh');if(!k)return;
+  if(k==='per'){
+    var sc=t.getAttribute('data-s'),f=t.getAttribute('data-k');
+    if(sc==='hdr'){S.dash.per=dPerSet(S.dash.per,f,t.value);try{lsSet('desk-dash-per',JSON.stringify(S.dash.per))}catch(e){}dTouch()}
+    else if(sc==='draft'&&S.dash.builder){var c=S.dash.builder.card;c.period=dPerSet(c.period,f,t.value);dBuilderRender()}
+  }else if(k==='docsm'){S.dash.docs.ym=t.value;dDocsRender()}
+  else dBuilderChange(t,k);
+});
+
+/* ---- pointer drag (move), corner grip (resize), keyboard ---- */
+var DD=null;
+function ddScroll(y){var m=70;if(y<m)window.scrollBy(0,-18);else if(y>window.innerHeight-m)window.scrollBy(0,18)}
+document.addEventListener('pointerdown',function(ev){
+  var h=ev.target.closest&&ev.target.closest('[data-dd]');if(!h||DD)return;
+  var card=h.closest('.dsh-card');if(!card||!S.dash.edit||!dCanEdit())return;
+  if(ev.pointerType==='mouse'&&ev.button!==0)return;
+  ev.preventDefault();var grid=card.parentNode,r=card.getBoundingClientRect(),kind=h.getAttribute('data-dd');
+  S.dash.dragging=true;
+  if(kind==='handle'){
+    var ph=document.createElement('div');ph.className='dsh-ph';ph.setAttribute('data-sp',card.getAttribute('data-sp'));ph.style.height=r.height+'px';
+    var ghost=card.cloneNode(true);ghost.classList.add('dsh-ghost');ghost.style.cssText='position:fixed;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;pointer-events:none;z-index:60';
+    grid.insertBefore(ph,card);card.style.display='none';document.body.appendChild(ghost);
+    DD={mode:'move',id:card.getAttribute('data-id'),card:card,grid:grid,ph:ph,ghost:ghost,dx:ev.clientX-r.left,dy:ev.clientY-r.top};
+  }else DD={mode:'resize',id:card.getAttribute('data-id'),card:card,grid:grid,left:r.left,span:+card.getAttribute('data-sp')};
+  window.addEventListener('pointermove',ddMove);window.addEventListener('pointerup',ddUp);window.addEventListener('pointercancel',ddCancel);
+});
+function ddMove(ev){
+  if(!DD)return;
+  if(DD.mode==='move'){
+    DD.ghost.style.left=(ev.clientX-DD.dx)+'px';DD.ghost.style.top=(ev.clientY-DD.dy)+'px';ddScroll(ev.clientY);
+    var el=document.elementFromPoint(ev.clientX,ev.clientY),t=el&&el.closest&&el.closest('.dsh-card');
+    if(t&&t!==DD.card&&t.parentNode===DD.grid){
+      var r=t.getBoundingClientRect(),cols=getComputedStyle(DD.grid).gridTemplateColumns.split(' ').length;
+      var before=cols>1?((ev.clientX-r.left)/r.width<0.5):((ev.clientY-r.top)/r.height<0.5);
+      DD.grid.insertBefore(DD.ph,before?t:t.nextSibling);
+    }
+  }else{
+    var cs=getComputedStyle(DD.grid),cols2=cs.gridTemplateColumns.split(' ').length,gap=parseFloat(cs.columnGap)||14,colW=(DD.grid.clientWidth-(cols2-1)*gap)/cols2;
+    var span=Math.max(1,Math.min(cols2,Math.round((ev.clientX-DD.left+gap)/(colW+gap))));DD.span=span;DD.card.setAttribute('data-sp',span);
+  }
+}
+function ddEnd(){window.removeEventListener('pointermove',ddMove);window.removeEventListener('pointerup',ddUp);window.removeEventListener('pointercancel',ddCancel)}
+function ddUp(){
+  if(!DD)return;var d=DD;DD=null;ddEnd();S.dash.dragging=false;
+  if(d.mode==='move'){
+    var ids=[];Array.prototype.forEach.call(d.grid.children,function(ch){if(ch===d.ph)ids.push(d.id);else if(ch!==d.card&&ch.getAttribute&&ch.getAttribute('data-id'))ids.push(ch.getAttribute('data-id'))});
+    d.ghost.remove();d.ph.remove();d.card.style.display='';
+    var by={};S.dash.cards.forEach(function(c){by[c.id]=c});S.dash.cards=ids.map(function(i){return by[i]}).filter(Boolean);
+    if(S.dash.cards.length!==Object.keys(by).length){/* never lose a card */S.dash.cards=Object.keys(by).map(function(k){return by[k]})}
+    dTouch();dFocusHandle(d.id);
+  }else{var c=dCardById(d.id);if(c)c.span=d.span;dTouch()}
+}
+function ddCancel(){
+  if(!DD)return;var d=DD;DD=null;ddEnd();S.dash.dragging=false;
+  if(d.mode==='move'){d.ghost.remove();d.ph.remove();d.card.style.display=''}else dTouch();
+}
+document.addEventListener('keydown',function(ev){
+  var h=ev.target.closest&&ev.target.closest('.dsh-hd');if(!h||!ev.altKey)return;
+  var id=h.closest('.dsh-card').getAttribute('data-id'),D=S.dash,i=D.cards.findIndex(function(c){return c.id===id}),d=(ev.key==='ArrowUp'||ev.key==='ArrowLeft')?-1:(ev.key==='ArrowDown'||ev.key==='ArrowRight')?1:0;
+  if(!d)return;ev.preventDefault();dMoveTo(id,i+d);dFocusHandle(id);
+});
+
+/* ---- src/54-dash6-builder.js ---- */
+/* ================= My Dashboard, part 6: card builder (Measure x Breakdown x Filters x Period x Visual, live preview) and library ================= */
+function dBuilderOpen(card,tab){
+  var D=S.dash;
+  D.builder={tab:tab||'build',card:card?dClone(card):dBlank(),editId:card?card.id:null,q:'',mod:''};
+  dBuilderRender(true);
+}
+function dBlank(){return dSan({id:dUid(),measure:'sheets',by:'none',visual:'kpi',span:2,filters:[],period:{k:'follow'}})}
+function dMeasOpts(card,role){
+  return D_MODS.map(function(mod){
+    var items=Object.keys(MEAS).filter(function(k){return MEAS[k].mod===mod&&(MEAS[k].kind!=='bench'||true)});
+    return '<optgroup label="'+esc(mod)+'">'+items.map(function(k){var m=MEAS[k],bad=!dRoleOk(role,m);return '<option value="'+k+'"'+(card.measure===k?' selected':'')+(bad?' disabled':'')+'>'+esc(m.label)+(bad?' (not for '+esc(role)+')':'')+'</option>'}).join('')+'</optgroup>';
+  }).join('');
+}
+function dFilterValsCtl(i,f,card){
+  var id='dsh-fv'+i,dim=f.dim,sc=dScope(),opts=null;
+  if(dim==='plant')opts=sc.plants.slice().sort().map(function(p){return [p,plantShort(p)]});
+  else if(dim==='zone'){var z={};sc.plants.forEach(function(p){z[dZone(p)]=1});opts=Object.keys(z).sort().map(function(x){return [x,x]})}
+  else if(dim==='state'){var z2={};sc.plants.forEach(function(p){z2[dState(p)]=1});opts=Object.keys(z2).sort().map(function(x){return [x,x]})}
+  else if(dim==='group')opts=GROUPS.map(function(g){return [g,g]});
+  if(opts)return '<select id="'+id+'" class="in" multiple size="4" data-dsh="b" data-f="fval" data-i="'+i+'" aria-label="Values">'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(f.vals.indexOf(o[0])>=0?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select>';
+  var list='';
+  if(dim==='salesperson')list=distinct('sp').slice(0,300).map(function(s){return '<option value="'+esc(s)+'">'}).join('');
+  else if(dim==='thickness'||dim==='brand'){var seen={};Object.keys(DS.dim).forEach(function(k){DS.dim[k].rows.forEach(function(r){seen[r[dim==='thickness'?0:1]]=1})});list=Object.keys(seen).sort().slice(0,200).map(function(s){return '<option value="'+esc(s)+'">'}).join('')}
+  return '<input id="'+id+'" class="in" list="'+id+'-l" value="'+esc(f.vals.join(', '))+'" placeholder="'+(dim==='customer'?'customer code':'value, value')+'" data-dsh="b" data-f="fval" data-i="'+i+'" aria-label="Values"><datalist id="'+id+'-l">'+list+'</datalist>';
+}
+function dBuilderForm(B){
+  var c=B.card,role=effRole(),meas=MEAS[c.measure],fit=dVisFit(c),by=meas.fixedBy||c.by||'none';
+  var h='<div class="fld"><label for="dsh-title">Title</label><input id="dsh-title" class="in" maxlength="80" value="'+esc(c.title||'')+'" placeholder="'+esc(dDefTitle(c))+'" data-dsh="b" data-f="title"></div>';
+  h+='<div class="fld"><label for="dsh-meas">Measure (what)</label><select id="dsh-meas" class="in" data-dsh="b" data-f="measure">'+dMeasOpts(c,role)+'</select><span class="note">Binds to: '+esc(meas.src)+'</span></div>';
+  if(meas.kind==='bench'){h+='<div class="fld"><label for="dsh-base">Benchmark of</label><select id="dsh-base" class="in" data-dsh="b" data-f="base">'+Object.keys(MEAS).filter(function(k){var m=MEAS[k];return m.kind!=='bench'&&m.kind!=='dh'&&m.kind!=='person'&&m.kind!=='rating'&&dRoleOk(role,m)}).map(function(k){return '<option value="'+k+'"'+(c.base===k?' selected':'')+'>'+esc(MEAS[k].mod+' · '+MEAS[k].label)+'</option>'}).join('')+'</select></div>'}
+  h+='<div class="fld"><label for="dsh-by">Breakdown (by)</label><select id="dsh-by" class="in" data-dsh="b" data-f="by"'+(meas.fixedBy?' disabled':'')+'>'+Object.keys(D_BY).map(function(k){var ok=k!=='item'&&dDimOk(c,k),why=k==='item'?dByWhy(c,'item'):dByWhy(c,k);return '<option value="'+k+'"'+((meas.fixedBy||c.by)===k?' selected':'')+(ok?'':' disabled')+(ok?'':' title="'+esc(why)+'"')+'>'+esc(D_BY[k]+(ok?'':' (not available)'))+'</option>'}).join('')+'</select>'+(meas.fixedBy?'<span class="note">This measure is always by '+esc(D_BY[meas.fixedBy])+'.</span>':'')+'</div>';
+  h+='<fieldset class="dsh-fs"><legend>Filters (where), up to 3, all must match</legend>';
+  (c.filters||[]).forEach(function(f,i){
+    h+='<div class="dsh-frow"><select class="in" id="dsh-fd'+i+'" data-dsh="b" data-f="fdim" data-i="'+i+'" aria-label="Filter '+(i+1)+' dimension">'+D_FILTER_DIMS.map(function(d){return '<option value="'+d+'"'+(f.dim===d?' selected':'')+'>'+esc(D_BY[d])+'</option>'}).join('')+'</select>'+dFilterValsCtl(i,f,c)+'<button class="btn sm" data-act="d-b-frm" data-i="'+i+'" aria-label="Remove filter">Remove</button></div>';
+  });
+  if((c.filters||[]).length<3)h+='<button class="btn sm" data-act="d-b-fadd">+ Add filter</button>';
+  h+='</fieldset><fieldset class="dsh-fs"><legend>Period (when)</legend><div class="dsh-per">'+dPerCtl(c.period,'draft',true)+'</div><span class="note">Growth is always against the previous quarter (three months back). There is no last-year option.</span></fieldset>';
+  h+='<fieldset class="dsh-fs"><legend>Visual (how)</legend><div class="dsh-vis">'+Object.keys(D_VIS).map(function(v){var why=fit[v];return '<label class="dsh-vc'+(why?' off':'')+(c.visual===v?' on':'')+'"'+(why?' title="'+esc(why)+'"':'')+'><input type="radio" name="dsh-vis" value="'+v+'" data-dsh="b" data-f="visual"'+(c.visual===v?' checked':'')+(why?' disabled':'')+'>'+esc(D_VIS[v])+'</label>'}).join('')+'</div></fieldset>';
+  h+='<div class="dsh-opt"><div class="fld"><label for="dsh-n">Show top N (0 = automatic)</label><input id="dsh-n" class="in" type="number" min="0" max="50" value="'+(c.n||0)+'" data-dsh="b" data-f="n"></div>'
+   +'<div class="fld"><label for="dsh-dir">Top or bottom</label><select id="dsh-dir" class="in" data-dsh="b" data-f="dir"><option value="top"'+(c.dir!=='bottom'?' selected':'')+'>Top (best first)</option><option value="bottom"'+(c.dir==='bottom'?' selected':'')+'>Bottom (worst first)</option></select></div>'
+   +'<div class="fld"><label for="dsh-sort">Sort by</label><select id="dsh-sort" class="in" data-dsh="b" data-f="sortBy"><option value="value"'+(c.sortBy==='value'?' selected':'')+'>Value</option><option value="qoq"'+(c.sortBy==='qoq'?' selected':'')+'>QoQ %</option><option value="label"'+(c.sortBy==='label'?' selected':'')+'>Name</option></select></div>'
+   +'<div class="fld"><label for="dsh-span">Width</label><select id="dsh-span" class="in" data-dsh="b" data-f="span">'+[1,2,3,4].map(function(w){return '<option value="'+w+'"'+(c.span===w?' selected':'')+'>'+w+' of 4 columns</option>'}).join('')+'</select></div></div>';
+  return h;
+}
+function dBuilderPrevHtml(B){
+  var c=dSan(Object.assign({},B.card,{id:B.card.id}))||B.card;
+  if(!MEAS[c.measure])return '';
+  return '<p class="note dsh-read" style="margin:0 0 8px">'+esc(dReadLine(c))+'</p><div class="dsh-prevcard ox">'+dCardHtml(c,{preview:true})+'</div>';
+}
+function dBuilderLib(B){
+  var role=effRole(),q=(B.q||'').toLowerCase(),mod=B.mod;
+  var list=D_LIB.filter(function(e){return (!mod||e.mod===mod)&&(!q||(e.title+' '+e.desc+' '+e.mod+' '+(MEAS[e.s.measure]?MEAS[e.s.measure].label:'')).toLowerCase().indexOf(q)>=0)});
+  if(!list.length)return '<div class="ox-empty"><b>No card matches</b><span>Try another word, or build your own.</span></div>';
+  var h='';
+  D_MODS.forEach(function(m){var es=list.filter(function(e){return e.mod===m});if(!es.length)return;
+    h+='<h4 class="dsh-lh"><span class="dsh-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'+D_MOD_ICON[m]+'</svg></span>'+esc(m)+'</h4><div class="dsh-lib">'+es.map(function(e){
+      var why=dLibLocked(e,role),cur=S.dash.cards.some(function(c){return c.lib===e.id});
+      return '<div class="dsh-le'+(why?' lock':'')+'"><b>'+esc(e.title)+'</b><span class="note">'+esc(e.desc)+'</span>'+(why?'<span class="ox-chip sm nl" title="'+esc(why)+'">Locked: '+esc(why)+'</span>':'<div class="ox-row"><button class="btn sm pri" data-act="d-b-add" data-id="'+e.id+'">Add</button><button class="btn sm" data-act="d-b-custom" data-id="'+e.id+'">Customise</button>'+(cur?'<span class="ox-chip sm ok">on your dashboard</span>':'')+'</div>')+'</div>'}).join('')+'</div>';
+  });
+  return h;
+}
+function dBuilderRender(open){
+  var B=S.dash.builder;if(!B)return;var role=effRole();
+  var ae=document.activeElement,aid=ae&&ae.id,pos=ae&&ae.selectionStart;
+  var head='<div class="hd"><h3>'+(B.editId?'Edit card':'Add card')+'</h3><button class="btn sm" data-act="d-b-close">Close</button></div><div class="seg dsh-seg" role="group" aria-label="Builder tab"><button data-act="d-b-tab" data-t="lib" aria-pressed="'+(B.tab==='lib')+'">Starter library</button><button data-act="d-b-tab" data-t="build" aria-pressed="'+(B.tab==='build')+'">Build your own</button></div>';
+  var body;
+  if(B.tab==='lib'){
+    body='<div class="dsh-libbar"><div class="fld"><label for="dsh-q">Search the library</label><input id="dsh-q" class="in" type="search" value="'+esc(B.q||'')+'" placeholder="sales, collections, thickness, rating…" data-dsh="b" data-f="q"></div><div class="dsh-mods" role="group" aria-label="Module">'+['']
+      .concat(D_MODS).map(function(m){return '<button class="chip'+(B.mod===m?' on':'')+'" data-act="d-b-mod" data-m="'+esc(m)+'" aria-pressed="'+(B.mod===m)+'">'+esc(m||'All')+'</button>'}).join('')+'</div></div><div id="dsh-liblist" class="dsh-liblist">'+dBuilderLib(B)+'</div>';
+  }else{
+    body='<div class="dsh-bgrid"><div class="dsh-prev" id="dsh-prev" aria-live="polite">'+dBuilderPrevHtml(B)+'</div><div class="dsh-form" id="dsh-form">'+dBuilderForm(B)+'</div></div>'
+     +'<div id="d-err"></div><div class="row"><button class="btn pri" data-act="d-b-save">'+(B.editId?'Save changes':'Add to dashboard')+'</button><button class="btn" data-act="d-b-close">Cancel</button></div>';
+  }
+  var html='<div class="dsh-bld" id="dsh-bld">'+head+body+'</div>';
+  if(open||!document.getElementById('dsh-bld')){openDlg(html);var dl=document.querySelector('#dlg .dlg');if(dl)dl.classList.add('dsh-dlg')}
+  else document.getElementById('dsh-bld').outerHTML=html;
+  if(aid){var n=document.getElementById(aid);if(n&&n.focus){n.focus();try{if(pos!=null&&n.setSelectionRange&&(n.type==='text'||n.type==='search'))n.setSelectionRange(pos,pos)}catch(e){}}}
+}
+function dBldPrev(){var B=S.dash.builder,el=document.getElementById('dsh-prev');if(B&&el)el.innerHTML=dBuilderPrevHtml(B)}
+function dBuilderChange(t,k){
+  var B=S.dash.builder;if(!B||k!=='b')return;var c=B.card,f=t.getAttribute('data-f'),i=+t.getAttribute('data-i');
+  if(f==='q'){B.q=t.value;var el=document.getElementById('dsh-liblist');if(el)el.innerHTML=dBuilderLib(B);return}
+  if(f==='title'){c.title=t.value.slice(0,80);dBldPrev();return}
+  if(f==='measure'){var prevT=dDefTitle(c);c.measure=t.value;var m=MEAS[c.measure];if(m.fixedBy)c.by=m.fixedBy;else if(!dDimOk(c,c.by))c.by='none';if(m.kind==='bench'&&!MEAS[c.base])c.base='sheets';if(c.title===prevT)c.title='';if(dVisFit(c)[c.visual]||!c.visual)c.visual=dAutoVisual(c)}
+  else if(f==='base'){c.base=t.value;if(dVisFit(c)[c.visual])c.visual=dAutoVisual(c)}
+  else if(f==='by'){var pb=c.by;c.by=t.value;if(dVisFit(c)[c.visual]||(c.visual==='kpi'&&pb==='none'&&c.by!=='none'))c.visual=dAutoVisual(c)}
+  else if(f==='visual')c.visual=t.value;
+  else if(f==='n')c.n=Math.max(0,Math.min(50,parseInt(t.value,10)||0));
+  else if(f==='dir')c.dir=t.value==='bottom'?'bottom':'top';
+  else if(f==='sortBy')c.sortBy=t.value;
+  else if(f==='span')c.span=+t.value;
+  else if(f==='fdim'){c.filters[i]={dim:t.value,vals:[]}}
+  else if(f==='fval'){var vals=t.tagName==='SELECT'?Array.prototype.map.call(t.selectedOptions,function(o){return o.value}):t.value.split(',').map(function(x){return x.trim()}).filter(Boolean);c.filters[i]=Object.assign({},c.filters[i],{vals:vals});if(t.tagName!=='SELECT'){dBldPrev();return}}
+  /* the card always draws through dSan so a half-filled filter never breaks the preview */
+  dBuilderRender();
+}
+document.addEventListener('input',function(ev){
+  var t=ev.target,k=t.getAttribute&&t.getAttribute('data-dsh');if(k!=='b')return;var f=t.getAttribute('data-f');
+  if(f==='title'||f==='q'||(f==='fval'&&t.tagName==='INPUT')){clearTimeout(dBuilderChange.tm);dBuilderChange.tm=setTimeout(function(){dBuilderChange(t,'b')},180)}
+});
+Object.assign(handlers,{
+ 'd-b-close':function(){S.dash.builder=null;closeDlg()},
+ 'd-b-tab':function(t){S.dash.builder.tab=t.getAttribute('data-t');dBuilderRender()},
+ 'd-b-mod':function(t){S.dash.builder.mod=t.getAttribute('data-m');dBuilderRender()},
+ 'd-b-add':function(t){var c=dFromLib(t.getAttribute('data-id'));if(!c)return;S.dash.cards.push(c);S.dash.edit=false;dTouch();dBuilderRender();toast('Added: '+dCardTitle(c))},
+ 'd-b-custom':function(t){var c=dFromLib(t.getAttribute('data-id'));if(!c)return;var B=S.dash.builder;B.card=c;B.editId=null;B.tab='build';dBuilderRender()},
+ 'd-b-fadd':function(){var c=S.dash.builder.card;if((c.filters||[]).length<3){c.filters=(c.filters||[]).concat([{dim:'plant',vals:[]}])}dBuilderRender()},
+ 'd-b-frm':function(t){var c=S.dash.builder.card;c.filters.splice(+t.getAttribute('data-i'),1);dBuilderRender()},
+ 'd-b-save':function(){
+   var B=S.dash.builder,c=dSan(Object.assign({},B.card));if(!c){var el=$('#d-err');if(el)el.innerHTML='<div class="banner err">Pick a measure first</div>';return}
+   if(!dRoleOk(effRole(),MEAS[c.measure])){var e2=$('#d-err');if(e2)e2.innerHTML='<div class="banner err">'+esc(dRoleWhy(effRole(),MEAS[c.measure]))+'</div>';return}
+   var D=S.dash;
+   if(B.editId){var i=D.cards.findIndex(function(x){return x.id===B.editId});if(i>=0){c.id=B.editId;D.cards[i]=c}else D.cards.push(c)}else D.cards.push(c);
+   delete D.dr[c.id];S.dash.builder=null;closeDlg();dTouch();toast(B.editId?'Card updated':'Card added')
+ }
+});
 
 /* ---- src/55-sales-team.js ---- */
 /* ================= v0.9 Sales, Team & Scorecard ================= */
@@ -6541,9 +7959,10 @@ S.f={mode:'QTD',q:'',m:'',from:'',to:'',plant:'',sp:'',group:'',search:''};
 S.acF={status:'',owner:'',rule:'',q:''};S.logF={kind:'',by:'',q:'',from:''};S.acTab='list';S.threadId=null;
 S.actions=[];S.followups=[];S.phasing=[];S.rollDocs={};S.rollLoaded=false;S.orders=[];S.deliv=[];S.recv=[];S.coll=[];S.stock=[];S.potVer=0;S.viewAs=null;S.demoMode=false;
 var PAGES=[
- ['overview','Overview','Overview'],['sales','Sales','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
+ ['overview','Overview','Overview'],['dashboard','My Dashboard','Overview'],['sales','Sales','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
  ['today','Today','Team'],['actions','Action Center','Team'],['team','Team & Scorecard','Team'],['targets','Targets & Potential','Plan'],['intake','Data Intake','Data'],['admin','Admin','Data'],['geography','Geography','Data']];
 var TITLES={
+ dashboard:['My Dashboard','Your own cards: move, resize, add and edit them. Every figure comes from the Desk\'s loaded SAP data; growth is always against the previous quarter.'],
  overview:['Overview','Sheets sold, collections and stock against market potential. Growth is always against the previous quarter.'],
  sales:['Sales','Branch → salesperson → customer → SAP document · A/B/C customer tiles'],
  receivables:['Receivables','Ageing buckets and collection plan against actual'],
@@ -6572,7 +7991,7 @@ function dataChip(){
   return l?'<span class="chip">SAP '+esc(l.sys||'B1')+' · loaded '+esc(istStr(l.at))+'</span>':'<span class="chip">No SAP data loaded</span>';
 }
 /* line icons, 24x24, stroke 2, drawn at 17px like the reference (no icon library) */
-var NAV_ICON={overview:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+var NAV_ICON={dashboard:'<rect x="3" y="3" width="8" height="11" rx="2"/><rect x="13" y="3" width="8" height="6" rx="2"/><rect x="13" y="12" width="8" height="9" rx="2"/><rect x="3" y="17" width="8" height="4" rx="2"/>',overview:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
  sales:'<path d="M3 20h18M6 16l4-5 4 3 5-7"/>',geography:'<path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',targets:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',orders:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',receivables:'<path d="M7 4h10M7 9h10M7 4c5 0 5 5 0 5l7 11"/>',inventory:'<path d="M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4"/>',
  today:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>',actions:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
  team:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c2 .6 3.2 2.4 3.5 5.5"/>',
@@ -6656,6 +8075,7 @@ function pageHtml(u){
   var pg=S.tab;
   if(pg==='today')return pageToday();
   if(pg==='targets')return pageTargets();
+  if(pg==='dashboard')return pageDash();
   if(pg==='geography')return pageGeography();
   if(pg==='actions')return S.threadId?pageThread(S.threadId):pageActions();
   var body='';
@@ -7833,6 +9253,10 @@ Object.assign(window.__dbg,{geoStartQ:geoStartQ,isGeoQ:isGeoQ,geoKey:geoKey,stat
 Object.assign(window.__dbg,{loadDim:loadDim,dimAgg:dimAgg,dimState:dimState,dimKeyOf:dimKeyOf,ratingCalc:ratingCalc,ratingRows:ratingRows,ratingBasis:ratingBasis,ratingStars:ratingStars,zoneFromLines:zoneFromLines,zoneOfPlant:zoneOfPlant,zoneCanon:zoneCanon,zonesFromSales:zonesFromSales,setZonesFromSales:setZonesFromSales,oxSplitData:oxSplitData});
 Object.assign(window.__dbg,{oxRatingCard:oxRatingCard,oxRatingRow:oxRatingRow,oxCollBars:oxCollBars,oxSplitCard:oxSplitCard,zonesPreviewHtml:zonesPreviewHtml,zoneMonthsOf:zoneMonthsOf,dimKick:dimKick});
 Object.assign(window.__dbg,{oxSafe:oxSafe,oxRatingTable:oxRatingTable});
+
+/* ---- src/99-zdash-expose.js ---- */
+/* test hooks for My Dashboard (read-only helpers; no data) */
+Object.assign(window.__dbg,{DASH:DASH,dRun:dRun,dRun0:dRun0,MEAS:MEAS,D_LIB:D_LIB,D_VIS:D_VIS,D_BY:D_BY,dVisFit:dVisFit,dAutoVisual:dAutoVisual,dFromLib:dFromLib,dSan:dSan,dBuiltin:dBuiltin,dCapFor:dCapFor,dRoleOk:dRoleOk,dDimOk:dDimOk,dRes:dRes,dPerSpec:dPerSpec,dCardHtml:dCardHtml,dBodyHtml:dBodyHtml,dBump:dBump,dLoad:dLoad,dDirty:dDirty,dDataSig:dDataSig,dFilt:dFilt,dScope:dScope,dQuarters:dQuarters,dDrill:dDrill,dEff:dEff,planQtyF:planQtyF,ownKey:ownKey,shQoq:shQoq});
 
 
 /* ================= boot ================= */

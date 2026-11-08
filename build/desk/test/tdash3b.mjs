@@ -1,0 +1,20 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-big-dash.json'));
+const browser=await chromium.launch();
+const {page,errs}=await open(browser,{store,today:'2026-10-23'});
+await page.waitForFunction(()=>window.__dbg&&window.__dbg.DS&&window.__dbg.DS.ready&&window.__dbg.DS.plants.length>=40,null,{timeout:240000});
+await page.evaluate(()=>{location.hash='#/dashboard'});await page.waitForSelector('.dsh-card');
+const r=await page.evaluate(async()=>{
+  const d=window.__dbg,c=d.dFromLib('sales_cust'),t0=performance.now();let polls=0,h;
+  do{h=d.dCardHtml(c,{preview:true});if(/Reading|reading/.test(h)){await new Promise(r=>setTimeout(r,250));polls++}else break}while(performance.now()-t0<120000);
+  const tRead=Math.round(performance.now()-t0);
+  d.dBump();const t1=performance.now();h=d.dCardHtml(c,{preview:true});const tWarm=Math.round(performance.now()-t1);
+  const rows=d.dRun(d.dEff(c)).rows.length;
+  const c2=d.dFromLib('sales_thk');const t2=performance.now();let h2=d.dCardHtml(c2,{preview:true});
+  const k=0;
+  return {tRead,tWarm,rows,custPlantMonths:Object.keys(d.DS.cust).length,thkOk:!/Reading|not loaded/i.test(h2)};
+});
+console.log(JSON.stringify(r),errs.filter(e=>/PAGEERROR/.test(e)));
+await browser.close();

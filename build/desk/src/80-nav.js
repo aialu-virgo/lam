@@ -3,9 +3,10 @@ S.f={mode:'QTD',q:'',m:'',from:'',to:'',plant:'',sp:'',group:'',search:''};
 S.acF={status:'',owner:'',rule:'',q:''};S.logF={kind:'',by:'',q:'',from:''};S.acTab='list';S.threadId=null;
 S.actions=[];S.followups=[];S.phasing=[];S.rollDocs={};S.rollLoaded=false;S.orders=[];S.deliv=[];S.recv=[];S.coll=[];S.stock=[];S.potVer=0;S.viewAs=null;S.demoMode=false;
 var PAGES=[
- ['overview','Overview','Overview'],['sales','Sales','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
+ ['overview','Overview','Overview'],['dashboard','My Dashboard','Overview'],['sales','Sales','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
  ['today','Today','Team'],['actions','Action Center','Team'],['team','Team & Scorecard','Team'],['targets','Targets & Potential','Plan'],['intake','Data Intake','Data'],['admin','Admin','Data'],['geography','Geography','Data']];
 var TITLES={
+ dashboard:['My Dashboard','Your own cards: move, resize, add and edit them. Every figure comes from the Desk\'s loaded SAP data; growth is always against the previous quarter.'],
  overview:['Overview','Sheets sold, collections and stock against market potential. Growth is always against the previous quarter.'],
  sales:['Sales','Branch → salesperson → customer → SAP document · A/B/C customer tiles'],
  receivables:['Receivables','Ageing buckets and collection plan against actual'],
@@ -34,7 +35,7 @@ function dataChip(){
   return l?'<span class="chip">SAP '+esc(l.sys||'B1')+' · loaded '+esc(istStr(l.at))+'</span>':'<span class="chip">No SAP data loaded</span>';
 }
 /* line icons, 24x24, stroke 2, drawn at 17px like the reference (no icon library) */
-var NAV_ICON={overview:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+var NAV_ICON={dashboard:'<rect x="3" y="3" width="8" height="11" rx="2"/><rect x="13" y="3" width="8" height="6" rx="2"/><rect x="13" y="12" width="8" height="9" rx="2"/><rect x="3" y="17" width="8" height="4" rx="2"/>',overview:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
  sales:'<path d="M3 20h18M6 16l4-5 4 3 5-7"/>',geography:'<path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',targets:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',orders:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',receivables:'<path d="M7 4h10M7 9h10M7 4c5 0 5 5 0 5l7 11"/>',inventory:'<path d="M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4"/>',
  today:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>',actions:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
  team:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c2 .6 3.2 2.4 3.5 5.5"/>',
@@ -118,6 +119,7 @@ function pageHtml(u){
   var pg=S.tab;
   if(pg==='today')return pageToday();
   if(pg==='targets')return pageTargets();
+  if(pg==='dashboard')return pageDash();
   if(pg==='geography')return pageGeography();
   if(pg==='actions')return S.threadId?pageThread(S.threadId):pageActions();
   var body='';
