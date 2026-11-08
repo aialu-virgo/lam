@@ -953,7 +953,7 @@ async function demoClear(){
     var cellIds=Object.keys(S.cells);
     for(var i=0;i<cellIds.length;i++){
       var c=JSON.parse(JSON.stringify(S.cells[cellIds[i]])),ch=false;
-      for(var p in c.plants){var x=c.plants[p];if(x.demo){for(var k=0;k<x.chunks;k++)await ddel('inv/'+x.sys+'-'+p+'-'+c.ym+'-'+k);delete c.plants[p];ch=true}}
+      for(var p in c.plants){var x=c.plants[p];if(x.demo){for(var k=0;k<x.chunks;k++)await ddel('inv/'+x.sys+'-'+p+'-'+c.ym+'-'+k);delete c.plants[p];cellRefTouch();ch=true}}
       if(ch){if(Object.keys(c.plants).length){await dset('cells/'+cellIds[i],c);S.cells[cellIds[i]]=c}else{await ddel('cells/'+cellIds[i]);delete S.cells[cellIds[i]]}}
     }
     for(var u of S.uploads.filter(function(x){return x.demo})){await ddel('uploads/'+u._id);await ddel('rejects/'+u._id)}

@@ -136,7 +136,13 @@ function filtPlants(sc,fp){/* Set of plants for the current filter */
   if(fp)return new Set([fp]);return sc.plants}
 
 /* ---- completeness (coverage grid decides whether QoQ may be trusted) ---- */
-function cellRef(){var r=0;Object.keys(S.cells).forEach(function(k){var c=S.cells[k];if(c.entity==='INV')r=Math.max(r,Object.keys(c.plants||{}).length)});return r}
+/* perf: the reference plant count is memoised; it is recomputed when the cells object is replaced (a snapshot), or after an in-place edit (cellRefTouch) */
+var CR={c:null,t:-1,d:0,k:-1,v:0};
+function cellRefTouch(){CR.d++}
+function cellRef(){
+  if(CR.c===S.cells&&CR.t===S.cellsSigTick&&CR.k===CR.d)return CR.v;
+  var r=0;for(var k in S.cells){var c=S.cells[k];if(c.entity==='INV'){var n=0;for(var p in (c.plants||{}))n++;if(n>r)r=n}}
+  CR.c=S.cells;CR.t=S.cellsSigTick;CR.k=CR.d;CR.v=r;return r}
 function monthLoaded(ym,plants){
   if(ym<histLoYm())return false;/* D28: before history start nothing counts as loaded */
   var c=S.cells['INV_'+ym];if(!c)return false;

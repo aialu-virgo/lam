@@ -108,7 +108,12 @@ function fuzzyMatch(raw){
      (compact keys equal), and only when it picks one person. Initials and close spellings are SUGGESTIONS (spSuggest): they
      never change whose sales a figure or a Sales executive's scope shows until a Super admin saves them as an alias. */
   var cp=compactKey(raw);if(!cp)return null;
-  var hit=SM.list.filter(function(p){return compactKey(p.name)===cp||(p.b1name&&compactKey(p.b1name)===cp)}),o={},u=[];
+  /* perf: the master's compact keys are indexed once per master (was: recomputed for every master row on every lookup, the main cost of reading a large history); same people, same order */
+  if(!SM.cix||SM.cixList!==SM.list||SM.cixN!==SM.list.length){
+    SM.cix={};SM.cixList=SM.list;SM.cixN=SM.list.length;
+    SM.list.forEach(function(p,i){var a=compactKey(p.name),b=p.b1name?compactKey(p.b1name):null;(SM.cix[a]=SM.cix[a]||[]).push(i);if(b!==null&&b!==a)(SM.cix[b]=SM.cix[b]||[]).push(i)});
+  }
+  var ix=Object.prototype.hasOwnProperty.call(SM.cix,cp)?SM.cix[cp]:[],hit=ix.map(function(i){return SM.list[i]}),o={},u=[];
   hit.forEach(function(p){if(!o[p.code]){o[p.code]=1;u.push(p)}});
   if(u.length===1)return {p:u[0],how:'spacing or punctuation'};
   return u.length>1?{ambiguous:true}:null;
@@ -437,7 +442,7 @@ async function undoUpload0(uid){
   var jobs=[],months=pl.months.slice(),sets=[];
   pl.months.forEach(function(ym){
     var c=JSON.parse(JSON.stringify(S.cells['INV_'+ym]));
-    pl.mine[ym].forEach(function(p){var x=c.plants[p];for(var i=0;i<(x.chunks||0);i++)jobs.push('inv/'+x.sys+'-'+p+'-'+ym+'-'+i);if(S.rollDocs[p+'-'+ym])jobs.push('roll/'+p+'-'+ym);delete c.plants[p]});
+    pl.mine[ym].forEach(function(p){var x=c.plants[p];for(var i=0;i<(x.chunks||0);i++)jobs.push('inv/'+x.sys+'-'+p+'-'+ym+'-'+i);if(S.rollDocs[p+'-'+ym])jobs.push('roll/'+p+'-'+ym);delete c.plants[p];cellRefTouch()});
     sets.push([ym,c]);
   });
   var toast0=function(m){toast(m)};toast0('Undoing '+uid+': removing '+pl.n+' plant-months...');
