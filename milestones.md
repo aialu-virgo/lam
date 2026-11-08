@@ -26,7 +26,7 @@ related:
 | Fri 15:00 | Incoming Payment Report Apr 2025–Sep 2026 loaded live and checked | Delivery Lead | done (D43) |
 | Fri 17:30 | Receivables, credit notes, customer master intakes; net-sales basis (D40); auto-replaced history (D41) published | Full-Stack Engineer | done 14:50 (v32); QA FAIL 5 defects (D45), v33 16:55; backup size blocker (D46); v34 17:30; QA FAIL on backup cap (D47), v35 18:40, QA passed (D48); sales uploads released |
 | File + 45 min | Each receivables / credit-note / customer file loaded live after Vijay sends it | Delivery Lead | waiting on files |
-| Sun 8 Nov | Sales Apr 2025–Oct 2026 + stock 7-Nov reloaded from VIRGO_ONE files, inter-company excluded (D70, D72) | Delivery Lead | done 16:42 IST |
+| Sun 8 Nov | Sales Apr 2025–Oct 2026 + stock 7-Nov reloaded from VIRGO_ONE files, inter-company excluded (D70, D94) | Delivery Lead | done 16:42 IST |
 | Wed 4 Nov 12:00 | Infographic Overview mock-up for approval (D50) | Product Designer | v2 approved by Vijay (D52) |
 | Tue 3 Nov 23:30 | Infographic Overview built on real data, published (v36); QA check right after | Full-Stack Engineer | published 21:50 (v36); v37 22:46, QA passed (D54) |
 | Wed 4 Nov 15:00 | v38: no DEMO targets against real sales, 6+ quarters with values, brand in item master (D55) | Full-Stack Engineer | published 13:58; item master reloaded with brand (D56); QA FAIL (D57); v39 15:13, QA: one label defect (D58); v40 16:00, QA passed (D59) |
