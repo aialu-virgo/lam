@@ -45,13 +45,14 @@ ok('upload: thickness labels read "1.00 MM", brands come from the item master, z
 /* independent zone majority from the generated CSV */
 const cats=await ev(cs=>cs.filter(c=>window.__desk.groupOf('B1',c,'')),[...new Set(Object.values(gen).flatMap(a=>a.rows.map(r=>r[a.headers.indexOf('Catagory')])))]);
 const truth={};plants.forEach(p=>{const cnt={};Object.values(gen).forEach(a=>{const H=a.headers,iz=H.indexOf('Zone'),ip=H.indexOf('BPLName'),ic=H.indexOf('Catagory'),ia=H.indexOf('AcctName'),icu=H.indexOf('CardCode');a.rows.forEach(r=>{if(r[ip]!==p.name||!cats.includes(r[ic])||r[iz]==='BRANCH'||/stock outward/i.test(r[ia]))return;const m=/^ZONE([1-5])$/.exec(r[iz]);if(m)cnt[m[1]]=(cnt[m[1]]||0)+1})});truth[p.code]=cnt});
+await dbg('zonesFromSales');
 const zf=await ev(cs=>Object.fromEntries(cs.map(c=>[c,window.__dbg.zoneFromLines(c)])),codes);
 let zOk=true,zd='';codes.forEach(c=>{const t=truth[c],ks=Object.keys(t).sort((a,b)=>t[b]-t[a]||a-b),tie=ks.length>1&&t[ks[1]]===t[ks[0]],r=zf[c];const exp=tie?null:'ZONE '+ks[0];if(!r||r.zone!==exp||JSON.stringify(r.counts)!==JSON.stringify(t)){zOk=false;zd+=' '+c+' got '+JSON.stringify(r&&{z:r.zone,c:r.counts})+' want '+exp+JSON.stringify(t)}});
 ok('zones: each plant\'s zone from sales lines equals the majority counted independently in the file (non-transfer lines, last 12 months)',zOk,zd);
 /* ---- 2. Overview cards ---- */
 await ev(()=>{location.hash='#/overview'});await page.waitForTimeout(3500);
 const txt=await page.innerText('#main').catch(()=>page.innerText('body'));
-ok('cards: Overview shows the thickness split, brand split and branch rating cards with the informational-only line',/Thickness split \(top 6 \+ Other\)/.test(txt)&&/Brand split \(top 8 \+ Other\)/.test(txt)&&/Branch rating/.test(txt)&&/Informational only/.test(txt)&&/not for incentives or disciplinary action/.test(txt)&&/Stars: 80\+ = 5, 60 to under 80 = 4, 40 to under 60 = 3, 20 to under 40 = 2, under 20 = 1/.test(txt),'');
+ok('cards: Overview shows the thickness split, brand split and branch rating cards with the informational-only line',/Thickness split \(top 6 \+ Other\)/i.test(txt)&&/Brand split \(top 8 \+ Other\)/i.test(txt)&&/Branch rating/i.test(txt)&&/Informational only/.test(txt)&&/not for incentives or disciplinary action/.test(txt)&&/Stars: 80\+ = 5, 60 to under 80 = 4, 40 to under 60 = 3, 20 to under 40 = 2, under 20 = 1/.test(txt),txt.slice(0,80));
 const sd=await ev(()=>{const c=window.__dbg.viewCtx();const o={};for(const k of ['thk','brand']){const D=window.__dbg.oxSplitData(k,c);o[k]={n:D.rows.length,total:D.total,labels:D.rows.map(r=>r.label),sh:D.rows.map(r=>r.sh),share:D.rows.reduce((a,r)=>a+r.share,0),q:D.rows.map(r=>r.q.state),ready:D.st.ready,complete:D.st.complete,qv:D.rows.map(r=>r.q.v),P:D.rows.map(r=>r.P)}}
   o.sum=window.__dbg.sumF({plants:c.plants},c.res.cur).sh;o.label=c.res.label;o.prior=c.res.priorLabel;return o});
 ok('cards: thickness split has top 6 + Other, sorted by sheets, shares add to 100, and the total equals the invoiced sheets of the page',sd.thk.n===7&&/^Other \(2 values\)$/.test(sd.thk.labels[6])&&sd.thk.sh.slice(0,6).every((v,i,a)=>!i||a[i-1]>=v)&&Math.abs(sd.thk.share-100)<1e-6&&Math.abs(sd.thk.total-sd.sum)<0.5&&sd.thk.ready&&sd.thk.complete,JSON.stringify(sd.thk).slice(0,300)+' sum '+sd.sum);
@@ -77,8 +78,8 @@ ok('rating maths: ties share the half-rank, a branch with no measure is "not rat
 const rb=await ev(()=>[window.__dbg.ratingBasis([{ach:90},{ach:80},{ach:null}]),window.__dbg.ratingBasis([{ach:90},{ach:null},{ach:null}]),window.__dbg.ratingBasis([{ach:null},{ach:null}]),window.__dbg.ratingBasis([{ach:90},{ach:null}])]);
 ok('rating: sales measure is Ach % in sheets when most branches have a valid one, else QoQ % in sheets',JSON.stringify(rb)==='["ach","qoq","qoq","qoq"]',JSON.stringify(rb));
 /* guard: a wrong target (over 300%) is "Check target", never a score input */
-const RG=await ev(()=>{const mk=(p,sh,ach,ck)=>({p:p,o:{sh:sh,sh0:sh,Psh:null,Psh0:null,incomplete:true,bothNet:false},ach:ach,ck:ck});const R=window.__dbg.ratingRows([mk('1',100,95,false),mk('2',100,80,false),mk('3',100,null,true),mk('4',100,70,false)],{prior:null,priorMonths:[]},null,null);const html=window.__dbg.oxRatingCard(R,{label:'x'},'');return {basis:R.basis,rows:R.rows.map(r=>({id:r.id,sk:r.sk,psk:r.p_sk,ck:r.ck,n3:r.n3,score:r.score})),has:/Check target/.test(html)}});
-ok('guard R8: a branch with Ach above 300% shows "Check target" and its sales measure is left out of the score',RG.basis==='ach'&&RG.rows[2].sk==null&&RG.rows[2].psk==null&&RG.rows[2].ck===true&&RG.rows[2].score===null&&RG.has,JSON.stringify(RG));
+const RG=await ev(()=>{const mk=(p,sh,ach,ck)=>({p:p,o:{sh:sh,sh0:sh,Psh:null,Psh0:null,incomplete:true,bothNet:false},ach:ach,ck:ck});const R=window.__dbg.ratingRows([mk('1',100,95,false),mk('2',100,80,false),mk('3',100,null,true),mk('4',100,70,false)],{prior:null,priorMonths:[]},null,{L:[{plant:'1',days:40,sheets:10},{plant:'2',days:30,sheets:10},{plant:'3',days:20,sheets:10},{plant:'4',days:50,sheets:10}]});const html=window.__dbg.oxRatingCard(R,{label:'x'},'');return {basis:R.basis,rows:R.rows.map(r=>({id:r.id,sk:r.sk,psk:r.p_sk,ck:r.ck,n3:r.n3,score:r.score})),has:/Check target/.test(html)}});
+ok('guard R8: a branch with Ach above 300% shows "Check target" and its sales measure is left out of the score',RG.basis==='ach'&&RG.rows[2].sk==null&&RG.rows[2].psk==null&&RG.rows[2].ck===true&&RG.rows[2].score!=null&&RG.rows[2].n3===1&&RG.has,JSON.stringify(RG));
 /* top 5 and bottom 5 with 12 branches */
 const R12=await ev(()=>{const L=[];for(let i=1;i<=12;i++)L.push({id:'P'+i,name:'Branch '+i,sh:100+i,sk:i*7,col:80+i,stk:20+i,ach:i*7,ck:false});const R=window.__dbg.ratingCalc(L);const html=window.__dbg.oxRatingCard({rows:L,basis:'ach'},{label:'x'},'Q2');const d=document.createElement('div');d.innerHTML=html;return {top:/Top 5/.test(html),bot:/Bottom 5/.test(html),n:d.querySelectorAll('.ox-br').length,first:/#1 /.test(d.querySelector('.ox-br').innerText),stars:d.querySelectorAll('[aria-label$="of 5 stars"]').length}});
 ok('rating: with more than 10 branches the card shows Top 5 and Bottom 5 (10 rows), best first',R12.top&&R12.bot&&R12.n===10&&R12.first&&R12.stars===10,JSON.stringify(R12));
@@ -90,7 +91,77 @@ await ev(()=>{const S=window.__dbg.S;for(const k of ['2026-10','2026-09','2026-0
 await ev(()=>{location.hash='#/sales'});await page.waitForTimeout(300);await ev(()=>{location.hash='#/overview'});await page.waitForTimeout(1500);
 const t2=await page.innerText('#main').catch(()=>page.innerText('body'));
 ok('not loaded, never zero: months loaded before v44 (no detail) show "No thickness or brand detail" and name the fix, with no bars',/No thickness or brand detail for Q3 FY27/.test(t2)&&/Reload these months in Data Intake/.test(t2)&&(await ev(()=>document.querySelectorAll('.ox-sp').length))===0,'');
-/* partial: detail on some plant-months only */
-await ev(()=>{const S=window.__dbg.S;const c=S.cells['INV_2026-10'];const ps=Object.keys(c.plants);const real=window.__realCells;});
+/* restore the detail flags, then a partial case */
+const flags=await ev(()=>{const S=window.__dbg.S,o={};for(const k of Object.keys(S.cells)){const c=S.cells[k];if(c.entity==='INV')Object.keys(c.plants).forEach(p=>{o[k+'|'+p]=c.plants[p].dimFrom})}return o});
+await ev(([f])=>{const S=window.__dbg.S;Object.keys(f).forEach(k=>{const[ck,p]=k.split('|');S.cells[ck].plants[p]=Object.assign({},S.cells[ck].plants[p],{dimFrom:f[k]})});window.__dbg.DS.dimVer++;S.lastHtml=''},[flags]);
+await ev(()=>{location.hash='#/sales'});await page.waitForTimeout(300);await ev(()=>{location.hash='#/overview'});await page.waitForTimeout(1500);
+const t3=await page.innerText('#main').catch(()=>page.innerText('body'));
+ok('detail comes back after the flags are restored (no reload needed: already read)',(await ev(()=>document.querySelectorAll('.ox-sp').length))===16&&!/No thickness or brand detail/.test(t3),'');
+await ev(([c])=>{const S=window.__dbg.S;const x=S.cells['INV_2026-10'];x.plants[c]=Object.assign({},x.plants[c],{dimFrom:undefined});window.__dbg.DS.dimVer++;S.lastHtml=''},[codes[0]]);
+await ev(()=>{location.hash='#/sales'});await page.waitForTimeout(300);await ev(()=>{location.hash='#/overview'});await page.waitForTimeout(1500);
+const t4=await page.innerText('#main').catch(()=>page.innerText('body'));
+const sdP=await ev(()=>{const D=window.__dbg.oxSplitData('thk',window.__dbg.viewCtx());return {states:D.rows.map(r=>r.q.state),n:D.rows.length}});
+ok('partial: detail on 3 of 4 plant-months in the quarter shows "Partial: 3 of 4" and no QoQ is computed from incomplete detail',/Partial: 3 of 4 plant-months carry item detail/.test(t4)&&sdP.states.every(s=>s==='incomplete'),JSON.stringify(sdP));
+await ev(([f])=>{const S=window.__dbg.S;Object.keys(f).forEach(k=>{const[ck,p]=k.split('|');S.cells[ck].plants[p]=Object.assign({},S.cells[ck].plants[p],{dimFrom:f[k]})});window.__dbg.DS.dimVer++;S.lastHtml=''},[flags]);
+/* ---- 6. zones: plant master first, else sales lines; Admin action writes it ---- */
+const setM=async(c,z)=>ev(async([c,z])=>{const p=window.__dbg.S.plants.find(x=>x.plant_code===c);await window.__desk.dset('plants/'+c,Object.assign({},p,{_id:undefined,zone:z}))},[c,z]);
+await setM(codes[0],'Zone 3');for(const c of codes.slice(1))await setM(c,'');await page.waitForTimeout(800);
+const zo=await ev(cs=>cs.map(c=>window.__dbg.zoneOfPlant(c)),codes);
+const wantZ=c=>{const t=truth[c],ks=Object.keys(t).sort((a,b)=>t[b]-t[a]||a-b);return 'ZONE '+ks[0]};
+ok('zones: a master value wins ("Zone 3" is read as ZONE 3 and never replaced); blank plants take the sales-line majority',zo[0].z==='ZONE 3'&&zo[0].src==='master'&&codes.slice(1).every((c,i)=>zo[i+1].z===wantZ(c)&&zo[i+1].src==='sales'),JSON.stringify(zo));
+await ev(()=>{location.hash='#/overview'});await page.waitForTimeout(2500);
+const t5=await page.innerText('#main').catch(()=>page.innerText('body'));
+ok('zones: Overview shows ZONE tiles and says 3 plants take the zone from their sales lines',/3 plants take the zone from their sales lines/.test(t5)&&(await ev(()=>Array.from(document.querySelectorAll('.ox-zone small')).map(e=>e.textContent))).every(z=>/^ZONE [1-5]$/.test(z)),'');
+await ev(()=>{location.hash='#/admin'});await page.waitForTimeout(800);
+await page.click('[data-act="atab"][data-t="plants"]');await page.waitForTimeout(500);
+ok('admin: Plants tab has the "Set zones from sales" action',(await page.$('[data-act="zones-set"]'))!=null,'');
+await page.click('[data-act="zones-set"]');await page.waitForSelector('[data-act="zones-go"]',{timeout:30000});
+const dl=await page.innerText('#dlg');
+const nBlank=codes.slice(1).length;
+ok('admin: the preview lists each plant with master, sales zone, lines and share, and offers to write only the blank ones',/Set zones from sales/.test(dl)&&/Write 3 zones to the plant master/.test(dl)&&codes.every(c=>dl.includes(plants.find(p=>p.code===c).name))&&/never changed/.test(dl),dl.slice(0,200));
+await page.click('[data-act="zones-go"]');await page.waitForTimeout(2500);
+const pl2=await ms('^plants/'),au2=Object.values(await ms('^audit/')).filter(a=>a.event==='zones set from sales');
+ok('admin: the zones are written to the plant master (source, time and line counts kept); the existing "Zone 3" is untouched; audit entry written',pl2['plants/'+codes[0]].zone==='Zone 3'&&codes.slice(1).every(c=>pl2['plants/'+c].zone===wantZ(c)&&pl2['plants/'+c].zone_src==='sales'&&pl2['plants/'+c].zone_lines>0&&!!pl2['plants/'+c].zone_set_at)&&au2.length===1&&au2[0].written===3,JSON.stringify(au2));
+ok('admin: the page confirms with a banner',/Set zones from sales: zones written to the plant master: 3/.test(await page.innerText('#up-msg')),(await page.innerText('#up-msg')).slice(0,120));
+/* ---- 7. the set_zones job type ---- */
+for(const c of codes)await setM(c,'');await page.waitForTimeout(600);
+await ev(async()=>{await window.__desk.dset('jobs/jz',{type:'set_zones',requested_by:'coordinator',requested_at:new Date().toISOString(),reason:'D65 test',status:'queued'})});
+await page.waitForFunction(()=>{const j=window.__mockStore()['jobs/jz'];return j&&(j.status==='failed'||j.status==='done')},null,{timeout:60000});await page.waitForTimeout(500);
+const jz=(await ms('^jobs/'))['jobs/jz'],pl3=await ms('^plants/');
+ok('job set_zones: runs from the queue, ends "done", writes the 4 zones, result text says how many',jz.status==='done'&&/zones written to the plant master: 4/.test(jz.results[0].text)&&codes.every(c=>pl3['plants/'+c].zone===wantZ(c)),JSON.stringify(jz.results));
+/* ---- 8. undo removes the detail chunks with the month ---- */
+const ups=await ev(()=>window.__dbg.S.uploads.filter(u=>/2026-10 t62/.test(u.file||'')).map(u=>u._id));
+await ev(async id=>{await window.__desk.dset('jobs/ju',{type:'undo',uploads:id,requested_by:'coordinator',requested_at:new Date(Date.now()+500).toISOString(),reason:'t62 undo',status:'queued'})},ups);
+await page.waitForFunction(()=>{const j=window.__mockStore()['jobs/ju'];return j&&(j.status==='failed'||j.status==='done')},null,{timeout:120000});await page.waitForTimeout(800);
+const st9=await ev(()=>window.__mockStore());
+ok('undo: removing the October upload deletes its normal and detail chunks and cells (nothing of 2026-10 is left)',st9['jobs/ju'].status==='done'&&!Object.keys(st9).some(k=>/^inv\/.*-2026-10-\d+$/.test(k))&&!st9['cells/INV_2026-10'],JSON.stringify(st9['jobs/ju'].results||st9['jobs/ju'].error).slice(0,200));
+/* ---- 9. synthetic: 12-month window and a tie ---- */
+const syn=await ev(()=>{const S=window.__dbg.S,DS=window.__dbg.DS,SEP='\u0001';const yms=[];for(let y=2025,m=1;yms.length<14;m++){if(m>12){m=1;y++}yms.push(y+'-'+String(m).padStart(2,'0'))}
+  yms.forEach((ym,i)=>{const id='INV_'+ym;const c=S.cells[id]||(S.cells[id]={entity:'INV',ym:ym,plants:{}});c.plants['TZ9']={sys:'B1',chunks:2,dimFrom:1,at:'x'+ym};
+    const rows=i<2?[['1.00 MM','B','Laminate','5',1000,1,1,1]]:[['1.00 MM','B','Laminate','2',10,1,1,1],['1.00 MM','B','Laminate','4',10,1,1,1]];DS.dim['TZ9'+SEP+ym]={at:'x'+ym,rows:rows}});
+  const a=window.__dbg.zoneFromLines('TZ9');
+  DS.dim['TZ9'+SEP+yms[13]].rows.push(['1.00 MM','B','Laminate','4',1,1,1,1]);
+  const b=window.__dbg.zoneFromLines('TZ9');return {a:{z:a.zone,amb:a.ambiguous,months:a.months,counts:a.counts},b:{z:b.zone,months:b.months,counts:b.counts},list:window.__dbg.zoneMonthsOf('TZ9')}});
+ok('zones: only the 12 latest loaded months count (the two older months with zone 5 are ignored); a tie is "ambiguous" and sets nothing; one more line breaks it',syn.a.amb===true&&syn.a.z===null&&syn.a.months===12&&syn.a.counts['5']==null&&syn.b.z==='ZONE 4'&&syn.list.length===12&&syn.list[0]==='2026-02',JSON.stringify(syn));
+/* ---- 10. layout and screenshots ---- */
+const shots={};
+for(const [w,sch] of [[1440,'light'],[360,'dark'],[1440,'dark'],[360,'light']]){
+  await page.setViewportSize({width:w,height:900});await page.emulateMedia({colorScheme:sch});
+  await ev(()=>{location.hash='#/sales'});await page.waitForTimeout(200);await ev(()=>{location.hash='#/overview'});await page.waitForTimeout(1200);
+  shots[w+sch]=await ev(()=>({sw:document.documentElement.scrollWidth,iw:innerWidth,ovf:Array.from(document.querySelectorAll('.ox-card')).filter(e=>e.scrollWidth>e.clientWidth+1).length}));
+  await page.screenshot({path:SP+'v44-overview-'+w+'-'+sch+'.png',fullPage:true});
+}
+ok('layout: no horizontal page scroll and no card overflow at 360 and 1440, light and dark',Object.values(shots).every(x=>x.sw<=x.iw&&x.ovf===0),JSON.stringify(shots));
+/* ---- 11. no AI calls, no data in the sources ---- */
+const dist=fs.readFileSync(process.env.DIST||new URL('../dist/index.html',import.meta.url).pathname,'utf8');
+const src53=fs.readFileSync(new URL('../src/53-splits.js',import.meta.url).pathname,'utf8');
+ok('no LLM calls: the new module has no network or model call, and the page still has no ask-Claude call',!/fetch\(|XMLHttpRequest|window\.claude|WebSocket/.test(src53)&&!/window\.claude\.(complete|ask|prompt)/.test(dist),'');
 console.log(errs.filter(e=>!/ERR_FAILED/.test(e)).slice(0,3));
-console.log(res.join('\n'));await browser.close();
+console.log(res.join('\n'));
+await page.context().close();
+/* ---- 12. set_zones with no zone detail loaded fails the job with the reason, changes nothing ---- */
+const d2=clone(st0);d2['jobs/jn']={type:'set_zones',requested_by:'coordinator',requested_at:new Date().toISOString(),reason:'no detail',status:'queued'};
+const c2=await open(browser,{store:d2});await c2.page.waitForFunction(()=>{const j=window.__mockStore()['jobs/jn'];return j&&(j.status==='done'||j.status==='failed')},null,{timeout:60000});
+const jn=(await c2.page.evaluate(()=>window.__mockStore()))['jobs/jn'];
+console.log([jn.status==='failed'&&/no sales line with a zone is loaded/.test(jn.error||'')?'PASS':'FAIL','job set_zones: with no zone detail loaded the job fails with the reason and writes nothing',JSON.stringify(jn.error)].join(' | '));
+await browser.close();
