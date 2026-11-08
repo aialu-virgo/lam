@@ -201,7 +201,7 @@ const V = await openGas(browser, env2, 'data@virgoasia.com'); await V.page.waitF
 ok('a fresh session on the restored store shows the data (uploads and coverage present)', await V.page.evaluate(() => window.__desk.S.uploads.length > 0 && Object.keys(window.__desk.S.cells).length > 0));
 ok('largest backup part is at most the forced size plus one document', maxChars < 300000 + 262144 + 1000, maxChars);
 
-ok('the Apps Script build has no "Sign in to claude.ai" text', !fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '../out/Desk-Index.txt'), 'utf8').includes('Sign in to claude.ai'));
+ok('the Apps Script build has no "Sign in to claude.ai" text', !fs.readdirSync(path.join(path.dirname(new URL(import.meta.url).pathname), '../out')).filter(f => /^Desk-Index\d*\.txt$/.test(f)).sort().map(f => fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '../out', f), 'utf8')).join('').includes('Sign in to claude.ai'));
 /* ---------- 4. backup: data changing during the export is flagged ---------- */
 const C2 = await openClaude(browser, { viewer: { email: 'data@virgoasia.com', name: 'Vijay' }, store: JSON.parse(JSON.stringify(mock)), autoload: false }); await C2.page.waitForTimeout(3500);
 await C2.page.evaluate(() => { location.hash = '#/admin'; }); await C2.page.waitForTimeout(600); await C2.page.click('[data-t="tools"]'); await C2.page.waitForTimeout(500);

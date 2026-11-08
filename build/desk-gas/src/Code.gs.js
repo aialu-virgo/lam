@@ -5,7 +5,7 @@
  * All parts of a document are appended together, so they sit in adjacent rows. An update appends the new parts under a new token and only then deletes the old rows,
  * so the old complete version stays readable until the new one is complete. A reader takes the newest token whose parts are all present.
  * Revisions: Script Property DESK_REVS = {"revs":{collection:n},"wts":ms}. n is odd while a write to that collection is in progress and even otherwise; every write adds 2.
- * LOCKS: the script lock is taken in exactly two places and never while it is already held: database creation (ssId_, its own short lock) and the write section of
+ * LOCKS: the script lock is taken in exactly three places (the third is deskLease, below) and never while it is already held: database creation (ssId_, its own short lock) and the write section of
  * deskWrite / deskWipe. The SAP feed (sap.gs.js, joined to this file by build-gas.mjs) takes it only for its run flag and for its staging write section, the same way. The database is created BEFORE any write lock is taken (setup(), doGet, or the first step of deskWrite).
  * A read is accepted only when the revision was even and unchanged from before to after the read (sequence lock), so a page never mixes two versions. */
 var SEED_SUPER = ['data@virgoasia.com', 'spa@virgoasia.com', 'ai.acp@virgoasia.com'];
@@ -14,7 +14,7 @@ var MAX_DOC_CHARS = 262144;      // 256 KiB per document, as the page assumes
 var PAGE_CHARS = 2500000;        // characters per page read (one getValues)
 var PAGE_ROWS = 4000;            // rows per page read
 var STALE_WRITE_MS = 150000;     // an odd revision whose heartbeat (wts) is older than this is a crashed write and is ignored; a live writer refreshes wts before every step
-var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes', 'sapstage', 'geography', 'dashroles'];
+var ADMIN_COLLECTIONS = ['periods', 'audit', 'settings', 'users', 'plants', 'cells', 'inv', 'roll', 'mappings', 'transfers', 'uploads', 'rejects', 'items', 'itemmeta', 'salesmaster', 'orders', 'deliveries', 'receivables', 'collections', 'stock', 'backups', 'customers', 'creditnotes', 'sapstage', 'geography', 'dashroles', 'jobs'];
 var SHARED_COLLECTIONS = ['potential', 'phasing', 'actions', 'followups', 'log', 'planlocks', 'dashlayouts'];
 var HEADER = ['id', 'part', 'len', 'json', 'updatedAt', 'updatedBy'];
 
@@ -39,13 +39,178 @@ function doGet(e) {
   var email = activeEmail_();
   var boot = { email: email, url: ScriptApp.getService().getUrl(), h: (e && e.parameter && e.parameter.h) || '', owner: false, name: '' };
   try { var who = resolveUser_(email); boot.owner = who.role === 'Super admin'; boot.name = who.name || ''; } catch (err) { boot.err = String(err && err.message || err); }
-  var html = HtmlService.createHtmlOutputFromFile('Index').getContent();
+  var loaded = loadPage_();
+  if (loaded.error) return indexErrorPage_(loaded.error);
+  var html = loaded.html;
   var json = JSON.stringify(boot).replace(/</g, '\\u003c');
   html = html.split('/*@@GAS_BOOT@@*/').join('window.__GAS_BOOT=' + json + ';');
   return HtmlService.createHtmlOutput(html)
     .setTitle('Virgo Laminates Performance Desk')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+}
+
+/* ---------- the page ----------
+ * Preferred: from Google Drive (DESK_PAGE_FOLDER_ID, below). Fallback: the HTML files Index, Index2, Index3 ... in this project, joined in order.
+ * Project HTML files are read with HtmlService.createTemplateFromFile(name).getRawContent(): exact text. createHtmlOutputFromFile(name).getContent() parses the file as HTML and refuses
+ * a fragment ("Malformed HTML content"), which is what Index2 to Index4 are, so it must NOT be used for them.
+ * INDEX_MANIFEST = [{name, chars, sum}] per part, written by build-gas.mjs; raw content is exact, so each part is checked by length and checksum.
+ * null (unbuilt source, or set by hand as a stopgap) = join until the first missing file, unchecked. */
+var INDEX_MANIFEST = /*@@INDEX_MANIFEST@@*/null;
+function indexPartName_(i) { return i === 0 ? 'Index' : 'Index' + (i + 1); }
+/* The text that is measured: CRLF as LF, no trailing whitespace (the editor changes the very end of a file by a newline). The page itself is served as read. */
+function indexNorm_(s) { return String(s).replace(/\r\n/g, '\n').replace(/\s+$/, ''); }
+function indexRaw_(name) { return HtmlService.createTemplateFromFile(name).getRawContent(); }
+function loadIndex_() {
+  var out = [], i, text;
+  if (!INDEX_MANIFEST) {
+    for (i = 0; i < 50; i++) { try { text = indexRaw_(indexPartName_(i)); } catch (err) { if (i === 0) return { error: { file: 'Index', problem: 'is missing' } }; break; } out.push(text); }
+    return { html: out.join('') };
+  }
+  for (i = 0; i < INDEX_MANIFEST.length; i++) {
+    var m = INDEX_MANIFEST[i];
+    try { text = indexRaw_(m.name); }
+    catch (err) { return { error: { file: m.name, problem: 'is missing (the Desk has ' + INDEX_MANIFEST.length + ' page files, Index to ' + indexPartName_(INDEX_MANIFEST.length - 1) + ')' } }; }
+    var nt = indexNorm_(text);
+    if (nt.length !== m.chars) return { error: { file: m.name, problem: 'is incomplete or out of date: it has ' + nt.length + ' characters, it must have ' + m.chars + (nt.length < m.chars ? ' (it was cut short when saved, or an older version is still there)' : ' (it is from another Desk version, or has extra text)') } };
+    var sum = indexSum_(nt);
+    if (sum !== m.sum) return { error: { file: m.name, problem: 'has the right length but different content (checksum ' + sum + ', expected ' + m.sum + '): it is from another Desk version or was edited' } };
+    out.push(text);
+  }
+  return { html: out.join('') };
+}
+function indexErrorPage_(e) {
+  var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var fix = e.fix || ('Admin: open the Apps Script project, open <b>' + esc(e.file) + '</b>, select all, paste the matching Desk-' + esc(e.file) + '.txt, save, check its last line (see README), then Deploy &gt; Manage deployments &gt; New version.');
+  return HtmlService.createHtmlOutput('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Desk setup problem</title></head><body style="font-family:sans-serif;max-width:640px;margin:48px auto;padding:0 16px">'
+    + '<h2>The Desk page is not fully installed</h2><p>' + (e.drive ? 'The page file' : 'The HTML file') + ' <b>' + esc(e.file) + '</b> ' + esc(e.problem) + '.</p><p>' + fix + '</p></body></html>')
+    .setTitle('Desk setup problem');
+}
+/* Only the project owner (editor run) or a Super admin may run the diagnostics; anyone else gets one line and nothing about the setup. */
+function diagGate_() {
+  try { var email = activeEmail_(), eff = String(Session.getEffectiveUser().getEmail() || '').toLowerCase(); if (email && (email === eff || isAdmin_(resolveUser_(email)))) return ''; } catch (err) {}
+  return 'Only the project owner or a Super admin may run this.';
+}
+
+/* ---------- page from Google Drive (preferred): folder DESK_PAGE_FOLDER_ID holds desk-page-<yyyymmddhhmm>-<hash>.html, one per release ----------
+ * Line 1 of each file is <!--DESK-PAGE build=<id> api=<n> chars=<n> sum=<hex>-->; chars and sum cover the text after that line and are checked on the raw Drive text.
+ * A file that fails any check is never served. Script Properties: DESK_PAGE_FOLDER_ID (turns this path on), DESK_PAGE_FILE_ID (optional: pin one exact file, for rollback).
+ * Neither property set = the Index files above. The newest file is looked up on EVERY request (one Drive listing); only its content is cached (10 minutes, CacheService, chunks under
+ * 100 KB, key = file id + updated time, re-checked against the header checksum), so a new upload, good or bad, is acted on at once. */
+var DESK_API = 1;                // bump only when server functions change in a way an older page cannot work with
+var PAGE_NAME_RE = /^desk-page-(\d{12})-([0-9a-z]+)\.html$/;   // the build id is a fixed-width UTC timestamp, then the git hash: plain name order is build order
+var PAGE_NAME_LOOSE_RE = /^desk-page-.*\.html$/i;
+var PAGE_CACHE_SECS = 600;
+var PAGE_CHUNK_CHARS = 30000;    // 3 bytes per character at worst = 90 KB, under the 100 KB cache value limit
+var FIX_UPLOAD = 'Delivery Lead: upload the page file again (Drive, plain text, no conversion; the file name is desk-page-&lt;yyyymmddhhmm&gt;-&lt;hash&gt;.html). Nothing else needs to change.';
+var FIX_ACCESS = 'Admin: share the folder "Virgo Desk page (do not edit)" with the Google account that deployed this web app (Deploy &gt; Manage deployments &gt; Execute as), then check DESK_PAGE_FOLDER_ID in Project Settings &gt; Script properties.';
+function indexSum_(str) { var h = 0x811c9dc5; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return ('00000000' + (h >>> 0).toString(16)).slice(-8); }
+function pageErr_(file, problem, fix) { return { error: { file: file, problem: problem, drive: true, fix: fix || FIX_UPLOAD } }; }
+/* checks the raw text of a page file; returns {html, build, sum} or {error} */
+function pageCheck_(name, raw) {
+  var nl = raw.indexOf('\n'), head = nl < 0 ? raw : raw.slice(0, nl);
+  var m = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->$/.exec(head.replace(/^\uFEFF/, '').replace(/\r$/, ''));
+  if (!m) return pageErr_(name, 'has no valid DESK-PAGE header on line 1 (it is not a Desk page file, or it was converted or edited)');
+  var body = raw.slice(nl + 1), nb = indexNorm_(body);
+  if (nb.length !== +m[3]) return pageErr_(name, 'is incomplete or was changed: it has ' + nb.length + ' characters after the header, it must have ' + m[3] + (nb.length < +m[3] ? ' (the upload was cut short)' : ' (extra text)'));
+  var sum = indexSum_(nb);
+  if (sum !== m[4]) return pageErr_(name, 'has the right length but its content does not match the build (checksum ' + sum + ', expected ' + m[4] + '): it was edited or converted');
+  if (+m[2] !== DESK_API) return pageErr_(name, 'is for server version api=' + m[2] + ' but Code.gs is api=' + DESK_API, 'Admin: paste the newer Desk-Code.gs.txt into Code.gs and make a New version (Deploy &gt; Manage deployments &gt; New version). To go back to an older page instead, ask the Delivery Lead to set DESK_PAGE_FILE_ID.');
+  if (!/<\/html>\s*$/.test(body)) return pageErr_(name, 'does not end with </html>');
+  return { html: body, build: m[1], sum: m[4] };
+}
+function pageFind_(props) {
+  var pin = props.getProperty('DESK_PAGE_FILE_ID'), folderId = props.getProperty('DESK_PAGE_FOLDER_ID'), file = null;
+  if (pin) {
+    try { file = DriveApp.getFileById(pin); } catch (err) { return pageErr_('DESK_PAGE_FILE_ID', 'does not open (' + String(err && err.message || err) + '): the pinned file id is wrong, or this account cannot see the file', FIX_ACCESS); }
+    return { file: file, name: file.getName() };
+  }
+  var folder;
+  try { folder = DriveApp.getFolderById(folderId); } catch (err) { return pageErr_('DESK_PAGE_FOLDER_ID', 'does not open (' + String(err && err.message || err) + '): the folder id is wrong, or this account cannot see the folder', FIX_ACCESS); }
+  var best = null, bestName = '', it = folder.getFiles(), ties = [];
+  while (it.hasNext()) {
+    var f = it.next(), n = f.getName();
+    if (!PAGE_NAME_LOOSE_RE.test(n)) continue;
+    if (!PAGE_NAME_RE.test(n)) return pageErr_(n, 'does not have a valid name: it must be desk-page-<yyyymmddhhmm>-<hash>.html (12-digit UTC build time, then the git hash), so the newest file can be told from the name', 'Delivery Lead: rename or delete that file in the Drive folder.');
+    if (!best || n > bestName) { best = f; bestName = n; ties = [f]; } else if (n === bestName) ties.push(f);
+  }
+  if (!best) return pageErr_('the Desk page folder', 'holds no file named desk-page-<yyyymmddhhmm>-<hash>.html');
+  if (ties.length > 1) { var bt = 0; for (var i = 0; i < ties.length; i++) { var t = ties[i].getLastUpdated().getTime(); if (t >= bt) { bt = t; best = ties[i]; } } }
+  return { file: best, name: bestName };
+}
+function pageCachePut_(cache, key, html, sum) {
+  try {
+    var n = Math.ceil(html.length / PAGE_CHUNK_CHARS);
+    for (var i = 0; i < n; i++) cache.put(key + ':' + i, html.substr(i * PAGE_CHUNK_CHARS, PAGE_CHUNK_CHARS), PAGE_CACHE_SECS);
+    cache.put(key + ':n', n + ':' + html.length + ':' + sum, PAGE_CACHE_SECS);
+  } catch (err) { /* cache is an optimisation only */ }
+}
+function pageCacheGet_(cache, key) {
+  try {
+    var meta = cache.get(key + ':n'); if (!meta) return null;
+    var p = meta.split(':'), n = +p[0], out = [];
+    for (var i = 0; i < n; i++) { var c = cache.get(key + ':' + i); if (c === null || c === undefined) return null; out.push(c); }
+    var html = out.join('');
+    return (html.length === +p[1] && indexSum_(indexNorm_(html)) === p[2]) ? html : null;
+  } catch (err) { return null; }
+}
+function loadPageDrive_(props) {
+  var cache = null; try { cache = CacheService.getScriptCache(); } catch (err) {}
+  var found = pageFind_(props);
+  if (found.error) return found;
+  var key = 'pgc:' + found.file.getId() + ':' + found.file.getLastUpdated().getTime() + ':' + DESK_API;
+  if (cache) { var hit = pageCacheGet_(cache, key); if (hit !== null) return { html: hit, cached: true, name: found.name }; }
+  var raw;
+  try { raw = found.file.getBlob().getDataAsString('UTF-8'); }
+  catch (err) { return pageErr_(found.name, 'could not be read from Drive (' + String(err && err.message || err) + ')', 'Reload in a minute. If it keeps failing: ' + FIX_ACCESS); }
+  var checked = pageCheck_(found.name, raw);
+  if (checked.error) return checked;
+  if (cache) pageCachePut_(cache, key, checked.html, checked.sum);
+  return { html: checked.html, build: checked.build, name: found.name };
+}
+function loadPage_() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('DESK_PAGE_FOLDER_ID') || props.getProperty('DESK_PAGE_FILE_ID')) return loadPageDrive_(props);
+  return loadIndex_();
+}
+/* Run from the editor (select pageDiag, Run, then Execution log): which page source is in use and whether the chosen file passes its checks. Reads Drive directly, never the cache. Owner / Super admin only. */
+function pageDiag() {
+  var gate = diagGate_(); if (gate) return gate;
+  var props = PropertiesService.getScriptProperties(), lines = [];
+  lines.push('DESK_API (Code.gs) = ' + DESK_API);
+  lines.push('DESK_PAGE_FOLDER_ID = ' + (props.getProperty('DESK_PAGE_FOLDER_ID') || '(not set)') + ' | DESK_PAGE_FILE_ID = ' + (props.getProperty('DESK_PAGE_FILE_ID') || '(not set)'));
+  if (!props.getProperty('DESK_PAGE_FOLDER_ID') && !props.getProperty('DESK_PAGE_FILE_ID')) lines.push('Page source: the Index HTML files (run indexDiag for detail). Set DESK_PAGE_FOLDER_ID to serve from Drive.');
+  else {
+    var found = pageFind_(props);
+    if (found.error) lines.push('ERROR: ' + found.error.file + ' ' + found.error.problem);
+    else {
+      lines.push('Folder: ' + (props.getProperty('DESK_PAGE_FILE_ID') ? '(pinned file)' : 'ok') + ' | chosen file: ' + found.name + ' | id ' + found.file.getId() + ' | updated ' + found.file.getLastUpdated());
+      try {
+        var raw = found.file.getBlob().getDataAsString('UTF-8'), h = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->/.exec(raw.replace(/^\uFEFF/, '')), r = pageCheck_(found.name, raw);
+        lines.push('Raw length ' + raw.length + (h ? ' | build ' + h[1] + ' | api ' + h[2] + ' | header chars ' + h[3] + ' | header sum ' + h[4] : ' | no header found'));
+        lines.push('Check: ' + (r.error ? 'FAILED: ' + r.error.problem : 'passed'));
+      } catch (err) { lines.push('Read failed: ' + String(err && err.message || err)); }
+    }
+  }
+  lines.forEach(function (l) { Logger.log(l); });
+  return lines.join('\n');
+}
+/* Run from the editor (select indexDiag, Run, then Execution log): for each Index file, the exact (raw) content and what the old HTML-parsing call returns. Owner / Super admin only. */
+function indexDiag() {
+  var gate = diagGate_(); if (gate) return gate;
+  var n = INDEX_MANIFEST ? INDEX_MANIFEST.length : 12, lines = [];
+  lines.push('INDEX_MANIFEST = ' + JSON.stringify(INDEX_MANIFEST));
+  for (var i = 0; i < n; i++) {
+    var name = indexPartName_(i), text, m = INDEX_MANIFEST ? INDEX_MANIFEST[i] : null, old;
+    try { text = indexRaw_(name); }
+    catch (err) { lines.push(name + ': MISSING (' + String(err && err.message || err) + ')'); if (!INDEX_MANIFEST) break; continue; }
+    try { old = 'ok, ' + HtmlService.createHtmlOutputFromFile(name).getContent().length + ' characters'; } catch (err) { old = 'FAILS: ' + String(err && err.message || err); }
+    lines.push(name + ': raw length ' + text.length + (m ? ' (expected ' + m.chars + ')' : '') + ' | checksum ' + indexSum_(text) + (m ? ' (expected ' + m.sum + ')' : '') + ' | createHtmlOutputFromFile ' + old);
+    lines.push('  first 80: ' + JSON.stringify(text.slice(0, 80)));
+    lines.push('  last 80: ' + JSON.stringify(text.slice(-80)));
+  }
+  lines.forEach(function (l) { Logger.log(l); });
+  return lines.join('\n');
 }
 
 /* ---------- envelope: every client call returns {ok:true,...} or {ok:false,code,message} ---------- */
@@ -396,6 +561,32 @@ function deskWipe(cols) {
       try { hit.forEach(function (c) { beat_(); var sh = colSheet_(ss, c, false), last = sh.getLastRow(); n += last - 1; sh.deleteRows(2, last - 1); }); }
       finally { endWrite_(hit); }
       return { ok: true, removedRows: n };
+    } finally { lock.releaseLock(); }
+  });
+}
+/* ---------- document leases (admin job queue): the page's ref.acquire({holder, ttlMs}) ----------
+ * One lease per document path "collection/id", kept in Script Property DESK_LEASES = {path: {h: holder, u: until ms}} (expired ones are dropped on every call).
+ * Granted when free, expired, or already held by the same holder (then renewed); refused (acquired:false, with expiresAt) while another holder has it. ttl is clamped to 1 s .. 10 min, default 30 s.
+ * Super admin only, admin collections only. The script lock is held only for the read-decide-write of this one property, never while another lock is held. */
+function deskLease(col, id, holder, ttlMs) {
+  return wrap_(function () {
+    var who = requireUser_();
+    if (!isAdmin_(who)) fail_('permission_denied', 'Super admin only.');
+    if (!knownCol_(col) || ADMIN_COLLECTIONS.indexOf(col) < 0) fail_('invalid_argument', 'Leases exist for admin collections only.');
+    id = String(id || ''); holder = String(holder || '');
+    if (!id || id.length > 200 || id.indexOf('/') >= 0 || !holder || holder.length > 200) fail_('invalid_argument', 'Bad lease request.');
+    var ttl = Math.min(600000, Math.max(1000, Number(ttlMs) || 30000)), path = col + '/' + id;
+    var lock = LockService.getScriptLock(); lock.waitLock(10000);
+    try {
+      var props = PropertiesService.getScriptProperties(), now = Date.now(), m = {}, live = {}, n = 0;
+      try { m = JSON.parse(props.getProperty('DESK_LEASES') || '{}') || {}; } catch (e) { m = {}; }
+      Object.keys(m).forEach(function (k) { if (m[k] && m[k].u > now) { live[k] = m[k]; n++; } });
+      var cur = live[path];
+      if (cur && cur.h !== holder) return { ok: true, acquired: false, holder: cur.h, expiresAt: new Date(cur.u).toISOString() };
+      if (!cur && n >= 40) fail_('quota_exceeded', 'Too many live leases.');
+      live[path] = { h: holder, u: now + ttl };
+      props.setProperty('DESK_LEASES', JSON.stringify(live));
+      return { ok: true, acquired: true, version: 1, holder: holder, expiresAt: new Date(now + ttl).toISOString() };
     } finally { lock.releaseLock(); }
   });
 }
