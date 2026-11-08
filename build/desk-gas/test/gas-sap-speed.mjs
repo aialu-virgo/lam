@@ -163,11 +163,24 @@ function iso(d) { return new Date(+/\((\d+)\)/.exec(d.BillingDocumentDate)[1]).t
     t.env.setEmail(SUPER); t.env.setEmail('se@virgoasia.com'); t.env.ctx.sapShadowAutoTrigger_(); ok('a signed-in non-admin reaching the trigger entry point does nothing', t.S.calls.length === 0); }
   { // done in one run: no trigger at all
     const t = build({ docs: docs0() }); const r = t.env.call('sapShadowRunAuto'); ok('finished in one run: no trigger is left behind', r.ok && r.done && r.auto.state === 'finished' && t.env.state.triggers.length === 0 && !t.env.props.SAP_AUTO && /Finished in 1 run\./.test(r.message), sj(r.auto)); }
-  { // sync: the existing continue trigger, started by sapSyncAuto
-    const t = mk(); runAll(t.env, 'sapShadowRun'); const r = t.env.call('sapSyncAuto');
-    ok('sapSyncAuto: a cut run leaves the one-off continue trigger', r.ok && r.done === false && t.env.state.triggers.some(x => x.fn === 'sapContinueTrigger_'), sj(t.env.state.triggers.map(x => x.fn)));
-    t.env.setEmail(''); let n = 0; while (t.env.state.triggers.some(x => x.fn === 'sapContinueTrigger_') && n++ < 80) t.env.ctx.sapContinueTrigger_(); t.env.setEmail(SUPER);
-    ok('...the chain finishes the sync and leaves no trigger', 'sapstage/man_2026-10' in t.env.stored() && !t.env.state.triggers.some(x => x.fn === 'sapContinueTrigger_') && !t.env.props.SAP_CURSOR);
+  { // sync: the same chain as the shadow, with its own SAP_AUTO record
+    const t = mk(); runAll(t.env, 'sapShadowRun'); const sy = (env) => env.state.triggers.filter(x => x.fn === 'sapSyncAutoTrigger_'); const r = t.env.call('sapSyncAuto');
+    ok('sapSyncAuto: a cut run leaves ONE one-off trigger (60 s) and an SAP_AUTO record of kind sync', r.ok && r.done === false && r.auto.state === 'continuing' && sy(t.env).length === 1 && sy(t.env)[0].ms === 60000 && JSON.parse(t.env.props.SAP_AUTO).kind === 'sync', sj([r.auto, t.env.state.triggers.map(x => x.fn), t.env.props.SAP_AUTO]));
+    ok('...it does not use the daily-run continue trigger', !t.env.state.triggers.some(x => x.fn === 'sapContinueTrigger_'));
+    ok('...sapStatus reports it as waiting, not stale', (() => { const a = t.env.call('sapStatus').status.auto; return a && a.kind === 'sync' && a.waiting === true && a.stale === false; })());
+    t.env.setEmail(''); let n = 0; while (sy(t.env).length && n++ < 80) t.env.ctx.sapSyncAutoTrigger_(); t.env.setEmail(SUPER);
+    ok('...the chain finishes the sync, removes its trigger and record, and nothing is left behind', 'sapstage/man_2026-10' in t.env.stored() && sy(t.env).length === 0 && !t.env.props.SAP_AUTO && !t.env.props.SAP_CURSOR && t.env.state.triggers.length === 0, sj([t.env.state.triggers, t.env.props.SAP_AUTO]));
+    const u = mk({}, { SAP_AUTO_MAX_RUNS: '2' }); runAll(u.env, 'sapShadowRun'); u.env.call('sapSyncAuto'); u.env.setEmail(''); let m = 0; while (sy(u.env).length && m++ < 40) u.env.ctx.sapSyncAutoTrigger_(); u.env.setEmail(SUPER);
+    ok('the sync chain stops after SAP_AUTO_MAX_RUNS runs, removes its trigger and says how to carry on (the position is kept)', sy(u.env).length === 0 && !u.env.props.SAP_AUTO && /Stopped after 2 automatic runs.*sapSyncAuto/.test(u.env.call('sapStatus').status.message) && !!u.env.props.SAP_CURSOR, u.env.call('sapStatus').status.message);
+    const v = mk(); runAll(v.env, 'sapShadowRun'); v.env.call('sapSyncAuto'); v.env.state.triggers = [];
+    const sv = v.env.call('sapStatus').status; ok('a killed sync chain (record, no trigger, no run) is reported stale and names sapSyncAuto', sv.auto && sv.auto.stale === true && /sapSyncAuto/.test(sv.next), sj(sv.auto));
+    const w = mk(); runAll(w.env, 'sapShadowRun'); w.env.call('sapSyncAuto'); w.S.failNext(/BillingDocument/, 500, 9999); w.env.setEmail(''); w.env.ctx.sapSyncAutoTrigger_(); w.env.setEmail(SUPER);
+    ok('an error in a continued sync removes the trigger and the record and keeps the position', sy(w.env).length === 0 && !w.env.props.SAP_AUTO && !!w.env.props.SAP_CURSOR);
+    const x2 = mk(); x2.env.call('sapShadowRunAuto'); const rr = x2.env.call('sapSyncAuto'); ok('a sync chain cannot be started over a waiting shadow chain', rr.ok === false && /automatic shadow run is waiting/.test(rr.message) && x2.env.state.triggers.filter(y => y.fn === 'sapShadowAutoTrigger_').length === 1);
+    const y2 = mk(); runAll(y2.env, 'sapShadowRun'); y2.env.call('sapSyncAuto'); const r4 = y2.env.call('sapShadowRunAuto'); ok('...and the other way round', r4.ok === false && /automatic sync is waiting/.test(r4.message));
+    const z = build({ docs: docs0(), plants: [] }); z.env.props.SAP_STATUS = JSON.stringify({ verify: JSON.parse(z.env.props.SAP_STATUS).verify, shadow: { at: 'x', ym: '2026-10', clean: true } }); const c0 = z.S.calls.length;
+    const q1 = z.env.call('sapSync'), q2 = z.env.call('sapSyncAuto');
+    ok('sapSync and sapSyncAuto refuse to start when the Desk has no active plants: no SAP call, nothing staged, no trigger', q1.ok === false && /no active plants/.test(q1.message) && q2.ok === false && /no active plants/.test(q2.message) && z.S.calls.length === c0 && z.env.state.triggers.length === 0 && !z.env.props.SAP_RUN && !Object.keys(z.env.stored()).some(k => k.startsWith('sapstage/')), sj([q1, q2]).slice(0, 300));
   }
 }
 
@@ -270,7 +283,13 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
 {
   const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); t.env.call('sapShadowRun');
   const r = t.env.call('sapShadowRun'); ok('sapShadowRun() with no month resumes the saved month', r.resume.resumed === true);
-  const r3 = t.env.call('sapShadowRun', ['2026-11']); ok('asking for a different month starts that month and says the saved position was for another', r3.ok && r3.resume.resumed === false && /different month was asked for \(2026-11; the saved position was for 2026-10\)/.test(r3.resume.reason), sj(r3.resume));
+  const before = t.env.props.SAP_CURSOR_SHADOW, c0 = t.S.calls.length, r3 = t.env.call('sapShadowRun', ['2026-11']);
+  ok('asking for another month while one is part-way is refused, names the month in progress, says how to reset, and keeps the position untouched', r3.ok === false && r3.code === 'invalid_argument' && /shadow run for 2026-10 is part-way/.test(r3.message) && /sapResetCursors/.test(r3.message) && /sapShadowRunAuto\(\)/.test(r3.message) && t.env.props.SAP_CURSOR_SHADOW === before && t.S.calls.length === c0, sj(r3).slice(0, 300));
+  const ra = t.env.call('sapShadowRunAuto', ['2026-11']); ok('...also through sapShadowRunAuto, which then installs no trigger and leaves the position alone', ra.ok === false && /part-way/.test(ra.message) && t.env.props.SAP_CURSOR_SHADOW === before && t.env.state.triggers.length === 0 && !t.env.props.SAP_AUTO);
+  { const u = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); u.env.call('sapShadowRunAuto'); const trig = u.env.state.triggers.length, au = u.env.props.SAP_AUTO; u.env.call('sapShadowRunAuto', ['2026-11']);
+    ok('...and an automatic chain that is waiting is not disturbed by the refused call', u.env.state.triggers.length === trig && u.env.props.SAP_AUTO === au); }
+  const rs = t.env.call('sapResetCursors'); const r5 = t.env.call('sapShadowRun', ['2026-11']); ok('after sapResetCursors the other month can be started', rs.ok && r5.ok && r5.resume.resumed === false, sj(r5.resume));
+  { const u = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); u.env.call('sapShadowRun'); const r6 = u.env.call('sapShadowRun', ['2026-10']); ok('asking for the month in progress by name resumes it', r6.ok && r6.resume.resumed === true, sj(r6.resume)); }
 }
 { // errors never touch the saved position
   const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); t.env.call('sapShadowRun'); const cur = t.env.props.SAP_CURSOR_SHADOW;
@@ -309,10 +328,10 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
   const r2 = t.env.call('sapShadowRunAuto'); ok('sapShadowRunAuto then carries on from the saved position', r2.ok && r2.resume.resumed === true, sj(r2.resume));
   // sync watchdog
   const u = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); runAll(u.env, 'sapShadowRun'); let dur2 = null; const o2 = u.S.fetch;
-  u.S.fetch = (url, o, e) => { if (!dur2) dur2 = u.env.state.triggers.filter(x => x.fn === 'sapContinueTrigger_').map(x => x.ms); return o2(url, o, e); };
+  u.S.fetch = (url, o, e) => { if (!dur2) dur2 = u.env.state.triggers.filter(x => x.fn === 'sapSyncAutoTrigger_').map(x => x.ms); return o2(url, o, e); };
   u.env.call('sapSyncAuto'); ok('sapSyncAuto also has a watchdog while it runs', sj(dur2) === sj([510000]), sj(dur2));
   u.S.fails = []; const v = build({ docs: docs0(), props: {} }); runAll(v.env, 'sapShadowRun'); v.S.failNext(/BillingDocument/, 500, 9999); v.env.call('sapSyncAuto');
-  ok('an error in the sync chain removes the watchdog too', !v.env.state.triggers.some(x => x.fn === 'sapContinueTrigger_'));
+  ok('an error in the sync chain removes the watchdog too', !v.env.state.triggers.some(x => x.fn === 'sapSyncAutoTrigger_'));
 }
 { // 11c. shape B: a page that is one whole document is read completely
   const d = docs0(); const bigDoc = JSON.parse(JSON.stringify(d.find(x => x.CompanyCode === '1000' && x.BillingDocumentType === 'F2' && !x.BillingDocumentIsCancelled && iso(x) === '2026-10')));
@@ -338,6 +357,18 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
   const t = build({ docs: d5, plants: ['1001'] }); const r = t.env.call('sapShadowRun');
   ok('under a quarter of the lines counted: WARNING with both numbers (not only when zero)', r.done && /WARNING: only \d+ of the \d+ lines SAP sent were counted/.test(r.message), r.message.slice(0, 400));
   const t2 = build({ docs: docs0() }); ok('...and a normal run does not warn', !/WARNING/.test(t2.env.call('sapShadowRun').message));
+}
+
+{ // the WARNING survives the 160-character msg cut of the log line: own field
+  const m = synthMasters(7); const d5 = synthDocs({ masters: m, from: '2026-10-01', to: '2026-10-31', plants: ['1001', '1002', '1003', '1004', '1005'], perDayPerPlant: 8 });
+  const t = build({ docs: d5, plants: ['1001'] }); const r = t.env.call('sapShadowRun'); const line = (t.env.state.logs || []).filter(l => /^SAP \{"fn":"sapShadowRun"/.test(l)).map(l => JSON.parse(l.slice(4))).pop();
+  ok('the log line carries the low-count WARNING in its own field (not cut by msg)', /WARNING/.test(r.message) && line && /^WARNING: only \d+ of the \d+ lines SAP sent were counted/.test(line.warn) && line.msg.length <= 160, sj(line).slice(0, 400));
+  const t2 = build({ docs: docs0() }); t2.env.call('sapShadowRun'); const l2 = (t2.env.state.logs || []).filter(l => /^SAP \{"fn":"sapShadowRun"/.test(l)).map(l => JSON.parse(l.slice(4))).pop(); ok('a normal run has no warn field', l2 && !('warn' in l2));
+}
+{ // wording: 5-minute budget, the auto function named
+  const t = build({ docs: docs0(), s4opts: { msPerCall: 20000, pageCap: 25 }, props: { SAP_RUN_BUDGET_MS: '170000' } }); runAll(t.env, 'sapShadowRun'); t.env.call('sapSync');
+  const nx = t.env.call('sapStatus').status.next, msg = t.env.call('sapStatus').status.message;
+  ok('a sync cut at the run limit: sapStatus names the 5-minute run limit (not 6 minutes) and sapSyncAuto', /5-minute run limit/.test(nx) && /sapSyncAuto/.test(nx) && !/6-minute/.test(nx) && /sapSyncAuto/.test(msg), nx + ' | ' + msg);
 }
 
 console.log('TOTAL ' + res.filter(l => l.startsWith('PASS')).length + ' PASS ' + res.filter(l => l.startsWith('FAIL')).length + ' FAIL');

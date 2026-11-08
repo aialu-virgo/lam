@@ -401,7 +401,7 @@ function sapJsonOf(env, k) { try { return JSON.parse(env.props[k] || '{}'); } ca
   r = env.call('sapShadowRun'); ok('shadow run is also cut at the limit and says to run it again', r.ok && r.done === false && /again/.test(r.message), sj(r).slice(0, 200));
   let n = 0; while (!r.done && n++ < 40) r = env.call('sapShadowRun'); ok('and finishes on a later call', r.done === true && n > 1, n);
   r = env.call('sapSync'); let runs = 1; ok('sapSync stops at the time budget with done:false and keeps a cursor', r.ok && r.done === false && env.call('sapStatus').status.resume === true && /time limit/.test(r.message), sj(r).slice(0, 250));
-  ok('while a run is cut the card says to run again', /run sapSync again/i.test(env.call('sapStatus').status.next));
+  ok('while a run is cut the card says to run sapSyncAuto once', /run sapSyncAuto once/i.test(env.call('sapStatus').status.next));
   while (!r.done && runs++ < 60) r = env.call('sapSync');
   ok('repeated runs resume (resumed=true) and finish: all months staged', r.done === true && runs >= 2 && 'sapstage/man_2026-10' in env.stored() && 'sapstage/man_2026-11' in env.stored(), runs);
   const res2 = stagedRows(env, '2026-10');

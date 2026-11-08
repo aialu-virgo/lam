@@ -239,7 +239,7 @@ function sapMissing_() { var p = sapProps_(), m = []; ['SAP_BASE_URL', 'SAP_USER
 function sapTriggerOn_() { return ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sapSyncTrigger_'; }); }
 function sapNext_(s, missing, trig) {
   if (missing.length) return 'Set ' + missing.join(', ') + ' in the Apps Script project (Project Settings, Script properties). Then run sapVerifyMetadata.';
-  if (s.resume) return 'The last run stopped at the 6-minute limit. Run sapSync again (the daily trigger also continues it).';
+  if (s.resume) return 'The last sync stopped at its 5-minute run limit (SAP_RUN_BUDGET_MS). Run sapSyncAuto once to finish it without more clicks (the daily trigger also continues it).';
   if (!s.verify || s.verify.failed || (s.verify.blockingSales !== undefined ? s.verify.blockingSales.length : !s.verify.ok)) return s.verify && s.verify.failed ? 'The last sapVerifyMetadata did not finish. Run it again.' : s.verify ? 'SAP lacks ' + s.verify.gaps + ' required name(s) (' + (s.verify.blockingSales || s.verify.blocking || []).join(', ') + '). Send the sapVerifyMetadata result to the Delivery Lead.' : 'Run sapVerifyMetadata once to check the SAP service names.';
   if (!s.shadow) return 'Run sapShadowRunAuto (October 2026, writes nothing; it continues by itself if one run is not enough) and show Vijay the differences. The first real run needs his OK.';
   if (s.unresolved && s.unresolved.rows) return 'Credit memos for ' + s.unresolved.months.join(', ') + ' are not loaded: ' + s.unresolved.rows + ' lines use product codes that are not in the item master. Load the item master with the S/4 codes (Q18). Credit coverage stays off until this is zero.';
@@ -251,7 +251,7 @@ function sapNext_(s, missing, trig) {
 }
 function sapAutoView_() {
   var a = sapGetJson_('SAP_AUTO', null); if (!a) return null;
-  try { var waiting = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sapShadowAutoTrigger_'; }); a.waiting = waiting; a.stale = !waiting && !sapRunBusy_(); if (a.stale) a.note = 'An automatic run was cut off and no trigger is waiting. Run sapShadowRunAuto to carry on from the saved position.'; } catch (e) {}
+  try { var K = SAP_AUTO_KINDS[a.kind] || SAP_AUTO_KINDS.shadow, waiting = sapAutoTriggers_(a.kind || 'shadow').length > 0; a.waiting = waiting; a.stale = !waiting && !sapRunBusy_(); if (a.stale) a.note = 'An automatic ' + K.label + ' was cut off and no trigger is waiting. Run ' + K.name + ' to carry on from the saved position.'; } catch (e) {}
   return a;
 }
 function sapPagingView_() {
@@ -650,7 +650,7 @@ function sapSyncRun_(source) {
   var cfg = sapCfg_(), st = sapStatusGet_();
   sapVerifyGate_('sales');
   if (!st.shadow) fail_('sap_shadow_first', 'Run sapShadowRun first and have Vijay accept the October comparison. Nothing was read.');
-  var ss = book_(true); sapAcquire_();
+  var ss = book_(true); sapRequirePlants_(ss, 'the staged month would hold no rows'); sapAcquire_();
   var contOff = function () { try { ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapContinueTrigger_') ScriptApp.deleteTrigger(t); }); } catch (e) {} };
   if (source === 'trigger') sapContinueLater_(SAP_RUN_STALE_MS + 30000);   // a watchdog: if Google kills this run, this trigger (after the run flag has gone stale) carries on from the saved position
   var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, job = null, resumed = false, res = null, info = null;
@@ -689,7 +689,7 @@ function sapSyncRun_(source) {
       var stg = sapStatusGet_(), n = 0; Object.keys(stg.staged || {}).forEach(function (k) { n += stg.staged[k].rows; });
       sapStatusPatch_({ lastAt: new Date(Date.now()).toISOString(), lastKind: 'sync', lastOk: true, lastSync: new Date(Date.now()).toISOString(), message: 'Read ' + tot.headers + ' documents and ' + tot.lines + ' lines; staged ' + tot.rows + ' rows in ' + months.length + ' month(s).', read: { headers: tot.headers, lines: tot.lines }, stagedRows: n, conn: { ok: true, at: new Date(Date.now()).toISOString() } });
     } else {
-      sapStatusPatch_({ lastAt: new Date(Date.now()).toISOString(), lastKind: 'sync', lastOk: true, message: 'Stopped at the run time limit after month ' + (job.i + 1) + ' of ' + months.length + '; run sapSync again to continue. ' + ((sapStatusGet_().progress || {}).text || ''), conn: { ok: true, at: new Date(Date.now()).toISOString() } });
+      sapStatusPatch_({ lastAt: new Date(Date.now()).toISOString(), lastKind: 'sync', lastOk: true, message: 'Stopped at the run time limit after month ' + (job.i + 1) + ' of ' + months.length + '; run sapSyncAuto once to finish it (or sapSync again). ' + ((sapStatusGet_().progress || {}).text || ''), conn: { ok: true, at: new Date(Date.now()).toISOString() } });
       if (source === 'trigger') sapContinueLater_();
     }
     return { ok: true, done: res.done, resumed: resumed, resume: info, months: months, monthsDone: Math.min(job.i, months.length), read: { headers: tot.headers, lines: tot.lines }, stagedRows: tot.rows, skippedMonths: (sapStatusGet_().skippedMonths || []), message: sapStatusGet_().message };
@@ -720,6 +720,10 @@ function sapGroupOf_(cat, tt) {   // the S/4 rule of the register intake, withou
   if (c === 'ZABLAM' || c === 'ZCRLAM') { var t = String(tt || '').trim().toUpperCase(); return t === 'DOOR' ? 'Door' : t.indexOf('COMPACT') >= 0 ? 'Compact board' : 'Laminate'; }
   return null;
 }
+function sapRequirePlants_(ss, what) {
+  var n = 0; readAll_(ss, 'plants').docs.forEach(function (d) { try { var o = JSON.parse(d.json); if (o && o.plant_code && o.active !== false) n++; } catch (e) {} });
+  if (!n) fail_('unavailable', 'The Desk has no active plants in its plants list (Admin > Plants), so SAP lines for every plant would be left out and ' + what + '. Nothing was read from SAP and nothing was changed. If this Desk was just restored, finish the restore first (a stale page may have refused it), then run this again.');
+}
 function sapDropText_(job) {
   var D = job.drops || {}, ex = job.dropEx || {}, parts = Object.keys(D).filter(function (k) { return k !== 'counted'; }).map(function (k) {
     var e = ex[k] ? ' (' + Object.keys(ex[k]).map(function (v) { return v + ' x' + ex[k][v]; }).join(', ') + ')' : ''; return k + ' ' + D[k] + e; });
@@ -730,9 +734,9 @@ function sapShadowRun_(ymArg) {
   if (!ss) fail_('unavailable', 'The database is not set up yet. Run setup() once.');
   sapVerifyGate_('sales');
   var firstYm = sapYm_(SAP_FEED_FROM), ym = ymArg || firstYm;
+  sapShadowMonthGuard_(ymArg);
   if (!/^\d{4}-\d\d$/.test(ym) || ym < firstYm) fail_('invalid_argument', 'The shadow run reads ' + firstYm + ' or later only.');
-  var nPlants = 0; readAll_(ss, 'plants').docs.forEach(function (d) { try { var o = JSON.parse(d.json); if (o && o.plant_code && o.active !== false) nPlants++; } catch (e) {} });
-  if (!nPlants) fail_('unavailable', 'The Desk has no active plants in its plants list (Admin > Plants), so every SAP line would be left out and the comparison would be empty. Nothing was read from SAP and nothing was changed. If this Desk was just restored, finish the restore first (a stale page may have refused it), then run this again.');
+  sapRequirePlants_(ss, 'the comparison would be empty');
   sapAcquire_();
   var t0 = Date.now(), budget = +sapProps_().getProperty('SAP_RUN_BUDGET_MS') || SAP_BUDGET_MS, job = null, resumed = false, info = null;
   try {
@@ -981,6 +985,7 @@ function sapLogLine_(fn, r, ms) {
     if (r && r.drops) line.drops = r.drops; if (r && r.dropExamples) line.dropEx = r.dropExamples;
     if (r && r.auto) line.auto = String(r.auto.state || '').slice(0, 40);
     line.ms = ms;
+    var rawMsg = String(r && r.message || ''), wi = rawMsg.indexOf('WARNING'); if (wi >= 0) line.warn = sapRedact_({ secrets: [p.getProperty('SAP_USER'), p.getProperty('SAP_PASSWORD'), p.getProperty('SAP_BASE_URL')] }, rawMsg.slice(wi)).slice(0, 200);   // never cut off by the short msg below
     // only the free-text msg is redacted and cut, so the line is always valid JSON and keeps ms
     line.msg = sapRedact_({ secrets: [p.getProperty('SAP_USER'), p.getProperty('SAP_PASSWORD'), p.getProperty('SAP_BASE_URL')] }, String(r && r.message || '')).slice(0, 160);
     Logger.log('SAP ' + JSON.stringify(line));
@@ -995,44 +1000,54 @@ function sapShadowRun(ym) { return sapPub_('sapShadowRun', function () { return 
 function sapSync() { return sapPub_('sapSync', function () { return sapSyncRun_('manual'); }); }
 /* ---------- automatic continuation (no manual re-runs) ---------- */
 /* sapShadowRunAuto(ym): runs the shadow read; if the run limit stops it, installs ONE one-off trigger that continues it about a minute later, and so on until it is finished. The trigger is removed when the run is done, on any error, when another run holds the run flag too often, or after SAP_AUTO_MAX_RUNS runs. Nothing is written to the Desk store. A time trigger cannot call sapShadowRun(ym) directly (it passes an event object), so the trigger calls sapShadowAutoTrigger_, which reads the month from SAP_AUTO. */
-function sapAutoTriggers_() { return ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'sapShadowAutoTrigger_'; }); }
+var SAP_AUTO_KINDS = { shadow: { fn: 'sapShadowAutoTrigger_', name: 'sapShadowRunAuto', label: 'shadow run' }, sync: { fn: 'sapSyncAutoTrigger_', name: 'sapSyncAuto', label: 'sync' } };
+function sapAutoTriggers_(kind) { return ScriptApp.getProjectTriggers().filter(function (t) { var f = t.getHandlerFunction(); return kind ? f === SAP_AUTO_KINDS[kind].fn : (f === SAP_AUTO_KINDS.shadow.fn || f === SAP_AUTO_KINDS.sync.fn); }); }
 function sapAutoClear_() { try { sapAutoTriggers_().forEach(function (t) { ScriptApp.deleteTrigger(t); }); } catch (e) {} try { sapProps_().deleteProperty ? sapProps_().deleteProperty('SAP_AUTO') : sapProps_().setProperty('SAP_AUTO', ''); } catch (e2) {} }
 function sapAutoSchedule_(st, delayMs) {
   sapAutoTriggers_().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('sapShadowAutoTrigger_').timeBased().after(delayMs || SAP_AUTO_DELAY_MS).create();
+  ScriptApp.newTrigger(SAP_AUTO_KINDS[st.kind].fn).timeBased().after(delayMs || SAP_AUTO_DELAY_MS).create();
   st.at = new Date(Date.now()).toISOString(); sapSetJson_('SAP_AUTO', st);
 }
 function sapRunBusy_() { var r = sapGetJson_('SAP_RUN', null); return !!(r && Date.now() - (r.at || 0) < SAP_RUN_STALE_MS); }
-function sapAutoStep_(ymArg, first) {
-  var max = sapIntProp_('SAP_AUTO_MAX_RUNS', 1, 30, SAP_AUTO_MAX_RUNS), st = sapGetJson_('SAP_AUTO', null), ym = ymArg;
+/* the shadow position belongs to one month. Asking for another month while one is part-way is refused, never allowed to overwrite it. */
+function sapShadowMonthGuard_(ymArg) {
+  if (!ymArg) return;
+  var cur = sapCursorGet_('SAP_CURSOR_SHADOW'), j = cur.job;
+  if (j && j.job === 'shadow' && j.months[0] !== ymArg) fail_('invalid_argument', 'A shadow run for ' + j.months[0] + ' is part-way' + (j.total ? ' (' + sapFmt_(j.skip) + ' of about ' + sapFmt_(j.total) + ' read)' : '') + ', so ' + ymArg + ' was not started and nothing was changed. Finish it first with sapShadowRunAuto() (no month), or discard it on purpose with sapResetCursors and then ask for ' + ymArg + '.');
+}
+/* one step of an automatic chain: kind 'shadow' or 'sync'. Same rules for both: a watchdog trigger before the run, one one-off trigger after a run that is not finished, a cap on runs, an SAP_AUTO record that sapStatus reports as stale when its trigger is gone, and an end (trigger and record removed) on done, error or the cap. */
+function sapAutoStep_(kind, ymArg, first) {
+  var K = SAP_AUTO_KINDS[kind], max = sapIntProp_('SAP_AUTO_MAX_RUNS', 1, 30, SAP_AUTO_MAX_RUNS), st = sapGetJson_('SAP_AUTO', null), ym = ymArg;
   if (first) {
     if (sapRunBusy_()) fail_('unavailable', 'Another SAP run is in progress. If it is an automatic one it carries on by itself; check sapStatus in a few minutes.');   // never take over a run that is going
-    sapAutoClear_(); st = { kind: 'shadow', ym: ymArg || '', runs: 0, busy: 0, since: new Date(Date.now()).toISOString() };
+    if (st && st.kind && st.kind !== kind && sapAutoTriggers_(st.kind).length) fail_('unavailable', 'An automatic ' + SAP_AUTO_KINDS[st.kind].label + ' is waiting for its next run. Let it finish, or stop it with sapStopAuto, before starting an automatic ' + K.label + '.');
+    if (kind === 'shadow') sapShadowMonthGuard_(ymArg);   // before anything is cleared or scheduled
+    sapAutoClear_(); st = { kind: kind, ym: ymArg || '', runs: 0, busy: 0, since: new Date(Date.now()).toISOString() };
   } else {
-    if (!st || st.kind !== 'shadow') { sapAutoClear_(); return { ok: true, done: false, auto: { state: 'cancelled' }, message: 'The automatic shadow run was cancelled; nothing was read.' }; }
-    sapAutoTriggers_().forEach(function (t) { ScriptApp.deleteTrigger(t); });   // this trigger has fired; a new one is made only if more is needed
+    if (!st || st.kind !== kind) { sapAutoTriggers_(kind).forEach(function (t) { ScriptApp.deleteTrigger(t); }); return { ok: true, done: false, auto: { state: 'cancelled' }, message: 'The automatic ' + K.label + ' was cancelled; nothing was read.' }; }
+    sapAutoTriggers_(kind).forEach(function (t) { ScriptApp.deleteTrigger(t); });   // this trigger has fired; a new one is made only if more is needed
     ym = st.ym || undefined;
   }
   sapAutoSchedule_(st, SAP_RUN_STALE_MS + 30000);   // a watchdog: if Google kills this run at 6 minutes nothing below runs, and this trigger (after the run flag has gone stale) carries on from the saved position
   var r;
-  try { r = sapShadowRun_(ym || undefined); }
+  try { r = kind === 'shadow' ? sapShadowRun_(ym || undefined) : sapSyncRun_('auto'); }
   catch (e) {
     if (e.deskCode === 'unavailable' && /Another SAP run/.test(String(e.message)) && !first && st.busy < SAP_AUTO_BUSY_MAX) {   // two runs at once is refused by the run flag; wait and try again
       st.busy++; sapAutoSchedule_(st);
       return { ok: true, done: false, auto: { state: 'waiting', busy: st.busy }, message: 'Another SAP run is in progress; the automatic run will try again in about a minute (' + st.busy + ' of ' + SAP_AUTO_BUSY_MAX + ').' };
     }
-    sapAutoClear_(); throw e;   // an error ends the chain; the read position is kept, so sapShadowRunAuto or sapShadowRun resumes it
+    sapAutoClear_(); throw e;   // an error ends the chain; the read position is kept, so ' + K.name + ' or the plain function resumes it
   }
   st.runs++;
   if (r.done) { sapAutoClear_(); r.auto = { state: 'finished', runs: st.runs }; r.message = (r.message || '') + ' Finished in ' + st.runs + ' run' + (st.runs === 1 ? '' : 's') + '. No trigger is left.'; return r; }
-  if (st.runs >= max) { sapAutoClear_(); r.auto = { state: 'stopped', runs: st.runs }; r.message = 'Stopped after ' + st.runs + ' automatic runs without finishing (limit SAP_AUTO_MAX_RUNS). The read position is kept; run sapShadowRunAuto again to carry on. ' + ((sapStatusGet_().progress || {}).text || ''); sapStatusPatch_({ message: r.message.slice(0, 400) }); return r; }
+  if (st.runs >= max) { sapAutoClear_(); r.auto = { state: 'stopped', runs: st.runs }; r.message = 'Stopped after ' + st.runs + ' automatic runs without finishing (limit SAP_AUTO_MAX_RUNS). The read position is kept; run ' + K.name + ' again to carry on. ' + ((sapStatusGet_().progress || {}).text || ''); sapStatusPatch_({ message: r.message.slice(0, 400) }); return r; }
   sapAutoSchedule_(st); r.auto = { state: 'continuing', runs: st.runs, next: 'in about a minute' };
   r.message = 'Not finished yet; the next run starts by itself in about a minute (no need to click again). ' + ((sapStatusGet_().progress || {}).text || '');
   return r;
 }
-function sapShadowRunAuto(ym) { return sapPub_('sapShadowRunAuto', function () { return sapAutoStep_(ym, true); }); }
-/* the same for the sync: a run cut at the time limit installs the one-off continue trigger (sapContinueTrigger_), which removes itself and continues, until done or an error */
-function sapSyncAuto() { return sapPub_('sapSyncAuto', function () { return sapSyncRun_('trigger'); }); }
+function sapShadowRunAuto(ym) { return sapPub_('sapShadowRunAuto', function () { return sapAutoStep_('shadow', ym, true); }); }
+/* the same chain for the sync (SAP_SYNC_ENABLED and a finished shadow run are still required, as for sapSync) */
+function sapSyncAuto() { return sapPub_('sapSyncAuto', function () { return sapAutoStep_('sync', undefined, true); }); }
 /* stops an automatic chain: removes its trigger and state; the read position is kept */
 function sapResetCursors() {
   return sapPub_('sapResetCursors', function () { var n = 0; ['SAP_CURSOR', 'SAP_CURSOR_SHADOW'].forEach(function (k) { if (sapProps_().getProperty(k)) { sapProps_().setProperty(k, ''); n++; } });
@@ -1094,8 +1109,13 @@ function sapSyncTrigger_() {
 }
 function sapShadowAutoTrigger_() {
   if (!sapTriggerGate_()) { sapLogLine_('sapShadowAutoTrigger_', { ok: false, code: 'permission_denied', message: 'Refused: not the owner or a Super admin.' }, 0); return; }
-  var t0 = Date.now(), r = wrap_(function () { return sapAutoStep_(undefined, false); });
+  var t0 = Date.now(), r = wrap_(function () { return sapAutoStep_('shadow', undefined, false); });
   sapLogLine_('sapShadowAutoTrigger_', r, Date.now() - t0);
+}
+function sapSyncAutoTrigger_() {
+  if (!sapTriggerGate_()) { sapLogLine_('sapSyncAutoTrigger_', { ok: false, code: 'permission_denied', message: 'Refused: not the owner or a Super admin.' }, 0); return; }
+  var t0 = Date.now(), r = wrap_(function () { return sapAutoStep_('sync', undefined, false); });
+  sapLogLine_('sapSyncAutoTrigger_', r, Date.now() - t0);
 }
 function sapContinueTrigger_() {
   if (!sapTriggerGate_()) { sapLogLine_('sapContinueTrigger_', { ok: false, code: 'permission_denied', message: 'Refused: not the owner or a Super admin.' }, 0); return; }
