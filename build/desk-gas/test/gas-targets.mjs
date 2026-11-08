@@ -71,7 +71,7 @@ ok('HOD sees the tab view-only; the page guard refuses a HOD proposal (server ru
 /* SAP customer feed hook (D78): staged customers load through the page's customer intake; B1 customers survive; PIN and district reach the attribution */
 env.setEmail('data@virgoasia.com');
 const H2 = ['Customer', 'Name', 'Customer Group', 'City', 'Region', 'Postal Code', 'District', 'GSTIN', 'Sales Executive', 'Payment Terms', 'Sales District', 'Blocked', 'Legacy Code', 'Address Count'];
-const crow = [['50001000', 'Synthetic Customer 1 Traders', '01', 'PUNE', '13', '411001', 'Pune', '27ABCDE1234F1Z5', 'S01', '0001', '', '', 'VRGLCU000001', 1], ['50001001', 'Synthetic Customer 2 Traders', '01', 'X', '99', '', '', '', '', '', '', '', '', 1]];
+const crow = [['50001000', 'Synthetic Customer 1 Traders', '01', 'PUNE', '13', '411001', 'Pune', '27ABCDE1234F1Z5', 'S01', '0001', '', '', 'VRGLCU000001', 1], ['50001001', 'Synthetic Customer 2 Traders', '01', 'X', '99', '', '', '', '', '', '', '', '', 1], ['50001002', 'Synthetic Customer 3 Traders', '01', 'X', '98', '', '', '24ABCDE1234F1Z5', '', '', '', '', '', 1]];
 const run = 'mockrun1';
 r = env.call('deskWrite', [[set('sapstage', 'cust_c_' + run + '_0', { ym: 'cust', run, seq: 0, n: crow.length, z: env.ctx.sapGz_(crow) }), set('sapstage', 'cust_man', { run, at: new Date().toISOString(), complete: true, cols: H2, n: 1, rows: crow.length, status: 'staged', counts: { pin6: 1, noRegion: 0 } })]]);
 env.ctx.sapStatusPatch_({ cust: { run, rows: crow.length, at: new Date().toISOString(), status: 'staged', counts: { pin6: 1, noRegion: 0 } } });
@@ -83,13 +83,14 @@ await A.page.evaluate(() => { location.hash = '#/intake'; }); await A.page.waitF
 const card = await A.page.evaluate(() => (document.querySelector('#i-feed') || {}).innerText || '');
 await A.page.evaluate(async () => window.__dbg.sapFeedLoad()); await A.page.waitForTimeout(4000);
 st = env.stored();
-const after = await A.page.evaluate(() => { const D = window.__dbg; return { s4: D.custInfo('50001000'), b1: !!D.custInfo('VRGLCU000009'), g: D.custGeo('50001000', ''), gaps: D.custRegionGaps(), msg: window.__sapf.msg, err: window.__sapf.err, card: (document.querySelector('#i-feed') || {}).innerText || '' }; });
+const after = await A.page.evaluate(() => { const D = window.__dbg; return { s4: D.custInfo('50001000'), b1: !!D.custInfo('VRGLCU000009'), g: D.custGeo('50001000', ''), g3: D.custGeo('50001002', 'Kerala'), gst: D.custGstinPlaced(), gaps: D.custRegionGaps(), msg: window.__sapf.msg, err: window.__sapf.err, card: (document.querySelector('#i-feed') || {}).innerText || '' }; });
 const stat = env.call('sapStatus').status;
 ok('B1 file loaded first (customers/main_B1)', b1.ok && !!st['customers/main_B1'], JSON.stringify(b1));
 ok('the SAP card shows the staged customer master and enables Load SAP feed', /Customer master/i.test(card) && /staged/.test(card), card.slice(0, 400));
-ok('Load SAP feed loads the staged customers through the page intake (customers/main_S4), B1 customers survive', !!st['customers/main_S4'] && after.s4 && after.b1 && /Customer master loaded: 2/.test(after.msg), JSON.stringify([after.msg, after.err, !!after.s4, after.b1]));
+ok('Load SAP feed loads the staged customers through the page intake (customers/main_S4), B1 customers survive', !!st['customers/main_S4'] && after.s4 && after.b1 && /Customer master loaded: 3/.test(after.msg), JSON.stringify([after.msg, after.err, !!after.s4, after.b1]));
 ok('sapMarkLoaded marks the customer run loaded on the server', stat.cust && stat.cust.status === 'loaded' && JSON.parse(st['sapstage/cust_man']).status === 'loaded', JSON.stringify(stat.cust));
 ok('Region SAP:13 maps to Maharashtra through the state alias; PIN 411001 reaches district Pune', after.g.st === '27' && after.g.dist === 'MH-PUNE', JSON.stringify(after.g));
 ok('an unmapped region (99) counts as state unknown and shows on the SAP card', after.gaps.n === 1 && /region with no state/.test(after.card) && /99 \(1\)/.test(after.card), JSON.stringify(after.gaps) + after.card.slice(0, 300));
+ok('GSTIN fallback on the SAP feed: unmapped region 98 + GSTIN 24 → Gujarat, counted and shown on the SAP card', after.g3.st === '24' && after.g3.how === 'gstin' && after.gst.by.S4 === 1 && /1 customers placed in a state by their GSTIN/.test(after.card), JSON.stringify([after.g3, after.gst]) + after.card.slice(0, 300));
 console.log('TOTAL', res.length, 'PASS', res.filter(x => x.startsWith('PASS')).length, 'FAIL', res.filter(x => x.startsWith('FAIL')).length);
 await browser.close();

@@ -30,16 +30,20 @@ function geoDistrictPlant(id){var d=GEO.districts[id];return d?(d.responsible_pl
 function geoDistrictName(id){var d=GEO.districts[id];return d?d.district_name:id}
 /* customer -> state and district (target-model "How actuals reach a district"): master state, else the invoice's customer state, else 00; district only by PIN (state must agree) or the master's District text */
 function custGeo(code,invState){
-  var c=custInfo(code),st='';
-  if(c&&c[4])st=stateCode(c[4]);
-  if(!st&&invState)st=stateCode(invState);
-  if(!st)st='00';
+  var c=custInfo(code),st='',how='';
+  if(c&&c[4]){st=stateCode(c[4]);if(st)how=/^SAP:/i.test(c[4])?'region':'master'}
+  if(!st&&c){st=gstinState(c[12]);if(st)how='gstin'}
+  if(!st&&invState){st=stateCode(invState);if(st)how='invoice'}
+  if(!st){st='00';how='unknown'}
   var dist='',why='';
   if(c&&c[9]){var p=GEO.pins.get(String(c[9]).trim());if(!p)why='pin not in master';else if(p[1]!==st)why='pin state differs';else if(!p[2])why='pin has no district';else dist=p[2]}
   else why='no pin';
   if(!dist&&c&&c[10]){var id=GEO.dname.get(st+'|'+geoNorm(c[10]));if(id)dist=id}
-  return {st:st,dist:dist,why:dist?'':why};
+  return {st:st,dist:dist,why:dist?'':why,how:how};
 }
+/* GSTIN fallback (D80 addition): the first two digits of a GSTIN are the GST state code; used only when the master's state is blank or an unmapped SAP region */
+function gstinState(g){var m=/^(\d\d)[A-Z0-9]{13}$/i.exec(String(g||'').trim());return m&&GEO.states[m[1]]&&m[1]!=='00'?m[1]:''}
+function custGstinPlaced(){var n=0,by={B1:0,S4:0};if(S.custIdx)S.custIdx.forEach(function(a){if(!(a[4]&&stateCode(a[4]))&&gstinState(a[12])){n++;by[a[11]==='S4'?'S4':'B1']++}});return {n:n,by:by}}
 /* ---- invoice customer detail for every plant (attribution is by customer, not by the viewer's plant scope) ---- */
 var GEOA={rows:{},pending:{},jobs:0,done:0,ver:0};
 function geoMonthsLoaded(yms){return yms.every(function(ym){var c=S.cells['INV_'+ym];if(!c)return true;return Object.keys(c.plants||{}).every(function(p){return !!GEOA.rows[p+SEP+ym]})})}
@@ -152,7 +156,7 @@ function pageGeography(){
    +'</section>';
   h+='<section class="card"><div class="hd"><h2>Masters · upload</h2></div><p class="note" style="margin:0">State, district and PIN lists from the templates (header row as in the template; the public lists are loaded here, never into the code). A re-run of the draft replaces only drafted rows, never rows a person set.</p>'
    +'<div class="row">'+[['state','State list'],['district','District list'],['pin','PIN → district']].map(function(t){return (can?'<label class="btn sm" for="up-geo-'+t[0]+'" style="cursor:pointer">Upload '+t[1]+' (CSV)</label><input id="up-geo-'+t[0]+'" data-geofile="'+t[0]+'" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px">':'')+'<button class="btn sm" data-act="geo-tmpl" data-t="'+t[0]+'">'+t[1]+' template</button>'}).join('')+'</div>'
-   +'<div class="kpis"><div class="kpi"><small>States saved</small><b>'+GEO.stored+'</b><small>'+Object.keys(GEO.states).length+' known (GST list + saved)</small></div><div class="kpi"><small>Districts</small><b>'+Object.keys(GEO.districts).length+'</b></div><div class="kpi"><small>PIN codes</small><b>'+fmtN(GEO.pins.size)+'</b></div></div>'
+   +'<div class="kpis"><div class="kpi"><small>States saved</small><b>'+GEO.stored+'</b><small>'+Object.keys(GEO.states).length+' known (GST list + saved)</small></div><div class="kpi"><small>Districts</small><b>'+Object.keys(GEO.districts).length+'</b></div><div class="kpi"><small>PIN codes</small><b>'+fmtN(GEO.pins.size)+'</b></div><div class="kpi"><small>Customers placed by GSTIN</small><b>'+fmtN(custGstinPlaced().n)+'</b><small>state blank or an unmapped SAP region; state taken from the GSTIN\'s first two digits</small></div></div>'
    +'<div id="geo-up-msg">'+(S.geoUpMsg||'')+'</div></section>';
   return h;
 }

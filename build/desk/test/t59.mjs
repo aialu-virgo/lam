@@ -215,6 +215,19 @@ let S2;
   ok('Keyed by (system, code): B1 customers survive the S/4 load',r2.size===r1.before+3&&r2.b1&&r2.b1[11]==='B1'&&r2.docs.includes('customers/main_B1')&&r2.docs.includes('customers/main_S4'),JSON.stringify([r2.size,r1.before,r2.docs]));
   ok('Region is the SAP region code (SAP:13) mapped through the state alias; PIN 411001 resolves to Pune; District text resolves too; GSTIN stored',r2.s4[4]==='SAP:13'&&r2.g1.st==='27'&&r2.g1.dist==='MH-PUNE'&&r2.g3.dist==='MH-PUNE'&&r2.s4[12]==='27ABCDE1234F1Z5',JSON.stringify([r2.s4,r2.g1,r2.g3]));
   ok('Unmapped region counts as "state unknown" and is listed',r2.g2.st==='00'&&r2.gaps.n===1&&r2.gaps.regions['99']===1,JSON.stringify([r2.g2,r2.gaps]));
+  /* GSTIN fallback: order master state > mapped SAP region > GSTIN prefix > invoice state > State not known */
+  const gx=await page.evaluate(async H=>{const D=window.__dbg;
+    await D.custFeedLoad({sys:'S4',headers:H,rows:[['50002000','G1','01','X','99','','','24ABCDE1234F1Z5','','','','','',1],['50002001','G2','01','X','','','','29ABCDE1234F1Z5','','','','','',1],['50002002','G3','01','X','13','','','24ABCDE1234F1Z5','','','','','',1],['50002003','G4','01','X','99','','','','','','','','',1],['50002004','G5','01','X','99','','','XXABCDE1234F1Z5','','','','','',1]],name:'gstin'});
+    await new Promise(r=>setTimeout(r,2500));
+    const g=c=>D.custGeo(c,'Kerala');return {a:g('50002000'),b:g('50002001'),c:g('50002002'),d:g('50002003'),e:g('50002004'),n:D.custGstinPlaced(),gaps:D.custRegionGaps()}},H);
+  ok('GSTIN fallback: unmapped region 99 + GSTIN 24 → Gujarat; blank state + GSTIN 29 → Karnataka (placed by GSTIN)',gx.a.st==='24'&&gx.a.how==='gstin'&&gx.b.st==='29'&&gx.b.how==='gstin',JSON.stringify([gx.a,gx.b]));
+  ok('GSTIN fallback order: a mapped region wins over the GSTIN; no GSTIN or a bad one falls to the invoice state',gx.c.st==='27'&&gx.c.how==='region'&&gx.d.st==='32'&&gx.d.how==='invoice'&&gx.e.st==='32',JSON.stringify([gx.c,gx.d,gx.e]));
+  ok('GSTIN count: customers placed by GSTIN counted (2, S/4); unmapped-region list keeps only those still unknown',gx.n.n===2&&gx.n.by.S4===2&&gx.gaps.regions['99']===3,JSON.stringify([gx.n,gx.gaps]));
+  await page.evaluate(()=>{location.hash='#/geography'});await page.waitForTimeout(1200);
+  ok('Admin › Geography shows how many customers were placed by GSTIN',/Customers placed by GSTIN\s*2/i.test(await page.innerText('#pg')),'');
+  const b1g=await page.evaluate(async()=>{const D=window.__dbg;await D.custFeedLoad({sys:'B1',headers:['CardCode','CardName','CardType','State','LicTradNum'],rows:[['VRGLCU000101','B1 A','C','','24ABCDE1234F1Z5'],['VRGLCU000102','B1 B','C','Maharashtra','24ABCDE1234F1Z5']],name:'b1g'});await new Promise(r=>setTimeout(r,2500));return [D.custGeo('VRGLCU000101',''),D.custGeo('VRGLCU000102','')]});
+  ok('B1 file customers: blank state + GSTIN (LicTradNum) → Gujarat; the master\'s own state wins over the GSTIN',b1g[0].st==='24'&&b1g[0].how==='gstin'&&b1g[1].st==='27'&&b1g[1].how==='master',JSON.stringify(b1g));
+  await page.evaluate(()=>{location.hash='#/admin'});await page.waitForTimeout(800);
   /* reverse: a B1 load leaves S/4 customers alone */
   const r3=await page.evaluate(async()=>{const D=window.__dbg;const r=await D.custFeedLoad({sys:'B1',headers:['CardCode','CardName','CardType','State','ZipCode'],rows:[['VRGLCU000001','B1 Customer','C','Maharashtra','411001']],name:'b1'});return r});
   await page.waitForTimeout(2500);

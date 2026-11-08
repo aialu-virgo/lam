@@ -17,7 +17,7 @@ var CU_FIELDS=[
  {k:'terms',label:'Payment terms',canon:'payment_terms',c:['PymntGroup','Payment Terms','Payment Group','Terms']},
  {k:'pin',label:'PIN code (D77: district by PIN)',canon:'pin',c:['ZipCode','Zip Code','PIN','PIN Code','Pincode','Pin Code','PostalCode','Postal Code']},
  {k:'dist',label:'District (D77)',canon:'district',c:['District','County']},
- {k:'gstin',label:'GSTIN',canon:'gstin',c:['GSTIN','GST No','GSTIN No','GST Number']}];
+ {k:'gstin',label:'GSTIN',canon:'gstin',c:['GSTIN','GST No','GSTIN No','GST Number','LicTradNum','U_GSTIN','GSTIN/UIN']}];
 function custDetect(headers){
   var set={};headers.forEach(function(h){set[norm(h)]=1});var has=function(a){return a.some(function(x){return set[norm(x)]})};
   if(has(['docnum','itemcode','linetotal','quantity','docduedate','branchname','tranfser','invoice document number','checksum','onhand','whscode']))return null;
@@ -148,4 +148,4 @@ async function custFeedLoad(o){
   var r=st.res||{};return {ok:st.stage==='done',loaded:r.loaded||0,rejected:r.rejected||0,skippedType:r.skippedType||0,withPin:r.withPin||0,msg:st.msg};
 }
 /* S/4 region codes that no state alias maps (counted as "state unknown") */
-function custRegionGaps(){var o={},n=0;if(S.custIdx)S.custIdx.forEach(function(a){var v=String(a[4]||'');if(/^SAP:/i.test(v)&&!stateCode(v)){o[v.slice(4)]=(o[v.slice(4)]||0)+1;n++}else if(a[11]==='S4'&&!v){o['(blank)']=(o['(blank)']||0)+1;n++}});return {n:n,regions:o}}
+function custRegionGaps(){var o={},n=0;if(S.custIdx)S.custIdx.forEach(function(a){var v=String(a[4]||'');if(/^SAP:/i.test(v)&&!stateCode(v)&&!gstinState(a[12])){o[v.slice(4)]=(o[v.slice(4)]||0)+1;n++}else if(a[11]==='S4'&&!v&&!gstinState(a[12])){o['(blank)']=(o['(blank)']||0)+1;n++}});return {n:n,regions:o}}

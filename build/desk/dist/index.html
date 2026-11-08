@@ -4618,7 +4618,7 @@ var CU_FIELDS=[
  {k:'terms',label:'Payment terms',canon:'payment_terms',c:['PymntGroup','Payment Terms','Payment Group','Terms']},
  {k:'pin',label:'PIN code (D77: district by PIN)',canon:'pin',c:['ZipCode','Zip Code','PIN','PIN Code','Pincode','Pin Code','PostalCode','Postal Code']},
  {k:'dist',label:'District (D77)',canon:'district',c:['District','County']},
- {k:'gstin',label:'GSTIN',canon:'gstin',c:['GSTIN','GST No','GSTIN No','GST Number']}];
+ {k:'gstin',label:'GSTIN',canon:'gstin',c:['GSTIN','GST No','GSTIN No','GST Number','LicTradNum','U_GSTIN','GSTIN/UIN']}];
 function custDetect(headers){
   var set={};headers.forEach(function(h){set[norm(h)]=1});var has=function(a){return a.some(function(x){return set[norm(x)]})};
   if(has(['docnum','itemcode','linetotal','quantity','docduedate','branchname','tranfser','invoice document number','checksum','onhand','whscode']))return null;
@@ -4749,7 +4749,7 @@ async function custFeedLoad(o){
   var r=st.res||{};return {ok:st.stage==='done',loaded:r.loaded||0,rejected:r.rejected||0,skippedType:r.skippedType||0,withPin:r.withPin||0,msg:st.msg};
 }
 /* S/4 region codes that no state alias maps (counted as "state unknown") */
-function custRegionGaps(){var o={},n=0;if(S.custIdx)S.custIdx.forEach(function(a){var v=String(a[4]||'');if(/^SAP:/i.test(v)&&!stateCode(v)){o[v.slice(4)]=(o[v.slice(4)]||0)+1;n++}else if(a[11]==='S4'&&!v){o['(blank)']=(o['(blank)']||0)+1;n++}});return {n:n,regions:o}}
+function custRegionGaps(){var o={},n=0;if(S.custIdx)S.custIdx.forEach(function(a){var v=String(a[4]||'');if(/^SAP:/i.test(v)&&!stateCode(v)&&!gstinState(a[12])){o[v.slice(4)]=(o[v.slice(4)]||0)+1;n++}else if(a[11]==='S4'&&!v&&!gstinState(a[12])){o['(blank)']=(o['(blank)']||0)+1;n++}});return {n:n,regions:o}}
 
 /* ---- src/70-admin.js ---- */
 /* ================= v0.9 Admin: plans workflow, settings, tools, roll-up rebuild, demo extras ================= */
@@ -5051,16 +5051,20 @@ function geoDistrictPlant(id){var d=GEO.districts[id];return d?(d.responsible_pl
 function geoDistrictName(id){var d=GEO.districts[id];return d?d.district_name:id}
 /* customer -> state and district (target-model "How actuals reach a district"): master state, else the invoice's customer state, else 00; district only by PIN (state must agree) or the master's District text */
 function custGeo(code,invState){
-  var c=custInfo(code),st='';
-  if(c&&c[4])st=stateCode(c[4]);
-  if(!st&&invState)st=stateCode(invState);
-  if(!st)st='00';
+  var c=custInfo(code),st='',how='';
+  if(c&&c[4]){st=stateCode(c[4]);if(st)how=/^SAP:/i.test(c[4])?'region':'master'}
+  if(!st&&c){st=gstinState(c[12]);if(st)how='gstin'}
+  if(!st&&invState){st=stateCode(invState);if(st)how='invoice'}
+  if(!st){st='00';how='unknown'}
   var dist='',why='';
   if(c&&c[9]){var p=GEO.pins.get(String(c[9]).trim());if(!p)why='pin not in master';else if(p[1]!==st)why='pin state differs';else if(!p[2])why='pin has no district';else dist=p[2]}
   else why='no pin';
   if(!dist&&c&&c[10]){var id=GEO.dname.get(st+'|'+geoNorm(c[10]));if(id)dist=id}
-  return {st:st,dist:dist,why:dist?'':why};
+  return {st:st,dist:dist,why:dist?'':why,how:how};
 }
+/* GSTIN fallback (D80 addition): the first two digits of a GSTIN are the GST state code; used only when the master's state is blank or an unmapped SAP region */
+function gstinState(g){var m=/^(\d\d)[A-Z0-9]{13}$/i.exec(String(g||'').trim());return m&&GEO.states[m[1]]&&m[1]!=='00'?m[1]:''}
+function custGstinPlaced(){var n=0,by={B1:0,S4:0};if(S.custIdx)S.custIdx.forEach(function(a){if(!(a[4]&&stateCode(a[4]))&&gstinState(a[12])){n++;by[a[11]==='S4'?'S4':'B1']++}});return {n:n,by:by}}
 /* ---- invoice customer detail for every plant (attribution is by customer, not by the viewer's plant scope) ---- */
 var GEOA={rows:{},pending:{},jobs:0,done:0,ver:0};
 function geoMonthsLoaded(yms){return yms.every(function(ym){var c=S.cells['INV_'+ym];if(!c)return true;return Object.keys(c.plants||{}).every(function(p){return !!GEOA.rows[p+SEP+ym]})})}
@@ -5173,7 +5177,7 @@ function pageGeography(){
    +'</section>';
   h+='<section class="card"><div class="hd"><h2>Masters · upload</h2></div><p class="note" style="margin:0">State, district and PIN lists from the templates (header row as in the template; the public lists are loaded here, never into the code). A re-run of the draft replaces only drafted rows, never rows a person set.</p>'
    +'<div class="row">'+[['state','State list'],['district','District list'],['pin','PIN → district']].map(function(t){return (can?'<label class="btn sm" for="up-geo-'+t[0]+'" style="cursor:pointer">Upload '+t[1]+' (CSV)</label><input id="up-geo-'+t[0]+'" data-geofile="'+t[0]+'" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px">':'')+'<button class="btn sm" data-act="geo-tmpl" data-t="'+t[0]+'">'+t[1]+' template</button>'}).join('')+'</div>'
-   +'<div class="kpis"><div class="kpi"><small>States saved</small><b>'+GEO.stored+'</b><small>'+Object.keys(GEO.states).length+' known (GST list + saved)</small></div><div class="kpi"><small>Districts</small><b>'+Object.keys(GEO.districts).length+'</b></div><div class="kpi"><small>PIN codes</small><b>'+fmtN(GEO.pins.size)+'</b></div></div>'
+   +'<div class="kpis"><div class="kpi"><small>States saved</small><b>'+GEO.stored+'</b><small>'+Object.keys(GEO.states).length+' known (GST list + saved)</small></div><div class="kpi"><small>Districts</small><b>'+Object.keys(GEO.districts).length+'</b></div><div class="kpi"><small>PIN codes</small><b>'+fmtN(GEO.pins.size)+'</b></div><div class="kpi"><small>Customers placed by GSTIN</small><b>'+fmtN(custGstinPlaced().n)+'</b><small>state blank or an unmapped SAP region; state taken from the GSTIN\'s first two digits</small></div></div>'
    +'<div id="geo-up-msg">'+(S.geoUpMsg||'')+'</div></section>';
   return h;
 }
@@ -7348,7 +7352,7 @@ function sapRenderFeed(el){
      +'<div class="kpi"><small>Waiting to load</small><b>'+fmtN(pend.reduce(function(a,m){return a+(st.staged[m].rows||0)},0))+'</b><small>'+esc(pend.map(ymLabel).join(', ')||'nothing')+'</small></div>'
      +'<div class="kpi"><small>Errors</small><b>'+fmtN(errN)+'</b><small>'+(errN?esc(st.errors[0].msg):'none')+'</small></div>'
      +(st.cust?'<div class="kpi"><small>Customer master</small><b>'+fmtN(st.cust.rows||0)+'</b><small>'+esc(st.cust.status||'')+(st.cust.loadedAt?' '+esc(istStr(st.cust.loadedAt)):st.cust.at?' '+esc(istStr(st.cust.at)):'')+(st.cust.counts?' · '+fmtN(st.cust.counts.pin6||0)+' with PIN, '+fmtN(st.cust.counts.noRegion||0)+' no region':'')+'</small></div>':'')+'</div>'
-     +(function(){var gp=custRegionGaps();return gp.n?'<div class="banner warn" style="display:block"><b>'+fmtN(gp.n)+' S/4 customers have a region with no state:</b> '+esc(Object.keys(gp.regions).sort().map(function(k){return k+' ('+gp.regions[k]+')'}).join(', '))+'. They count as "state unknown" until the region code is added to the state\'s aliases as SAP:&lt;code&gt; in Admin › Geography.</div>':''})()
+     +(function(){var gs=custGstinPlaced();return gs.n?'<p class="note" style="margin:0">'+fmtN(gs.n)+' customers placed in a state by their GSTIN (state blank or region not mapped): '+fmtN(gs.by.S4)+' S/4, '+fmtN(gs.by.B1)+' B1.</p>':''})()+(function(){var gp=custRegionGaps();return gp.n?'<div class="banner warn" style="display:block"><b>'+fmtN(gp.n)+' S/4 customers have a region with no state:</b> '+esc(Object.keys(gp.regions).sort().map(function(k){return k+' ('+gp.regions[k]+')'}).join(', '))+'. They count as "state unknown" until the region code is added to the state\'s aliases as SAP:&lt;code&gt; in Admin › Geography.</div>':''})()
      +'<p class="note" style="margin:0"><b>Next step:</b> '+esc(st.next||'')+'</p>';
     if(st.message&&st.lastOk===false)h+='<div class="banner err" style="display:block">'+esc(st.message)+'</div>';
     if(st.skippedMonths&&st.skippedMonths.length)h+='<p class="note" style="margin:0">Closed quarters are never re-read: skipped '+esc(st.skippedMonths.map(ymLabel).join(', '))+'.</p>';
@@ -7456,7 +7460,7 @@ document.addEventListener('change',function(ev){var t=ev.target;if(t&&t.getAttri
 /* test hooks (read-only helpers for the self-test; no data) */
 window.__dbg={loadItemIdx:loadItemIdx,stockDays:stockDays,dailySheets:dailySheets,demoLoad:demoLoad,demoClear:demoClear,hasRealData:hasRealData,S:S,DS:DS,CFG:CFG,sumF:sumF,quarterSeries:quarterSeries,trendStats:trendStats,stretchOf:stretchOf,planQ:planQ,planW:planW,resolvePeriod:resolvePeriod,qoqOf:qoqOf,walk:walk,WD:WD,wdBetween:wdBetween,scoreOf:scoreOf,rankSort:rankSort,TODAY:TODAY,qMonths:qMonths,monthsLoaded:monthsLoaded,viewCtx:viewCtx,figs:figs,priorMonth:priorMonth,closedQuarters:closedQuarters,curQuarterKey:curQuarterKey,effUser:effUser,buildDraft:buildDraft,custAgg:custAgg,loadCust:loadCust,classMap:classMap,todayCandidates:todayCandidates,capFor:capFor,scopeOf:scopeOf,fillTpl:fillTpl,addDays:addDays,addWD:addWD,hashRef:hashRef,runLadder:runLadder,runEngine:runEngine,kpiCompute:kpiCompute,itemsHtml:itemsHtml,sempHtml:sempHtml,spMatch:spMatch,spCanon:spCanon,SM:SM,matchStats:matchStats,unmatchedSp:unmatchedSp,nameKey:nameKey,validateUser:validateUser,scopedUsers:scopedUsers,isPH:isPH,viewerRole:viewerRole,usersOfRole:usersOfRole};
 Object.assign(window.__dbg,{tpModel:tpModel,tpTemplateCsv:tpTemplateCsv,tpSave:tpSave,advanceDoc:advanceDoc,proposerOf:proposerOf,planGuard:planGuard,phasingFor:phasingFor,leafTgt:leafTgt,masterUpload:masterUpload,pagesFor:pagesFor,isPlanLocked:isPlanLocked});
-Object.assign(window.__dbg,{geoStartQ:geoStartQ,isGeoQ:isGeoQ,geoKey:geoKey,stateCode:stateCode,custGeo:custGeo,geoAgg:geoAgg,geoLoadMonths:geoLoadMonths,geoDraft:geoDraft,geoBand:geoBand,geoVote:geoVote,GEO:GEO,GEOA:GEOA,geoUpload:geoUpload,tpUploadCheck:tpUploadCheck,custInfo:custInfo,gz:gz,ungz:ungz,geoSnap:geoSnap,geoRespPlant:geoRespPlant,dset:dset,ddel:ddel,custFeedLoad:custFeedLoad,custRegionGaps:custRegionGaps,sapFeedLoad:sapFeedLoad,planQ:planQ,pageGeography:pageGeography});
+Object.assign(window.__dbg,{geoStartQ:geoStartQ,isGeoQ:isGeoQ,geoKey:geoKey,stateCode:stateCode,custGeo:custGeo,geoAgg:geoAgg,geoLoadMonths:geoLoadMonths,geoDraft:geoDraft,geoBand:geoBand,geoVote:geoVote,GEO:GEO,GEOA:GEOA,geoUpload:geoUpload,tpUploadCheck:tpUploadCheck,custInfo:custInfo,gz:gz,ungz:ungz,geoSnap:geoSnap,geoRespPlant:geoRespPlant,dset:dset,ddel:ddel,custFeedLoad:custFeedLoad,custRegionGaps:custRegionGaps,custGstinPlaced:custGstinPlaced,gstinState:gstinState,sapFeedLoad:sapFeedLoad,planQ:planQ,pageGeography:pageGeography});
 
 
 /* ================= boot ================= */
