@@ -49,3 +49,10 @@ Backup → restore with Replace everything on `/exec` (not confirmed done); Peop
 - **Do not publish or send files until gas-e2e is 48/0 and a blind QA of the merged build passes.** Then: publish dist to the claude.ai Desk (merge onto version 47 is now in source), republish the setup page, send the three files, log D92, and message session_01MrczuPzhyUR5CA4GNy3QT5 that it may resume.
 - The other session ran a live data reload until ~17:15 IST; check with it before any write to the Desk database.
 - Vijay was told to hold pasting/restoring the 15:35 files.
+
+## Update 18:50 IST
+- Released to Vijay: merged Apps Script files (c6622f9, D92) and the restore-race Desk-Index follow-up (c4ee91c, D93); Vijay deployed the Index.
+- claude.ai Desk: the parallel session published version 48 at ~18:44 IST from origin/m8-dashboard (our merge + v44 + My Dashboard). Not republished by us (D94). origin/m8-dashboard merged into this branch (0e893b5).
+- Next Apps Script files must wait for the parallel session's My Dashboard QA (it adds dashroles/dashlayouts collections to Code.gs).
+- Open: engBlock timeout + "rules paused" notice (engineer, due 19:30); Vijay's sapShadowRun still running; publishing order agreed: each session tells the other before publishing.
+- Decision numbering: parallel session's m8-gcp uses its own D73/D74; anything new from either side starts at D95.
