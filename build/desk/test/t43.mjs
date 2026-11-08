@@ -27,7 +27,7 @@ let r=await page.evaluate(()=>{const u=window.__desk.S.cu.res;return {loaded:u.l
 ok('customers only (supplier skipped and counted); empty code and duplicate code rejected; bad limit warned',r.loaded===3&&r.rej===2&&r.skip===1&&r.lim===1&&r.warn===1,JSON.stringify(r));
 await page.click('[data-act="cu-load"]');await page.waitForFunction(()=>window.__desk.S.cu.stage==='done',null,{timeout:20000});await page.waitForTimeout(800);
 let m=await mstore('^customers/');
-ok('stored as customers/c0 with the index document and an upload record',!!m['customers/c0']&&m['customers/main'].loaded===3&&Object.keys(await mstore('^uploads/')).some(k=>true),Object.keys(m).join(','));
+ok('stored per source system (D79): customers/B1_c0 with the index document main_B1 and an upload record',!!m['customers/B1_c0']&&m['customers/main_B1'].loaded===3&&Object.keys(await mstore('^uploads/')).some(k=>true),Object.keys(m).join(','));
 const info=await page.evaluate(()=>{const s=window.__desk.S;return {n:s.custIdx.size,one:s.custIdx.get('DEMOCU1')}});
 ok('index decoded: name, group, city, salesperson, credit limit',info.n===3&&info.one[1]==='DEMO Customer One'&&info.one[5]==='DEMO Rep A'&&info.one[6]===5000,JSON.stringify(info));
 /* Receivables page: names, suggestion, limit, over limit */
@@ -45,7 +45,7 @@ ok('S/4 business partner layout detected',/S\/4/.test(cu.layout)&&cu.sys==='S4',
 await page.click('[data-act="cu-check"]');await page.waitForFunction(()=>window.__desk.S.cu.stage==='checked',null,{timeout:20000});
 await page.click('[data-act="cu-load"]');await page.waitForFunction(()=>window.__desk.S.cu.stage==='done',null,{timeout:20000});await page.waitForTimeout(800);
 const n2=await page.evaluate(()=>window.__desk.S.custIdx.size);
-ok('each load replaces the whole master (2 customers now, not 5)',n2===2,String(n2));
+const mm=await mstore('^customers/main');ok('an S/4 load replaces only the S/4 customers (D79): B1 customers stay (3 B1 + 2 S/4, one code in both shows once)',n2===4&&!!mm['customers/main_B1']&&!!mm['customers/main_S4'],String(n2));
 /* unknown layout -> mapping step */
 fs.writeFileSync(AF+'weird.csv',csvOf(['Code','Who','Where'],[['DEMOCU5','DEMO Five','X']]));
 await page.setInputFiles('#up-cust',AF+'weird.csv').catch(()=>{});await page.waitForTimeout(800);
