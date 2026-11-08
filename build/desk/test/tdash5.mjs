@@ -1,0 +1,38 @@
+import { chromium, open } from './run.mjs';
+import fs from 'fs';
+const SP='/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/';
+const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
+const browser=await chromium.launch();const res=[];process.on('exit',()=>console.log(res.join('\n')));
+const ok=(n,c,d)=>res.push([c?'PASS':'FAIL',n,d||''].join(' | '));
+const clone=o=>JSON.parse(JSON.stringify(o));
+const {page,errs}=await open(browser,{store:clone(store),today:'2026-10-23'});await page.waitForTimeout(4500);
+await page.evaluate(()=>{location.hash='#/dashboard'});await page.waitForSelector('.dsh-card');await page.waitForTimeout(800);
+const build=async(title,by,vis)=>{
+  await page.click('[data-act="d-add"]');await page.waitForTimeout(400);await page.click('[data-act="d-b-tab"][data-t="build"]');await page.waitForTimeout(400);
+  await page.fill('#dsh-title',title);await page.selectOption('#dsh-by',by);await page.waitForTimeout(300);
+  if(vis){await page.check('input[name="dsh-vis"][value="'+vis+'"]');await page.waitForTimeout(400)}
+  await page.click('[data-act="d-b-save"]');await page.waitForTimeout(800);
+};
+await build('Zone drill test','zone','bar');
+const sel='.dsh-card[aria-label="Zone drill test"]';
+let txt=await page.innerText(sel);
+ok('DR1: a bar card by zone lists ZONE rows',/ZONE \d/i.test(txt),txt.slice(0,100).replace(/\n/g,' '));
+await page.click(sel+' .dsh-lb >> nth=0');await page.waitForTimeout(800);
+txt=await page.innerText(sel);
+ok('DR2: clicking a bar filters the card and re-breaks it down by the next level (zone to plant), with a breadcrumb',/DEMO plant/i.test(txt)&&(await page.$$(sel+' .dsh-cr .chip')).length>=2,txt.slice(0,160).replace(/\n/g,' '));
+await page.click(sel+' .dsh-lb >> nth=0');await page.waitForTimeout(4000);
+txt=await page.innerText(sel);
+ok('DR3: the next level is customers, read lazily from the stored detail',/DEMO Customer \d+/i.test(txt),txt.slice(0,200).replace(/\n/g,' '));
+await page.click(sel+' .dsh-cr .chip >> nth=1');await page.waitForTimeout(700);
+ok('DR4: a breadcrumb goes back one level',(await page.$$(sel+' .dsh-cr .chip')).length===2&&/DEMO plant/i.test(await page.innerText(sel)),'');
+await page.click(sel+' .dsh-cr .chip >> nth=0');await page.waitForTimeout(700);
+ok('DR5: the first crumb returns the card to its saved state',(await page.$$(sel+' .dsh-cr')).length===0&&/ZONE \d/i.test(await page.innerText(sel)),'');
+const j1=await page.evaluate(()=>JSON.stringify(window.__dbg.S.dash.cards.map(c=>c.drill||null)));
+ok('DR6: drill-down is a view and is never saved into the layout',!/\{/.test(j1),j1.slice(0,60));
+await build('Quarter pin test','quarter');
+const qs='.dsh-card[aria-label="Quarter pin test"]';
+await page.click(qs+' .dsh-g >> nth=2');await page.waitForTimeout(800);
+const chip=await page.innerText(qs+' .dsh-cr');
+ok('DR7: clicking a quarter column pins the card to that quarter',/Q\d FY\d\d/.test(chip),chip.replace(/\n/g,' '));
+ok('DR8: no page errors in drill flows',errs.filter(e=>/PAGEERROR/.test(e)).length===0,JSON.stringify(errs.filter(e=>/PAGEERROR/.test(e))));
+await browser.close();

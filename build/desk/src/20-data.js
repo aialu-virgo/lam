@@ -43,7 +43,7 @@ function spOk(sc,name){
 }
 /* what a role may open (role-matrix.md, department table) */
 var DEPT_PAGES={Sales:['overview','sales','team'],CRR:['sales','team'],Accounts:['receivables','team'],Plant:['inventory','team'],HO:['overview','sales','receivables','inventory','team']};
-function pagesFor(u){
+function pagesFor0(u){
   var base=['today'];if(!u)return [];
   var r=u.role;
   if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake','admin','geography'];

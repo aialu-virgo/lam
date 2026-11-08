@@ -1,0 +1,2 @@
+/* test hooks for My Dashboard (read-only helpers; no data) */
+Object.assign(window.__dbg,{DASH:DASH,dRun:dRun,dRun0:dRun0,MEAS:MEAS,D_LIB:D_LIB,D_VIS:D_VIS,D_BY:D_BY,dVisFit:dVisFit,dAutoVisual:dAutoVisual,dFromLib:dFromLib,dSan:dSan,dBuiltin:dBuiltin,dCapFor:dCapFor,dRoleOk:dRoleOk,dDimOk:dDimOk,dRes:dRes,dPerSpec:dPerSpec,dCardHtml:dCardHtml,dBodyHtml:dBodyHtml,dBump:dBump,dLoad:dLoad,dDirty:dDirty,dDataSig:dDataSig,dFilt:dFilt,dScope:dScope,dQuarters:dQuarters,dDrill:dDrill,dEff:dEff,planQtyF:planQtyF,ownKey:ownKey,shQoq:shQoq});
