@@ -33,7 +33,7 @@ related:
 | Thu 5 Nov 13:00 | v41: credit-note files blocked in sales intake, CN lock, bulk Undo (D60) | Full-Stack Engineer | published 12:13; QA FAIL on undo integrity (D61); v42 12:37, QA passed (D63); Undo cleared |
 | Sun 8 Nov 13:00 | v43: admin job queue; recovery Undo + Clear demo queued by Delivery Lead (D66) | Full-Stack Engineer | v43 live (version 46); jobs ran 12:21–12:36 IST (D68) |
 | After Vijay opens the Desk | Sales Apr 2025–Sep 2026 restored; credit notes written and locked | Delivery Lead | done 12:40 IST (D68) |
-| Sun 8 Nov 18:00 | v44: thickness, brand, collections, branch-rating cards; zones from sales (D64, D65) | Full-Stack Engineer | in build |
+| Sun 8 Nov 18:00 | v44: thickness, brand, collections, branch-rating cards; zones from sales (D64, D65) | Full-Stack Engineer | built, tests run (D69); awaiting QA and publish |
 
 ## Milestones
 **M0 Discovery**
