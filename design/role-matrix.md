@@ -2,8 +2,9 @@
 title: Role matrix
 summary: Eight roles with the row-level scope filter applied before rendering, allowed actions, Today cap and one QA test case each, on a small demo fixture.
 status: approved (interim, Vijay, D13)
-updated: 2026-11-07
+updated: 2026-11-08
 related:
+  - data-map/geography.md
   - handover/_index.md
   - design/_index.md
   - data-map/sales-employee.md
@@ -80,6 +81,9 @@ Y = yes, own scope. P = propose only. A = approves. V = view only. — = no.
 | Export action log CSV | Y | Y | Y (dept) | Y (branch) | — | — | — | — |
 
 Who may edit potential and targets, locked quarters, and the server-versus-page rule: [Target model](target-model.md#who-edits-potential-and-targets). SP Sir approves as a Super admin or Management user; his approval satisfies "SP Sir or a Management role" in [Target model](target-model.md).
+
+## Geography scope for plans (D77, 8 Nov 2026)
+Only the Plan > Targets & Potential tab changes; every other page keeps the plant filter above. No new user field: a Branch manager's states are those whose `default_plant_code` is in `plant_codes`, and their districts are those whose `responsible_plant_code` is in `plant_codes` ([Geography](../data-map/geography.md)). Detail and the Assumed (new) state-edit rule: [Target model](target-model.md#geography-basis-d77). QA case: `bm.a@demo` (plant A) edits a district mapped to plant A and a state whose default plant is A; the same screen refuses a district mapped to plant B and refuses `_state` of a state with no default plant; `mgmt@demo` edits all.
 
 ## D9 limits on scope
 - **Salesperson is not in the document index**, only in aggregates. For a Sales executive, the *figures* are exact (aggregates), but the *document list* behind a figure is filtered by customer and plant, so it can include a document sold under another salesperson. The list carries the note "Documents of your customers". **Cannot be exact at D9 grain.** Recommendation: add `salesperson` to the document index row (see the open item below).

@@ -2,8 +2,9 @@
 title: Data map — Target phasing
 summary: Monthly phasing of each quarter's target (3 rows summing to 100%, equal by default) and template target-phasing.csv.
 status: draft
-updated: 2026-10-20
+updated: 2026-11-08
 related:
+  - data-map/geography.md
   - design/canonical-data-model.md
   - data-map/_index.md
   - data-map/market-potential.md
@@ -22,19 +23,20 @@ Entered in Admin or uploaded with [target-phasing.csv](templates/target-phasing.
 | Column | Type | Mandatory | Rule |
 |---|---|---|---|
 | `fy_quarter` | `FY27-Q3` | Yes | Not locked. |
-| `plant_code` | 4 digits | No | Blank = all plants. |
+| `state_code` | 2 digits | No | Blank = all states (D77; replaces `plant_code`). |
+| `district_id` | LGD code or `_state` | No | Blank or `_state` = the state row. A district row overrides the state row; optional. |
 | `product_group` | text | No | Blank = all groups. |
 | `customer_segment` | text | No | Blank = all segments. |
 | `month_in_quarter` | 1, 2 or 3 | Yes | 1 = first month (Q3 = Oct). |
 | `phasing_pct` | number 0–100 | Yes | Three rows per key sum to 100 (±0.01). |
 
-A more specific row (plant, group, segment) overrides a broader row. Each change creates a revision like any target edit ([Target model](../design/target-model.md)).
+A more specific row (district, state, group, segment) overrides a broader row. Each change creates a revision like any target edit ([Target model](../design/target-model.md)).
 
 ## B1 ↔ S/4HANA mapping
 None; not an SAP entity.
 
 ## Validation
-Exactly three months per key; each in 1–3; percentages sum to 100; keys exist in the plant master and the group and segment lists; locked quarters rejected.
+Exactly three months per key; each in 1–3; percentages sum to 100; keys exist in the geography master and the group and segment lists; locked quarters rejected.
 
 ## Coverage (12 quarters)
 Nothing loaded; equal phasing applies to every quarter. Past quarters need no phasing (actuals are used).

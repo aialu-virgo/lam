@@ -2,8 +2,9 @@
 title: Data map — Invoice
 summary: Invoice lines from B1 "Combine Sale" (41 columns, Sep 2026 only) and the S/4 sales register: columns, laminates filter, B1↔S4 parity, validation, coverage.
 status: draft
-updated: 2026-11-07
+updated: 2026-11-08
 related:
+  - data-map/geography.md
   - design/canonical-data-model.md
   - data-map/_index.md
   - data-map/invoice-s4-register.md

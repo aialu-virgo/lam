@@ -2,8 +2,9 @@
 title: Index — data-map/
 summary: One file per SAP export or plan file the page takes. Upload templates are header-only and generated from these files.
 status: active
-updated: 2026-11-07
+updated: 2026-11-08
 related:
+  - data-map/geography.md
   - data-map/collection.md
   - data-map/credit-note.md
   - data-map/customer.md
@@ -32,8 +33,9 @@ related:
 - [Data map — Delivery](delivery.md) — not used (D31)
 - [Data map — Invoice](invoice.md) — draft — B1 Combine Sale mapped; Sep 2026 only
 - [Data map — Invoice, S/4 sales register](invoice-s4-register.md) — draft — 4–19 Oct 2026, plant 1013 only
+- [Data map — Geography master](geography.md) — draft — states, optional districts, PIN, branch map derived from sales history (D77)
 - [Data map — Item](item.md) — draft — item master mapped
-- [Data map — Market potential](market-potential.md) — draft — template ready, no data
+- [Data map — Market potential](market-potential.md) — draft — state-first template ready (D77), no data
 - [Data map — Plant / branch master](plant-master.md) — draft — Plant List mapped
 - [Data map — Receivable](receivable.md) — active — snapshot intake built (D39); four layouts
 - [Data map — Sales employee](sales-employee.md) — draft — employee master mapped; no SlpCode
@@ -45,5 +47,5 @@ related:
 - [Data map — Plant / warehouse](warehouse.md) — draft — no export; interim plant = warehouse
 
 ## Upload templates (header only)
-- [market-potential.csv](templates/market-potential.csv) · [user-master.csv](templates/user-master.csv) · [plant-master.csv](templates/plant-master.csv) · [target-phasing.csv](templates/target-phasing.csv)
+- [market-potential.csv](templates/market-potential.csv) · [user-master.csv](templates/user-master.csv) · [plant-master.csv](templates/plant-master.csv) · [target-phasing.csv](templates/target-phasing.csv) · [geography-state.csv](templates/geography-state.csv) · [geography-district.csv](templates/geography-district.csv) · [geography-pin.csv](templates/geography-pin.csv)
   - data-map/s4-odata-feed.md

@@ -2,8 +2,9 @@
 title: Data map — Invoice, S/4 sales register
 summary: The S/4HANA Public Cloud sales register export (60 columns, plant 1013, 4–19 Oct 2026): every column mapped or unused, fan-out defect, coverage.
 status: draft
-updated: 2026-11-07
+updated: 2026-11-08
 related:
+  - data-map/geography.md
   - handover/_index.md
   - design/canonical-data-model.md
   - data-map/_index.md

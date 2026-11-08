@@ -1,1 +1,1 @@
-fy_quarter,plant_code,territory,product_group,customer_segment,potential_value_inr,potential_qty_sheets,potential_qty_sqft,source_type,source_note,owner_email
+fy_quarter,state_code,district_id,product_group,customer_segment,potential_value_inr,potential_qty_sheets,potential_qty_sqft,share_pct,source_type,source_note,owner_email

@@ -2,8 +2,9 @@
 title: Data map — Plant / branch master
 summary: Plant List (61 plants, codes 1001–1065): laminates scope 1001–1006, 1011, 1012–1049; template plant-master.csv; B1 branch and S/4 plant join.
 status: draft
-updated: 2026-11-07
+updated: 2026-11-08
 related:
+  - data-map/geography.md
   - design/canonical-data-model.md
   - data-map/_index.md
   - data-map/invoice.md
@@ -39,6 +40,9 @@ related:
 | ACP depot or factory | 1050–1065 | 16 | **No** (other product line, Assumed) |
 
 This matches the default in the brief (factories 1001–1006, HO 1011, depots 1012–1049). The file has no zone, state or manager; `zone` and `state` must be filled in Admin (the B1 `Zone` and employee-master `Zone` can seed it).
+
+## Role under D77
+A plant is no longer a key for potential and targets. A plant's target is the roll-up of the states it is default plant for and the districts it is responsible for ([Geography](geography.md)). This master stays the authority for plant codes and for the invoicing plant on actuals.
 
 ## Laminates filter
 `business = laminates` for codes 1001–1049; `business = ACP` for 1050–1065 (not loaded, not shown). **Assumed**; confirm with Q-D1.

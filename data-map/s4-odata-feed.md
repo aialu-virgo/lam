@@ -1,9 +1,10 @@
 ---
 title: Data map — S/4HANA OData feed
-summary: Read-only OData feed for sales and credit notes from 1 Oct 2026: candidate services and fields mapped to the S/4 register columns and canonical fields, filters, incremental plant-month replace, paging, volume, and the day-one verification checklist.
+summary: Read-only OData feed for sales, credit notes and (D77) the customer master incl. state, PIN and district from 1 Oct 2026: candidate services and fields mapped to the S/4 register columns and canonical fields, filters, incremental plant-month replace, paging, volume, and the day-one verification checklist.
 status: draft
-updated: 2026-11-07
+updated: 2026-11-08
 related:
+  - data-map/geography.md
   - data-map/_index.md
   - data-map/invoice-s4-register.md
   - data-map/invoice.md
@@ -17,7 +18,7 @@ related:
   - open-questions.md
 ---
 
-# S/4HANA OData feed (sales and credit notes)
+# S/4HANA OData feed (sales, credit notes, customer master)
 **Owner:** Data Architect · **Status:** design only; nothing built, nothing called, no communication user yet · **Decided:** D66 (Desk on Google Apps Script).
 
 **Short version.** From 1 Oct 2026 the connector reads billing documents from S/4HANA through released OData APIs (`UrlFetchApp`, communication user, GET only) and hands the Desk the same rows the S/4 Sales Register upload produces, so the existing intake rules, replace-a-plant-month and Net basis apply unchanged. Data to 30 Sep 2026 stays as uploaded; the feed never touches it.
@@ -93,7 +94,36 @@ Same service, same read as 1.1; credit memos are billing documents of other type
 | GSTIN | `A_BusinessPartner` → `to_BusinessPartnerTax`, tax type `IN3`, `BPTaxNumber` (seen in another group portal's code) | GSTIN | `customer_xref` only; not needed for sales | candidate — verify against $metadata |
 | Plant | none. `Plant` on the billing item is the 4-digit code; the Plant List in Admin is the authority | — | The group's connector lists `API_PLANT_SRV` as a placeholder guess with no API confirmed; do not read it in v1 | candidate — verify against $metadata |
 
-Product and customer reads are by key and cached by the connector (about 564 distinct products and 92 customers appeared in 16 days at one plant, [register profile](invoice-s4-register.md)); a code not yet cached is fetched once. No master is bulk-loaded into the Desk by the feed; the Admin master intakes stay as they are.
+Product and customer name reads for code resolution are by key and cached by the connector (about 564 distinct products and 92 customers appeared in 16 days at one plant, [register profile](invoice-s4-register.md)); a code not yet cached is fetched once. Apart from the customer master in 1.4, no master is bulk-loaded into the Desk by the feed; the other Admin master intakes stay as they are.
+
+### 1.4 Customer master (business partner) — added 8 Nov 2026, D77
+**Why.** Targets and potential are set by state and district ([Geography](geography.md)); actuals reach a state and district through the customer's state and PIN. Those live on the customer, so the connector reads the customer master itself, not only a name per code. Every SAP name below: **candidate — verify against $metadata.** Sources: the group's existing S/4 connector's customer mapping (read-only reference; built on mocks, unverified; a few names there are used in production by another group portal, which is not verification here) and the standard business-partner API as recalled (**Assumed**).
+
+**Service (OData v2):** `API_BUSINESS_PARTNER` — candidate — verify against $metadata.
+**Scope:** customers extended to the laminates company code (`SAP_COMPANY_CODE`): read `A_CustomerCompany` (`Customer`, `CompanyCode`) and keep only those customers; customers outside it are dropped and counted. Candidate; the group's connector scopes the same way.
+**Read shape:** full read of the in-scope customers, weekly to start (change stamp not assumed), plus by-key reads for any billing customer not in the master (the cache of 1.3). `$top=200` pages; address, tax and sales area through `$expand` where the service allows, else a second read by key. Customer count of the tenant is not known (the B1 sales file has 3,696 customer codes, [Customer](customer.md)); expect a few thousand, about 20 pages per entity set.
+
+| # | OData entity set and field | Canonical field ([Customer](customer.md)) | Desk master column | Rule | Status |
+|---|---|---|---|---|---|
+| 1 | `A_Customer` `Customer` | `customer_code` | code | Key, trimmed as in 1.1 row 5. If the business partner key differs from `Customer`, use `Customer` | candidate — verify against $metadata |
+| 2 | `A_Customer` `CustomerName` (or `A_BusinessPartner` `BusinessPartnerFullName`) | `name` | name | First 60 characters kept | candidate — verify against $metadata |
+| 3 | `A_Customer` `CustomerAccountGroup` | none (kept for the partner-type test) | skipped | Only customer account groups are kept; others counted as "not a customer" | candidate — verify against $metadata |
+| 4 | `A_CustomerSalesArea` `CustomerGroup` | `customer_group` | group | As the register's `Customer Group` (C1, C2) | candidate — verify against $metadata |
+| 5 | `A_BusinessPartner` → `to_BusinessPartnerTax`, `BPTaxType` = `IN3`, `BPTaxNumber` | `gstin` | stored with the master for the B1 ↔ S/4 match | The group's connector guesses a flat `A_Customer` `TaxNumber3`; use it only if the relation is absent | candidate — verify against $metadata |
+| 6 | `A_BusinessPartner` → `to_BusinessPartnerAddress` `Region` | `state` → `state_code` | state | S/4 region code; mapped to the GST state code by the geography state table. The group's connector guesses a flat `A_Customer` `Region` | candidate — verify against $metadata |
+| 7 | `to_BusinessPartnerAddress` `PostalCode` | `pin` | PIN | 6 digits; anything else stored blank and counted. The group's connector guesses a flat `A_Customer` `PostalCode` | candidate — verify against $metadata |
+| 8 | `to_BusinessPartnerAddress` `CityName` | `city` | city | Free text; used by the derived draft only ([Geography](geography.md)) | candidate — verify against $metadata |
+| 9 | `to_BusinessPartnerAddress` `District` | `district_text` | district (text) | Optional text; matched to the public district list in the geography master. Whether the field is filled by Virgo is unknown (checklist 21) | candidate — verify against $metadata |
+| 10 | `A_CustomerSalesArea` `SalesDistrict` | `sales_district` | sales district | Same value as the register's `Sales District` (ZONE01…). A zone, **not a district**: cross-check of state only | candidate — verify against $metadata |
+| 11 | `A_CustomerSalesArea` `SalesGroup`, or the partner-function relation (`to_PartnerFunction`: partner function, personnel number) | `sales_employee_code` | salesperson | The register's Sales Executive is 100% blank, so this may also be blank. The group's connector guesses a flat `SalesEmployee`. Used as a suggestion only, as today | candidate — verify against $metadata |
+| 12 | `A_CustomerSalesArea` `CustomerPaymentTerms` | `payment_terms` | terms | As [Customer](customer.md) | candidate — verify against $metadata |
+| 13 | `A_Customer` `DeletionIndicator`, `PostingIsBlocked` | `active` | blocked flag | Blocked customers stay in the master, flagged | candidate — verify against $metadata |
+| 14 | `A_Customer` custom property for the old B1 card code (the group's connector guesses `LegacyB1Code`) | `legacy_b1_code` | legacy code | Exact B1 ↔ S/4 customer match, better than GSTIN (82.4% overlap, [Customer](customer.md)) | candidate — verify against $metadata |
+| 15 | Credit limit | `credit_limit` | limit | **Not read here.** Credit limit probably sits in a separate credit-management API (the group's connector says so); keep it blank until that API is checked | candidate — verify against $metadata |
+
+**Address rule.** A business partner can have several addresses. The Desk needs the one the invoice goes to. Candidate rule: the standard/bill-to address (the address usage or default flag is a name to verify); if several remain, the lowest address number, and the customer is counted under "several addresses". Checklist 21 settles it.
+
+**How it lands.** Rows are passed through the existing customer-master loader as one upload entry labelled "S/4 customer feed" (Undo works as for a file). Requirement for the Full-Stack Engineer: the master is keyed by (`source_system`, `customer_code`) and a load replaces only its own system's rows, because today's Admin intake replaces the whole master per load ([Customer](customer.md)), which would let a B1 file wipe the S/4 customers or the reverse. **Assumed:** B1 history customers not in S/4 stay on the OCRD upload (Q-D13), matched to S/4 by legacy code, then GSTIN. Only the Desk database holds the rows; nothing goes into the repo.
 
 ## 2. Filters
 All names in this section: candidate — verify against $metadata.
@@ -171,10 +201,15 @@ Do in order. Record each result in [Decisions](../decisions.md) with date and so
 | 16 | Licence: written statement from the SAP partner that read-only API calls by this user are not counted (FUE, digital access) | In writing (Q33) | Stop. The feed does not go live |
 | 17 | Credentials: stored in Apps Script Script Properties only (never the sheet, repo or Desk backup) | Confirmed by Vijay | Move them |
 | 18 | Credit-note item gap (1.2): count of S/4 credit-memo rows not resolved to an item | Zero for the month, or a rule agreed | Keep credit coverage off for that month |
+| 19 | Customer read: count of in-scope customers (company code filter) vs the 92 customers of the register extract | Non-zero, at least those 92; out-of-scope rows counted | Fix the scope relation (row `A_CustomerCompany`) |
+| 20 | Customer fields present on the tenant: every row 1–15 of 1.4 | Names listed in `$metadata`; each marked present or replaced by the real one | Mark GAP; the field stays blank and the geography draft says so |
+| 21 | Address: for 20 known customers compare `Region`, `PostalCode`, `CityName`, `District` with the customer's real bill-to; count customers with several addresses; share of customers with a 6-digit PIN and with `District` filled (counts only, no values written down) | Address rule picks the bill-to; PIN share known | Change the address rule; PIN share decides whether the derived draft can use PIN ([Geography](geography.md)) |
+| 22 | Legacy code and GSTIN: match rate of S/4 customers to the B1 customer list by legacy code and by GSTIN | Match rate known | Keep GSTIN as the key (Assumed) |
 
-After checks 1–18 pass: Vijay approves the first live replace of October; SP Sir is told in the next update. The Data Intake "live feed" card changes from "Not connected" only after that approval.
+After checks 1–22 pass: Vijay approves the first live replace of October; SP Sir is told in the next update. The Data Intake "live feed" card changes from "Not connected" only after that approval.
 
 ## Open items
+- Customer master (1.4, D77): the Desk needs state and PIN per customer; names are candidates until checklist 20 and 21. Vijay's answers of 8 Nov: the customer master comes from this connector, and no district-to-branch list exists, so [Geography](geography.md) derives a draft from sales history.
 - Questions only Vijay can answer are Q29–Q33 in [Open questions](../open-questions.md): communication arrangement and user, API host, IP allow-list, same tenant and company code, licence position.
 - Q-D4 (does the register keep credit memos and cancelled invoices) and Q18 (S/4 material master with the old B1 code) decide `CANCEL_MODE` and the credit-note item gap.
 - Apps Script sends calls from Google addresses that are not fixed. If SAP requires an allow-list, the feed cannot meet it without a fixed-address route, which is a spend and needs a Principal's OK (Q31).

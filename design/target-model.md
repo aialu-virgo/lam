@@ -1,7 +1,7 @@
 ---
 title: Target model
 summary: Target = market potential x share % per state and district (D77, was plant) and product group, phased to months, with the state/district sum rule, revision workflow, approvers, Stretch flag and hand-calculable examples for QA checks 11 and 12.
-status: approved (interim, Vijay, D13); geography basis D77 proposed, awaiting mock-up and approval
+status: approved (interim, Vijay, D13); state-first geography basis (D77) proposed, awaiting mock-up and approval
 updated: 2026-11-08
 related:
   - data-map/geography.md
@@ -32,20 +32,20 @@ related:
 - **Actual** for a leaf is the aggregate sum of Sales (laminate product groups, internal transfers excluded) for that plant, product group and the customers in that segment ([Canonical data model](canonical-data-model.md)). Segment is a customer attribute joined at read time. Salesperson targets: see [Plan model](plan-model.md).
 
 ## Geography basis (D77)
-Home of the geography rules; the master is [Geography](../data-map/geography.md). Added 8 Nov 2026 under D77 (Vijay): State is the macro level, District the micro level.
+Home of the geography rules; the master is [Geography](../data-map/geography.md). Added 8 Nov 2026 under D77 (Vijay): State is the macro level, District the micro level. **Vijay, 8 Nov: State is the only required level. Potential and targets are set and approved per state × product group and everything works fully at state level; the district split is optional and used later.** With no district records for a state, nothing warns, blocks or shows as a gap.
 
 **Keys.** A potential or target record is keyed by (`fy_quarter`, `state_code`, `district_id` or the literal `_state`, `product_group`, `customer_segment`). The caller's tuple (state, district | `_state`, product group, quarter) keeps today's segment as the fifth part (`All` when not split) because D77 keeps the same measures and levels. Record `_id` = `slug(geo_<quarter>_<state>_<district|_state>_<group>_<segment>)`; phasing `_id` = the same without segment. The `geo_` prefix cannot collide with legacy plant-keyed ids.
-- `_state` record = the **state total** (macro): potential ₹, sheets, sq ft, share %. District record = that district's slice (micro). Nothing else is stored; **unallocated is derived, never stored**.
+- `_state` record = the **state total** (macro) and the **only required record**: potential ₹, sheets, sq ft, share %. District record = optional slice of it (micro). Nothing else is stored; **unallocated is derived, never stored**.
 
-**Sum rule** (per quarter × state × product group × segment, checked separately for ₹, sheets and sq ft):
+**Sum rule** (applies only to a state × product group × segment that has at least one district record; checked separately for ₹, sheets and sq ft):
 `unallocated = state total − Σ district values`.
-- Σ districts ≤ state total: allowed. The tab shows the remainder as **"Unallocated to districts"** on the state row, in the pending (orange) style, until it is zero.
+- **No district record (the default):** the `_state` record is an ordinary leaf. State target = state potential × share. No unallocated line, no "gap", no warning, no block, nothing greyed out.
+- Σ districts ≤ state total: allowed. The tab then shows the remainder on the state row as **"Unallocated to districts"** (informational, not an error), until it is zero or the person stops allocating.
 - Σ districts > state total: **Draft can be saved, Submit is refused** ("districts exceed the state by x"). Nobody's number is silently changed.
-- No `_state` record, districts only: state total is **derived** = Σ districts, unallocated 0, labelled "derived".
-- `_state` record, no districts: the whole total is unallocated.
+- Districts only, no `_state` record: state total is **derived** = Σ districts, unallocated 0, labelled "derived". (A state still needs a `_state` record to be targetable at state level; the tab offers "use the sum".)
 - Tolerance ±0.01, as the P2 rule. If a state uses segments on one side and `All` on the other, the check runs on the total across segments.
 
-**Targets and the unallocated slice.** District leaf target = district potential × district share. The unallocated slice is a virtual leaf: target = `unallocated potential × share_pct` of the `_state` record; blank share means no target on that slice (shown "no target on unallocated"). **State target = Σ district leaf targets + unallocated leaf target.** Actuals of customers whose district cannot be resolved ("<State> – unassigned") are compared with the unallocated slice, so the state row always compares like with like.
+**Targets and the unallocated slice.** With no districts, skip this paragraph. With districts: district leaf target = district potential × district share. The unallocated slice is a virtual leaf: target = `unallocated potential × share_pct` of the `_state` record; blank share means no target on that slice (shown "no target on unallocated"). **State target = Σ district leaf targets + unallocated leaf target.** Actuals of customers whose district cannot be resolved ("<State> – unassigned") are compared with the unallocated slice, so the state row always compares like with like.
 - The unallocated target is derived from currently Approved values (approved state total − Σ approved district totals, × approved state share). When a district is approved with more potential, the unallocated slice shrinks automatically; each change was approved on its own record.
 - **Default share (Q4)** is computed per leaf as before from last quarter's actual and potential for the same key. For a district with no prior potential there is no default. For the `_state` record the default uses the state's last quarter actual ÷ potential and applies to the unallocated slice only.
 
@@ -53,13 +53,16 @@ Home of the geography rules; the master is [Geography](../data-map/geography.md)
 
 **Revisions and approval.** Unchanged (D70, D71): every record has its own revision trail; Draft → Discussed → Approved → Locked; approver is never the proposer; HOD view only; locked quarters read-only. Stored `status` is per record, so the state row's status is the roll-up of its records (as the product-group row is today).
 
-**Who edits (changed by D77 only in scope).** A Branch manager edits potential, share, target and phasing for the **districts whose responsible plant is in their `plant_codes`**, and cannot edit the `_state` record or another plant's districts. Management / HO and Super admin edit all, including `_state` and the geography master. A district with no responsible plant is editable by Management / HO and Super admin only. See [Role matrix](role-matrix.md).
+**Who edits (changed by D77 only in scope).**
+- **State record (`_state`):** Management / HO and Super admin. A Branch manager also edits it for a state whose `default_plant_code` is one of their plants ([Geography](../data-map/geography.md)); a state with no default plant is Management / HO and Super admin only. **Assumed (new)**, because with state as the only required level a Branch manager would otherwise have nothing to edit until districts are mapped; flagged for Vijay and SP Sir.
+- **District records (optional, later):** a Branch manager edits the **districts whose responsible plant is in their `plant_codes`**, never another plant's. A district with no responsible plant: Management / HO and Super admin only.
+- Geography master: Super admin and Management / HO. See [Role matrix](role-matrix.md).
 
 ### How actuals reach a district
 1. Take the invoice aggregate's `customer_code` (the aggregates hold customer; [Plan model](plan-model.md) D9 effects). Internal transfers stay excluded.
 2. **State** = the customer master's `state_code` (B1 state name via the alias table, or S/4 GST code). If the customer is not in the master or has no state, use the invoice row's State (`customer_state`). If neither, the row goes to the **"State not known"** bucket (`state_code` 00). Place of Supply is not used (it is a tax field).
-3. **District** = PIN master lookup of the customer master's PIN, accepted only if the PIN's state equals step 2's state. Otherwise the customer is **"<State> – unassigned"**. Reasons are counted in Admin: no PIN, PIN not in master, PIN state differs, PIN has no district.
-4. **Responsible plant** = the district's `responsible_plant_code`. The state's unassigned actuals and unallocated potential go to the state's `default_plant_code` if set, else show under "No responsible branch".
+3. **District (only when a district master exists)** = PIN master lookup of the customer master's PIN, accepted only if the PIN's state equals step 2's state. Otherwise the customer is **"<State> – unassigned"** (shown only where the state has district records; at state level the customer simply counts in the state). Reasons are counted in Admin: no PIN, PIN not in master, PIN state differs, PIN has no district.
+4. **Responsible plant** = the district's `responsible_plant_code`. State-level figures, unassigned actuals and unallocated potential go to the state's `default_plant_code` if set, else show under "No responsible branch". Before any district map exists, a plant view is the roll-up of its default states only.
 5. Attribution is by **customer**, not invoice, using the master at read time. **Rule: a locked quarter's attributed actuals must not move when the master is later edited.** Recommendation: snapshot the attributed actuals per (state, district, group, segment, month) when the quarter is locked (Assumed (new); build choice for the Full-Stack Engineer).
 6. Credit notes (net basis, D40) attribute the same way through the customer on each credit-note line. The stored credit-note aggregate is plant-month × group, so the lines (which carry the customer) must be read; net at district level is possible but costs a read of the line chunks. Until then district achievement uses invoiced sales and says so.
 
@@ -75,7 +78,7 @@ Every change to a potential figure, share %, or phasing creates a **revision**: 
 
 | State | Meaning | Who can move it here | Counts for achievement? |
 |---|---|---|---|
-| **Draft** | Proposed or default; being worked on | Proposer: Branch manager (own districts), Management / HO, Super admin. HOD is view only ([who edits](#who-edits-potential-and-targets)) | Shown as "Draft target" only if no approved one exists |
+| **Draft** | Proposed or default; being worked on | Proposer: Branch manager (own states and districts), Management / HO, Super admin. HOD is view only ([who edits](#who-edits-potential-and-targets)) | Shown as "Draft target" only if no approved one exists |
 | **Discussed** | Discussion held and recorded | The proposer, once reason, discussion date and participants are filled | No |
 | **Approved** | Accepted as the working target | **SP Sir or a Management / HO user. Never the proposer of that revision** | **Yes: the current approved target** |
 | **Locked** | Quarter frozen | Management / HO or Super admin, "Lock quarter" for all Approved revisions of the quarter | Yes, no edits |
@@ -88,7 +91,7 @@ Every change to a potential figure, share %, or phasing creates a **revision**: 
 
 ## Who edits potential and targets
 Home of this fact (D70, D71). Potential, share % and monthly phasing are filled in the **Plan > Targets & Potential** tab ([Wireframes](wireframes.md)); the non-admin Plans screen is replaced and Admin's Market potential links to the tab.
-- **Propose, edit or upload:** Branch manager (own districts only: those whose responsible plant is one of theirs, D77), Management / HO, Super admin. **HOD: view only.** **HOD does not approve P1** (target values). Others: no access.
+- **Propose, edit or upload:** Branch manager (own states and districts only, D77: [who edits](#geography-basis-d77)), Management / HO, Super admin. **HOD: view only.** **HOD does not approve P1** (target values). Others: no access.
 - **Approve target values:** SP Sir (or a Management / HO user who is not the proposer), as in the table above.
 - **Locked quarters are read-only** for everyone.
 - **UI label "Proposed" = stored status `Discussed`.** Submit needs reason, discussion date and participants.
@@ -158,6 +161,7 @@ Closed-quarter actuals:
 - Edits: D1 to 800 → Σ districts 1,100, unallocated 100, unallocated target 30.00, state target 400 + 120 + 30 = 550. D1 to 1,000 → Σ 1,300 > 1,200: Submit refused, Draft saved. State total changed to 1,100 with D1 500, D2 300 → unallocated 300, target 90, state target 460.
 - Branch manager of Plant B edits D2, cannot edit D1 or `_state` S; Management edits all.
 - A locked quarter: master edit moving D2's customers to D1 does not change the locked snapshot.
+- **State only (the default, check this first):** state S potential 1,200, share 40% → target **480.00**; actual 420 → achievement **87.50%**; no unallocated line, no warning, no gap shown. Adding a first district record D1 (500, 50%) then introduces the unallocated slice 700 × 40% = 280 and state target 250 + 280 = **530.00**.
 
 ## D9 effects
 Targets are plan entities, outside D9. Actuals at leaf level need customer × product group × month (for district and segment through the customer master): all present in the aggregates, so no history reload is needed for D77. The read must cross every invoicing plant's chunks for a state's customers (a build cost, not a data gap). Item- or line-level targets **cannot** be tracked and are not offered. Documents spanning two product groups sit in one aggregate row per group, so group actuals are exact; the document index shows document totals only.
