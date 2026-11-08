@@ -31,7 +31,7 @@ ok('a short page is one part', splitPage('a\nb\n').length === 1);
 // doGet joins the parts and checks them
 const env = makeEnv(), page = f => env.ctx.doGet({ parameter: {} }).html;
 const good = env.ctx.doGet({ parameter: {} });
-ok('doGet serves the joined page (boot marker replaced)', good.html.includes('window.__GAS_BOOT=') && !good.html.includes('/*@@GAS_BOOT@@*/') && good.html.length > joined.length - 10);
+ok('doGet serves the joined page (boot marker replaced)', good.html.includes('window.__GAS_BOOT=') && !good.html.includes('/*@@GAS_BOOT@@*/'));
 ok('doGet page equals joined parts apart from the boot marker', good.html.replace(/window\.__GAS_BOOT=\{.*?\};/, '/*@@GAS_BOOT@@*/') === joined.toString('utf8'));
 const texts = Object.fromEntries(bufs.map((b, i) => [names[i], b.toString('utf8')]));
 const run = over => makeEnv({ htmlFiles: { ...texts, ...over } }).ctx.doGet({ parameter: {} });
