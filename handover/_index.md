@@ -28,4 +28,5 @@ Drafted 20 Oct for M7; each is checked against the page at the acceptance walk-t
 - [Data upload problems and fixes](upload-issues.md) — active
 
 **Session takeover**
-- [Desk data load and v44, 8 Nov](session-takeover-2026-11-08-desk-load.md) — active
+- [Takeover by another Claude account, 8 Nov 20:40](takeover-2026-11-08-new-account.md) — active
+- [Desk data load and v44, 8 Nov 15:35](session-takeover-2026-11-08-desk-load.md) — superseded
