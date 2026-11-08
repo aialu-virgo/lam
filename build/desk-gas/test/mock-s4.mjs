@@ -20,7 +20,7 @@ export function synthDocs({ seed = 1, from = '2026-10-01', to = '2026-10-10', pl
     const n = 1 + Math.floor(r() * 4), items = [];
     for (let k = 0; k < n; k++) {
       const m = prods[Math.floor(r() * prods.length)], P = masters.products[m], q = 1 + Math.floor(r() * 40), net = Math.round((q * (500 + r() * 900)) * 100) / 100;
-      items.push({ BillingDocumentItem: pad((k + 1) * 10, 6), Plant: plant, Material: pad(m, 18), BillingQuantity: q.toFixed(3), BillingQuantityUnit: 'PC', NetAmount: net.toFixed(2), TransactionCurrency: 'INR', AdditionalMaterialGroup3: P.mg3, AdditionalMaterialGroup4: P.mg4, SalesDistrict: 'ZONE0' + (1 + Math.floor(r() * 3)), ReferenceSDDocument: '' });
+      items.push({ BillingDocumentItem: pad((k + 1) * 10, 6), Plant: plant, Material: pad(m, 18), BillingQuantity: q.toFixed(3), BillingQuantityUnit: 'PC', NetAmount: net.toFixed(2), TransactionCurrency: 'INR', AdditionalMaterialGroup3: P.mg3, AdditionalMaterialGroup4: P.mg4, ReferenceSDDocument: '' });
     }
     return Object.assign({ BillingDocument: pad(no++, 10), BillingDocumentType: type, BillingDocumentDate: odDate(day), CompanyCode: company, SoldToParty: pad(custs[Math.floor(r() * custs.length)], 10), BillingDocumentIsCancelled: false, CancelledBillingDocument: '', LastChangeDate: odDate(day), TransactionCurrency: 'INR', to_Item: { results: items } }, over);
   };
@@ -40,7 +40,7 @@ export function synthDocs({ seed = 1, from = '2026-10-01', to = '2026-10-10', pl
 }
 const META = {
   API_BILLING_DOCUMENT_SRV: { A_BillingDocument: { type: 'A_BillingDocumentType', props: ['BillingDocument', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate', 'TransactionCurrency', 'SDDocumentCategory'], nav: ['to_Item'] },
-    A_BillingDocumentItem: { type: 'A_BillingDocumentItemType', props: ['BillingDocument', 'BillingDocumentItem', 'Plant', 'Material', 'BillingQuantity', 'BillingQuantityUnit', 'NetAmount', 'TransactionCurrency', 'AdditionalMaterialGroup3', 'AdditionalMaterialGroup4', 'SalesDistrict', 'ReferenceSDDocument', 'TaxAmount', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate'], nav: [] } },
+    A_BillingDocumentItem: { type: 'A_BillingDocumentItemType', props: ['BillingDocument', 'BillingDocumentItem', 'Plant', 'Material', 'BillingQuantity', 'BillingQuantityUnit', 'NetAmount', 'TransactionCurrency', 'AdditionalMaterialGroup3', 'AdditionalMaterialGroup4', 'ReferenceSDDocument', 'TaxAmount', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate'], nav: [] } },
   API_PRODUCT_SRV: { A_Product: { type: 'A_ProductType', props: ['Product', 'ProductType', 'BaseUnit'], nav: [] } },
   API_BUSINESS_PARTNER: { A_Customer: { type: 'A_CustomerType', props: ['Customer', 'CustomerName'], nav: [] } } };
 export function makeS4(cfg = {}) {
@@ -84,6 +84,14 @@ export function makeS4(cfg = {}) {
     if (auth !== want) return res(401, { error: { message: { value: 'Authentication failed for ' + S.user } } });
     const m = /^\/sap\/opu\/odata\/sap\/([A-Z_]+)\/(.+)$/.exec(u.pathname); if (!m || !META[m[1]]) return res(404, { error: { message: { value: 'Service not found' } } });
     const svc = m[1], rest = decodeURIComponent(m[2]), q = u.searchParams;
+    // like the real tenant: a $select naming a property the entity does not have (or that metaGaps removes) is HTTP 404 "Resource not found for the segment '<name>'"
+    if (q.get('$select') && rest !== '$metadata') {
+      const es = /^(A_\w+)/.exec(rest), has = (set, p) => !!META[svc][set] && META[svc][set].props.includes(p) && !S.metaGaps.includes(set + '.' + p);
+      if (es && META[svc][es[1]]) {
+        const bad = q.get('$select').split(',').find(w => w.startsWith('to_Item/') ? !has('A_BillingDocumentItem', w.slice(8)) : !has(es[1], w));
+        if (bad) return res(404, { error: { message: { value: "Resource not found for the segment '" + bad.replace(/^to_Item\//, '') + "'." } } });
+      }
+    }
     if (rest === '$metadata') return res(200, metaXml(svc), { 'content-type': 'application/xml' });
     let mm;
     if (svc === 'API_BILLING_DOCUMENT_SRV') {
@@ -106,7 +114,7 @@ export function registerRows(S, { types = ['F2'], includeCancelled = false } = {
   S.docs.filter(d => d.CompanyCode === '1000' && types.includes(d.BillingDocumentType) && (includeCancelled || !d.BillingDocumentIsCancelled)).forEach(d => d.to_Item.results.forEach(it => {
     if (it.BillingQuantityUnit !== 'PC') return;
     const mat = strip(it.Material), cust = strip(d.SoldToParty), date = new Date(+/\((\d+)\)/.exec(d.BillingDocumentDate)[1]).toISOString().slice(0, 10);
-    rows.push([strip(d.BillingDocument), '', strip(it.BillingDocumentItem), date, it.Plant, cust, S.customers[cust] || '', it.SalesDistrict, '', (S.products[mat] || {}).type || '', mat, it.AdditionalMaterialGroup3, it.AdditionalMaterialGroup4, +it.BillingQuantity, +it.NetAmount, d.BillingDocumentType]);
+    rows.push([strip(d.BillingDocument), '', strip(it.BillingDocumentItem), date, it.Plant, cust, S.customers[cust] || '', '', '', (S.products[mat] || {}).type || '', mat, it.AdditionalMaterialGroup3, it.AdditionalMaterialGroup4, +it.BillingQuantity, +it.NetAmount, d.BillingDocumentType]);
   }));
   return rows;
 }

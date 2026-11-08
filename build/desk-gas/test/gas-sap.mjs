@@ -135,13 +135,13 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
 /* =============================== A4. verify $metadata =============================== */
 {
   let { S, env } = build(); let r = env.call('sapVerifyMetadata');
-  ok('sapVerifyMetadata: every entity set and property ok', r.ok && r.allOk && r.gaps === 0 && r.rows.every(x => x.status === 'ok') && r.rows.length === 30, sj(r).slice(0, 300));
+  ok('sapVerifyMetadata: every entity set and property ok', r.ok && r.allOk && r.gaps === 0 && r.rows.every(x => x.status === 'ok') && r.rows.length === 29 && r.optionalGaps === 0, sj(r).slice(0, 300));
   ok('it reports per service, entity set and property', ['API_BILLING_DOCUMENT_SRV', 'API_PRODUCT_SRV', 'API_BUSINESS_PARTNER'].every(s => r.rows.some(x => x.service === s)) && r.rows.some(x => x.entitySet === 'A_BillingDocument' && x.property === 'LastChangeDate' && x.status === 'ok') && r.rows.some(x => x.property === 'to_Item (navigation)'));
   ok('only $metadata was read, with GET and the Basic header (and no password in any URL)', S.calls.length === 3 && S.calls.every(c => c.method === 'get' && /\$metadata$/.test(c.path) && /^Basic /.test(c.headers.Authorization) && !c.url.includes(S.password)));
   ({ S, env } = build({ s4opts: { metaGaps: ['A_BillingDocument.LastChangeDate', 'API_PRODUCT_SRV.A_Product'] } })); env.props.SAP_BILLING_SHAPE = 'A'; r = env.call('sapVerifyMetadata');
   const gap = r.rows.filter(x => x.status === 'GAP');
-  ok('a missing property and a missing entity set are reported as GAP', r.ok && r.allOk === false && r.gaps === 4 && gap.some(x => x.property === 'LastChangeDate') && gap.some(x => x.entitySet === 'A_Product' && x.property === '(entity set)'), sj(gap));
-  ok('the status shows the gap count and the next step', env.call('sapStatus').status.verify.gaps === 4 && /4 gaps/.test(env.call('sapStatus').status.next));
+  ok('a missing property and a missing entity set are reported as GAP (required: ok is false)', r.ok === false && r.allOk === false && r.gaps === 4 && gap.some(x => x.property === 'LastChangeDate') && gap.some(x => x.entitySet === 'A_Product' && x.property === '(entity set)'), sj(gap));
+  ok('the status shows the gap count and the next step', env.call('sapStatus').status.verify.gaps === 4 && /4 required name/.test(env.call('sapStatus').status.next));
 }
 
 /* =============================== A4b. shape B (item set carrying the header fields, as the group's existing connector reads) and the IP allow-list messages =============================== */
@@ -164,6 +164,60 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   ok('the default company code is 1000', (() => { const e2 = build({ docs }); return e2.env.call('sapStatus').ok && /datetime/.test('') === false && (e2.env.call('sapVerifyMetadata'), e2.env.call('sapShadowRun'), e2.S.calls.some(c => /CompanyCode%20eq%20%271000%27/.test(c.query))); })());
 }
 
+
+/* =============================== A4b. optional fields, required gaps, verify result = saved status, run logs (first real-SAP finding, 8 Nov) =============================== */
+{
+  const docs = synthDocs({ masters });
+  const logsOf = (env) => (env.state.logs || []).filter(l => l.startsWith('SAP '));
+  // 1. the real tenant has no SalesDistrict: the feed never names it (verify list, $select, $expand) and the column stays blank
+  let { S, env } = build({ docs, s4opts: { pageCap: 17 } }); let r = env.call('sapVerifyMetadata');
+  ok('tenant without SalesDistrict: verify is ok with no GAP (the property is not in the list)', r.ok === true && r.gaps === 0 && !r.rows.some(x => x.property === 'SalesDistrict'), sj(r.rows.filter(x => x.status === 'GAP')));
+  r = env.call('sapShadowRun'); const st1 = env.call('sapSync');
+  ok('shadow run and sync complete on the tenant that has no SalesDistrict', r.ok && r.done && st1.ok && st1.done, sj([r, st1]).slice(0, 300));
+  ok('no request names SalesDistrict (strict mock answers 404 "Resource not found for the segment" for an unknown name)', S.calls.every(c => !/SalesDistrict/.test(decodeURIComponent(c.url))) && S.calls.length > 5);
+  const sr = stagedRows(env, '2026-10');
+  ok('the staged "Sales District" column (14th) is blank on every row', sr && sr.rows.length > 0 && sr.rows.every(x => x[13] === ''), sj(sr && sr.rows[0]));
+  // 2. an optional property missing on the tenant: GAP flagged, ok true with a warning, left out of later reads, list kept in a Script Property
+  ({ S, env } = build({ docs, s4opts: { metaGaps: ['A_BillingDocumentItem.ReferenceSDDocument'] } })); env.props.SAP_BILLING_SHAPE = 'A';
+  r = env.call('sapVerifyMetadata');
+  const og = r.rows.filter(x => x.status === 'GAP');
+  ok('optional GAP: flagged as GAP and marked optional', og.length === 1 && og[0].property === 'ReferenceSDDocument' && og[0].optional === true && r.optionalGaps === 1 && r.gaps === 0, sj(og));
+  ok('optional GAP: ok is true, with a warning naming the property', r.ok === true && r.allOk === false && /ReferenceSDDocument/.test(r.warning || '') && /Warning/.test(r.message), sj([r.ok, r.warning]));
+  ok('optional GAP: the skip list is kept in the Script Property SAP_OPT_SKIP', sj(JSON.parse(env.props.SAP_OPT_SKIP)) === sj(['A_BillingDocumentItem.ReferenceSDDocument']), env.props.SAP_OPT_SKIP);
+  const n0 = S.calls.length; r = env.call('sapShadowRun');
+  ok('optional GAP: the shadow run completes (the property is left out of the $select, so the strict tenant answers 200)', r.ok && r.done && S.calls.slice(n0).some(c => /A_BillingDocument\?/.test(c.path + c.query)) && S.calls.slice(n0).every(c => !/ReferenceSDDocument/.test(decodeURIComponent(c.url))), sj(r).slice(0, 300));
+  ok('optional GAP: the card says verified, not blocked', env.call('sapStatus').status.verify.ok === true && env.call('sapStatus').status.verify.optionalGaps === 1);
+  r = env.call('sapSync'); const g = stagedRows(env, '2026-10');
+  ok('optional GAP: sync stages the rows with that column blank', r.ok && r.done && g.rows.length > 0 && g.rows.every(x => x[14] === ''));
+  env.props.SAP_BILLING_SHAPE = 'A'; S.metaGaps = []; r = env.call('sapVerifyMetadata');
+  ok('once the tenant has the property again, verify clears the skip list', r.ok && r.optionalGaps === 0 && env.props.SAP_OPT_SKIP === '[]' && r.allOk === true);
+  // CustomerName optional: the customer lookup is left out, name blank
+  ({ S, env } = build({ docs, s4opts: { metaGaps: ['A_Customer.CustomerName'] } })); env.props.SAP_BILLING_SHAPE = 'A'; r = env.call('sapVerifyMetadata'); const c0 = S.calls.length;
+  const r2 = env.call('sapShadowRun'); const r3 = env.call('sapSync'); const g2 = stagedRows(env, '2026-10');
+  ok('optional CustomerName GAP: ok true, no customer request, shadow and sync complete, name column blank', r.ok === true && r.optionalGaps === 1 && r2.ok && r3.ok && S.calls.slice(c0).every(c => !/A_Customer/.test(c.path)) && g2.rows.every(x => x[5] === ''), sj([r.ok, r2.ok, r3.ok]));
+  // 3. a required GAP still blocks, with a clear message
+  ({ S, env } = build({ docs, s4opts: { metaGaps: ['A_BillingDocumentItem.NetAmount', 'A_BillingDocumentItem.ReferenceSDDocument'] } })); env.props.SAP_BILLING_SHAPE = 'A'; r = env.call('sapVerifyMetadata');
+  ok('required GAP: verify ok is false, code sap_verify_gap, blocking list names it, the optional one is still only a warning', r.ok === false && r.code === 'sap_verify_gap' && r.gaps === 1 && r.optionalGaps === 1 && sj(r.blocking) === sj(['A_BillingDocumentItem.NetAmount']) && /NetAmount/.test(r.message), sj([r.ok, r.code, r.blocking, r.message]));
+  const n1 = S.calls.length, sh = env.call('sapShadowRun'), sy = env.call('sapSync');
+  ok('required GAP: the shadow run is refused with a clear message and no SAP call', sh.ok === false && sh.code === 'sap_verify_gap' && /NetAmount/.test(sh.message) && /Nothing was read/.test(sh.message) && S.calls.length === n1, sj(sh));
+  ok('required GAP: the sync is refused too', sy.ok === false && sy.code === 'sap_verify_gap' && S.calls.length === n1 && !('sapstage/man_2026-10' in env.stored()), sj(sy));
+  ok('required GAP: the card shows the blocking name in the next step', /NetAmount/.test(env.call('sapStatus').status.next));
+  // 4. verify's ok matches the saved status, in every case
+  const cases = [{}, { metaGaps: ['A_BillingDocumentItem.ReferenceSDDocument'] }, { metaGaps: ['A_BillingDocumentItem.NetAmount'] }, { metaGaps: ['API_PRODUCT_SRV.A_Product'] }, { metaGaps: ['A_Customer.CustomerName', 'A_Product.ProductType'] }];
+  const same = cases.map(mg => { const e = build({ docs, s4opts: mg }); e.env.props.SAP_BILLING_SHAPE = 'A'; const v = e.env.call('sapVerifyMetadata'), sv = e.env.call('sapStatus').status; return v.ok === sv.verify.ok && sv.lastOk === v.ok && v.gaps === sv.verify.gaps && v.optionalGaps === sv.verify.optionalGaps; });
+  ok('verify: the returned ok, gaps and optionalGaps equal the saved status (verify.ok, lastOk) in all ' + cases.length + ' cases', same.every(Boolean), sj(same));
+  // 5. logs: every public function writes one line, success or failure, with no credential or address
+  ({ S, env } = build({ docs })); const pub = [['sapVerifyMetadata', []], ['sapShadowRun', []], ['sapSync', []], ['sapStatus', []], ['sapInstallDailyTrigger', []], ['sapRemoveDailyTrigger', []], ['sapMarkLoaded', [{ months: ['2026-10'] }]]];
+  const per = pub.map(([f, a]) => { const l0 = logsOf(env).length; const rr = env.call(f, a); const ls = logsOf(env); return { f, ok: rr.ok, n: ls.length - l0, line: ls[ls.length - 1] || '' }; });
+  ok('logs: each of the 7 public functions wrote exactly one "SAP ..." line on success, naming the function', per.every(x => x.ok && x.n === 1 && x.line.includes('"fn":"' + x.f + '"') && x.line.includes('"ok":true')), sj(per.map(x => [x.f, x.n])));
+  const failed = [];
+  env.props.SAP_PASSWORD = 'wrong-pw'; for (const f of ['sapVerifyMetadata', 'sapShadowRun']) { const l0 = logsOf(env).length; const rr = env.call(f); failed.push({ f, ok: rr.ok, code: rr.code, n: logsOf(env).length - l0, line: logsOf(env).slice(-1)[0] || '' }); }
+  ok('logs: a failed run (wrong password, HTTP 401) is logged too, with ok:false and the code', failed.every(x => x.ok === false && x.n === 1 && x.line.includes('"ok":false') && x.line.includes('sap_auth')), sj(failed));
+  env.setEmail('se@virgoasia.com'); const l1 = logsOf(env).length, rf = env.call('sapStatus'); env.setEmail(SUPER);
+  ok('logs: a refused caller is logged as a failure', rf.ok === false && logsOf(env).length === l1 + 1 && logsOf(env).slice(-1)[0].includes('permission_denied'));
+  const allLogs = (env.state.logs || []).join('\n');
+  ok('logs: no password, user name or SAP address in any log line', !allLogs.includes(S.password) && !allLogs.includes('wrong-pw') && !allLogs.includes(S.user) && !allLogs.includes('mock-tenant') && !/Basic /.test(allLogs) && allLogs.length > 0);
+}
 /* =============================== A5. filters, cut-off, cancellation modes, other types =============================== */
 {
   const docs = synthDocs({ masters, from: '2026-09-24', to: '2026-09-30', extras: false, startNo: 80000001 }).concat(synthDocs({ masters, from: '2026-10-01', to: '2026-10-08' }));
