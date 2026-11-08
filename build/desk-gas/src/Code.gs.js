@@ -39,7 +39,7 @@ function doGet(e) {
   var email = activeEmail_();
   var boot = { email: email, url: ScriptApp.getService().getUrl(), h: (e && e.parameter && e.parameter.h) || '', owner: false, name: '' };
   try { var who = resolveUser_(email); boot.owner = who.role === 'Super admin'; boot.name = who.name || ''; } catch (err) { boot.err = String(err && err.message || err); }
-  var loaded = loadIndex_();
+  var loaded = loadPage_();
   if (loaded.error) return indexErrorPage_(loaded.error);
   var html = loaded.html;
   var json = JSON.stringify(boot).replace(/</g, '\\u003c');
@@ -103,10 +103,119 @@ function indexDiag() {
 }
 function indexErrorPage_(e) {
   var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var fix = e.fix || ('Admin: open the Apps Script project, open <b>' + esc(e.file) + '</b>, select all, paste the matching Desk-' + esc(e.file) + '.txt, save, check its last line (see README), then Deploy &gt; Manage deployments &gt; New version.');
   return HtmlService.createHtmlOutput('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Desk setup problem</title></head><body style="font-family:sans-serif;max-width:640px;margin:48px auto;padding:0 16px">'
-    + '<h2>The Desk page is not fully installed</h2><p>The HTML file <b>' + esc(e.file) + '</b> ' + esc(e.problem) + '.</p>'
-    + '<p>Admin: open the Apps Script project, open <b>' + esc(e.file) + '</b>, select all, paste the matching Desk-' + esc(e.file) + '.txt, save, check its last line (see README), then Deploy &gt; Manage deployments &gt; New version.</p></body></html>')
+    + '<h2>The Desk page is not fully installed</h2><p>' + (e.drive ? 'The page file' : 'The HTML file') + ' <b>' + esc(e.file) + '</b> ' + esc(e.problem) + '.</p><p>' + fix + '</p></body></html>')
     .setTitle('Desk setup problem');
+}
+
+/* ---------- page from Google Drive (preferred): folder DESK_PAGE_FOLDER_ID holds desk-page-<build>.html, one per release ----------
+ * Line 1 of each file is <!--DESK-PAGE build=<id> api=<n> chars=<n> sum=<hex>-->; chars and sum cover the text after that line and are checked on the raw Drive text
+ * (no HtmlService processing). A file that fails any check is never served. Script Properties: DESK_PAGE_FOLDER_ID (turns this path on), DESK_PAGE_FILE_ID (optional: pin one exact file, for rollback).
+ * Neither property set = the Index files path above. The checked page is cached 10 minutes (CacheService, chunks under 100 KB) under the file id and its updated time. */
+var DESK_API = 1;                // bump only when server functions change in a way an older page cannot work with
+var PAGE_FILE_RE = /^desk-page-.+\.html$/;
+var PAGE_CACHE_SECS = 600;
+var PAGE_CHUNK_CHARS = 30000;    // 3 bytes per character at worst = 90 KB, under the 100 KB cache value limit
+function indexSum_(str) { var h = 0x811c9dc5; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return ('00000000' + (h >>> 0).toString(16)).slice(-8); }
+function pageErr_(file, problem, fix) { return { error: { file: file, problem: problem, drive: true, fix: fix } }; }
+/* checks the raw text of a page file; returns {html, build} or {error} */
+function pageCheck_(name, raw) {
+  var nl = raw.indexOf('\n'), head = nl < 0 ? raw : raw.slice(0, nl);
+  var m = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->$/.exec(head.replace(/^\uFEFF/, ''));
+  if (!m) return pageErr_(name, 'has no valid DESK-PAGE header on line 1 (it is not a Desk page file, or it was converted or edited)');
+  var body = raw.slice(nl + 1);
+  if (body.length !== +m[3]) return pageErr_(name, 'is incomplete or was changed: it has ' + body.length + ' characters after the header, it must have ' + m[3] + (body.length < +m[3] ? ' (the upload was cut short)' : ' (extra text)'));
+  var sum = indexSum_(body);
+  if (sum !== m[4]) return pageErr_(name, 'has the right length but its content does not match the build (checksum ' + sum + ', expected ' + m[4] + '): it was edited or converted');
+  if (+m[2] !== DESK_API) return pageErr_(name, 'is for server version api=' + m[2] + ' but Code.gs is api=' + DESK_API + ': paste the newer Desk-Code.gs.txt into Code.gs and make a New version (or pin an older page file with DESK_PAGE_FILE_ID)');
+  if (!/<\/html>\s*$/.test(body)) return pageErr_(name, 'does not end with </html>');
+  return { html: body, build: m[1] };
+}
+function pageFind_(props) {
+  var pin = props.getProperty('DESK_PAGE_FILE_ID'), folderId = props.getProperty('DESK_PAGE_FOLDER_ID'), file = null;
+  if (pin) {
+    try { file = DriveApp.getFileById(pin); } catch (err) { return pageErr_('DESK_PAGE_FILE_ID', 'does not open (' + String(err && err.message || err) + '): the pinned file id is wrong, or this account cannot see the file'); }
+    return { file: file, name: file.getName() };
+  }
+  var folder;
+  try { folder = DriveApp.getFolderById(folderId); } catch (err) { return pageErr_('DESK_PAGE_FOLDER_ID', 'does not open (' + String(err && err.message || err) + '): the folder id is wrong, or this account cannot see the folder'); }
+  var best = null, bestName = '', bestTime = 0, it = folder.getFiles();
+  while (it.hasNext()) {
+    var f = it.next(), n = f.getName();
+    if (!PAGE_FILE_RE.test(n)) continue;
+    var t = f.getLastUpdated().getTime();
+    if (!best || n > bestName || (n === bestName && t > bestTime)) { best = f; bestName = n; bestTime = t; }
+  }
+  if (!best) return pageErr_('the Desk page folder', 'holds no file named desk-page-<build>.html');
+  return { file: best, name: bestName };
+}
+function pageCachePut_(cache, key, html) {
+  try {
+    var n = Math.ceil(html.length / PAGE_CHUNK_CHARS), all = {};
+    for (var i = 0; i < n; i++) all[key + ':' + i] = html.substr(i * PAGE_CHUNK_CHARS, PAGE_CHUNK_CHARS);
+    for (var k in all) cache.put(k, all[k], PAGE_CACHE_SECS);
+    cache.put(key + ':n', String(n) + ':' + html.length, PAGE_CACHE_SECS);
+  } catch (err) { /* cache is an optimisation only */ }
+}
+function pageCacheGet_(cache, key) {
+  try {
+    var meta = cache.get(key + ':n'); if (!meta) return null;
+    var p = meta.split(':'), n = +p[0], out = [];
+    for (var i = 0; i < n; i++) { var c = cache.get(key + ':' + i); if (c === null || c === undefined) return null; out.push(c); }
+    var html = out.join('');
+    return html.length === +p[1] ? html : null;
+  } catch (err) { return null; }
+}
+function loadPageDrive_(props) {
+  var cache = null; try { cache = CacheService.getScriptCache(); } catch (err) {}
+  var pin = props.getProperty('DESK_PAGE_FILE_ID') || '', folderId = props.getProperty('DESK_PAGE_FOLDER_ID') || '';
+  var ptrKey = 'pgp:' + pin + ':' + folderId + ':' + DESK_API;
+  if (cache) {
+    try {
+      var ptr = cache.get(ptrKey);
+      if (ptr) { var html = pageCacheGet_(cache, 'pgc:' + ptr); if (html !== null) return { html: html, cached: true }; }
+    } catch (err) {}
+  }
+  var found = pageFind_(props);
+  if (found.error) return found;
+  var raw;
+  try { raw = found.file.getBlob().getDataAsString('UTF-8'); }
+  catch (err) { return pageErr_(found.name, 'could not be read from Drive (' + String(err && err.message || err) + ')'); }
+  var checked = pageCheck_(found.name, raw);
+  if (checked.error) return checked;
+  if (cache) {
+    var key = found.file.getId() + ':' + found.file.getLastUpdated().getTime();
+    pageCachePut_(cache, 'pgc:' + key, checked.html);
+    try { cache.put(ptrKey, key, PAGE_CACHE_SECS); } catch (err) {}
+  }
+  return { html: checked.html, build: checked.build, name: found.name };
+}
+function loadPage_() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('DESK_PAGE_FOLDER_ID') || props.getProperty('DESK_PAGE_FILE_ID')) return loadPageDrive_(props);
+  return loadIndex_();
+}
+/* Run from the editor (select pageDiag, Run, then Execution log): which page source is in use and whether the chosen file passes its checks. Reads Drive directly, never the cache. */
+function pageDiag() {
+  var props = PropertiesService.getScriptProperties(), lines = [];
+  lines.push('DESK_API (Code.gs) = ' + DESK_API);
+  lines.push('DESK_PAGE_FOLDER_ID = ' + (props.getProperty('DESK_PAGE_FOLDER_ID') || '(not set)') + ' | DESK_PAGE_FILE_ID = ' + (props.getProperty('DESK_PAGE_FILE_ID') || '(not set)'));
+  if (!props.getProperty('DESK_PAGE_FOLDER_ID') && !props.getProperty('DESK_PAGE_FILE_ID')) lines.push('Page source: the Index HTML files (run indexDiag for detail). Set DESK_PAGE_FOLDER_ID to serve from Drive.');
+  else {
+    var found = pageFind_(props);
+    if (found.error) lines.push('ERROR: ' + found.error.file + ' ' + found.error.problem);
+    else {
+      lines.push('Folder: ' + (props.getProperty('DESK_PAGE_FILE_ID') ? '(pinned file)' : 'ok') + ' | chosen file: ' + found.name + ' | id ' + found.file.getId() + ' | updated ' + found.file.getLastUpdated());
+      try {
+        var raw = found.file.getBlob().getDataAsString('UTF-8'), h = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->/.exec(raw.replace(/^\uFEFF/, '')), r = pageCheck_(found.name, raw);
+        lines.push('Raw length ' + raw.length + (h ? ' | build ' + h[1] + ' | api ' + h[2] + ' | header chars ' + h[3] + ' | header sum ' + h[4] : ' | no header found'));
+        lines.push('Check: ' + (r.error ? 'FAILED: ' + r.error.problem : 'passed'));
+      } catch (err) { lines.push('Read failed: ' + String(err && err.message || err)); }
+    }
+  }
+  lines.forEach(function (l) { Logger.log(l); });
+  return lines.join('\n');
 }
 
 /* ---------- envelope: every client call returns {ok:true,...} or {ok:false,code,message} ---------- */

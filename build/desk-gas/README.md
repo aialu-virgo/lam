@@ -3,6 +3,20 @@
 Files: `Desk-Code.gs.txt` (server), `appsscript.json.txt` (settings) and the page, which is cut into numbered parts `Desk-Index.txt`, `Desk-Index2.txt`, `Desk-Index3.txt` ... (the Apps Script editor cuts a single file off at about 1 MB when saving, so no part is over 700 KB).
 The server joins the parts in order. Only the page parts change between Desk versions (Code.gs changes too whenever the number of parts or a checksum changes, so paste it every time).
 
+### How the page is served: from Google Drive (preferred)
+The page is not pasted into the editor at all. The Delivery Lead uploads each release to a Drive folder named **Virgo Desk page (do not edit)** as `desk-page-<build>.html` (plain text, no conversion; old files stay). `Code.gs` reads the newest one with DriveApp, checks its header (length, checksum, server version) and serves it. A file that fails a check is never served; the Web app shows an error page that names the file and the reason.
+
+**One-time setup (Vijay, as data@virgoasia.com)**
+1. Paste the new `Desk-Code.gs.txt` into `Code.gs` and `appsscript.json.txt` into `appsscript.json` (it adds the Drive read-only permission).
+2. Run **setup** (or **pageDiag**) from the toolbar and accept the new permission "See and download all your Google Drive files".
+3. Project Settings > Script properties > add `DESK_PAGE_FOLDER_ID` = the folder id the Delivery Lead gives you (the part of the folder link after `/folders/`).
+4. Run **pageDiag**, open Execution log: it must say `Check: passed`. Then Deploy > Manage deployments > New version.
+
+**Every later release:** the Delivery Lead uploads the new `desk-page-<build>.html` to the folder. Within 10 minutes (the page is cached that long) everyone gets it. Vijay does nothing, unless `Code.gs` changed (then paste it and make a New version; the error page says so when the page needs a newer `Code.gs`).
+**Rollback:** set Script property `DESK_PAGE_FILE_ID` to the id of an older `desk-page-*.html` (it pins that exact file); delete the property to go back to "newest". **Check anything:** run **pageDiag** (folder, chosen file, build, length, check result, server version).
+The Index files below are the fallback: they are used only while `DESK_PAGE_FOLDER_ID` and `DESK_PAGE_FILE_ID` are both unset.
+
+## Fallback: the page as Index files in the editor
 ### The page files (this build)
 Create one **HTML** file in the editor for each row, named exactly as shown (no `.html`), select all, paste the matching `.txt`, **Save**. Then check each file: click in it, press Ctrl+End, and the last line with text (ignore an empty line at the very end) must be the text in the last column. If it is not, the save cut it off: select all, delete, paste again.
 <!--@@PARTS_TABLE@@-->

@@ -17,6 +17,7 @@ if ((head + page).split('/*@@GAS_BOOT@@*/').length !== 2) throw new Error('boot 
 const outDir = path.join(here, 'out');
 fs.mkdirSync(outDir, { recursive: true });
 // ---- split the page into numbered part files, each <= MAX_PART_BYTES UTF-8 bytes (Apps Script editor save limit, see README) ----
+import { execSync } from 'child_process';
 import { MAX_PART_BYTES, indexSum, splitAtBoundaries, addSentinels } from './split-lib.mjs';
 const full = head + page + '\n</html>\n';
 const buildId = indexSum(full);
@@ -36,5 +37,14 @@ fs.writeFileSync(path.join(outDir, 'appsscript.json.txt'), fs.readFileSync(path.
 const table = ['| Create this HTML file in the editor | Paste this file | Size | Must end with (last line with text) |', '|---|---|---|---|']
   .concat(manifest.map(m => '| `' + m.name + '` | `' + m.file + '` | ' + Math.round(m.bytes / 1024) + ' KB | `' + m.tail.replace(/`/g, "'") + '` |')).join('\n');
 fs.writeFileSync(path.join(outDir, 'README.md'), fs.readFileSync(path.join(here, 'README.md'), 'utf8').replace('<!--@@PARTS_TABLE@@-->', table));
+// ---- the Drive page file: desk-page-<build>.html = header line + the exact page (no sentinels), checked by Code.gs pageCheck_ ----
+const apiMatch = /var DESK_API = (\d+);/.exec(code); if (!apiMatch) throw new Error('Code.gs has no DESK_API');
+let gitHash = 'nogit'; try { gitHash = execSync('git rev-parse --short HEAD', { cwd: here, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (e) {}
+const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 12); // yyyymmddhhmm UTC: first, so names sort oldest to newest
+const pageBuild = process.env.PAGE_BUILD || stamp + '-' + gitHash;
+for (const f of fs.readdirSync(outDir)) if (/^desk-page-.*\.html$/.test(f)) fs.unlinkSync(path.join(outDir, f));
+const pageFile = 'desk-page-' + pageBuild + '.html';
+fs.writeFileSync(path.join(outDir, pageFile), '<!--DESK-PAGE build=' + pageBuild + ' api=' + apiMatch[1] + ' chars=' + full.length + ' sum=' + indexSum(full) + '-->\n' + full);
+console.log('Drive page file:', pageFile);
 for (const f of fs.readdirSync(outDir).sort()) console.log(f, fs.statSync(path.join(outDir, f)).size, 'bytes');
 console.log('page parts:', manifest.length, 'max', Math.max(...manifest.map(m => m.bytes)), 'bytes');
