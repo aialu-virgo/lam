@@ -18,13 +18,13 @@ const outDir = path.join(here, 'out');
 fs.mkdirSync(outDir, { recursive: true });
 // ---- split the page into numbered part files, each <= MAX_PART_BYTES UTF-8 bytes (Apps Script editor save limit, see README) ----
 import { execSync } from 'child_process';
-import { MAX_PART_BYTES, indexSum, splitAtBoundaries } from './split-lib.mjs';
+import { MAX_PART_BYTES, indexSum, splitAtBoundaries, normText } from './split-lib.mjs';
 const full = head + page + '\n</html>\n';
 const partTexts = splitAtBoundaries(full, MAX_PART_BYTES);
 const partName = i => i === 0 ? 'Index' : 'Index' + (i + 1);
 const fileName = i => 'Desk-' + partName(i) + '.txt';
 for (const f of fs.readdirSync(outDir)) if (/^Desk-Index\d*\.txt$/.test(f)) fs.unlinkSync(path.join(outDir, f)); // no stale parts from an earlier build
-const manifest = partTexts.map((t, i) => ({ name: partName(i), file: fileName(i), bytes: Buffer.byteLength(t, 'utf8'), chars: t.length, sum: indexSum(t), tail: t.replace(/\s+$/, '').split('\n').pop().slice(-70) }));
+const manifest = partTexts.map((t, i) => ({ name: partName(i), file: fileName(i), bytes: Buffer.byteLength(t, 'utf8'), chars: normText(t).length, sum: indexSum(normText(t)), tail: t.replace(/\s+$/, '').split('\n').pop().slice(-70) }));
 if (manifest.some(m => m.bytes > MAX_PART_BYTES)) throw new Error('a part is over ' + MAX_PART_BYTES + ' bytes');
 partTexts.forEach((t, i) => fs.writeFileSync(path.join(outDir, fileName(i)), t));
 let code = fs.readFileSync(path.join(here, 'src/Code.gs.js'), 'utf8');
@@ -44,7 +44,7 @@ const pageBuild = process.env.PAGE_BUILD || stamp + '-' + gitHash;
 if (!/^\d{12}-[0-9a-z]+$/.test(pageBuild)) throw new Error('PAGE_BUILD must be yyyymmddhhmm-<hash> (fixed-width UTC time first), got ' + pageBuild);
 for (const f of fs.readdirSync(outDir)) if (/^desk-page-.*\.html$/.test(f)) fs.unlinkSync(path.join(outDir, f));
 const pageFile = 'desk-page-' + pageBuild + '.html';
-fs.writeFileSync(path.join(outDir, pageFile), '<!--DESK-PAGE build=' + pageBuild + ' api=' + apiMatch[1] + ' chars=' + full.length + ' sum=' + indexSum(full) + '-->\n' + full);
+fs.writeFileSync(path.join(outDir, pageFile), '<!--DESK-PAGE build=' + pageBuild + ' api=' + apiMatch[1] + ' chars=' + normText(full).length + ' sum=' + indexSum(normText(full)) + '-->\n' + full);
 console.log('Drive page file:', pageFile);
 for (const f of fs.readdirSync(outDir).sort()) console.log(f, fs.statSync(path.join(outDir, f)).size, 'bytes');
 console.log('page parts:', manifest.length, 'max', Math.max(...manifest.map(m => m.bytes)), 'bytes');

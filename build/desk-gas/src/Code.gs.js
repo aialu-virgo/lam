@@ -58,6 +58,8 @@ function doGet(e) {
  * null (unbuilt source, or set by hand as a stopgap) = join until the first missing file, unchecked. */
 var INDEX_MANIFEST = /*@@INDEX_MANIFEST@@*/null;
 function indexPartName_(i) { return i === 0 ? 'Index' : 'Index' + (i + 1); }
+/* The text that is measured: CRLF as LF, no trailing whitespace (the editor changes the very end of a file by a newline). The page itself is served as read. */
+function indexNorm_(s) { return String(s).replace(/\r\n/g, '\n').replace(/\s+$/, ''); }
 function indexRaw_(name) { return HtmlService.createTemplateFromFile(name).getRawContent(); }
 function loadIndex_() {
   var out = [], i, text;
@@ -69,8 +71,9 @@ function loadIndex_() {
     var m = INDEX_MANIFEST[i];
     try { text = indexRaw_(m.name); }
     catch (err) { return { error: { file: m.name, problem: 'is missing (the Desk has ' + INDEX_MANIFEST.length + ' page files, Index to ' + indexPartName_(INDEX_MANIFEST.length - 1) + ')' } }; }
-    if (text.length !== m.chars) return { error: { file: m.name, problem: 'is incomplete or out of date: it has ' + text.length + ' characters, it must have ' + m.chars + (text.length < m.chars ? ' (it was cut short when saved, or an older version is still there)' : ' (it is from another Desk version, or has extra text)') } };
-    var sum = indexSum_(text);
+    var nt = indexNorm_(text);
+    if (nt.length !== m.chars) return { error: { file: m.name, problem: 'is incomplete or out of date: it has ' + nt.length + ' characters, it must have ' + m.chars + (nt.length < m.chars ? ' (it was cut short when saved, or an older version is still there)' : ' (it is from another Desk version, or has extra text)') } };
+    var sum = indexSum_(nt);
     if (sum !== m.sum) return { error: { file: m.name, problem: 'has the right length but different content (checksum ' + sum + ', expected ' + m.sum + '): it is from another Desk version or was edited' } };
     out.push(text);
   }
@@ -106,11 +109,11 @@ function pageErr_(file, problem, fix) { return { error: { file: file, problem: p
 /* checks the raw text of a page file; returns {html, build, sum} or {error} */
 function pageCheck_(name, raw) {
   var nl = raw.indexOf('\n'), head = nl < 0 ? raw : raw.slice(0, nl);
-  var m = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->$/.exec(head.replace(/^﻿/, ''));
+  var m = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->$/.exec(head.replace(/^\uFEFF/, '').replace(/\r$/, ''));
   if (!m) return pageErr_(name, 'has no valid DESK-PAGE header on line 1 (it is not a Desk page file, or it was converted or edited)');
-  var body = raw.slice(nl + 1);
-  if (body.length !== +m[3]) return pageErr_(name, 'is incomplete or was changed: it has ' + body.length + ' characters after the header, it must have ' + m[3] + (body.length < +m[3] ? ' (the upload was cut short)' : ' (extra text)'));
-  var sum = indexSum_(body);
+  var body = raw.slice(nl + 1), nb = indexNorm_(body);
+  if (nb.length !== +m[3]) return pageErr_(name, 'is incomplete or was changed: it has ' + nb.length + ' characters after the header, it must have ' + m[3] + (nb.length < +m[3] ? ' (the upload was cut short)' : ' (extra text)'));
+  var sum = indexSum_(nb);
   if (sum !== m[4]) return pageErr_(name, 'has the right length but its content does not match the build (checksum ' + sum + ', expected ' + m[4] + '): it was edited or converted');
   if (+m[2] !== DESK_API) return pageErr_(name, 'is for server version api=' + m[2] + ' but Code.gs is api=' + DESK_API, 'Admin: paste the newer Desk-Code.gs.txt into Code.gs and make a New version (Deploy &gt; Manage deployments &gt; New version). To go back to an older page instead, ask the Delivery Lead to set DESK_PAGE_FILE_ID.');
   if (!/<\/html>\s*$/.test(body)) return pageErr_(name, 'does not end with </html>');
@@ -148,7 +151,7 @@ function pageCacheGet_(cache, key) {
     var p = meta.split(':'), n = +p[0], out = [];
     for (var i = 0; i < n; i++) { var c = cache.get(key + ':' + i); if (c === null || c === undefined) return null; out.push(c); }
     var html = out.join('');
-    return (html.length === +p[1] && indexSum_(html) === p[2]) ? html : null;
+    return (html.length === +p[1] && indexSum_(indexNorm_(html)) === p[2]) ? html : null;
   } catch (err) { return null; }
 }
 function loadPageDrive_(props) {
@@ -183,7 +186,7 @@ function pageDiag() {
     else {
       lines.push('Folder: ' + (props.getProperty('DESK_PAGE_FILE_ID') ? '(pinned file)' : 'ok') + ' | chosen file: ' + found.name + ' | id ' + found.file.getId() + ' | updated ' + found.file.getLastUpdated());
       try {
-        var raw = found.file.getBlob().getDataAsString('UTF-8'), h = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->/.exec(raw.replace(/^﻿/, '')), r = pageCheck_(found.name, raw);
+        var raw = found.file.getBlob().getDataAsString('UTF-8'), h = /^<!--DESK-PAGE build=(\S+) api=(\d+) chars=(\d+) sum=([0-9a-f]{8})-->/.exec(raw.replace(/^\uFEFF/, '')), r = pageCheck_(found.name, raw);
         lines.push('Raw length ' + raw.length + (h ? ' | build ' + h[1] + ' | api ' + h[2] + ' | header chars ' + h[3] + ' | header sum ' + h[4] : ' | no header found'));
         lines.push('Check: ' + (r.error ? 'FAILED: ' + r.error.problem : 'passed'));
       } catch (err) { lines.push('Read failed: ' + String(err && err.message || err)); }
