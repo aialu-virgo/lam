@@ -5,7 +5,7 @@
  * All parts of a document are appended together, so they sit in adjacent rows. An update appends the new parts under a new token and only then deletes the old rows,
  * so the old complete version stays readable until the new one is complete. A reader takes the newest token whose parts are all present.
  * Revisions: Script Property DESK_REVS = {"revs":{collection:n},"wts":ms}. n is odd while a write to that collection is in progress and even otherwise; every write adds 2.
- * LOCKS: the script lock is taken in exactly two places and never while it is already held: database creation (ssId_, its own short lock) and the write section of
+ * LOCKS: the script lock is taken in exactly three places (the third is deskLease, below) and never while it is already held: database creation (ssId_, its own short lock) and the write section of
  * deskWrite / deskWipe. The SAP feed (sap.gs.js, joined to this file by build-gas.mjs) takes it only for its run flag and for its staging write section, the same way. The database is created BEFORE any write lock is taken (setup(), doGet, or the first step of deskWrite).
  * A read is accepted only when the revision was even and unchanged from before to after the read (sequence lock), so a page never mixes two versions. */
 var SEED_SUPER = ['data@virgoasia.com', 'spa@virgoasia.com', 'ai.acp@virgoasia.com'];
@@ -558,6 +558,32 @@ function deskWipe(cols) {
       try { hit.forEach(function (c) { beat_(); var sh = colSheet_(ss, c, false), last = sh.getLastRow(); n += last - 1; sh.deleteRows(2, last - 1); }); }
       finally { endWrite_(hit); }
       return { ok: true, removedRows: n };
+    } finally { lock.releaseLock(); }
+  });
+}
+/* ---------- document leases (admin job queue): the page's ref.acquire({holder, ttlMs}) ----------
+ * One lease per document path "collection/id", kept in Script Property DESK_LEASES = {path: {h: holder, u: until ms}} (expired ones are dropped on every call).
+ * Granted when free, expired, or already held by the same holder (then renewed); refused (acquired:false, with expiresAt) while another holder has it. ttl is clamped to 1 s .. 10 min, default 30 s.
+ * Super admin only, admin collections only. The script lock is held only for the read-decide-write of this one property, never while another lock is held. */
+function deskLease(col, id, holder, ttlMs) {
+  return wrap_(function () {
+    var who = requireUser_();
+    if (!isAdmin_(who)) fail_('permission_denied', 'Super admin only.');
+    if (!knownCol_(col) || ADMIN_COLLECTIONS.indexOf(col) < 0) fail_('invalid_argument', 'Leases exist for admin collections only.');
+    id = String(id || ''); holder = String(holder || '');
+    if (!id || id.length > 200 || id.indexOf('/') >= 0 || !holder || holder.length > 200) fail_('invalid_argument', 'Bad lease request.');
+    var ttl = Math.min(600000, Math.max(1000, Number(ttlMs) || 30000)), path = col + '/' + id;
+    var lock = LockService.getScriptLock(); lock.waitLock(10000);
+    try {
+      var props = PropertiesService.getScriptProperties(), now = Date.now(), m = {}, live = {}, n = 0;
+      try { m = JSON.parse(props.getProperty('DESK_LEASES') || '{}') || {}; } catch (e) { m = {}; }
+      Object.keys(m).forEach(function (k) { if (m[k] && m[k].u > now) { live[k] = m[k]; n++; } });
+      var cur = live[path];
+      if (cur && cur.h !== holder) return { ok: true, acquired: false, holder: cur.h, expiresAt: new Date(cur.u).toISOString() };
+      if (!cur && n >= 40) fail_('quota_exceeded', 'Too many live leases.');
+      live[path] = { h: holder, u: now + ttl };
+      props.setProperty('DESK_LEASES', JSON.stringify(live));
+      return { ok: true, acquired: true, version: 1, holder: holder, expiresAt: new Date(now + ttl).toISOString() };
     } finally { lock.releaseLock(); }
   });
 }

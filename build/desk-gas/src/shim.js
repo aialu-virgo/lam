@@ -150,7 +150,9 @@
       get: async function () { var j = await getDoc(path); var o = j == null ? undefined : JSON.parse(j); return { id: id, exists: j != null, data: function () { return o; } }; },
       set: function (d) { var j = JSON.stringify(d); if (j.length > 262144) return Promise.reject({ code: 'invalid_argument', message: 'Document too large' }); return write({ op: 'set', col: col, id: id, json: j }); },
       update: function (d) { return write({ op: 'merge', col: col, id: id, json: JSON.stringify(d) }); }, /* merged on the server under the write lock */
-      delete: function () { return write({ op: 'delete', col: col, id: id }); }
+      delete: function () { return write({ op: 'delete', col: col, id: id }); },
+      /* single-writer lease (admin job queue): {acquired, holder, expiresAt}; granted when free, expired or already ours, refused while another holder has it (server: deskLease) */
+      acquire: async function (o) { o = o || {}; var r = await call('deskLease', [col, id, o.holder, o.ttlMs]); return { acquired: !!r.acquired, version: r.version, holder: r.holder, expiresAt: r.expiresAt }; }
     };
   }
   var db = {
