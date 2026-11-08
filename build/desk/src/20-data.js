@@ -181,18 +181,23 @@ function filtPlants(sc,fp){/* Set of plants for the current filter */
 
 /* ---- completeness (coverage grid decides whether QoQ may be trusted) ---- */
 /* perf: the reference plant count is memoised; it is recomputed when the cells object is replaced (a snapshot), or after an in-place edit (cellRefTouch) */
-var CR={c:null,t:-1,d:0,k:-1,v:0};
+var CR={c:null,t:-1,d:0,k:-1,v:0},CRP=new WeakMap();
 function cellRefTouch(){CR.d++}
+/* number of plants in a cell, memoised per plants object (snapshot data is frozen; an in-place edit calls cellRefTouch) */
+function plantCount(c){
+  var po=c.plants;if(!po)return 0;
+  var h=CRP.get(po);if(h&&h.t===S.cellsSigTick&&h.d===CR.d)return h.n;
+  var n=0;for(var p in po)n++;CRP.set(po,{n:n,t:S.cellsSigTick,d:CR.d});return n}
 function cellRef(){
   if(CR.c===S.cells&&CR.t===S.cellsSigTick&&CR.k===CR.d)return CR.v;
-  var r=0;for(var k in S.cells){var c=S.cells[k];if(c.entity==='INV'){var n=0;for(var p in (c.plants||{}))n++;if(n>r)r=n}}
+  var r=0;for(var k in S.cells){var c=S.cells[k];if(c.entity==='INV'){var n=plantCount(c);if(n>r)r=n}}
   CR.c=S.cells;CR.t=S.cellsSigTick;CR.k=CR.d;CR.v=r;return r}
 function monthLoaded(ym,plants){
   if(ym<histLoYm())return false;/* D28: before history start nothing counts as loaded */
   var c=S.cells['INV_'+ym];if(!c)return false;
-  var have=Object.keys(c.plants||{});
-  if(plants&&plants.size){var n=0;plants.forEach(function(p){if(c.plants[p])n++});return n===plants.size}
-  var ref=cellRef();return ref>0&&have.length>=Math.ceil(ref*0.9);
+  if(plants&&plants.size){var n=0;plants.forEach(function(p){if(c.plants&&c.plants[p])n++});return n===plants.size}
+  var have=plantCount(c);
+  var ref=cellRef();return ref>0&&have>=Math.ceil(ref*0.9);
 }
 function monthsLoaded(ms,plants){return ms.length>0&&ms.every(function(m){return monthLoaded(m,plants)})}
 function anyMonthData(ms,plants){return ms.some(function(m){if(m<histLoYm())return false;var c=S.cells['INV_'+m];if(!c)return false;if(plants&&plants.size){var h=false;plants.forEach(function(p){if(c.plants[p])h=true});return h}return Object.keys(c.plants||{}).length>0})}

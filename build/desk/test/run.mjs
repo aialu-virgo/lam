@@ -6,7 +6,7 @@ const require = createRequire('/opt/node22/lib/node_modules/');
 export const { chromium } = require('playwright');
 export const here = path.dirname(fileURLToPath(import.meta.url));
 export const dist = process.env.DIST || path.join(here, '../dist/index.html');
-export async function open(browser, { viewer, store, size = { width: 1440, height: 900 }, scheme = 'light', today, mode, autoload, init } = {}) {
+export async function open(browser, { viewer, store, size = { width: 1440, height: 900 }, scheme = 'light', today, mode, autoload, init, distFile } = {}) {
   const ctx = await browser.newContext({ viewport: size, colorScheme: scheme });
   await ctx.route(/fonts\.googleapis|fonts\.gstatic/, r => r.abort());
   await ctx.route(/cdnjs.*xlsx/, r => r.fulfill({ path: process.env.XLSX_JS || '/tmp/claude-0/-home-user-lam/d7306c55-60da-5c6b-9450-11043959e763/scratchpad/xlsx.full.min.js', contentType: 'application/javascript' }));
@@ -18,6 +18,6 @@ export async function open(browser, { viewer, store, size = { width: 1440, heigh
   await page.addInitScript({ content: `window.__NOAUTOLOAD=${autoload?'false':'true'};window.__MODE=${JSON.stringify(mode || {})};window.__INIT_STORE=${JSON.stringify(store || {})};window.__VIEWER=${JSON.stringify(viewer || { email: 'data@virgoasia.com', name: 'Vijay' })};${today ? `try{localStorage.setItem('desk-today','${today}')}catch(e){}` : ''}` });
   await page.addInitScript({ path: path.join(here, 'mock-claude.js') });
   if (init) await page.addInitScript(init);
-  await page.goto('file://' + dist);
+  await page.goto('file://' + (distFile || dist));
   return { ctx, page, errs };
 }
