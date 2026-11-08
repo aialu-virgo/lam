@@ -7,8 +7,8 @@ function acNum(s,re){var m=re.exec(s||'');return m?[+m[1],+m[2]]:null}
 function acCollect(){
   var tasks=[],errs=[];
   try{
-    var names=Object.keys(ACT.subs).filter(function(n){return !(n==='jobs'&&typeof window.__gasCall==='function')}),ld=names.filter(function(n){return S.loaded[n]}).length;
-    Object.keys(S.errs||{}).forEach(function(k){if(k==='jobs'&&typeof window.__gasCall==='function')return;/* the admin job queue exists on claude.ai only; Apps Script has no such collection (known, shown in the message area, not worth a red chip) */errs.push({key:'sub:'+k,msg:'Could not read '+k+' ('+S.errs[k]+')'})});
+    var names=Object.keys(ACT.subs),ld=names.filter(function(n){return S.loaded[n]}).length;
+    Object.keys(S.errs||{}).forEach(function(k){errs.push({key:'sub:'+k,msg:'Could not read '+k+' ('+S.errs[k]+')'})});
     if(DS.spErr)errs.push({key:'sp',msg:'Salesperson history failed: '+DS.spErr});
     if(ACT.err&&Date.now()-ACT.err.at<30000&&ACT.err.at!==ACT.errSeen)errs.push({key:'db'+ACT.err.at,msg:(ACT.err.kind==='w'?'A save failed: ':'A read failed: ')+ACT.err.msg});
     if(S.fb&&S.fb.stage==='error')errs.push({key:'fb',msg:'Backup failed: '+S.fb.msg});
@@ -36,7 +36,7 @@ function acCollect(){
     if(DS.custJobs>0)tasks.push({label:'Reading customer detail '+DS.custDone+' of '+DS.custJobs,done:DS.custDone,total:DS.custJobs,order:7});
     if(S.jobBusy)tasks.push({label:'Running admin jobs',order:8});
     if(S.dbState==='init')tasks.push({label:'Opening the Desk',order:9});
-    else if(names.length&&ld<names.length&&!Object.keys(S.errs||{}).filter(function(k){return !(k==='jobs'&&typeof window.__gasCall==='function')}).length)tasks.push({label:'Loading data '+ld+' of '+names.length,done:ld,total:names.length,order:9});
+    else if(names.length&&ld<names.length&&!Object.keys(S.errs||{}).length)tasks.push({label:'Loading data '+ld+' of '+names.length,done:ld,total:names.length,order:9});
     if(ACT.w>0)tasks.push({label:'Saving '+ACT.w+' change'+(ACT.w>1?'s':''),order:3.5});
     else if(ACT.r>0&&!tasks.length)tasks.push({label:'Loading data',order:11});
     if((window.__gasInflight||0)>0&&!tasks.length)tasks.push({label:'Waiting for the server ('+window.__gasInflight+')',order:12});
