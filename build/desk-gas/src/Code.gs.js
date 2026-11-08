@@ -51,26 +51,55 @@ function doGet(e) {
 }
 
 /* ---------- page parts: HTML files Index, Index2, Index3 ... (each saved under the editor's size limit), joined in order ----------
- * INDEX_MANIFEST is written by build-gas.mjs: [{name, chars, sum}] per part. null (unbuilt source) = join until the first missing file, unchecked. */
+ * HtmlService.getContent() does NOT return exactly what was pasted (it drops text such as block comments), so a part is never checked by length or checksum.
+ * build-gas.mjs ends every part with a sentinel that survives that processing: the string statement '@@PART k of N #id@@'; (last part: <meta name="desk-part" content="@@PART N of N #id@@"> before </html>).
+ * INDEX_MANIFEST = {parts: N, id: build id}, written by the build. null (unbuilt source, or set by hand as a stopgap) = join until the first missing file, unchecked. */
 var INDEX_MANIFEST = /*@@INDEX_MANIFEST@@*/null;
-function indexSum_(str) { var h = 0x811c9dc5; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16); }
-function indexPad_(s) { return ('00000000' + s).slice(-8); }
 function indexPartName_(i) { return i === 0 ? 'Index' : 'Index' + (i + 1); }
+function indexSentinel_(i) { return '@@PART ' + (i + 1) + ' of ' + INDEX_MANIFEST.parts + ' #' + INDEX_MANIFEST.id + '@@'; }
+/* '' when the part's sentinel is present, last, and near the end; otherwise what is wrong */
+function indexPartProblem_(text, i) {
+  var s = indexSentinel_(i), at = text.indexOf(s), last = text.lastIndexOf('@@PART ');
+  if (at < 0) {
+    if (last >= 0) return 'is from another Desk version or the wrong file: it ends with "' + text.substr(last, 45).replace(/[^\x20-\x7e]/g, '') + '", it must have "' + s + '"';
+    return 'is incomplete (it was cut short when saved) or empty: its end marker "' + s + '" is not there (it has ' + text.length + ' characters)';
+  }
+  if (last !== at || text.length - at > 400) return 'has text after its end marker "' + s + '": it holds more than one version pasted together';
+  return '';
+}
 function loadIndex_() {
   var out = [], i, text;
   if (!INDEX_MANIFEST) {
     for (i = 0; i < 50; i++) { try { text = HtmlService.createHtmlOutputFromFile(indexPartName_(i)).getContent(); } catch (err) { if (i === 0) return { error: { file: 'Index', problem: 'is missing' } }; break; } out.push(text); }
     return { html: out.join('') };
   }
-  for (i = 0; i < INDEX_MANIFEST.length; i++) {
-    var m = INDEX_MANIFEST[i];
-    try { text = HtmlService.createHtmlOutputFromFile(m.name).getContent(); }
-    catch (err) { return { error: { file: m.name, problem: 'is missing (the Desk has ' + INDEX_MANIFEST.length + ' page files, Index to ' + indexPartName_(INDEX_MANIFEST.length - 1) + ')' } }; }
-    if (text.length !== m.chars) return { error: { file: m.name, problem: 'is incomplete or out of date: it has ' + text.length + ' characters, it must have ' + m.chars + (text.length < m.chars ? ' (it was cut short when saved, or an older version is still there)' : ' (it is from another Desk version, or has extra text)') } };
-    if (indexPad_(indexSum_(text)) !== m.sum) return { error: { file: m.name, problem: 'has the right length but different content (checksum ' + indexPad_(indexSum_(text)) + ', expected ' + m.sum + '): it is from another Desk version or was edited' } };
+  for (i = 0; i < INDEX_MANIFEST.parts; i++) {
+    var name = indexPartName_(i);
+    try { text = HtmlService.createHtmlOutputFromFile(name).getContent(); }
+    catch (err) { return { error: { file: name, problem: 'is missing (the Desk has ' + INDEX_MANIFEST.parts + ' page files, Index to ' + indexPartName_(INDEX_MANIFEST.parts - 1) + ')' } }; }
+    var bad = indexPartProblem_(text, i);
+    if (bad) return { error: { file: name, problem: bad } };
     out.push(text);
   }
-  return { html: out.join('') };
+  var html = out.join('');
+  if (!/<\/html>\s*$/.test(html)) return { error: { file: indexPartName_(INDEX_MANIFEST.parts - 1), problem: 'does not end with </html>: the page is incomplete' } };
+  return { html: html };
+}
+/* Run from the editor (select indexDiag, Run, then View > Logs): what HtmlService really returns for each page file. */
+function indexDiag() {
+  var n = INDEX_MANIFEST ? INDEX_MANIFEST.parts : 12, lines = [];
+  lines.push('INDEX_MANIFEST = ' + JSON.stringify(INDEX_MANIFEST));
+  for (var i = 0; i < n; i++) {
+    var name = indexPartName_(i), text;
+    try { text = HtmlService.createHtmlOutputFromFile(name).getContent(); }
+    catch (err) { lines.push(name + ': MISSING (' + String(err && err.message || err) + ')'); if (!INDEX_MANIFEST) break; continue; }
+    var s = INDEX_MANIFEST ? indexSentinel_(i) : null, seen = text.match(/@@PART \d+ of \d+ #[0-9a-f]{8}@@/g);
+    lines.push(name + ': getContent length ' + text.length + ' | sentinel expected ' + s + ' | found ' + (s ? (text.indexOf(s) >= 0 ? 'yes at ' + text.indexOf(s) + ' (' + (text.length - text.indexOf(s)) + ' chars from the end)' : 'NO') : 'n/a') + ' | all sentinels in file ' + JSON.stringify(seen) + ' | contains boot marker ' + (text.indexOf('/*@@GAS_BOOT@@*/') >= 0) + ' | problem: ' + (INDEX_MANIFEST ? (indexPartProblem_(text, i) || 'none') : 'n/a'));
+    lines.push('  first 80: ' + JSON.stringify(text.slice(0, 80)));
+    lines.push('  last 80: ' + JSON.stringify(text.slice(-80)));
+  }
+  lines.forEach(function (l) { Logger.log(l); });
+  return lines.join('\n');
 }
 function indexErrorPage_(e) {
   var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };

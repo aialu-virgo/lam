@@ -6,6 +6,13 @@ import path from 'path';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 const here = path.dirname(fileURLToPath(import.meta.url));
+/* What the real HtmlService hands back is NOT what was pasted (tenant, 8 Nov 2026: Index came back 31,837 characters shorter; block comments are the suspected cause, unproven).
+ * Default mimic: block comments are removed (except the /*@@ ... marker comments, which the real tenant kept: version 11 booted) and trailing whitespace is trimmed.
+ * mode 'none' = hand back the text unchanged. */
+export function htmlProcess(t, mode = 'strip-comments') {
+  if (mode === 'none') return t;
+  return t.replace(/\/\*(?!@@)[\s\S]*?\*\//g, '').replace(/\s+$/, '');
+}
 export function makeEnv(opts = {}) {
   const CELL_LIMIT = 50000, state = { email: opts.email || 'data@virgoasia.com', locks: 0, calls: 0, lockFail: false, failAfterSetValues: null, held: 0, skew: 0, deleteCost: 0, onDelete: null, triggers: [] };
   const stats = { gv: [], sv: 0, byFn: {} };
@@ -62,8 +69,10 @@ export function makeEnv(opts = {}) {
     HtmlService: {
       XFrameOptionsMode: { DEFAULT: 'DEFAULT' },
       createHtmlOutputFromFile(name) { return { getContent() { // opts.htmlFiles = { Index: text, Index2: text ... } overrides the built parts; a missing name throws like Apps Script
-        if (opts.htmlFiles) { if (!(name in opts.htmlFiles)) throw new Error('Unknown file: ' + name); return opts.htmlFiles[name]; }
-        const f = path.join(here, '../out/Desk-' + name + '.txt'); if (!fs.existsSync(f)) throw new Error('Unknown file: ' + name); return fs.readFileSync(f, 'utf8'); } }; },
+        let t;
+        if (opts.htmlFiles) { if (!(name in opts.htmlFiles)) throw new Error('Unknown file: ' + name); t = opts.htmlFiles[name]; }
+        else { const f = path.join(here, '../out/Desk-' + name + '.txt'); if (!fs.existsSync(f)) throw new Error('Unknown file: ' + name); t = fs.readFileSync(f, 'utf8'); }
+        return htmlProcess(t, opts.htmlProcess); } }; },
       createHtmlOutput(h) { const o = { html: h, title: null, meta: [], setTitle(t) { o.title = t; return o; }, addMetaTag(a, b) { o.meta.push([a, b]); return o; }, setXFrameOptionsMode() { return o; } }; return o; },
     },
   };

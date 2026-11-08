@@ -7,6 +7,9 @@ The server joins the parts in order. Only the page parts change between Desk ver
 Create one **HTML** file in the editor for each row, named exactly as shown (no `.html`), select all, paste the matching `.txt`, **Save**. Then check each file: click in it, press Ctrl+End, and the last line with text (ignore an empty line at the very end) must be the text in the last column. If it is not, the save cut it off: select all, delete, paste again.
 <!--@@PARTS_TABLE@@-->
 If a part is missing, cut short or from another version, the Web app shows "The Desk page is not fully installed" and names the file, instead of a blank page.
+**If the page still fails:** in the editor pick the function **indexDiag**, press **Run**, then **Execution log** (or View > Logs) and send the lines to the Delivery Lead. They show, per file, what the server received (length, first and last 80 characters, whether the marker was found).
+Stopgap while a check is being fixed: in `Code.gs` set `var INDEX_MANIFEST = null;` (the page then loads without checks), and make a New version.
+Split size: `MAX_PART_BYTES=500000 node build-gas.mjs` builds smaller parts (default 700000).
 
 ## First time (as data@virgoasia.com)
 1. Go to script.google.com, **New project**. Name it "Virgo Desk".
