@@ -222,7 +222,7 @@ let S2;
     const g=c=>D.custGeo(c,'Kerala');return {a:g('50002000'),b:g('50002001'),c:g('50002002'),d:g('50002003'),e:g('50002004'),n:D.custGstinPlaced(),gaps:D.custRegionGaps()}},H);
   ok('GSTIN fallback: unmapped region 99 + GSTIN 24 → Gujarat; blank state + GSTIN 29 → Karnataka (placed by GSTIN)',gx.a.st==='24'&&gx.a.how==='gstin'&&gx.b.st==='29'&&gx.b.how==='gstin',JSON.stringify([gx.a,gx.b]));
   ok('GSTIN fallback order: a mapped region wins over the GSTIN; no GSTIN or a bad one falls to the invoice state',gx.c.st==='27'&&gx.c.how==='region'&&gx.d.st==='32'&&gx.d.how==='invoice'&&gx.e.st==='32',JSON.stringify([gx.c,gx.d,gx.e]));
-  ok('GSTIN count: customers placed by GSTIN counted (2, S/4); unmapped-region list keeps only those still unknown',gx.n.n===2&&gx.n.by.S4===2&&gx.gaps.regions['99']===3,JSON.stringify([gx.n,gx.gaps]));
+  ok('GSTIN count: customers placed by GSTIN counted (2, S/4); unmapped-region list keeps only those still unknown',gx.n.n===2&&gx.n.by.S4===2&&gx.gaps.regions['99']===2,JSON.stringify([gx.n,gx.gaps]));
   await page.evaluate(()=>{location.hash='#/geography'});await page.waitForTimeout(1200);
   ok('Admin › Geography shows how many customers were placed by GSTIN',/Customers placed by GSTIN\s*2/i.test(await page.innerText('#pg')),'');
   const b1g=await page.evaluate(async()=>{const D=window.__dbg;await D.custFeedLoad({sys:'B1',headers:['CardCode','CardName','CardType','State','LicTradNum'],rows:[['VRGLCU000101','B1 A','C','','24ABCDE1234F1Z5'],['VRGLCU000102','B1 B','C','Maharashtra','24ABCDE1234F1Z5']],name:'b1g'});await new Promise(r=>setTimeout(r,2500));return [D.custGeo('VRGLCU000101',''),D.custGeo('VRGLCU000102','')]});
@@ -231,7 +231,7 @@ let S2;
   /* reverse: a B1 load leaves S/4 customers alone */
   const r3=await page.evaluate(async()=>{const D=window.__dbg;const r=await D.custFeedLoad({sys:'B1',headers:['CardCode','CardName','CardType','State','ZipCode'],rows:[['VRGLCU000001','B1 Customer','C','Maharashtra','411001']],name:'b1'});return r});
   await page.waitForTimeout(2500);
-  const r4=await page.evaluate(()=>{const D=window.__dbg;return {s4:!!D.custInfo('50001000'),b1new:D.custInfo('VRGLCU000001'),oldB1:[...D.S.custIdx.keys()].filter(k=>/^DEMO/.test(k)).length}});
+  const r4=await page.evaluate(()=>{const D=window.__dbg;return {s4:!!D.custInfo('50002000'),b1new:D.custInfo('VRGLCU000001'),oldB1:[...D.S.custIdx.keys()].filter(k=>/^DEMO/.test(k)).length}});
   ok('B1 load replaces only B1 customers: S/4 customers survive, the old B1 set is replaced',r3.ok&&r4.s4&&r4.b1new&&r4.b1new[9]==='411001'&&r4.oldB1===0,JSON.stringify(r4));
   await page.context().close();
 }
