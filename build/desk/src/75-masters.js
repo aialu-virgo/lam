@@ -96,8 +96,8 @@ async function itemParse(){
     var hd=rows[0].map(function(x){return norm(x)}),ix=function(n){return hd.indexOf(norm(n))};
     var cCode=ix('Item No.'),cCat=ix('Item Category');
     if(cCode<0||cCat<0)throw new Error('Columns "Item No." and "Item Category" were not found in sheet "'+pick+'". Expected the item master (sheet FG).');
-    var cUom=ix('Inventory UoM'),cAct=ix('Active'),cThk=ix('Thickness'),cSize=ix('Size');
-    var res={sheet:pick,read:rows.length-1,loaded:0,rejected:0,warned:0,outOfScope:0,byGroup:{},rejects:[],warn:{noSize:0,notPcs:0,dupCode:0},items:[],cats:{},catUnknown:{}};
+    var cUom=ix('Inventory UoM'),cAct=ix('Active'),cThk=ix('Thickness'),cSize=ix('Size'),cBr=Math.max(ix('Brand'),ix('Brand Name'),ix('Item Brand'),ix('Make'));/* D55: brand is kept per item, with thickness, so sales can be split by either */
+    var res={hasBrandCol:cBr>=0,sheet:pick,read:rows.length-1,loaded:0,rejected:0,warned:0,outOfScope:0,byGroup:{},rejects:[],warn:{noSize:0,notPcs:0,dupCode:0},items:[],cats:{},catUnknown:{}};
     var seen={},T0=Date.now();
     for(var i=1;i<rows.length;i++){
       if(Date.now()-T0>40){T0=Date.now();st.msg='Checking item '+fmtN(i)+' of '+fmtN(rows.length-1);schedule();await tick()}
@@ -112,7 +112,8 @@ async function itemParse(){
       if(sq==null){res.warn.noSize++;res.warned++;sq=0}
       var uom=cUom>=0?normUom(r[cUom]):'';if(uom&&uom!=='Pcs'){res.warn.notPcs++;res.warned++}
       var thk=cThk>=0?parseThickness(r[cThk]):null,act=cAct>=0?(/^y/i.test(cellStr(r[cAct]))?1:0):1;
-      res.items.push([code,ITEM_GROUPS.indexOf(grp),Math.round(sq*1000)/1000,thk,uom,act,size.slice(0,20)]);
+      var brand=cBr>=0?cellStr(r[cBr]).slice(0,30):'';if(brand)res.withBrand=(res.withBrand||0)+1;if(thk!=null)res.withThk=(res.withThk||0)+1;
+      res.items.push([code,ITEM_GROUPS.indexOf(grp),Math.round(sq*1000)/1000,thk,uom,act,size.slice(0,20),brand]);
       res.byGroup[grp]=(res.byGroup[grp]||0)+1;res.loaded++;
     }
     st.res=res;st.stage='checked';st.msg='';
@@ -127,10 +128,10 @@ async function itemLoad(){
   try{
     var per=3000,n=Math.ceil(r.items.length/per);
     for(var i=0;i<n;i++){var part=r.items.slice(i*per,(i+1)*per);st.msg='Writing chunk '+(i+1)+' of '+n;schedule();
-      await dset('items/c'+i,{z:await gz(JSON.stringify(part)),n:part.length,i:i,at:nowISO(),by:by,fmt:'gz-json v1: [code,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sqft per sheet,thickness mm,uom,active,size]',demo:st.demo||undefined});chunks++}
+      await dset('items/c'+i,{z:await gz(JSON.stringify(part)),n:part.length,i:i,at:nowISO(),by:by,fmt:'gz-json v1: [code,group 0 Laminate 1 Door 2 PVC sheet 3 Compact board,sqft per sheet,thickness mm,uom,active,size,brand]',demo:st.demo||undefined});chunks++}
     /* remove chunks left over from a longer earlier load */
     var old=(S.itemMeta&&S.itemMeta.chunks)||0;for(var j=n;j<old;j++)await ddel('items/c'+j);
-    await dset('itemmeta/main',{at:nowISO(),by:by,file:st.name,sheet:r.sheet,read:r.read,loaded:r.loaded,out_of_scope:r.outOfScope,rejected:r.rejected,warned:r.warned,by_group:r.byGroup,chunks:n,upload:uid,demo:st.demo||undefined});
+    await dset('itemmeta/main',{at:nowISO(),by:by,file:st.name,sheet:r.sheet,read:r.read,loaded:r.loaded,out_of_scope:r.outOfScope,rejected:r.rejected,warned:r.warned,by_group:r.byGroup,with_brand:r.withBrand||0,with_thickness:r.withThk||0,has_brand_col:!!r.hasBrandCol,chunks:n,upload:uid,demo:st.demo||undefined});
     await dset('uploads/'+uid,{at:nowISO(),by:by,sys:'B1',entity:'IT',file:st.name,size:st.size||0,mode:'master',periodLabel:'Item master snapshot',read:r.read,loaded:r.loaded,rejected:r.rejected,warned:r.warned,status:r.rejected?'Partial':'Loaded',demo:st.demo||undefined,out_of_scope:{rows:r.outOfScope,value:0}});
     if(r.rejects.length){var rr=r.rejects.slice(0,1500);await dset('rejects/'+uid,{z:await gz(JSON.stringify(rr)),n:rr.length,total:r.rejected,demo:st.demo||undefined})}
     await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:by,event:'item master loaded',rows:r.loaded});
@@ -141,13 +142,14 @@ async function itemLoad(){
 function itemsHtml(){
   var st=S.mst.items,m=S.itemMeta,h='<section class="card"><div class="hd"><h2>Item master &middot; '+(m?fmtN(m.loaded)+' items':'not loaded')+'</h2><div class="row"><label class="btn pri sm" for="up-item" style="cursor:pointer">Upload item master (XLSX or CSV)</label><input id="up-item" data-mfile="items" type="file" accept=".xlsx,.xls,.csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="mst-tmpl" data-t="items">Download template</button></div></div>';
   h+='<p class="note" style="margin:0">Sheet <b>FG</b> of "Item master data" (B1 OITM). The Desk keeps, per in-scope item: code, product group, size in feet and sq ft per sheet, thickness, unit and active flag. Item category decides the group: Decorative laminate(s) → Laminate, "… door" → Door, PVC sheet, Compact board. ACP and other categories are counted and not stored. No descriptions are kept (decision D9: item detail is not needed below the document).</p>';
-  if(m)h+='<div class="kpis"><div class="kpi"><small>Items stored</small><b>'+fmtN(m.loaded)+'</b><small>'+Object.keys(m.by_group||{}).map(function(g){return g+' '+fmtN(m.by_group[g])}).join(' · ')+'</small></div><div class="kpi"><small>Out of scope (counted)</small><b>'+fmtN(m.out_of_scope)+'</b></div><div class="kpi"><small>Rejected rows</small><b>'+fmtN(m.rejected)+'</b></div><div class="kpi"><small>Loaded</small><b style="font-size:14px;font-family:var(--font)">'+esc(istStr(m.at))+'</b><small>'+esc((m.by||'').split('@')[0])+' · '+esc(m.file||'')+'</small></div></div>';
+  if(m)h+='<div class="kpis"><div class="kpi"><small>Items stored</small><b>'+fmtN(m.loaded)+'</b><small>'+Object.keys(m.by_group||{}).map(function(g){return g+' '+fmtN(m.by_group[g])}).join(' · ')+'</small></div><div class="kpi"><small>With brand · thickness</small><b>'+fmtN(m.with_brand||0)+' · '+fmtN(m.with_thickness||0)+'</b></div><div class="kpi"><small>Out of scope (counted)</small><b>'+fmtN(m.out_of_scope)+'</b></div><div class="kpi"><small>Rejected rows</small><b>'+fmtN(m.rejected)+'</b></div><div class="kpi"><small>Loaded</small><b style="font-size:14px;font-family:var(--font)">'+esc(istStr(m.at))+'</b><small>'+esc((m.by||'').split('@')[0])+' · '+esc(m.file||'')+'</small></div></div>';
   else h+='<div class="empty">No item master yet. Upload the item master workbook.</div>';
   if(st&&st.msg&&st.stage==='idle')h+='<div class="banner err">'+esc(st.msg)+'</div>';
   if(st&&st.stage==='working')h+='<div><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(st.msg)+'</div></div>';
   if(st&&st.res&&(st.stage==='checked'||st.stage==='loading'||st.stage==='done')){
     var r=st.res;
     h+=itemFixes(r);
+    h+='<div class="banner '+(r.hasBrandCol?'info':'warn')+'" style="display:block">'+(r.hasBrandCol?'Brand column found: '+fmtN(r.withBrand||0)+' of '+fmtN(r.loaded)+' items carry a brand; '+fmtN(r.withThk||0)+' carry a thickness.':'No Brand column in this file (looked for Brand, Brand Name, Item Brand, Make). Items are stored without a brand; add the column and load again to split sales by brand.')+'</div>';
     h+='<div class="hd"><h2>Check result · '+esc(st.name)+' · sheet '+esc(r.sheet)+'</h2><span class="pill '+(r.rejected?'part':'ok')+'">'+(r.rejected?'Some rows rejected':'All rows pass')+'</span></div>'
      +'<div class="kpis"><div class="kpi"><small>Rows read</small><b>'+fmtN(r.read)+'</b></div><div class="kpi"><small>In scope, loading</small><b>'+fmtN(r.loaded)+'</b></div><div class="kpi"><small>Out of scope</small><b>'+fmtN(r.outOfScope)+'</b></div><div class="kpi"><small>Rows rejected</small><b>'+fmtN(r.rejected)+'</b></div><div class="kpi"><small>Warnings</small><b>'+fmtN(r.warned)+'</b><small>'+r.warn.noSize+' without a readable size · '+r.warn.notPcs+' unit not Pcs</small></div></div>'
      +'<div class="tw"><table><thead><tr><th>Item category (as in the file)</th><th class="num">Items</th><th>Group</th></tr></thead><tbody>'+Object.keys(r.cats).sort(function(a,b){return r.cats[b]-r.cats[a]}).slice(0,30).map(function(c){var g=groupOf('B1',c==='(blank)'?'':c,'');return '<tr><td>'+esc(c)+'</td><td class="num">'+fmtN(r.cats[c])+'</td><td>'+(g?'<span class="pill ok">'+g+'</span>':'<span class="pill mute">out of scope</span>')+'</td></tr>'}).join('')+'</tbody></table></div>';
@@ -268,7 +270,7 @@ async function sempLoad(){
       await dset('actions/'+id,a);
     }
     var byCode={};r.people.forEach(function(p){byCode[norm(p[0])]=p;if(p[13])byCode[norm(p[13])]=p});var filled=0;
-    for(var ui=0;ui<S.users.length;ui++){var uu=S.users[ui];if(uu.reports_to_email||uu.pseudo)continue;
+    for(var ui=0;ui<S.users.length;ui++){var uu=S.users[ui];if(uu.reports_to_email||uu.pseudo||uu.placeholder)continue;
       var pp=r.people.find(function(p){return (p[7]&&p[7]===uu.email)||(uu.sales_employee_code&&(norm(uu.sales_employee_code)===norm(p[0])||norm(uu.sales_employee_code)===norm(p[13]||'~')))});
       var mg=pp&&pp[11]?byCode[norm(pp[11])]:null;
       if(mg&&mg[7]&&mg[7]!==uu.email){var ud=Object.assign({},uu,{reports_to_email:mg[7],slp_code:pp[9]||uu.slp_code||'',reports_to_code:pp[11]});delete ud._id;await dset('users/'+uu._id,ud);filled++}}
@@ -305,11 +307,11 @@ function sempHtml(){
   return h+'<div id="up-msg"></div></section>';
 }
 Object.assign(handlers,{
- 'mst-reset':function(t){S.mst[t.getAttribute('data-k')]=null;S.lastHtml='';schedule()},
+ 'mst-reset':function(t){var rk=t.getAttribute('data-k');if(rk==='cu')S.cu=null;else S.mst[rk]=null;S.lastHtml='';schedule()},
  'mst-item-load':function(){return itemLoad()},
  'mst-semp-check':function(){return sempCheck()},
  'mst-semp-load':function(){return sempLoad()},
- 'mst-tmpl':function(t){var k=t.getAttribute('data-t');return download(k==='items'?'item-master-template.csv':'sales-employee-template.csv',(k==='items'?'Item No.,Item Description,Inventory UoM,Active,Thickness,Size,Item Category':'Employee Code,*FirstName,*LastName,FullName,Mobile No.,Email,Designation,Zone,Plant Name,*CompanyCode,B1 SlpCode,B1 Sales Employee Name,Reports To (Employee Code),EndDate')+'\n')},
+ 'mst-tmpl':function(t){var k=t.getAttribute('data-t');return download(k==='cust'?'customer-master-template.csv':k==='items'?'item-master-template.csv':'sales-employee-template.csv',(k==='cust'?'CardCode,CardName,CardType,GroupName,City,State,SlpName,CreditLine,Balance,PymntGroup':k==='items'?'Item No.,Item Description,Inventory UoM,Active,Thickness,Size,Item Category,Brand':'Employee Code,*FirstName,*LastName,FullName,Mobile No.,Email,Designation,Zone,Plant Name,*CompanyCode,B1 SlpCode,B1 Sales Employee Name,Reports To (Employee Code),EndDate')+'\n')},
  'mst-rejcsv':function(t){var st=S.mst[t.getAttribute('data-k')];return download('rejected-rows.csv',csvLine(['row','code','','field','reason','value'])+'\n'+st.res.rejects.map(csvLine).join('\n'))},
  'mst-needs-csv':function(){var st=S.mst.semp;return download('people-needing-plant-and-designation.csv',csvLine(['row','worker_id','full_name','note'])+'\n'+(st.res.needs||[]).map(function(x){return csvLine([x[0],x[1],x[2],x[3]])}).join('\n'))},
  'mst-unmatched-csv':function(){return download('unmatched-salespeople.csv',csvLine(['b1_salesperson_name','invoice_lines','reason'])+'\n'+unmatchedSp().map(function(u){return csvLine([u.name,u.lines,u.why])}).join('\n'))}
@@ -320,6 +322,7 @@ document.addEventListener('change',function(ev){
   if(mf){var f=t.files&&t.files[0];if(!f)return;
     if(readOnly()||effRole()!=='Super admin'){toast('Only a Super admin can upload masters');return}
     if(mf==='items'){S.mst.items={stage:'working',name:f.name,size:f.size,msg:'Reading the workbook...',src:null,res:null};S.lastHtml='';schedule();listSheets(f).then(function(src){S.mst.items.src=src;return itemParse()}).catch(function(e){S.mst.items={stage:'idle',msg:'Could not read the file: '+((e&&e.message)||e)};schedule()})}
+    else if(mf==='cust')custPick(f);
     else sempPick(f);
     t.value='';return}
   if(t.getAttribute('data-chg')==='mst-sheet'){var st=S.mst.semp;if(st&&st.sheets[+t.getAttribute('data-i')])st.sheets[+t.getAttribute('data-i')].ticked=t.checked}

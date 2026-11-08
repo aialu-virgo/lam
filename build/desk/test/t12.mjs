@@ -5,7 +5,7 @@ const store=JSON.parse(fs.readFileSync(SP+'store-demo.json'));
 const browser = await chromium.launch();
 const res=[];const ok=(n,c,d)=>{res.push([c?'PASS':'FAIL',n,d||''].join(' | '));};
 {const {page,errs}=await open(browser,{store});await page.waitForTimeout(2500);
- await page.evaluate(()=>{location.hash='#/overview'});await page.waitForTimeout(800);
+ await page.evaluate(()=>{location.hash='#/overview'});await page.waitForTimeout(800);await page.evaluate(()=>{const b=document.querySelector('[data-act=\"ox-open\"][data-k=\"trendrs\"]');if(b)b.click()});await page.waitForTimeout(700);
  await page.evaluate(()=>{document.querySelector('.bar-q[data-q="FY27-Q2"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))});await page.waitForTimeout(500);
  let t=await page.innerText('#pg');ok('click bar -> quarter drill with 3 months',/Drill-down · Q2 FY27/i.test(t)&&/Jul 2026/.test(t)&&/Sep 2026/.test(t),'');
  await page.evaluate(()=>{document.querySelector('[data-act="drill-m"][data-m="2026-08"]').click()});await page.waitForTimeout(1200);

@@ -1,8 +1,8 @@
 ---
 title: Data map — Customer
-summary: Customer master: no export yet; 3,696 B1 customers and 92 S/4 customers are visible inside invoice lines; exact OCRD query listed.
-status: draft
-updated: 2026-10-20
+summary: Customer master intake built (D39): B1 OCRD and S/4 business partner in Admin; names, salesperson suggestion, credit limit and over-limit flag.
+status: active
+updated: 2026-10-23
 related:
   - design/canonical-data-model.md
   - data-map/_index.md
@@ -16,7 +16,7 @@ related:
 ---
 
 # Customer (SAP export)
-**Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Customer · **Status:** **no customer export uploaded.**
+**Owner:** Data Architect · **Input:** [Brief Part B — design inputs](../design/brief-part-b.md) §7 Customer · **Status:** **intake built (D39); no real file loaded yet.**
 
 ## Source and export
 - **Derived now (from invoices):** the B1 sales file holds 3,696 customer codes (3,655 on external rows) with code, name, GSTIN (0.27% blank), city (748 spellings, messy), state, zone. The S/4 register holds 92 customers with code, name, GSTIN, sales district, state code, customer group (C1, C2). Fields in [Data map — Invoice](invoice.md) and [Data map — Invoice, S/4 sales register](invoice-s4-register.md).
@@ -47,3 +47,7 @@ Recommendation: send once now, then weekly.
 | Q3 FY24 to Q2 FY27 (12 quarters) | missing |
 | Q3 FY27 (current) | missing |
 
+
+## Intake in the Desk (D39, 23 Oct 2026)
+Admin › Customers. Each load replaces the whole master (like the item master). Layouts: B1 OCRD (`CardCode`, `CardName`, `CardType` C only, `GroupName`, `City`, `State`, `SlpName`, `CreditLine`, `Balance`, `PymntGroup`) and the S/4 business partner list (`Customer`, `Name`, `City`, `Region`, credit limit); other headers go through the mapping step. Non-customer partners are skipped and counted; duplicate codes are rejected.
+Uses: the customer name where only a code shows; the salesperson from the master as a suggestion only; credit limit and "over limit by" on the Receivables page (open receivable of the customer across the plants in scope against the limit). A display and a flag, no new automatic action. Template: [customer-b1.csv](templates/customer-b1.csv).

@@ -1,7 +1,7 @@
 /* ================= Auto-fix pass (Vijay, 21 Oct 2026): upload files as SAP gives them, show what was fixed =================
  * Alias tables live in settings/alias_<kind> (database rule: admin write). Seeds are in code. Nothing is changed silently:
  * every fix is counted and shown in the "Fixes applied" panel of the upload; what only the source can fix is named. */
-S.alias={category:{},zone:{},designation:{},salesperson:{},plantprefix:{}};
+S.alias={category:{},zone:{},designation:{},salesperson:{},warehouse:{},plantprefix:{}};
 var ZONE_CANON=['ZONE1','ZONE2','ZONE3','ZONE4','ZONE5','BRANCH','FACTORY','ACP'];
 var CAT_CANON=['Laminate','Door','PVC sheet','Compact board','Out of scope'];
 function seedZone(){var o={};for(var i=1;i<=5;i++){o['zone'+i]='ZONE'+i;o['zone '+i]='ZONE'+i;o['zone 0'+i]='ZONE'+i}o.branch='BRANCH';o.factory='FACTORY';o.acp='ACP';return o}
@@ -12,6 +12,7 @@ var ALIAS_KINDS={
  designation:{label:'Designation spelling → designation',hint:'Applies when a sales-employee file is checked. The Desk role is proposed from the chosen designation.',canon:null,
   seed:{'sales executive':'Sales Executive','sale executive':'Sales Executive','sales exec':'Sales Executive','sales executives':'Sales Executive','sr sales executive':'Sr. Sales Executive','senior sales executive':'Sr. Sales Executive','branch manager':'Branch Manager','branch head':'Branch Manager','depot manager':'Depot Manager'}},
  salesperson:{label:'B1 salesperson name → employee code',hint:'One click in a list of unmatched names saves a row here. Applies at once, no reload.',canon:null,seed:{}},
+ warehouse:{label:'Warehouse code → plant code',hint:'B1 WhsCode (or S/4 storage location) to the plant that owns it. Several warehouses may map to one plant; their stock is added together. Applies when a stock file is checked.',canon:null,seed:{}},
  plantprefix:{label:'Employee ID prefix → plant code',hint:'The part of the employee ID before the number (E-XXX in E-XXX-0123). The Desk also learns prefixes from people whose plant is already known.',canon:null,seed:{}}
 };
 function akey(s){return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
@@ -28,7 +29,7 @@ function aliasRows(kind){
   return rows.sort(function(a,b){return a.k<b.k?-1:1});
 }
 function ingestAliases(docs){
-  var next={category:{},zone:{},designation:{},salesperson:{},plantprefix:{}};
+  var next={category:{},zone:{},designation:{},salesperson:{},warehouse:{},plantprefix:{}};
   (docs||[]).forEach(function(x){var m=/^alias_(\w+)$/.exec(x._id||'');if(m&&next[m[1]]&&x.map&&typeof x.map==='object')next[m[1]]=x.map});
   var changed=JSON.stringify(next)!==JSON.stringify(S.alias);S.alias=next;
   if(changed)onAliasChange();
@@ -282,7 +283,7 @@ function aliasesHtml(){
   var h='<section class="card"><div class="hd"><h2>Aliases and normalisations</h2></div><p class="note" style="margin:0">Every spelling table the auto-fix pass uses. Seeded with the current rules; Super admin edits. Each change is saved to the database and applies at the next check (names and prefixes apply at once). Nothing here changes stored data silently: uploads list what was fixed.</p></section>';
   Object.keys(ALIAS_KINDS).forEach(function(kind){
     var K=ALIAS_KINDS[kind],rows=aliasRows(kind);
-    var inCanon=K.canon?'<select id="al-c-'+kind+'" class="in">'+K.canon.map(function(c){return '<option>'+esc(c)+'</option>'}).join('')+'</select>':'<input id="al-c-'+kind+'" class="in" placeholder="'+(kind==='plantprefix'?'plant code, e.g. 1012':kind==='salesperson'?'employee code':'designation')+'">';
+    var inCanon=K.canon?'<select id="al-c-'+kind+'" class="in">'+K.canon.map(function(c){return '<option>'+esc(c)+'</option>'}).join('')+'</select>':'<input id="al-c-'+kind+'" class="in" placeholder="'+(kind==='plantprefix'||kind==='warehouse'?'plant code, e.g. 1012':kind==='salesperson'?'employee code':'designation')+'">';
     h+='<section class="card"><div class="hd"><h2>'+esc(K.label)+' &middot; '+rows.length+'</h2></div><p class="note" style="margin:0">'+esc(K.hint)+'</p>'
      +'<div class="row"><div class="fld"><label for="al-r-'+kind+'">'+(kind==='plantprefix'?'ID prefix':'Spelling in the file')+'</label><input id="al-r-'+kind+'" class="in"></div><div class="fld"><label for="al-c-'+kind+'">Becomes</label>'+inCanon+'</div><div class="fld"><label>&nbsp;</label><button class="btn pri sm" data-act="al-add" data-kind="'+kind+'">Add or change</button></div></div>'
      +(rows.length?'<div class="tw" style="max-height:260px;overflow:auto"><table><thead><tr><th>Spelling</th><th>Becomes</th><th>From</th><th></th></tr></thead><tbody>'+rows.map(function(x){return '<tr><td class="break">'+esc(x.k)+'</td><td class="break">'+esc(x.v==='-'?'(switched off)':x.v)+'</td><td><span class="pill '+(x.src==='seed'?'mute':'part')+'">'+x.src+'</span></td><td><button class="btn sm" data-act="al-del" data-kind="'+kind+'" data-k="'+esc(x.k)+'">'+(x.src==='seed'?'Switch off':'Remove')+'</button></td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty sm">No rows yet.</div>');
@@ -355,7 +356,8 @@ function replaceRisk(r){
 function canLoad(r,locked){
   if(!r||!(r.good>0)||locked)return false;
   var closedQs=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(closedQs.length&&U.reason.trim().length<3)return false;
+  if(closedQs.length&&U.reason.trim().length<10)return false;
+  if(cnLockedIn(oxMonthList(r)).length)return false;/* D61: months whose credit notes are locked cannot be replaced by a sales load */
   if(replaceRisk(r).length&&!U.confirmReplace)return false;
   return true;
 }
@@ -395,7 +397,18 @@ function undoPlan(uid){
   var aId=actionIdOf('R5',[uid,'upload']);
   return {u:u,mine:mine,months:Object.keys(mine).sort(),n:n,later:Math.max(0,(u.plantMonths||0)-n),actId:aId,act:S.actions.find(function(a){return a.id===aId}),fus:S.followups.filter(function(f){return f.action_id===aId})};
 }
-function undoDialog(uid){
+function undoDialog(uid){undoDialog0(uid);bkDialogNote(uid);
+  var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&us.entity==='CN'){var l=cnLockedIn(cnUndoPlan(uid).months);if(l.length){var e=document.getElementById('d-err');if(e)e.insertAdjacentHTML('beforebegin','<div class="banner err" style="display:block"><b>Locked: '+esc(l.map(ymLabel).join(', '))+'.</b> A Super admin must unlock these months with a reason before this upload can be undone.</div>');var g=document.querySelector('[data-act="undo-go"]');if(g)g.disabled=true}}
+}
+function undoDialog0(uid){
+  var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&(us.entity==='RC'||us.entity==='CN')){var rc=us.entity==='RC',ps=rc?S.recvSnaps.find(function(x){return x.upload===uid}):cnUndoPlan(uid);
+    openDlg('<h3>Undo '+(rc?'receivables':'credit-note')+' upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>'+(rc?(ps?'Removes the open-items snapshot as on '+esc(ps.as_of)+' ('+Object.keys(ps.plants||{}).length+' plants)':'This upload no longer holds a snapshot (a later upload for the same date replaced it)'):'Removes '+ps.docs.filter(function(d){return !d.chunk}).length+' plant-months of credit notes in '+ps.months.length+' month'+(ps.months.length===1?'':'s')+' and their coverage marks')+'</b> that still point to this upload. The upload stays in history marked Undone, and the undo is logged.</div><p class="note">Undo cannot bring back data this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
+  if(us&&us.entity==='CL'){var cp=collUndoPlan(uid);
+    openDlg('<h3>Undo collection upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>Removes '+cp.docs.length+' plant-month'+(cp.docs.length===1?'':'s')+' of receipts in '+cp.months.length+' month'+(cp.months.length===1?'':'s')+'</b> that still point to this upload. A collection plan already set on a month is kept. The upload stays in history marked Undone, and the undo is logged.</div><p><b>Months to upload again afterwards:</b> '+(cp.months.length?esc(cp.months.map(ymLabel).join(', ')):'none')+'.</p><p class="note">Undo cannot bring back receipts this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
+  if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);
+    openDlg('<h3>Undo stock upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(us.file||'')+' &middot; '+esc(istStr(us.at))+' &middot; '+esc(us.by||'')+'</p><div class="banner warn" style="display:block"><b>'+(sp?'Removes the stock snapshot as on '+esc(sp.as_of)+' ('+sp.plants+' plants)':'This upload no longer holds a snapshot (a later upload for the same date replaced it)')+'</b> with its item rows. The upload stays in history marked Undone, and the undo is logged.</div><p><b>Upload again afterwards:</b> '+(sp?'the stock file as on '+esc(sp.as_of):'nothing')+'.</p><p class="note">Undo cannot bring back an earlier snapshot for the same date that this upload replaced.</p><div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'">Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');return}
   var pl=undoPlan(uid);if(!pl)return;
   var u=pl.u,sa=effRole()==='Super admin'&&!readOnly();
   openDlg('<h3>Undo upload '+esc(uid)+'</h3><p class="note" style="margin:0">'+esc(u.file||'')+' &middot; '+esc(istStr(u.at))+' &middot; '+esc(u.by||'')+'</p>'
@@ -404,8 +417,22 @@ function undoDialog(uid){
    +'<p class="note">Undo cannot bring back what this upload replaced. Any month it overwrote lost its earlier figures, so upload those months again. Months it created are simply removed. '+(pl.later?pl.later+' plant-month'+(pl.later===1?'':'s')+' written by this upload were already replaced by a later upload; those are left alone. ':'')+(u.closedQuarters&&u.closedQuarters.length?'Quarters it closed ('+esc(u.closedQuarters.map(qLabel).join(', '))+') stay closed; reopen them in the coverage grid if needed. ':'')+'</p>'
    +'<div class="row"><button class="btn pri" data-act="undo-go" data-id="'+esc(uid)+'" '+(sa&&pl.n+(pl.act?1:0)+pl.fus.length>=0?'':'disabled')+'>Undo this upload</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="d-err"></div>');
 }
-async function undoUpload(uid){
+/* D61: nothing is deleted before the backup is checked. An incomplete backup stops a plain or bulk undo; only the explicit "Undo and remove these months" click (opts.confirmIncomplete) goes on, and then nothing is restored. */
+async function undoUpload(uid,opts){
   if(!superOnly('undo an upload'))return;
+  var us0=S.uploads.find(function(x){return x._id===uid});
+  if(us0&&(us0.entity||'INV')==='INV'){var lk0=cnLockedIn(((undoPlan(uid)||{}).months)||[]);if(lk0.length){var m0='credit notes are locked for '+lk0.map(ymLabel).join(', ')+'; a Super admin must unlock them (Data Intake › Credit-note locks) before this sales upload can be undone. Nothing was changed.';var e0=document.getElementById('d-err');if(e0)e0.innerHTML='<div class="banner err">Undo stopped: '+esc(m0)+'</div>';throw new Error(m0)}}
+  if(bkHas(uid)){var c0=bkCheck(uid);
+    if(!c0.ok&&!(opts&&opts.confirmIncomplete)){var m1='Backup incomplete for '+((us0&&us0.file)||uid)+': '+(c0.have||0)+' of '+(c0.of||'?')+' parts are usable. Nothing was changed; use "Undo and remove these months" on that upload to remove its months without restoring.';var e1=document.getElementById('d-err');if(e1)e1.innerHTML='<div class="banner err">Undo stopped: '+esc(m1)+'</div>';throw new Error(m1)}}
+  S.bkAllowIncomplete=!!(opts&&opts.confirmIncomplete);
+  try{return await undoUpload0(uid)}finally{S.bkAllowIncomplete=false}
+}
+async function undoUpload0(uid){
+  if(!superOnly('undo an upload'))return;
+  var us=S.uploads.find(function(x){return x._id===uid});
+  if(us&&(us.entity==='RC'||us.entity==='CN')){try{if(us.entity==='RC')await recvUndo(uid);else await cnUndo(uid);closeDlg();openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],us.entity==='RC'?'snap':null,'<p>The data this upload held was removed. Upload the file again if you still need it.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el2=$('#d-err');if(el2)el2.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
+  if(us&&us.entity==='CL'){try{var cpl=await collUndo(uid);closeDlg();openDlg('<h3>Collection upload '+esc(uid)+' undone</h3>'+undoDoneP(cpl.docs.length,cpl.months,null,'<p>Removed '+cpl.docs.length+' plant-months. <b>Upload these months again:</b> '+(cpl.months.length?esc(cpl.months.map(ymLabel).join(', ')):'none')+'.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el1=$('#d-err');if(el1)el1.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
+  if(us&&us.entity==='ST'){var sp=stockUndoPlan(uid);try{await stockUndo(uid);closeDlg();openDlg('<h3>Stock upload '+esc(uid)+' undone</h3>'+undoDoneP(null,[],'snap','<p>'+(sp?'Removed the snapshot as on '+esc(sp.as_of)+'. <b>Upload that stock file again if you still need it.</b>':'Nothing was left to remove.')+'</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>')}catch(e){var el0=$('#d-err');if(el0)el0.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'.</div>'}return}
   var pl=undoPlan(uid);if(!pl)return;
   var jobs=[],months=pl.months.slice(),sets=[];
   pl.months.forEach(function(ym){
@@ -418,6 +445,10 @@ async function undoUpload(uid){
     /* cells first, so the roll-up rebuilder never sees a month with chunks and no roll */
     for(var i=0;i<sets.length;i++){var ym=sets[i][0],c=sets[i][1];if(Object.keys(c.plants).length)await dset('cells/INV_'+ym,c);else await ddel('cells/INV_'+ym)}
     var q=jobs.slice();await Promise.all([0,1,2,3,4].map(async function(){while(q.length){var path=q.shift();await ddel(path)}}));
+    var okPm={};pl.months.forEach(function(ym){pl.mine[ym].forEach(function(p){okPm[p+'|'+ym]=1})});
+    var rs=await bkRestore(uid,function(path){var m=/^inv\/[A-Za-z0-9]+-([^-]+)-(\d{4}-\d\d)-\d+$/.exec(path)||/^roll\/([^-]+)-(\d{4}-\d\d)$/.exec(path)||/^cellpart:(\d{4}-\d\d):(.+)$/.exec(path);if(!m)return false;return path.indexOf('cellpart:')===0?!!okPm[m[2]+'|'+m[1]]:!!okPm[m[1]+'|'+m[2]]});
+    for(var ri=0;ri<rs.cells.length;ri++){var cp=/^cellpart:(\d{4}-\d\d):(.+)$/.exec(rs.cells[ri].p),cs=await dget('cells/INV_'+cp[1]),cc=cs.exists?JSON.parse(JSON.stringify(cs.data())):{entity:'INV',ym:cp[1],plants:{}};if(!cc.plants)cc.plants={};cc.plants[cp[2]]=rs.cells[ri].d;await dset('cells/INV_'+cp[1],cc)}
+    await bkDelete(uid);
     await ddel('rejects/'+uid);
     if(pl.act)await ddel('actions/'+pl.act._id);
     for(var f=0;f<pl.fus.length;f++)await ddel('followups/'+pl.fus[f]._id);
@@ -426,18 +457,51 @@ async function undoUpload(uid){
     await auditW('upload undone','',{upload:uid,file:(up.file||'').slice(0,120),months:months,plant_months:pl.n});
     await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:whoAmI(),event:'upload undone',upload:uid,months:months,plant_months:pl.n});
     closeDlg();
-    openDlg('<h3>Upload '+esc(uid)+' undone</h3><p>Removed '+pl.n+' plant-month'+(pl.n===1?'':'s')+'. <b>Upload these months again:</b> '+(months.length?esc(months.map(ymLabel).join(', ')):'none')+'.</p><div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>');
+    openDlg('<h3>Upload '+esc(uid)+' undone</h3>'+undoDoneP(pl.n,months,null,'<p>Removed '+pl.n+' plant-month'+(pl.n===1?'':'s')+'. <b>Upload these months again:</b> '+(months.length?esc(months.map(ymLabel).join(', ')):'none')+'.</p>')+'<div class="row"><button class="btn pri" data-act="dlg-close">Close</button></div>');
   }catch(e){var el=$('#d-err');if(el)el.innerHTML='<div class="banner err">Undo stopped: '+esc(dbErrText(e))+'. Nothing else was changed; run it again.</div>'}
 }
 Object.assign(handlers,{
  'hist-undo':function(t){undoDialog(t.getAttribute('data-id'))},
- 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'))},
+ 'undo-go':function(t){return undoUpload(t.getAttribute('data-id'),{confirmIncomplete:true})},
  'u-swap-serial':async function(){if(!U||!U.res)return;U.swapSerial=true;U.stage='validating';U.progressMsg='Reading date cells swapped...';renderUpload();await runValidation()},
  'u-unswap':async function(){if(!U||!U.res)return;U.swapSerial=false;U.stage='validating';renderUpload();await runValidation()}
 });
 
 /* ================= D33 (21 Oct 2026, Vijay): skipped rows never block; good rows load at once ================= */
+/* D41: an upload whose data nothing points to any more, because a later upload replaced the same plant-months or snapshot date, is "replaced" */
+function histHolds(u){
+  var id=u._id,e=u.entity||'INV',k;
+  if(e==='INV'){for(k in S.cells){var c=S.cells[k];if(c.entity!=='INV')continue;for(var p in (c.plants||{}))if(c.plants[p].upload===id)return true}return false}
+  if(e==='CL')return S.coll.some(function(d){return d.upload===id});
+  if(e==='ST')return S.stockSnaps.some(function(d){return d.upload===id});
+  if(e==='RC')return (S.recvSnaps||[]).some(function(d){return d.upload===id});
+  if(e==='CN')return (S.cn||[]).some(function(d){return d.upload===id});
+  if(e==='IT')return !!(S.itemMeta&&S.itemMeta.upload===id);
+  if(e==='CU')return !!(S.custMeta&&S.custMeta.upload===id);
+  return true;
+}
+function histReplacedBy(u){
+  if(!u||u.status!=='Loaded'&&u.status!=='Partial')return null;
+  var e=u.entity||'INV';if(['INV','CL','ST','RC','CN','IT','CU'].indexOf(e)<0)return null;
+  if(histHolds(u))return null;
+  var later=S.uploads.filter(function(v){return v._id!==u._id&&(v.entity||'INV')===e&&v.at>u.at&&(v.status==='Loaded'||v.status==='Partial')});
+  if(!later.length)return null;
+  var ov=function(a,b){if(!a||!b)return true;return a.some(function(x){return b.indexOf(x)>=0})};
+  later=later.filter(function(v){
+    if(e==='INV')return ov(u.quarters,v.quarters);
+    if(e==='CL'||e==='CN')return ov(u.months,v.months);
+    if(e==='ST'||e==='RC')return !u.as_of||u.as_of===v.as_of;
+    return true});
+  later.sort(function(a,b){return a.at<b.at?-1:1});
+  return later[0]||null;
+}
 function histStatusPill(u){
+  var lk=(u.entity==='CN'&&u.months&&u.months.some(function(m){return S.cnLock&&S.cnLock[m]}))?' <span class="pill ok" title="Credit-note month locked">🔒 Locked</span>':'';
+  var rm=lk+(u.backup_removed?' <span class="note" title="'+esc(u.backup_removed_why||'')+'">Undo no longer restores (backup removed '+esc(istStr(u.backup_removed))+')</span>':'');
+  return histStatusPill0(u)+rm;
+}
+function histStatusPill0(u){
+  var rb=histReplacedBy(u);if(rb)return '<span class="pill mute" title="Nothing stored points to this upload any more">Replaced by '+esc((rb.file||'').slice(0,40))+', '+esc(istStr(rb.at))+'</span>';
   var st=u.status,sk=u.rejected||0;
   if((st==='Loaded'||(st==='Partial'&&!u.stopped&&u.entity!=='INV'))&&sk>0)return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' row'+(sk===1?'':'s')+' skipped</span>';
   if(st==='Partial'&&!u.stopped&&sk>0&&(u.entity||'INV')!=='INV')return '<span class="pill ok">Loaded &middot; '+fmtN(sk)+' rows skipped</span>';
@@ -452,6 +516,66 @@ async function afterValidate(){
   if(replaceRisk(U.res).length&&!U.confirmReplace)why.push('it would replace months that hold more lines');
   if(U.res.dateInfo.mixed&&!U.confirmDates)why.push('the swapped-date range needs your confirmation');
   var closedQs=Object.keys(U.res.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(closedQs.length&&U.reason.trim().length<3)why.push('a closed quarter needs a reload reason');
+  if(closedQs.length&&U.reason.trim().length<10)why.push('a closed quarter needs a reload reason of at least 10 characters');
   if(why.length)toast('Not loaded yet: '+why.join('; ')+'. This is a safety check, not a rejected row.');
+}
+
+/* ================= D60: bulk Undo ("Undo selected"), newest first, through the existing integrity-checked Undo ================= */
+function bulkPlanLine(u){
+  var e=u.entity||'INV',n=0,unit='plant-months';
+  if(e==='INV'){var p=undoPlan(u._id);n=p?p.n:0}
+  else if(e==='CL'){n=collUndoPlan(u._id).docs.length}
+  else if(e==='CN'){n=cnUndoPlan(u._id).docs.filter(function(d){return !d.chunk}).length}
+  else{n=1;unit='snapshot'}
+  return {n:n,unit:unit};
+}
+async function bulkBackupUnits(uid){
+  var chk=bkCheck(uid);if(chk.none)return {txt:'no backup: the months are removed, upload them again',ok:true};
+  if(!chk.ok)return {txt:'backup incomplete: nothing will be restored',ok:false};
+  var docs=bkFor(uid),n=0;
+  for(var i=0;i<docs.length;i++){var items=JSON.parse(await ungz(docs[i].z));items.forEach(function(it){if(/^collections\/|^creditnotes\/[^~]*$|\/rsnap_|\/snap_|^cellpart:/.test(it.p))n++})}
+  return {txt:'restores the previous data for '+n+' plant-month'+(n===1?'':'s'),ok:true};
+}
+function bulkSelected(){
+  return Object.keys(S.hist.sel).map(function(id){return S.uploads.find(function(x){return x._id===id})}).filter(function(u){return u&&u.status!=='Undone'}).sort(function(a,b){return a.at<b.at?1:-1});
+}
+Object.assign(handlers,{
+ 'hist-sel':function(t){var id=t.getAttribute('data-id');if(S.hist.sel[id])delete S.hist.sel[id];else S.hist.sel[id]=true;S.hist.sig='';var bb=$('#hist-bulk');if(bb)bb.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')'},
+ 'hist-bulk':async function(){
+  if(!superOnly('undo uploads'))return;
+  var list=bulkSelected();if(!list.length){toast('Tick the uploads to undo first');return}
+  openDlg('<h3>Undo '+list.length+' upload'+(list.length===1?'':'s')+', newest first</h3><p class="note" style="margin:0">Each one uses the normal Undo, with its integrity check. The run stops at the first failure.</p><ol id="bulk-list">'+list.map(function(u){var pl=bulkPlanLine(u);return '<li id="bk-'+esc(u._id)+'"><b>'+esc(u.file||u._id)+'</b> · '+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+' · '+esc(u.periodLabel||'')+' · removes '+pl.n+' '+pl.unit+' · <span class="note bu">checking the backup...</span></li>'}).join('')+'</ol><div class="row"><button class="btn pri" data-act="bulk-go" id="bulk-go">Undo these '+list.length+' now</button><button class="btn" data-act="dlg-close">Cancel</button></div><div id="bulk-out"></div><div id="d-err"></div>');
+  for(var i=0;i<list.length;i++){var r=await bulkBackupUnits(list[i]._id),el=document.querySelector('#bk-'+list[i]._id.replace(/[^\w-]/g,'')+' .bu');if(el)el.textContent=r.txt}
+ },
+ 'bulk-go':async function(){
+  if(!superOnly('undo uploads'))return;
+  var list=bulkSelected(),out=document.getElementById('bulk-out'),btn=document.getElementById('bulk-go');if(btn)btn.disabled=true;
+  var r=await undoBulkRun(list,function(n){if(out)out.innerHTML='<div class="note">'+n+' of '+list.length+' undone...</div>'});
+  r.done.forEach(function(f,k){delete S.hist.sel[list[k]._id]});
+  if(r.stopped){if(out)out.innerHTML='<div class="banner err" style="display:block"><b>Stopped at '+esc(r.stopped.file||r.stopped.id)+'.</b> '+esc(r.stopped.msg)+' '+r.done.length+' of '+list.length+' were undone; nothing after this one was touched.</div>'+(r.done.length?'<p class="note">Undone: '+esc(r.done.join(', '))+'</p>':'');return}
+  S.hist.sig='';if(out)out.innerHTML='<div class="banner ok" style="display:block"><b>All '+list.length+' undone</b> (newest first): '+esc(r.done.join(', '))+'.</div>';
+  var bb=$('#hist-bulk');if(bb)bb.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')';
+ }
+});
+
+/* the one bulk-undo loop, used by the "Undo selected" dialog and by queued jobs: newest first, through the integrity-checked undoUpload, stop at the first failure */
+async function undoBulkRun(list,progress){
+  var o1=openDlg,c1=closeDlg,done=[],results=[],tmp=null;
+  if(!document.getElementById('d-err')){tmp=document.createElement('div');tmp.id='d-err';tmp.style.display='none';document.body.appendChild(tmp)}
+  try{
+    for(var i=0;i<list.length;i++){
+      var u=list[i],hadBk=bkHas(u._id),cap='',err=null;
+      openDlg=function(h){cap=h};closeDlg=function(){};
+      try{await undoUpload(u._id)}catch(e){err=dbErrText(e)}
+      openDlg=o1;closeDlg=c1;
+      var de=document.getElementById('d-err');if(!err&&de&&/Undo stopped/.test(de.textContent)){err=de.textContent.replace(/^[\s\S]*?Undo stopped:\s*/,'').trim()}
+      if(de)de.innerHTML='';
+      if(!err&&/Undo stopped/.test(cap)){var m=/Undo stopped: ([^<]*)/.exec(cap);err=m?m[1]:'Undo stopped'}
+      if(err){results.push({id:u._id,file:u.file||'',text:'stopped: '+err});return {done:done,results:results,stopped:{id:u._id,file:u.file,msg:err}}}
+      var units=(S.bkLast&&S.bkLast.units)||0;
+      results.push({id:u._id,file:u.file||'',text:hadBk&&units>0?'restored '+units+' plant-month'+(units===1?'':'s'):(hadBk?'removed (backup held nothing to restore)':'removed, no backup')});
+      done.push(u.file||u._id);if(progress)progress(done.length);
+    }
+    return {done:done,results:results,stopped:null};
+  }finally{openDlg=o1;closeDlg=c1;if(tmp)tmp.remove()}
 }

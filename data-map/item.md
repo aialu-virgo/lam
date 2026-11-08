@@ -91,3 +91,6 @@ Not a time series. One snapshot dated 30 Sep 2026 covers every sold B1 laminate 
 |---|---|
 | Q3 FY24 to Q1 FY27 | not applicable (snapshot); items inactive since then may be absent |
 | Q2 FY27 and Q3 FY27 | loaded (snapshot 30 Sep 2026); items created in Oct 2026 missing |
+
+## Brand and thickness kept per item (D55, 4 Nov 2026)
+The item chunks `items/c<i>` now carry `[code, group, sqft per sheet, thickness mm, uom, active, size, brand]` (field 8 is new; older chunks with 7 fields are still read). Brand is read from a column named `Brand`, `Brand Name`, `Item Brand` or `Make`; if the file has none the items load without a brand and the Admin check says so. A re-upload replaces the whole master and the item index refreshes. The template now ends with a `Brand` column.

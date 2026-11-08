@@ -150,3 +150,6 @@ Rejected rows and unanswered follow-ups are reviewed weekly ([Rules — learning
 
 ## V13. Expected month and date correction (D34, 21 Oct 2026)
 Each upload has an expected month: from the file name (YYYY-MM or Mon YYYY); otherwise the month holding at least 80% of the unambiguous dates (ISO text, or day over 12); if the name and those dates disagree, the dates win and the screen says so; otherwise none (rows are split by their own dates). The uploader can change it with a picker. A row whose date falls outside it is tried with day and month swapped (text and serial alike); if that lands in the expected month the date is stored corrected and counted in Fixes applied ("N dates corrected to Mar 2026"). A row still outside it, or dated in the future, is skipped with the reason "Date outside <month>" / "Date in the future"; it never blocks the file. The only stop left is the replace guard: a re-upload that would replace a plant-month holding more lines than the new data needs a confirm listing those months. Undo upload removes what one upload still holds (it cannot restore what it overwrote).
+
+
+> **D34:** Rule R4 runs on the latest stock snapshot. Trigger A (aged sheets) needs batch dates; without them only trigger B (stock days) can fire.

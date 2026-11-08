@@ -2,8 +2,8 @@
 S.adminTab='users';S.rbBusy=false;
 function adminTabs(){
   var r=effRole();
-  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['aliases','Aliases'],['settings','Rules & settings'],['tools','Tools']];
-  return [['potential','Market potential']];
+  if(r==='Super admin')return [['users','Users'],['plants','Plants'],['potential','Market potential'],['transfers','Internal transfer customers'],['items','Item master'],['semp','Sales employees'],['customers','Customers'],['aliases','Aliases'],['settings','Rules & settings'],['tools','Tools']];
+  return [['users','Users']];
 }
 function buildAdmin(){
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
@@ -15,36 +15,37 @@ function refreshAdmin0(){
   var el=$('#a-body');if(!el)return;
   var tabs=adminTabs();if(!tabs.some(function(t){return t[0]===S.adminTab}))S.adminTab=tabs[0][0];
   var focusId=document.activeElement&&document.activeElement.id,t=S.adminTab;
-  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():t==='aliases'?aliasesHtml():potentialHtml();
+  var html=t==='users'?usersHtml():t==='plants'?plantsHtml():t==='transfers'?transfersHtml():t==='settings'?settingsHtml():t==='tools'?toolsHtml():t==='items'?itemsHtml():t==='semp'?sempHtml():t==='customers'?custHtml():t==='aliases'?aliasesHtml():potentialHtml();
   if(el.getAttribute('data-h')!==String(html.length)+t||(t!=='settings'&&t!=='aliases')){el.innerHTML=html;el.setAttribute('data-h',String(html.length)+t)}
   if(focusId){var f=document.getElementById(focusId);if(f&&f.focus){f.focus();try{var v=f.value;if(f.setSelectionRange&&f.type!=='number'&&f.type!=='email'&&f.type!=='date')f.setSelectionRange(v.length,v.length)}catch(e){}}}
 }
-/* ---- plan permissions ---- */
+/* ---- plan permissions (one home for the P1 rules; the Targets & Potential tab and the CSV upload both call these) ---- */
 function planVisible(x){var sc=SC();if(!sc.plants)return true;return !!x.plant_code&&sc.plants.has(x.plant_code)}
+/* who may propose a sales target: Branch manager (own plants), Management / HO, Super admin. HOD and Sales executive view only (D70). */
 function planGuard(x){
   var u=effUser();if(readOnly())return 'Viewing as another user: preview is read-only';
-  if(['Super admin','Management / HO','HOD','Branch / depot manager'].indexOf(u.role)<0)return 'Your role cannot propose or approve sales targets';
+  if(['Super admin','Management / HO','Branch / depot manager'].indexOf(u.role)<0)return 'Your role cannot propose or approve sales targets';
   if(u.role==='Branch / depot manager'&&(!x.plant_code||!holdsPlant(u,x.plant_code)))return 'A Branch manager proposes targets for own plants only';
   return '';
 }
-function proposerOf(x){var rv=(x.revisions||[]).filter(function(r){return r.status==='Draft'}).slice(-1)[0];return rv?rv.by:''}
-async function advancePot(id){
-  var x=S.potential.find(function(p){return p._id===id});if(!x)return;var u=effUser();
-  var g=planGuard(x);if(g){toast(g);return}
-  if(isPlanLocked(x.fy_quarter)){toast('That quarter is locked');return}
-  var nx={Draft:'Discussed',Discussed:'Approved'}[x.status];if(!nx){toast(x.status==='Approved'?'Use Lock quarter to freeze approved targets':'Nothing further');return}
-  var last=(x.revisions||[]).slice(-1)[0]||{};
-  if(nx==='Discussed'){var lastDraft=(x.revisions||[]).filter(function(r){return r.status==='Draft'}).slice(-1)[0]||{};
-    if(!lastDraft.reason||!lastDraft.discussion_date||!lastDraft.participants){toast('Discussed needs a reason, a discussion date and the participants. Save a revision with all three first.');return}}
+/* the proposer is whoever last saved a Draft; a "returned" Draft written by the approver does not make the approver the proposer */
+function proposerOf(x){var rv=(x.revisions||[]).filter(function(r){return r.status==='Draft'&&!r.returned}).slice(-1)[0];return rv?rv.by:''}
+/* Draft to Discussed ("Proposed" on the page) to Approved. Returns {err} or {doc,nx}; the caller writes the document. */
+function advanceDoc(x,u){
+  var g=planGuard(x);if(g)return {err:g};
+  if(isPlanLocked(x.fy_quarter))return {err:'That quarter is locked'};
+  var nx={Draft:'Discussed',Discussed:'Approved'}[x.status];if(!nx)return {err:x.status==='Approved'?'Use Lock quarter to freeze approved targets':'Nothing further'};
+  if(nx==='Discussed'){var lastDraft=(x.revisions||[]).filter(function(r){return r.status==='Draft'&&!r.returned}).slice(-1)[0]||{};
+    if(!lastDraft.reason||!lastDraft.discussion_date||!lastDraft.participants)return {err:'Discussed needs a reason, a discussion date and the participants. Save a revision with all three first.'}}
   if(nx==='Approved'){
-    if(['Super admin','Management / HO'].indexOf(u.role)<0){toast('Approval is by SP Sir or a Management / HO user');return}
-    if(proposerOf(x)===u.email){toast('The proposer cannot approve their own revision');return}
-    if(x.share_pct===''||x.share_pct==null){toast('Set a share % before approval');return}
+    if(['Super admin','Management / HO'].indexOf(u.role)<0)return {err:'Approval is by SP Sir or a Management / HO user'};
+    if(proposerOf(x)===u.email)return {err:'The proposer cannot approve their own revision'};
+    if(x.share_pct===''||x.share_pct==null)return {err:'Set a share % before approval'};
   }
   var revs=(x.revisions||[]).concat([{n:x.rev||1,at:nowISO(),by:u.email,status:nx,reason:'Status change',discussion_date:'',participants:'',change:x.status+' to '+nx}]);
   var doc=Object.assign({},x,{status:nx,revisions:revs.slice(-40)});delete doc._id;
   if(nx==='Approved'){var ap={potential_value_inr:+x.potential_value_inr||0,potential_qty_sheets:+x.potential_qty_sheets||0,potential_qty_sqft:+x.potential_qty_sqft||0,share_pct:+x.share_pct,rev:x.rev||1,by:u.email,at:nowISO()};doc.approved=ap;if(!doc.original)doc.original=ap}
-  await dset('potential/'+id,doc);closeDlg();toast('Marked '+nx);
+  return {doc:doc,nx:nx};
 }
 function senseHtml(x){
   if(noData()||!x.plant_code)return '';
@@ -83,7 +84,7 @@ function toolsHtml(){
    +'<div class="kpis"><div class="kpi"><small>Roll-up documents</small><b>'+fmtN(rc)+'</b><small>'+(miss?miss+' plant-months still to build':'all plant-months have one')+'</small></div><div class="kpi"><small>Rules engine</small><b style="font-size:13px;font-family:var(--font)">'+esc(S.engStatus||'not run yet')+'</b></div></div>'
    +'<div class="row"><button class="btn" data-act="rb-run"'+(S.rbBusy?' disabled':'')+'>Rebuild roll-ups now</button><button class="btn" data-act="rules-run">Run the rules now</button></div>'
    +'<p class="note">Roll-ups are the small per plant × month summaries every business page reads. They are written on each upload; this rebuilds any that are missing (for example data loaded earlier).</p>'
-   +'<h3 style="margin:8px 0 0;font-size:13px">Test clock (this browser only)</h3><div class="row"><div class="fld"><label for="tc-d">Pretend today is</label><input id="tc-d" type="date" class="in" value="'+TODAY()+'"></div><button class="btn" data-act="clock-set">Set</button><button class="btn" data-act="clock-reset">Use the real date</button></div><p class="note">For the escalation walk-through: set a date, open Action Center, and the next ladder step is drafted. The real date is '+fmtDate(realToday())+'. The clock never changes stored data other than the drafts it causes.</p></section>';
+   +'<h3 style="margin:8px 0 0;font-size:13px">Test clock (this browser only)</h3><div class="row"><div class="fld"><label for="tc-d">Pretend today is</label><input id="tc-d" type="date" class="in" value="'+TODAY()+'"></div><button class="btn" data-act="clock-set">Set</button><button class="btn" data-act="clock-reset">Use the real date</button></div><p class="note">For the escalation walk-through: set a date, open Action Center, and the next ladder step is drafted. The real date is '+fmtDate(realToday())+'. The clock never changes stored data other than the drafts it causes.</p></section>'+(typeof fbHtml==='function'?fbHtml():'');
 }
 function missingRolls(){
   var out=[];Object.keys(S.cells).forEach(function(cid){var c=S.cells[cid];if(c.entity!=='INV')return;Object.keys(c.plants||{}).forEach(function(p){var id=p+'-'+c.ym,r=S.rollDocs[id];if(!r||r.src!==c.plants[p].at)out.push({p:p,ym:c.ym,info:c.plants[p],id:id})})});
@@ -197,7 +198,6 @@ async function demoOps(){
   var o=DemoGen.ops({today:today,plants:plants,months:months,planMonths:plan,seed:31});
   var i;
   for(i=0;i<o.receivables.length;i++)await dset('receivables/'+o.receivables[i].plant,Object.assign({demo:true},o.receivables[i]));
-  for(i=0;i<o.stock.length;i++)await dset('stock/'+o.stock[i].plant,Object.assign({demo:true},o.stock[i]));
   for(i=0;i<o.collections.length;i++){var c=o.collections[i];await dset('collections/'+c.plant+'-'+c.ym,Object.assign({demo:true},c))}
 }
 async function demoActions(){
@@ -208,6 +208,19 @@ async function demoActions(){
   list.push(mk('DEMO_VER','DEMO closure waiting for verification','bm.a@demo','hod.sales@demo',addDays(t,1),0,{status:'Done',closure:'Dispatched and confirmed with the customer.',done_at:nowISO()}));
   list.push(mk('DEMO_S1','DEMO call customer','se.s1@demo','bm.a@demo',addDays(t,1),300000,{plant:'1012'}));
   for(i=0;i<list.length;i++)await dset('actions/'+list[i].id,list[i]);
+}
+/* synthetic stock snapshots (batch layout, two warehouses per plant): month-end and today */
+async function demoStock(){
+  if(!window.DemoGen||!DemoGen.stockFile)return;
+  var idx=await loadItemIdx(),items=Array.from(idx.keys()).filter(function(c){return /^DEMOFG/.test(c)});if(!items.length)return;
+  var today=TODAY(),me=addDays(today.slice(0,7)+'-01',-1),plants=['1001','1011','1012','1013'].map(function(c){return {code:c}}),saveU=U;
+  var asOfs=[me,today];
+  for(var i=0;i<asOfs.length;i++){
+    var f=DemoGen.stockFile({kind:'batch',asOf:asOfs[i],plants:plants,items:items,seed:41+i});
+    U=newU();U.kind='stock';U.entity='ST';U.sk='batch';U.sys='B1';U.name='DEMO Stock '+asOfs[i]+' (synthetic).csv';U.headers=f.headers;U.rows=f.rows;U.map=stockDefaultMap('batch',f.headers);U.asOf=asOfs[i];U.demoFlag=true;
+    U.res=await stockParse();U.stage='validated';await stockLoad();
+  }
+  U=saveU;
 }
 /* synthetic masters: written only when no real master is loaded; flagged demo so Clear demo removes only these */
 async function demoMasters(){
@@ -233,6 +246,7 @@ async function demoMasters(){
 }
 async function demoExtras(facts){
   await demoMasters();
+  await demoStock();
   await demoPeople();
   var n=await demoPlans(facts,gridQuarters().cur);
   await demoOps();

@@ -9,7 +9,7 @@ const k=Object.keys(store).find(k=>k.startsWith('inv/B1-1012-2026-09-0'));const 
 ok('stored document index row has doc type (10 fields) and chunk has system',o.h[0].length===10&&o.h[0][9]==='INV'&&store[k].sys==='B1',JSON.stringify(o.h[0]));
 for(const email of ['data@virgoasia.com','mgmt@demo']){
  const {page}=await open(browser,{store,viewer:{email,name:email}});await page.waitForTimeout(2500);
- await page.evaluate(()=>{location.hash='#/overview'});await page.waitForTimeout(1200);
+ await page.evaluate(()=>{location.hash='#/overview'});await page.waitForTimeout(1200);await page.evaluate(()=>{const b=document.querySelector('[data-act=\"ox-open\"][data-k=\"trendrs\"]');if(b)b.click()});await page.waitForTimeout(700);
  /* trend bar */
  await page.evaluate(()=>{const r=[...document.querySelectorAll('.bar-q')];r[r.length-3].dispatchEvent(new MouseEvent('click',{bubbles:true}))});await page.waitForTimeout(700);
  let crumbs=await page.locator('#drillp .crumbs .chip').allInnerTexts();ok(`${email} Overview bar: quarter drill with chips`,crumbs.length>=2&&await page.locator('#drillp').count()===1,crumbs.join(' > '));
@@ -19,8 +19,8 @@ for(const email of ['data@virgoasia.com','mgmt@demo']){
  const row=(await page.locator('#drillp table').nth(1).locator('tbody tr').first().innerText()).replace(/\s+/g,' ');
  ok(`${email} Overview: month -> documents with System, Doc type, Doc no, Date`,heads.slice(0,4).join(',').toUpperCase()==='SYSTEM,DOC TYPE,DOC NO,DATE'&&/^(B1|S4) INV DEMO-\d+ \d{4}-\d\d-\d\d/.test(row)&&crumbs.length>=4,heads.slice(0,4).join(',')+' | '+row.slice(0,60)+' | '+crumbs.join(' > '));
  /* branch chart bar */
- await page.evaluate(()=>{location.hash='#/overview'});await page.waitForTimeout(800);
- await page.locator('.hb[data-act="ov-branch"]').first().click();await page.waitForTimeout(2500);
+ await page.evaluate(()=>{location.hash='#/overview'});await page.waitForTimeout(800);await page.evaluate(()=>{const b=document.querySelector('[data-act=\"ox-open\"][data-k=\"trendrs\"]');if(b)b.click()});await page.waitForTimeout(700);
+ await page.evaluate(()=>{const b=document.querySelector('[data-act="ox-tog"][data-k="branch"]');if(b)b.click()});await page.waitForTimeout(700);await page.locator('tr[data-act="ov-branch"]').first().click();await page.waitForTimeout(2500);
  const t=await page.innerText('#pg'),cr=await page.locator('.crumbs .chip').allInnerTexts();
  ok(`${email} Overview branch bar -> that branch's salesperson list`,/LEVEL 2 · SALESPERSON/i.test(t)&&cr.length>=2,cr.join(' > '));
  await page.locator('tr[data-act="dd"][data-k="sp"]').first().click();await page.waitForTimeout(1500);

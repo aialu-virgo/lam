@@ -15,15 +15,15 @@ function plantSet(plants){return plants instanceof Set?plants:null}
 function recvItems(plants){var sc=SC(),out=[];S.recv.forEach(function(d){if(!plantInScope(sc,d.plant)||(plants&&!plants.has(d.plant)))return;d.rows.forEach(function(r){out.push({plant:d.plant,inv:r[0],cust:r[1],name:r[2],due:r[3],open:r[4],total:r[5]})})});return out}
 function recvStats(plants){
   var it=recvItems(plants);if(!it.length)return {have:false,buckets:[0,0,0,0],notDue:0,total:0,overShare:null};
-  var t=TODAY(),b=[0,0,0,0],nd=0,tot=0,over=0;
+  var t=S.recvAsOf||TODAY(),b=[0,0,0,0],nd=0,tot=0,over=0;
   it.forEach(function(x){var od=diffDays(t,x.due);tot+=x.open;if(od<=0){nd+=x.open;return}if(od<=30)b[0]+=x.open;else if(od<=60)b[1]+=x.open;else if(od<=90)b[2]+=x.open;else b[3]+=x.open;if(od>CFG.overdue_share_days)over+=x.open});
   return {have:true,buckets:b,notDue:nd,total:tot,overShare:tot>0?over/tot*100:null,items:it};
 }
 function stockStats(plants){
   var sc=SC(),ds=S.stock.filter(function(d){return plantInScope(sc,d.plant)&&(!plants||plants.has(d.plant))});if(!ds.length)return {have:false};
-  var onh=0,aged=0,daysNum=0,daysDen=0;
-  ds.forEach(function(d){d.rows.forEach(function(r){onh+=r[1];aged+=r[2];var sd=stockDays(d.plant,r[0],r[1]);if(sd!=null){daysNum+=sd*r[1];daysDen+=r[1]}})});
-  return {have:true,onHand:onh,aged:aged,agedPct:onh>0?aged/onh*100:0,days:daysDen>0?daysNum/daysDen:null};
+  var onh=0,aged=0,ageBase=0,daysNum=0,daysDen=0,asOf=S.stockAsOf||'';
+  ds.forEach(function(d){d.rows.forEach(function(r){onh+=r[1];if(d.hasAge&&r[3]){aged+=r[2];ageBase+=r[3].reduce(function(a,b){return a+b},0)}var sd=stockDays(d.plant,r[0],r[1],d.asOn);if(sd!=null){daysNum+=sd*r[1];daysDen+=r[1]}})});
+  return {have:true,onHand:onh,aged:aged,agedPct:ageBase>0?aged/ageBase*100:null,hasAge:ageBase>0,days:daysDen>0?daysNum/daysDen:null};
 }
 function collMonths(plants,ms){
   var sc=SC(),rec=0,plan=0,have=false,planHave=false,planDefault=false;
@@ -57,12 +57,12 @@ function pageReceivables(){
   if(st.have){
     var names=['0–30','31–60','61–90','90+'],cols=['green','orange','red','red'];
     var cards=[kpiCard({color:'indigo',chip:'₹',title:'Open receivables',value:fmtMoney(st.total),sub:fmtMoney(st.notDue)+' not yet due',status:'none',pillTxt:'No plan',rows:[['Plan','—'],['Var','—'],['Ach %','—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['12-qtr trend','—']]}),
-     kpiCard({color:'orange',chip:'%',title:'K10 · Overdue share (over '+CFG.overdue_share_days+' days)',value:st.overShare!=null?st.overShare.toFixed(1)+'%':'—',sub:'Open receivables more than '+CFG.overdue_share_days+' days past due ÷ total open.',status:st.overShare==null?'none':statusOf(st.overShare/15*100,true),ach:st.overShare!=null?Math.min(100,15/Math.max(st.overShare,.1)*100):null,rows:[['Plan','15% (Assumed)'],['Var',st.overShare!=null?(st.overShare-15>=0?'+':'−')+Math.abs(st.overShare-15).toFixed(1)+' pts':'—'],['Ach %',st.overShare!=null?fmtAch(15/Math.max(st.overShare,.1)*100):'—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['12-qtr trend','—']]}),col.card];
+     kpiCard({color:'orange',chip:'%',title:'K10 · Overdue share (over '+CFG.overdue_share_days+' days)',value:st.overShare!=null?st.overShare.toFixed(1)+'%':'—',sub:'Open receivables more than '+CFG.overdue_share_days+' days past due ÷ total open.',status:st.overShare==null?'none':statusOf(achLower(st.overShare,15).ach),ach:st.overShare!=null?Math.min(100,achLower(st.overShare,15).ach):null,rows:[['Plan','15% (Assumed)'],['Var',st.overShare!=null?(st.overShare-15>=0?'+':'−')+Math.abs(st.overShare-15).toFixed(1)+' pts':'—'],['Ach %',st.overShare!=null?fmtAchLower(achLower(st.overShare,15)):'—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['12-qtr trend','—']]}),col.card];
     h+='<div class="kpirow">'+cards.join('')+'</div>';
     h+='<section class="card"><div class="hd"><h2>Ageing · days past due</h2></div><div class="ctiles">'+names.map(function(n,i){return '<div class="ctile t-'+['A','B','C','C'][i]+'"><b>'+n+' days</b><span class="big">'+fmtMoney(st.buckets[i])+'</span><span>'+(st.total>0?(st.buckets[i]/st.total*100).toFixed(1):'0.0')+'% of open</span></div>'}).join('')+'</div></section>';
-    var by={};st.items.forEach(function(x){var od=diffDays(TODAY(),x.due);if(od<=0)return;var k=x.plant+'|'+x.cust,o=by[k]||(by[k]={plant:x.plant,cust:x.cust,name:x.name,b:[0,0,0,0],total:0,oldest:0});var bi=od<=30?0:od<=60?1:od<=90?2:3;o.b[bi]+=x.open;o.total+=x.open;o.oldest=Math.max(o.oldest,od)});
+    var by={};st.items.forEach(function(x){var od=diffDays(S.recvAsOf||TODAY(),x.due);if(od<=0)return;var k=x.plant+'|'+x.cust,o=by[k]||(by[k]={plant:x.plant,cust:x.cust,name:x.name,b:[0,0,0,0],total:0,oldest:0});var bi=od<=30?0:od<=60?1:od<=90?2:3;o.b[bi]+=x.open;o.total+=x.open;o.oldest=Math.max(o.oldest,od)});
     var rows=Object.keys(by).map(function(k){return by[k]}).filter(function(o){var q=(S.f.search||'').toLowerCase();return !q||(o.cust+o.name).toLowerCase().indexOf(q)>=0}).sort(function(a,b){return b.total-a.total}).slice(0,60);
-    h+='<section class="card"><div class="hd"><h2>Overdue by customer</h2><span class="note">Source: open invoice items (SAP B1 OINV / S/4 BSID). Rule R2 raises an action at '+CFG.rcv_days+' days and '+fmtMoney(CFG.rcv_min_inr)+'.</span></div><div class="tw tall"><table><thead><tr><th>Customer</th><th>Plant</th><th class="num">0–30</th><th class="num">31–60</th><th class="num">61–90</th><th class="num">90+</th><th class="num">Overdue</th><th class="num">Oldest (days)</th></tr></thead><tbody>'+rows.map(function(o){return '<tr><td class="break"><b>'+esc(o.cust)+'</b> '+esc(o.name||'')+'</td><td>'+esc(plantShort(o.plant))+'</td>'+o.b.map(function(v){return '<td class="num">'+(v?fmtMoney(v):'—')+'</td>'}).join('')+'<td class="num"><b>'+fmtMoney(o.total)+'</b></td><td class="num">'+o.oldest+'</td></tr>'}).join('')+'</tbody></table></div></section>';
+    h+='<section class="card"><div class="hd"><h2>Overdue by customer</h2><span class="note">Source: open invoice items (SAP B1 OINV / S/4 BSID). Rule R2 raises an action at '+CFG.rcv_days+' days and '+fmtMoney(CFG.rcv_min_inr)+'.</span></div><div class="tw tall"><table><thead><tr><th>Customer</th><th>Plant</th><th class="num">0–30</th><th class="num">31–60</th><th class="num">61–90</th><th class="num">90+</th><th class="num">Overdue</th><th class="num">Oldest (days)</th>'+(S.custIdx&&S.custIdx.size?'<th>Salesperson (master)</th><th class="num">Credit limit</th><th class="num">Over limit by</th>':'')+'</tr></thead><tbody>'+rows.map(function(o){var ci=custInfo(o.cust),tot=custOpenTotal(o.cust),over=ci&&ci[6]>0&&tot>ci[6]?tot-ci[6]:0;return '<tr><td class="break"><b>'+esc(o.cust)+'</b> '+esc(custName(o.cust,o.name))+'</td><td>'+esc(plantShort(o.plant))+'</td>'+o.b.map(function(v){return '<td class="num">'+(v?fmtMoney(v):'—')+'</td>'}).join('')+'<td class="num"><b>'+fmtMoney(o.total)+'</b></td><td class="num">'+o.oldest+'</td>'+(S.custIdx&&S.custIdx.size?'<td>'+(ci&&ci[5]?esc(ci[5])+' <span class="note">suggested</span>':'—')+'</td><td class="num">'+(ci&&ci[6]>0?fmtMoney(ci[6]):'—')+'</td><td class="num">'+(over?'<span class="pill miss">'+fmtMoney(over)+'</span>':'—')+'</td>':'')+'</tr>'}).join('')+'</tbody></table></div></section>'+recvCreditHtml(plants);
   }else h+=needPanel(['recv'],'No receivable items are loaded.');
   /* collection plan vs actual by month */
   if(col.have){
@@ -75,21 +75,6 @@ function pageReceivables(){
 }
 
 /* ---- Inventory ---- */
-function pageInventory(){
-  var ctx=viewCtx(),ds=inScopeDocs(S.stock,ctx);
-  if(!ds.length)return needPanel(['stock'],'No stock is loaded.');
-  var plants=ctx.f.plant?new Set([ctx.f.plant]):ctx.plants,st=stockStats(plants);
-  var cards=[kpiCard({color:'indigo',chip:'▦',title:'Stock on hand',value:fmtN(st.onHand)+' sheets',sub:'All product groups in scope.',status:'none',pillTxt:'No plan',rows:[['Plan','—'],['Var','—'],['Ach %','—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['12-qtr trend','—']]}),
-   kpiCard({color:'violet',chip:'⏳',title:'K15 · Stock days',value:st.days!=null?st.days.toFixed(1)+' d':'—',sub:'On hand ÷ average daily sheets sold in the last three completed months.',status:st.days==null?'none':statusOf(st.days/CFG.stock_days_target*100,true),ach:st.days!=null?Math.min(100,CFG.stock_days_target/Math.max(st.days,.1)*100):null,rows:[['Plan',CFG.stock_days_target+' d'],['Var',st.days!=null?(st.days-CFG.stock_days_target>=0?'+':'−')+Math.abs(st.days-CFG.stock_days_target).toFixed(1)+' d':'—'],['Ach %',st.days!=null?fmtAch(CFG.stock_days_target/Math.max(st.days,.1)*100):'—'],['Last Qtr','no prior snapshot'],['QoQ %','—'],['12-qtr trend','—']]}),
-   kpiCard({color:'orange',chip:'%',title:'K16 · Aged stock % (over '+CFG.stock_age_days+' days)',value:st.agedPct.toFixed(1)+'%',sub:fmtN(st.aged)+' aged sheets.',status:statusOf(st.agedPct/10*100,true),ach:Math.min(100,10/Math.max(st.agedPct,.1)*100),rows:[['Plan','10% (Assumed)'],['Var',(st.agedPct-10>=0?'+':'−')+Math.abs(st.agedPct-10).toFixed(1)+' pts'],['Ach %',fmtAch(10/Math.max(st.agedPct,.1)*100)],['Last Qtr','no prior snapshot'],['QoQ %','—'],['12-qtr trend','—']]})];
-  var rows=[];ds.forEach(function(d){d.rows.forEach(function(r){var sd=stockDays(d.plant,r[0],r[1]);rows.push({plant:d.plant,group:r[0],on:r[1],aged:r[2],b:r[3]||[],days:sd})})});
-  var q=(S.f.search||'').toLowerCase();rows=rows.filter(function(r){return !q||(plantShort(r.plant)+r.group).toLowerCase().indexOf(q)>=0});
-  var h='<div class="kpirow">'+cards.join('')+'</div>';
-  h+='<section class="card"><div class="hd"><h2>Stock vs plan · plant × product group</h2><span class="note">As on '+esc(fmtDate(ds[0].asOn||TODAY()))+'</span></div><div class="tw tall"><table class="std"><thead><tr><th>Plant</th><th>Group</th><th class="num">On hand (sheets)</th><th class="num">Plan days</th><th class="num">Stock days</th><th class="num">Var</th><th class="num">Ach %</th><th class="num">Aged &gt;'+CFG.stock_age_days+'d</th><th class="num">Aged %</th><th>Status</th></tr></thead><tbody>'
-   +rows.sort(function(a,b){return (b.days||0)-(a.days||0)}).map(function(r){var ach=r.days!=null?CFG.stock_days_target/Math.max(r.days,.1)*100:null;var stt=r.days!=null?statusOf(r.days/CFG.stock_days_target*100,true):'none';return '<tr><td>'+esc(plantShort(r.plant))+'</td><td>'+esc(r.group)+'</td><td class="num">'+fmtN(r.on)+'</td><td class="num">'+CFG.stock_days_target+'</td><td class="num">'+(r.days!=null?r.days.toFixed(1):'—')+'</td><td class="num">'+(r.days!=null?(r.days-CFG.stock_days_target>=0?'+':'−')+Math.abs(r.days-CFG.stock_days_target).toFixed(1):'—')+'</td><td class="num">'+fmtAch(ach)+'</td><td class="num">'+fmtN(r.aged)+'</td><td class="num">'+(r.on>0?(r.aged/r.on*100).toFixed(1)+'%':'—')+'</td><td>'+statusPill(stt)+'</td></tr>'}).join('')+'</tbody></table></div>';
-  h+='<p class="note">Stock days are per plant × product group. Item-level stock days cannot be derived (the invoice store has no item; decision D9). Stock snapshots keep no history yet, so Last Qtr and QoQ show "—". Rule R4 raises an action at '+fmtN(CFG.stock_age_min_sheets)+' aged sheets or '+CFG.stock_over_pct+'% of plan days.</p></section>';
-  return h;
-}
 
 /* ---- collections: quarter series since history start for a scorecard (Accounts' primary KPI) ---- */
 function collSeries(plants){

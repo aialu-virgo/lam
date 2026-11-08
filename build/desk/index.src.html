@@ -143,14 +143,14 @@ tr:last-child td{border-bottom:0}
 (function(){
 'use strict';
 /* ================= constants ================= */
-var SEED_SUPER=['data@virgoasia.com','spa@virgoasia.com'];
+var SEED_SUPER=['data@virgoasia.com','spa@virgoasia.com','ai.acp@virgoasia.com'];
 var ROLES=['Super admin','Management / HO','HOD','Branch / depot manager','Sales executive','Coordinator (sales / CRR)','Accounts','Plant'];
 var GROUPS=['Laminate','Door','PVC sheet','Compact board'];
 var SEGMENT_NOTE='Segments are configurable (open question Q5).';
-var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'CN',label:'Credit note'},{k:'RC',label:'Receivable'},{k:'CL',label:'Collection'},{k:'ST',label:'Stock'}];
+var ENTITIES=[{k:'INV',label:'Invoice',live:true},{k:'CN',label:'Credit note',live:true},{k:'RC',label:'Receivable',live:true},{k:'CL',label:'Collection',live:true},{k:'ST',label:'Stock',live:true}];
 var ODATA=[['Customer','API_BUSINESS_PARTNER'],['Item','API_PRODUCT_SRV'],['Invoice / credit note','API_BILLING_DOCUMENT_SRV'],['Receivable / collection','I_OperationalAcctgDocItem'],['Stock','API_MATERIAL_STOCK_SRV']];
 var TEMPLATES={
- users:'email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code',
+ users:'user_id,email,name,role,department,plant_codes,reports_to_email,whatsapp_number,today_cap,active,sales_employee_code',
  plants:'plant_code,plant_name,plant_type,zone,state,b1_bpl_name,active',
  potential:'fy_quarter,plant_code,territory,product_group,customer_segment,potential_value_inr,potential_qty_sheets,potential_qty_sqft,source_type,source_note,owner_email',
  transfers:'CardCode,CardName,Tranfser',
@@ -218,7 +218,7 @@ async function ungz(s){var ds=new DecompressionStream('gzip');var w=ds.writable.
 
 /* ================= state ================= */
 var S={planlocks:{},audit:[],viewer:null,role:null,db:null,dbState:'init',users:[],plants:[],transfers:[],periods:{},cells:{},mappings:{},uploads:[],potential:[],logs:[],
-  tab:'intake',adminTab:'users',loaded:{},seeded:false,covSel:null,themeSeen:false,docCount:null,potFilter:{q:'',plant:'',group:'',seg:''}};
+  tab:'intake',adminTab:'users',loaded:{},seeded:false,covSel:null,themeSeen:false,docCount:null};
 var U=null; /* current upload */
 var cancelFlag=false;
 
@@ -292,7 +292,7 @@ async function seedDefaults(){
   try{
     var em=(S.viewer.email||'').toLowerCase();
     if(!S.users.length){
-      for(var i=0;i<SEED_SUPER.length;i++){var e=SEED_SUPER[i];await dset('users/'+slug(e),{email:e,name:e===em?(S.viewer.name||e):(e.indexOf('data@')===0?'Vijay':'SP Sir'),role:'Super admin',department:'HO',plant_codes:'',reports_to_email:'',whatsapp_number:'',today_cap:5,active:true,sales_employee_code:'',seed:true})}
+      for(var i=0;i<SEED_SUPER.length;i++){var e=SEED_SUPER[i];await dset('users/'+slug(e),{email:e,name:e===em?(S.viewer.name||e):({'data@virgoasia.com':'Vijay','spa@virgoasia.com':'SP Sir','ai.acp@virgoasia.com':'Admin AI ACP'}[e]||e),role:'Super admin',department:'HO',plant_codes:'',reports_to_email:'',whatsapp_number:'',today_cap:5,active:true,sales_employee_code:'',seed:true})}
     }
     if(!S.plants.length){
       var dp=defaultPlants();
@@ -305,6 +305,10 @@ async function seedDefaults(){
 function entityCells(ent){var o={};Object.keys(S.cells).forEach(function(k){var c=S.cells[k];if(c.entity===ent)o[c.ym]=c});return o}
 function cellPlants(c){return c?Object.keys(c.plants||{}).length:0}
 function covStatus(ent,qkey){
+  if(ent==='ST')return stockCov(qkey);
+  if(ent==='RC')return recvCov(qkey);
+  if(ent==='CN')return cnCov(qkey);
+  if(ent==='CL')return collCov(qkey);
   var cs=entityCells(ent),ref=0;Object.keys(cs).forEach(function(ym){ref=Math.max(ref,cellPlants(cs[ym]))});
   var months=qMonths(qkey),present=0,ok=0,detail=[];
   months.forEach(function(ym){var n=cellPlants(cs[ym]);detail.push({ym:ym,plants:n});if(n>0)present++;if(n>0&&n>=Math.ceil(ref*0.9))ok++});
@@ -355,10 +359,16 @@ function periodOptions(){
   return o;
 }
 function updateUploadPeriods(){var el=$('#u-period');if(el&&U&&U.stage!=='validating'&&U.stage!=='loading'){var v=el.value;el.innerHTML=periodOptions();el.value=U.period}}
+function oxMonthList(r){var m={};try{r.pm.forEach(function(P){m[P.ym]=1})}catch(e){}return Object.keys(m).sort()}
+function oxMonthsOf(r){var m={};try{r.pm.forEach(function(P){m[P.ym]=1})}catch(e){}return Object.keys(m).sort().map(function(x){return ymLabel(x)}).join(', ')||'the months in the file'}
 function newU(){var g=gridQuarters();return{stage:'idle',mode:'historic',period:'auto',entity:'INV',file:null,name:'',size:0,headers:[],rows:[],sys:null,map:{},savedMap:false,res:null,msg:'',closeAfter:true,reason:'',confirmDates:false,anyway:false,confirmReplace:false,swapSerial:false,expMonth:'auto',progress:0,progressMsg:''}}
 function renderUpload(){var _e=$('#i-upload');withScroll(_e,renderUpload0)}
 function renderUpload0(){
   if(!U)U=newU();
+  if(U.kind==='stock'){stockRender();return}
+  if(U.kind==='coll'){collRender();return}
+  if(U.kind==='recv'){recvRender();return}
+  if(U.kind==='cn'){cnRender();return}
   var el=$('#i-upload');if(!el)return;
   var st=U.stage;
   var stepIdx={idle:1,parsing:1,mapping:2,validating:3,validated:3,loading:4,done:4}[st]||1;
@@ -373,7 +383,7 @@ function renderUpload0(){
      +'<div class="note" style="margin-top:6px">One file per entity per quarter, or a multi-quarter file split by document date. The file is read in this browser; nothing is sent anywhere else.</div>'
      +(st==='parsing'?'<div style="margin-top:10px"><div class="bar"><i style="width:60%"></i></div><div class="note">'+esc(U.msg||'Reading file...')+'</div></div>':'')+'</div>';
     if(U.transferDone&&st==='idle')h+=U.transferDone;
-    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+'</div>';
+    if(U.msg&&st==='idle')h+='<div class="banner '+(U.offer?'warn':'err')+'"><span>'+esc(U.msg)+'</span>'+(U.offer&&effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="u-load-as-transfers">Load as Internal-transfer list</button>':'')+(U.cnOffer?'<button class="btn sm pri" data-act="cn-offer">Load as credit notes</button>':'')+(U.imp?'<button class="btn sm pri" data-act="imp-rc">Import as receivables</button><button class="btn sm pri" data-act="imp-cn">Import as credit notes</button>':'')+'</div>';
   }
   if(st==='mapping'||st==='validating'||st==='validated'||st==='loading'||st==='done'){
     h+='<div class="banner info"><span><b>'+esc(U.name)+'</b> &middot; '+fmtN(U.rows.length)+' data rows &middot; '+U.headers.length+' columns &middot; detected source <b>'+(U.sys==='B1'?'SAP B1':'SAP S/4HANA')+'</b>'+(U.savedMap?' &middot; saved mapping applied':'')+'</span><button class="btn sm" data-act="u-reset" '+(locked?'disabled':'')+'>Choose another file</button></div>';
@@ -428,8 +438,10 @@ function resultHtml(){
   }
   h+='<div class="grid2"><div><h3 class="note" style="margin:0 0 6px">By quarter (split by document date)</h3><div class="tw"><table><thead><tr><th>Quarter</th><th class="num">Rows</th><th class="num">Plants</th><th class="num">Months</th><th>Status</th></tr></thead><tbody>'+qrows+'</tbody></table></div></div>'
    +'<div><h3 class="note" style="margin:0 0 6px">By product group (in scope)</h3><div class="tw"><table><thead><tr><th>Group</th><th class="num">Lines</th><th class="num">Net value</th></tr></thead><tbody>'+grows+'</tbody></table></div></div></div>';
+  var lockedM=cnLockedIn(oxMonthList(r));
+  if(lockedM.length)h+='<div class="banner err" style="display:block"><b>Locked: '+esc(lockedM.map(ymLabel).join(', '))+'.</b> Credit notes are locked for these months, so their sales cannot be replaced. A Super admin must unlock them (Data Intake › Credit-note locks) first. This file is not loaded.</div>';
   var closedQs=qs.filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
-  if(closedQs.length)h+='<div class="banner err" style="display:block"><b>Closed quarter in this file: '+closedQs.map(qLabel).join(', ')+'.</b> Reloading a closed quarter needs Super admin and is logged. <div class="fld" style="margin-top:8px"><label for="u-reason">Reason for reload (required)</label><input id="u-reason" class="in" data-chg="reason" value="'+esc(U.reason)+'" '+(locked?'disabled':'')+'></div></div>';
+  if(closedQs.length)h+='<div class="banner err" style="display:block"><b>Closed quarter in this file: '+closedQs.map(qLabel).join(', ')+'.</b> Reloading a closed quarter needs Super admin and is logged. <div class="note" style="color:inherit">This will <b>replace the real sales</b> of '+esc(oxMonthsOf(r))+' with the rows of <b>'+esc(U.name)+'</b>. Check that this file is a sales export.</div><div class="fld" style="margin-top:8px"><label for="u-reason">Reason for reload (required, at least 10 characters; a bare YES is not accepted)</label><input id="u-reason" class="in" data-chg="reason" value="'+esc(U.reason)+'" '+(locked?'disabled':'')+'></div></div>';
   h+='<label class="chip" style="align-self:flex-start"><input type="checkbox" id="u-docs" data-chg="keepdocs" '+(U.keepDocs===false?'':'checked')+' '+(locked?'disabled':'')+'> Keep the document index (needed to drill down to a source document; uses most of the storage)</label>';
   if(U.mode==='historic')h+='<label class="chip" style="align-self:flex-start"><input type="checkbox" id="u-close" data-chg="closeafter" '+(U.closeAfter?'checked':'')+' '+(locked?'disabled':'')+'> Close quarters that become complete and have ended</label>';
   var can=canLoad(r,locked);
@@ -459,18 +471,18 @@ function renderCov0(){
   var head='<tr><th>Entity</th>'+g.list.map(function(k){return '<th class="'+(k===g.cur?'cur':'')+'" title="'+qMonths(k)[0]+' to '+qMonths(k)[2]+'">'+qLabel(k).replace(' ','<br>')+(k===g.cur?'<br>open':'')+'</th>'}).join('')+'</tr>';
   var body=ENTITIES.map(function(e){
     if(!e.live)return '<tr><td>'+e.label+'</td>'+g.list.map(function(){return '<td><span class="cell na" title="Not built yet">&ndash;</span></td>'}).join('')+'</tr>';
-    return '<tr><td><b>'+e.label+'</b></td>'+g.list.map(function(k){var c=covStatus(e.k,k);var sym=glyph(c.st);var sel=S.covSel===e.k+'|'+k;return '<td><button class="cell '+c.st+'" data-act="cov" data-ent="'+e.k+'" data-q="'+k+'" aria-pressed="'+sel+'" aria-label="'+e.label+' '+qLabel(k)+': '+({ok:'loaded',part:'partial',miss:'missing'})[c.st]+(c.closed?', closed':'')+'">'+sym+(c.closed?'<sup style="font-size:8px">L</sup>':'')+'</button></td>'}).join('')+'</tr>';
+    return '<tr><td><b>'+e.label+'</b></td>'+g.list.map(function(k){var c=covStatus(e.k,k);var sym=glyph(c.st)+(c.lock==='all'?' 🔒':c.lock==='some'?' ◐':'');var sel=S.covSel===e.k+'|'+k;return '<td><button class="cell '+c.st+'" data-act="cov" data-ent="'+e.k+'" data-q="'+k+'" aria-pressed="'+sel+'" aria-label="'+e.label+' '+qLabel(k)+': '+({ok:'loaded',part:'partial',miss:'missing'})[c.st]+(c.closed?', closed':'')+'">'+sym+(c.closed?'<sup style="font-size:8px">L</sup>':'')+'</button></td>'}).join('')+'</tr>';
   }).join('');
   var det='';
   if(S.covSel){
     var p=S.covSel.split('|'),c=covStatus(p[0],p[1]);
-    det='<div class="banner info" style="display:block"><b>'+qLabel(p[1])+' &middot; Invoice</b> &middot; '+({ok:'Loaded',part:'Partial',miss:'Missing'})[c.st]+(c.closed?' &middot; closed, locked':'')
+    det='<div class="banner info" style="display:block"><b>'+qLabel(p[1])+' &middot; '+(p[0]==='ST'?'Stock':p[0]==='CL'?'Collection':p[0]==='RC'?'Receivables':p[0]==='CN'?'Credit notes':'Invoice')+'</b> &middot; '+({ok:'Loaded',part:'Partial',miss:'Missing'})[c.st]+(c.closed?' &middot; closed, locked':'')
      +'<div class="note" style="color:inherit">'+c.detail.map(function(d){return d.ym+': '+d.plants+' plant'+(d.plants===1?'':'s')}).join(' &nbsp;|&nbsp; ')+(c.ref?' &nbsp;(a month counts as complete at 90% of the '+c.ref+' plants seen in the busiest month)':'')+'</div>'
-     +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>':'')
+     +'<div class="row" style="margin-top:8px">'+(effRole()==='Super admin'&&!readOnly()?(p[0]==='ST'?'<span class="note">Stock is a snapshot: the latest snapshot of each month counts as that month.</span>':(p[0]==='RC'||p[0]==='CN')?'<span class="note">'+(p[0]==='RC'?'Receivables are a snapshot: the latest snapshot of each month counts as that month.':'Credit notes load from the B1 or S/4 credit-note export; a month is covered when a file spans it.')+'</span>':p[0]==='CL'?'<span class="note">Collections load from the Incoming Payment Report; a month is covered when its plants have receipts.</span>':'<button class="btn sm pri" data-act="cov-upload" data-q="'+p[1]+'">Upload this quarter</button>'):'')
      +(effRole()!=='Super admin'||readOnly()?'<span class="note">Closing, reopening and reloading a quarter is for a Super admin.</span>':(c.closed?'<button class="btn sm" data-act="reopen" data-q="'+p[1]+'">Reopen quarter (reason required, logged)</button>':(c.st!=='miss'?'<button class="btn sm" data-act="close-q" data-q="'+p[1]+'">Close quarter</button>':'')))+'</div></div>';
   }
   el.innerHTML='<div class="hd"><h2>Coverage grid &middot; entity &times; quarters since '+qLabel(histStart())+' (history start, D28)</h2><div class="legend"><span><span class="pill ok">'+glyph('ok')+' Loaded</span></span><span><span class="pill part">'+glyph('part')+' Partial</span></span><span><span class="pill miss">'+glyph('miss')+' Missing</span></span><span>L = closed</span></div></div>'
-   +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det
+   +'<div class="tw"><table class="cov"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'+det+cnLockPanel()
    +'<p class="note">FY runs April to March; Q1 = Apr to Jun. A partial quarter greys its QoQ figures with "incomplete history" in the business views. Tap a cell for detail. Closed quarters are locked; reloading needs Super admin and is logged. Q3 FY27 is the current quarter, shown for reference. Other entities arrive later.</p>';
 }
 /* keep every inner scroll position across a re-render of a container (a snapshot or timer tick must not throw the reader back to the top) */
@@ -479,25 +491,27 @@ function withScroll(container,fn){
   fn();
   if(container){Array.prototype.forEach.call(container.querySelectorAll('.tw,.hscroll'),function(e,i){if(pos[i]){e.scrollTop=pos[i][0];e.scrollLeft=pos[i][1]}})}
 }
-S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:''};
-var ENT_NAME={INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
+S.hist={src:'',ent:'',status:'',q:'',shown:15,open:{},sig:'',showReplaced:false,sel:{}};function histSa(){return effRole()==='Super admin'&&!readOnly()}
+var ENT_NAME={CU:'Customers',RC:'Receivables',CL:'Collections',ST:'Stock',INV:'Invoice',SE:'Sales employees',IT:'Items',SO:'Sales order',DL:'Delivery',CN:'Credit note'};
 function histRows(){
   var f=S.hist,q=(f.q||'').toLowerCase();
   return S.uploads.slice().sort(function(a,b){return a.at<b.at?1:-1}).filter(function(u){
+    if(!f.showReplaced&&histReplacedBy(u))return false;
     return (!f.src||u.sys===f.src)&&(!f.ent||(u.entity||'INV')===f.ent)&&(!f.status||u.status===f.status)&&(!q||((u.file||'')+' '+(u.by||'')+' '+(u.periodLabel||'')+' '+(u.status||'')+' '+(u.demo?'demo':'')).toLowerCase().indexOf(q)>=0);
   });
 }
-function histSig(){return JSON.stringify([S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file]}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open)])}
+function histSig(){return JSON.stringify([S.hist.showReplaced,S.uploads.map(function(u){return [u._id,u.status,u.loaded,u.rejected,u.file,!!histReplacedBy(u),u.backup_removed||'']}),S.hist.src,S.hist.ent,S.hist.status,S.hist.q,S.hist.shown,Object.keys(S.hist.open),Object.keys(S.hist.sel),histSa(),Object.keys(S.cnLock||{})])}
 function histBodyHtml(){
   var all=histRows(),rows=all.slice(0,S.hist.shown);
   if(!S.uploads.length)return '<div class="empty">No uploads yet.</div>';
   if(!all.length)return '<div class="empty sm">No upload matches these filters.</div>';
   var open=S.hist.open;
-  return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr><th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
+  return '<div class="tw hist" tabindex="0" role="region" aria-label="Upload history, scrollable" style="max-height:420px;overflow:auto"><table><thead><tr>'+(histSa()?'<th>Pick</th>':'')+'<th>When (IST)</th><th>File</th><th>By</th><th>Src</th><th>Entity</th><th>Period</th><th class="num">Read</th><th class="num">Loaded</th><th class="num">Skipped</th><th>Status</th><th></th></tr></thead><tbody>'
    +rows.map(function(u){
      var fn=u.file||'',isOpen=!!open[u._id];
-     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'"><td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&(u.entity||'INV')==='INV'&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
-     if(isOpen)tr+='<tr class="hdet"><td colspan="11"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
+     var undoable=(u.status!=='Undone')&&['INV','ST','CL','RC','CN'].indexOf(u.entity||'INV')>=0;
+     var tr='<tr class="clk" data-act="hist-open" data-id="'+esc(u._id)+'" aria-expanded="'+isOpen+'">'+(histSa()?'<td>'+(undoable?'<input type="checkbox" data-act="hist-sel" data-id="'+esc(u._id)+'" aria-label="Select '+esc(fn)+' for undo" '+(S.hist.sel[u._id]?'checked':'')+'>':'')+'</td>':'')+'<td class="mono" style="white-space:nowrap">'+istStr(u.at)+'</td><td class="hfile" title="'+esc(fn)+'"><span>'+esc(fn||'—')+'</span></td><td style="white-space:nowrap">'+esc((u.by||'').split('@')[0])+'</td><td>'+esc(u.sys)+(u.demo?' <span class="pill part">DEMO</span>':'')+'</td><td>'+esc(ENT_NAME[u.entity||'INV']||u.entity||'')+'</td><td>'+esc(u.periodLabel||'')+'</td><td class="num">'+fmtN(u.read)+'</td><td class="num">'+fmtN(u.loaded)+'</td><td class="num">'+(u.rejected?'<a role="button" tabindex="0" style="cursor:pointer;text-decoration:underline" data-act="hist-rej" data-id="'+esc(u._id)+'" title="Download the skipped rows">'+fmtN(u.rejected)+'</a>':'0')+'</td><td>'+histStatusPill(u)+'</td><td>'+(u.rejected?'<button class="btn sm" data-act="hist-rej" data-id="'+esc(u._id)+'">Skipped rows</button>':'')+''+(effRole()==='Super admin'&&!readOnly()&&((u.entity||'INV')==='INV'||u.entity==='ST'||u.entity==='CL'||u.entity==='RC'||u.entity==='CN')&&u.status!=='Undone'?' <button class="btn sm" data-act="hist-undo" data-id="'+esc(u._id)+'">Undo</button>':'')+'</td></tr>';
+     if(isOpen)tr+='<tr class="hdet"><td colspan="12"><div class="note" style="color:inherit"><b>File:</b> '+esc(fn||'(not recorded)')+' &middot; <b>Size:</b> '+(u.size?fmtBytes(u.size):'—')+' &middot; <b>Mode:</b> '+esc(u.mode||'—')+' &middot; <b>Uploaded by:</b> '+esc(u.by||'—')+' &middot; <b>Warnings:</b> '+fmtN(u.warned||0)+(u.quarters&&u.quarters.length?' &middot; <b>Quarters:</b> '+esc(u.quarters.map(qLabel).join(', ')):'')+'</div></td></tr>';
      return tr}).join('')
    +'</tbody></table></div>'
    +'<div class="row" style="justify-content:space-between;align-items:center"><span class="note">Showing '+rows.length+' of '+all.length+(all.length!==S.uploads.length?' (filtered from '+S.uploads.length+')':'')+'. Click a row for the full file name and details.</span>'+(all.length>rows.length?'<button class="btn sm" data-act="hist-more">Show 15 more</button>':'')+'</div>';
@@ -510,10 +524,12 @@ function renderHist(){
     var sel=function(id,label,cur,opts,nm){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="hist-f" data-k="'+nm+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(cur===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'};
     el.innerHTML='<div class="hd"><h2>Upload history</h2><span class="note" id="hist-count"></span></div>'
      +'<div class="row" id="hist-ctl" style="align-items:flex-end">'+sel('hf-src','Source',f.src,srcs.map(function(x){return [x,x==='B1'?'SAP B1':x==='S4'?'SAP S/4':x]}),'src')+sel('hf-ent','Entity',f.ent,ents.map(function(x){return [x,ENT_NAME[x]||x]}),'ent')+sel('hf-st','Status',f.status,sts.map(function(x){return [x,x]}),'status')
-     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div></div><div id="hist-body"></div>';
+     +'<div class="fld"><label for="hf-q">Search file, person, period</label><input id="hf-q" class="in" data-chg="hist-f" data-k="q" value="'+esc(f.q)+'" placeholder="file name..."></div><div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-csv">Download history (CSV)</button></div>'+(histSa()?'<div class="fld"><label>&nbsp;</label><button class="btn sm" data-act="hist-bulk" id="hist-bulk">Undo selected (0)</button></div>':'')+'<div class="fld"><label>&nbsp;</label><label class="chip"><input type="checkbox" id="hf-rep" data-chg="hist-rep" '+(f.showReplaced?'checked':'')+'> Show replaced (<span id="hist-rep-n">0</span>)</label></div></div><div id="hist-body"></div>';
     S.hist.sig='';
   }
   if(S.hist.sig===sig)return;S.hist.sig=sig;
+  var rn=$('#hist-rep-n');if(rn)rn.textContent=String(S.uploads.filter(function(u){return !!histReplacedBy(u)}).length);
+  var bb0=$('#hist-bulk');if(bb0)bb0.textContent='Undo selected ('+Object.keys(S.hist.sel).length+')';
   var c=$('#hist-count');if(c)c.textContent=fmtN(S.uploads.length)+' upload'+(S.uploads.length===1?'':'s');
   var body=$('#hist-body');withScroll(body,function(){body.innerHTML=histBodyHtml()});
 }
@@ -576,7 +592,7 @@ async function onFile(file){
       var names=XLSX.read(buf,{type:'array',bookSheets:true}).SheetNames||[];
       var heads={};try{var wh=XLSX.read(buf,{type:'array',sheetRows:2,dense:true});names.forEach(function(n){var rr=XLSX.utils.sheet_to_json(wh.Sheets[n]||{},{header:1,raw:true,defval:'',blankrows:false});heads[n]=(rr[0]||[]).map(function(x){return x==null?'':String(x)})})}catch(e){}
       var kindOf=function(n){return heads[n]&&heads[n].length?detect(heads[n]):{type:'empty'}};
-      var pick=names.find(function(n){return /^(data|sapui5 export)$/i.test(n)&&kindOf(n).type==='invoice'})||names.find(function(n){return kindOf(n).type==='invoice'})||names.find(function(n){return /^(data|sapui5 export)$/i.test(n)})||names.find(function(n){return heads[n]&&heads[n].length&&!/^filter$/i.test(n)})||names.find(function(n){return !/^filter$/i.test(n)})||names[0];
+      var pick=names.find(function(n){return /^(data|sapui5 export)$/i.test(n)&&kindOf(n).type==='invoice'})||names.find(function(n){return heads[n]&&heads[n].length&&stockDetect(heads[n])})||names.find(function(n){return kindOf(n).type==='invoice'})||names.find(function(n){return /^(data|sapui5 export)$/i.test(n)})||names.find(function(n){return heads[n]&&heads[n].length&&!/^filter$/i.test(n)})||names.find(function(n){return !/^filter$/i.test(n)})||names[0];
       U.sheetPicked=pick;U.sheetsSeen=names.map(function(n){var k=kindOf(n);return n+' ('+(k.type==='invoice'?'invoice export':k.type==='master'?k.what+' list':k.type==='empty'?'empty':(heads[n]||[]).slice(0,4).join(', ')+(heads[n]&&heads[n].length>4?'...':''))+')'});
       sheetsSeen0=U.sheetsSeen;U.msg='Parsing sheet "'+pick+'"...';renderUpload();await tick();
       var wb=XLSX.read(buf,{type:'array',sheets:pick,dense:true,cellDates:false,cellNF:false,cellStyles:false,cellFormula:false,cellHTML:false});
@@ -588,9 +604,17 @@ async function onFile(file){
     var headers=rows[0].map(function(x){return x==null?'':String(x)});
     var d=detect(headers);
     var sheetsSeen=U.sheetsSeen,sheetPicked=U.sheetPicked;
+    var cud=d.type==='unknown'?custDetect(headers):null;if(cud){U=newU();U.mode=mode;U.period=period;U.msg='This is a customer master ('+cud.layout+'), not a transaction export. Load it from Admin > Customers.';renderUpload();return}
+    var rdt=recvDetect(headers);if(rdt){recvStart(file,rows,headers,rdt,sheetPicked);return}
+    var cnd=cnDetectB1(headers)||(d.type==='invoice'&&d.sys==='S4'&&cnS4Share(headers,rows)>0.5?{kind:'cn',sys:'S4',layout:'S/4 billing credit memos'}:null);if(cnd){cnStart(file,rows,headers,cnd,sheetPicked);return}
+    var cnGuard=creditLike(file.name,headers,rows,sheetsSeen,sheetPicked);
+    if(ent==='CN'&&d.type==='invoice'){cnStart(file,rows,headers,{sys:d.sys,layout:(d.sys==='S4'?'S/4':'B1')+' credit notes (sales-register layout)'},sheetPicked);return}
+    if(d.type==='invoice'&&cnGuard){U=newU();U.mode=mode;U.period=period;U.cnOffer={file:file,rows:rows,headers:headers,sys:d.sys,sheetPicked:sheetPicked};U.msg='This file looks like a credit-note register ('+cnGuard+'). Credit notes must not be loaded as sales: they would replace your sales for these months.';renderUpload();return}
+    if(d.type==='unknown'){var cdt=collDetect(headers);if(cdt){collStart(file,rows,headers,sheetPicked);return}var sdt=stockDetect(headers);if(sdt){stockStart(file,rows,headers,sdt,sheetPicked);return}}
     if(d.type==='master'&&d.what==='transfers'){U=newU();U.mode=mode;U.period=period;U.offer={file:file,rows:rows,what:'transfers'};U.msg='This file is the internal-transfer list (CardCode, CardName, Tranfser), not the sales export'+(sheetsSeen&&sheetsSeen.length>1?'. Sheets in the workbook: '+sheetsSeen.join('; ')+'. Save the DATA sheet as the CSV, or load the whole XLSX':'')+'. You can load it as the Internal-transfer list instead.';renderUpload();return}
     if(d.type==='master'){U=newU();U.mode=mode;U.period=period;U.msg='This is a '+d.what+' template, not a SAP export. Load it from Admin ('+({users:'Users',plants:'Plants',potential:'Market potential',phasing:'Market potential, Upload phasing',transfers:'Internal transfer',items:'Item master',semp:'Sales employees'})[d.what]+').';renderUpload();return}
-    if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;U.msg='The headers match no known file'+(rows.length<2?' (the sheet has no data rows)':'')+'. Found: '+(headers.filter(Boolean).slice(0,8).join(', ')||'no header row')+(sheetsSeen&&sheetsSeen.length?'. Sheets in the workbook: '+sheetsSeen.join('; '):'')+'. Expected the B1 Combine Sale export (sheet DATA: docnum, CardCode, BPLName ...) or the S/4 Sales Register (sheet SAPUI5 Export: Invoice Document Number, Plant, Invoice Date ...). For a master, use Admin.';renderUpload();return}
+    if(d.type==='unknown'&&rows.length>=2&&(ent==='RC'||ent==='CN')){var ug={sys:'B1',layout:'unrecognised layout, map the columns'};U=newU();U.mode=mode;U.period=period;if(ent==='RC')recvStart(file,rows,headers,ug,sheetPicked);else cnStart(file,rows,headers,ug,sheetPicked);return}
+    if(d.type==='unknown'){U=newU();U.mode=mode;U.period=period;if(rows.length>=2)U.imp={file:file,rows:rows,headers:headers,sheetPicked:sheetPicked};U.msg='The headers match no known file'+(rows.length<2?' (the sheet has no data rows)':'')+'. Found: '+(headers.filter(Boolean).slice(0,8).join(', ')||'no header row')+(sheetsSeen&&sheetsSeen.length?'. Sheets in the workbook: '+sheetsSeen.join('; '):'')+'. Expected the B1 Combine Sale export (sheet DATA: docnum, CardCode, BPLName ...) or the S/4 Sales Register (sheet SAPUI5 Export: Invoice Document Number, Plant, Invoice Date ...). For a master, use Admin.';renderUpload();return}
     U.headers=headers;U.sheetPicked=sheetPicked;U.rows=rows.slice(1);U.sys=d.sys;U.map=defaultMap(headers,d.sys);
     var sv=S.mappings[d.sys+'_invoice'];
     if(sv&&sv.map){var ix=headerIndex(headers),used=false;Object.keys(sv.map).forEach(function(k){var n=norm(sv.map[k]);if(sv.map[k]===null||sv.map[k]===''){U.map[k]=-1;used=true}else if(n in ix){U.map[k]=ix[n];used=true}});U.savedMap=used}
@@ -799,14 +823,20 @@ async function packChunks(sys,P){
 }
 async function runLoad(opts){
   var r=U.res,sys=U.sys,demo=!!opts.demo,by=whoAmI();
+  var lkS=cnLockedIn(oxMonthList(r));if(lkS.length){var lm='credit notes are locked for '+lkS.map(ymLabel).join(', ')+'; unlock them first. Nothing was changed.';toast(lm);throw new Error(lm)}
   if(demo&&hasRealData()){toast(DEMO_OFF_MSG);throw new Error(DEMO_OFF_MSG)}
   U.stage='loading';cancelFlag=false;U.progress=0;U.progressMsg='Preparing...';renderUpload();await tick();
   var uid='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   var pms=Array.from(r.pm.values()).sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:a.plant<b.plant?-1:1});
   var byYm={};pms.forEach(function(p){(byYm[p.ym]=byYm[p.ym]||[]).push(p)});
-  var yms=Object.keys(byYm).sort(),total=pms.length,done=0,bytes=0,docsW=0,failed=null,loadedLines=0,stopped=false;
+  var yms=Object.keys(byYm).sort(),total=pms.length,done=0,bytes=0,docsW=0,failed=null,loadedLines=0,stopped=false,B=bkNew(uid,'INV',demo);
   var reloadAudit=null,closedTouched=Object.keys(r.quarters).filter(function(k){return S.periods[k]&&S.periods[k].status==='closed'});
   try{
+    /* D46: save a backup of everything this load replaces BEFORE the first replacing write */
+    if(!demo){for(var by0=0;by0<yms.length;by0++){var ym0=yms[by0],cl0=S.cells['INV_'+ym0];if(!cl0||!cl0.plants)continue;
+      for(var bp=0;bp<byYm[ym0].length;bp++){var P0=byYm[ym0][bp],o0=cl0.plants[P0.plant];if(!o0||o0.demo)continue;
+        for(var bi=0;bi<(o0.chunks||0);bi++)await bkAddDb(B,'inv/'+o0.sys+'-'+P0.plant+'-'+ym0+'-'+bi);var rd0=S.rollDocs&&S.rollDocs[P0.plant+'-'+ym0];if(rd0)bkAdd(B,'roll/'+P0.plant+'-'+ym0,rd0);bkAdd(B,'cellpart:'+ym0+':'+P0.plant,o0);await bkMaybe(B)}}}
+    await bkCommit(B);
     if(closedTouched.length){await dset('log/'+uid,{at:nowISO(),by:by,event:'closed quarter reloaded',quarters:closedTouched,reason:U.reason||'',upload:uid,file:U.name});reloadAudit=await auditW('closed quarter reloaded',closedTouched.join(','),{quarters:closedTouched,from:nowISO(),reason:U.reason||'',upload:uid,demo:demo||undefined})}
     outer:for(var yi=0;yi<yms.length;yi++){
       var ym=yms[yi],cellId='INV_'+ym;
@@ -851,7 +881,7 @@ async function runLoad(opts){
   if(failed)status='Failed';
   var upl={at:nowISO(),by:by,sys:sys,entity:'INV',file:U.name,size:U.size,mode:U.mode,periodLabel:U.period==='auto'?(Object.keys(r.quarters).length>1?'Auto: '+Object.keys(r.quarters).length+' quarters':Object.keys(r.quarters).map(qLabel).join(', ')):qLabel(U.period),
     skipped:r.rejected,stopped:stopped||undefined,read:r.read,loaded:failed?0:r.good,rejected:r.rejected,warned:r.warned,fanout:r.fanout,injection:r.injection,status:status,demo:demo||undefined,
-    quarters:Object.keys(r.quarters),plantMonths:done,docsWritten:docsW,bytes:bytes,
+    quarters:Object.keys(r.quarters),backup:bkSummary(B),plantMonths:done,docsWritten:docsW,bytes:bytes,
     before_history_start:r.preHist?r.preHist.rows:0,fixes:{line_numbers_created:r.af.lineSynth,repeated_lines_removed:r.af.dupNoLine,category_rows_normalised:r.af.catAlias,zone_rows_normalised:r.af.zoneNorm,junk:r.af.junk,s4_sales_exec_filled:r.af.spFilled,s4_sales_exec_blank:r.af.blankSp,date_kinds:r.af.dateKinds},groups:r.groups,out_of_scope:r.other,internal_transfers:r.xfer,dateRepair:r.dateInfo.mixed?{swapped:r.dateInfo.swapped,min:r.minDate,max:r.maxDate}:null,
     mapping:Object.keys(U.map).reduce(function(o,k){o[k]=U.map[k]>=0?U.headers[U.map[k]]:null;return o},{}),closedQuarters:closedNow,reloadReason:closedTouched.length?U.reason:undefined,error:failed?dbErrText(failed):undefined};
   try{
@@ -899,6 +929,7 @@ async function demoLoad(){
 async function demoClear(){
   if(effRole()!=='Super admin'||readOnly()){toast('Only a Super admin can clear demo data');return}
   toast('Clearing demo data...');
+  var engWas=S.engBlock;S.engBlock=true;/* the rules engine must not write actions from half-cleared demo data (t31 race) */
   try{
     var cellIds=Object.keys(S.cells);
     for(var i=0;i<cellIds.length;i++){
@@ -912,17 +943,22 @@ async function demoClear(){
     for(var po of S.potential.filter(function(x){return x.demo}))await ddel('potential/'+po._id);
     if(S.itemMeta&&S.itemMeta.demo){for(var ic=0;ic<(S.itemMeta.chunks||0);ic++)await ddel('items/c'+ic);await ddel('itemmeta/main')}
     if(S.salesMaster&&S.salesMaster.demo)await ddel('salesmaster/main');
+    for(var w8=0;w8<80&&S.engBusy;w8++)await new Promise(function(r){setTimeout(r,100)});/* let a rules run that was already going finish, then sweep its actions too */
     await demoClearExtras();
     toast('Demo data cleared');
   }catch(e){toast('Clear failed: '+dbErrText(e))}
+  finally{
+    var left=function(){return [S.stock,S.recv,S.coll,S.actions,S.followups].some(function(l){return (l||[]).some(function(x){return x.demo})})||Object.keys(S.rollDocs||{}).some(function(k){return S.rollDocs[k].demo})};
+    for(var w9=0;w9<60&&left();w9++)await new Promise(function(r){setTimeout(r,100)});/* wait until the cleared documents have left memory before the rules engine runs again */
+    S.engBlock=engWas;S.engSig=null;schedule()}
 }
 
 /* ================= ADMIN ================= */
 function usersHtml(){
-  var rows=S.users.slice().sort(function(a,b){return a.email<b.email?-1:1});
-  return '<section class="card"><div class="hd"><h2>Users &middot; '+rows.length+'</h2><div class="row"><button class="btn pri sm" data-act="user-add">Add user</button><label class="btn sm" for="up-users" style="cursor:pointer">Upload users (CSV)</label><input id="up-users" data-file="users" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="users">Download template</button></div></div>'
-  +'<div class="tw"><table><thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Dept</th><th>Plants</th><th>Reports to</th><th>WhatsApp</th><th class="num">Cap</th><th>Active</th><th></th></tr></thead><tbody>'
-  +rows.map(function(u){return '<tr><td class="break">'+esc(u.email)+'</td><td>'+esc(u.name)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.department)+'</td><td class="mono break">'+esc(u.plant_codes||'All')+'</td><td class="break">'+esc(u.reports_to_email||'-')+'</td><td class="mono">'+esc(u.whatsapp_number||'-')+'</td><td class="num">'+esc(u.today_cap||'')+'</td><td>'+(u.active===false?'<span class="pill mute">Off</span>':'<span class="pill ok">On</span>')+'</td><td><button class="btn sm" data-act="user-edit" data-id="'+esc(u._id)+'">Edit</button></td></tr>'}).join('')+'</tbody></table></div>'
+  var rows=S.users.slice().sort(function(a,b){var x=a.user_id||'',y=b.user_id||'';if(x&&!y)return -1;if(y&&!x)return 1;if(x!==y)return x<y?-1:1;return a.email<b.email?-1:1});
+  return '<section class="card"><div class="hd"><h2>Users &middot; '+rows.filter(function(u){return !u.placeholder&&!isPH(u)}).length+(rows.some(function(u){return u.placeholder||isPH(u)})?' &middot; Placeholders '+rows.filter(function(u){return u.placeholder||isPH(u)}).length:'')+'</h2><div class="row"><button class="btn pri sm" data-act="user-add">Add user</button>'+(effRole()==='Super admin'&&!readOnly()?'<button class="btn sm" data-act="user-ph">Add placeholder users 1001&ndash;1050</button>':'')+'<label class="btn sm" for="up-users" style="cursor:pointer">Upload users (CSV)</label><input id="up-users" data-file="users" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="users">Download template</button></div></div>'
+  +'<div class="tw"><table><thead><tr><th>User ID</th><th>Email</th><th>Name</th><th>Role</th><th>Dept</th><th>Plants</th><th>Reports to</th><th>WhatsApp</th><th class="num">Cap</th><th>Active</th><th></th></tr></thead><tbody>'
+  +rows.map(function(u){return '<tr><td class="mono">'+esc(u.user_id||'-')+'</td><td class="break">'+esc(u.email)+'</td><td>'+esc(u.name)+(isPH(u)?' <span class="pill mute">Placeholder</span>':'')+'</td><td>'+esc(u.role||'-')+'</td><td>'+esc(u.department||'-')+'</td><td class="mono break">'+esc(u.plant_codes||'All')+'</td><td class="break">'+esc(u.reports_to_email||'-')+'</td><td class="mono">'+esc(u.whatsapp_number||'-')+'</td><td class="num">'+esc(u.today_cap||'')+'</td><td>'+(u.active===false?'<span class="pill mute">Off</span>':'<span class="pill ok">On</span>')+'</td><td><button class="btn sm" data-act="user-edit" data-id="'+esc(u._id)+'">Edit</button></td></tr>'}).join('')+'</tbody></table></div>'
   +'<p class="note">Roles: '+ROLES.join(' &middot; ')+'. Access is by email. An unknown or inactive viewer sees "Ask your admin for access". For a Sales executive, the sales employee code is the Employee Code from the sales-employee master (Admin › Sales employees) or the salesperson name in the SAP export. Seed Super admins: '+SEED_SUPER.join(', ')+'.</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
 }
 function plantsHtml(){
@@ -941,60 +977,72 @@ function transfersHtml(){
   +(rows.length?'<div class="tw" style="max-height:420px;overflow:auto"><table><thead><tr><th>CardCode</th><th>CardName</th><th>Internal</th><th></th></tr></thead><tbody>'+rows.map(function(t){return '<tr><td class="mono">'+esc(t.code)+'</td><td class="break">'+esc(t.name)+'</td><td>'+(t.flag===false?'<span class="pill mute">No</span>':'<span class="pill ok">Yes</span>')+'</td><td><button class="btn sm" data-act="tr-del" data-id="'+esc(t._id)+'">Remove</button></td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty">No accounts yet. Upload the list from the B1 export. Until then only the account and zone rules flag internal transfers.</div>')
   +'<div id="up-msg">'+(S.upMsg||'')+'</div></section>';
 }
-function potStatusPill(s){return '<span class="pill '+({Draft:'mute',Discussed:'info',Approved:'ok',Locked:'part'}[s]||'mute')+'">'+esc(s)+'</span>'}
+/* Market potential, shares, targets and phasing moved to the Targets & Potential tab (src/72-targets.js, D70): one entry point. */
 function potentialHtml(){
-  var f=S.potFilter,g=gridQuarters(),qs=[];if(f.q===''&&!f.init){f.init=1;f.q=g.cur}var k=g.cur;for(var i=0;i<5;i++){qs.push(k);k=nextQ(k)}
-  var all=S.potential.filter(planVisible);
-  var quarters=Array.from(new Set(all.map(function(x){return x.fy_quarter}).concat(qs))).sort().reverse();
-  var rows=all.filter(function(x){return (!f.q||x.fy_quarter===f.q)&&(!f.plant||(x.plant_code||x.territory)===f.plant)&&(!f.group||x.product_group===f.group)&&(!f.seg||x.customer_segment===f.seg)}).sort(function(a,b){return a.fy_quarter<b.fy_quarter?1:a.fy_quarter>b.fy_quarter?-1:(a.plant_code||'')<(b.plant_code||'')?-1:1});
-  var tot={v:0,s:0,t:0};rows.forEach(function(x){tot.v+=+x.potential_value_inr||0;tot.s+=shOfLeaf(x);if(x.share_pct!=null&&x.share_pct!=='')tot.t+=(+x.potential_value_inr||0)*(+x.share_pct)/100});
-  var plantsOpt=Array.from(new Set(all.map(function(x){return x.plant_code||x.territory}).filter(Boolean))).sort();
-  var groupOpt=Array.from(new Set(GROUPS.concat(all.map(function(x){return x.product_group})))),segOpt=Array.from(new Set(all.map(function(x){return x.customer_segment}).filter(Boolean)));
-  var sel=function(id,cur,opts,label){return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'" data-chg="potf" data-k="'+id+'"><option value="">All</option>'+opts.map(function(o){return '<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select></div>'};
-  var locked=function(q){return isPlanLocked(q)};
-  return '<section class="card"><div class="hd"><h2>Market potential &middot; revisions</h2><div class="row"><button class="btn pri sm" data-act="pot-add">Add figure</button><label class="btn sm" for="up-pot" style="cursor:pointer">Upload potential (CSV)</label><input id="up-pot" data-file="potential" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="potential">Download template</button><label class="btn sm" for="up-ph" style="cursor:pointer">Upload phasing (CSV)</label><input id="up-ph" data-file="phasing" type="file" accept=".csv" style="position:absolute;opacity:0;width:1px;height:1px"><button class="btn sm" data-act="tmpl" data-t="phasing">Phasing template</button></div></div>'
-  +'<div class="row">'+sel('pf-q',f.q,quarters.map(function(x){return x}),'Quarter')+sel('pf-plant',f.plant,plantsOpt,'Branch / territory')+sel('pf-group',f.group,groupOpt,'Product group')+sel('pf-seg',f.seg,segOpt,'Segment')+'</div>'
-  +(rows.length>300?'<div class="note">Showing the first 300 of '+rows.length+' figures. Filter by quarter, branch or group to narrow.</div>':'')+(rows.length?'<div class="tw tall"><table><thead><tr><th>Quarter</th><th>Branch / territory</th><th>Group</th><th>Segment</th><th class="num">Potential</th><th class="num">Potential sheets</th><th class="num">Share %</th><th class="num">Target</th><th>Source &middot; owner</th><th>Rev</th><th>Status</th><th></th></tr></thead><tbody>'
-   +rows.slice(0,300).map(function(x){var ap0=approvedOf(x),tg=x.share_pct!=null&&x.share_pct!==''?fmtMoney((+x.potential_value_inr||0)*(+x.share_pct)/100)+(ap0&&x.original&&Math.abs(leafTgt(x.original.potential_value_inr,x.original.share_pct)-leafTgt(ap0.potential_value_inr,ap0.share_pct))>1?'<div class="note">approved '+fmtMoney(leafTgt(ap0.potential_value_inr,ap0.share_pct))+' · orig '+fmtMoney(leafTgt(x.original.potential_value_inr,x.original.share_pct))+'</div>':''):'<span class="pill mute">pending</span>';return '<tr><td>'+qLabel(x.fy_quarter)+(locked(x.fy_quarter)?' <span class="pill part">Locked</span>':'')+'</td><td class="break">'+esc(x.plant_code||x.territory)+'</td><td>'+esc(x.product_group)+'</td><td>'+esc(x.customer_segment)+'</td><td class="num">'+fmtMoney(x.potential_value_inr)+'</td><td class="num">'+fmtN(Math.round(shOfLeaf(x)))+((+x.potential_qty_sqft)>0?'<div class="note">'+fmtN(x.potential_qty_sqft)+' sq ft</div>':'')+'</td><td class="num">'+(x.share_pct==null||x.share_pct===''?'-':x.share_pct)+'</td><td class="num">'+tg+'</td><td class="break">'+esc(x.source_type)+(x.owner_email?' &middot; '+esc(x.owner_email):'')+'</td><td class="mono">r'+(x.rev||1)+'</td><td>'+potStatusPill(x.status)+(x.demo?' <span class="pill part">DEMO</span>':'')+'</td><td><button class="btn sm" data-act="pot-edit" data-id="'+esc(x._id)+'">Open</button></td></tr>'}).join('')
-   +'<tr><td colspan="4"><b>Total (target = potential &times; share %)</b></td><td class="num"><b>'+fmtMoney(tot.v)+'</b></td><td class="num"><b>'+fmtN(Math.round(tot.s))+'</b></td><td></td><td class="num"><b>'+fmtMoney(tot.t)+'</b></td><td colspan="4"></td></tr></tbody></table></div>':'<div class="empty">No potential figures yet. Add one, or upload the template. Share % can stay empty until the discussion is done (target shows "pending").</div>')
-  +'<div class="row"><span class="note">Lock quarter (freezes every Approved target; cannot be undone in v1.0):</span>'+qs.map(function(q){return '<button class="btn sm" data-act="plan-lock" data-q="'+q+'"'+(locked(q)||!['Super admin','Management / HO'].includes(effRole())||readOnly()?' disabled':'')+'>'+qLabel(q)+(locked(q)?' (locked)':' lock')+'</button>'}).join('')+'</div>'
-  +'<p class="note">Values in ₹ with lakh/crore. Every change is a revision with reason, discussion date and participants. Status runs Draft, Discussed, Approved, Locked. A locked quarter cannot be edited. Open a row for the sense-check (QoQ needed vs 12-quarter average, Stretch flag). Approval is by SP Sir or a Management / HO user, never the proposer. Achievement counts only against the current approved target. '+SEGMENT_NOTE+'</p><div id="up-msg">'+(S.upMsg||'')+'</div></section>';
+  return '<section class="card"><div class="hd"><h2>Market potential</h2><a class="btn pri sm" href="#/targets">Open Targets &amp; Potential</a></div><p class="note" style="margin:0">Market potential, share %, target, monthly phasing, submit, approve and lock now live in one place: <b>Plan &rsaquo; Targets &amp; Potential</b>. Upload, templates and the revision trail are there too. Nothing is kept here any more.</p></section>';
 }
 
 /* ---- dialogs: users / plants / potential ---- */
 function userDlg(u){
-  var n=!u;u=u||{email:'',name:'',role:'Sales executive',department:'Sales',plant_codes:'',reports_to_email:'',whatsapp_number:'',today_cap:5,active:true,sales_employee_code:''};
+  var n=!u;u=u||{user_id:'',email:'',name:'',role:'Sales executive',department:'Sales',plant_codes:'',reports_to_email:'',whatsapp_number:'',today_cap:5,active:true,sales_employee_code:''};
   openDlg('<h3>'+(n?'Add user':'Edit user')+'</h3><div class="fgrid">'
-   +fld('d-email','Email',u.email,n?'':'readonly')+fld('d-name','Name',u.name)
-   +'<div class="fld"><label for="d-role">Role</label><select id="d-role">'+ROLES.map(function(r){return '<option'+(r===u.role?' selected':'')+'>'+r+'</option>'}).join('')+'</select></div>'
+   +fld('d-userid','User ID (4 digits, unique)',u.user_id||'','inputmode="numeric" maxlength="4"')+fld('d-email','Email'+(isPH(u)?' (replace the placeholder email with the real one)':''),u.email,n||isPH(u)?'':'readonly')+fld('d-name','Name',u.name)
+   +'<div class="fld"><label for="d-role">Role</label><select id="d-role">'+(u.role&&ROLES.indexOf(u.role)>=0?'':'<option value=""'+' selected>(none yet)</option>')+ROLES.map(function(r){return '<option'+(r===u.role?' selected':'')+'>'+r+'</option>'}).join('')+'</select></div>'
    +fld('d-dept','Department',u.department)+fld('d-plants','Plant codes (; separated, blank = all)',u.plant_codes)+fld('d-rep','Reports to (email)',u.reports_to_email)+fld('d-wa','WhatsApp (91 + 10 digits)',u.whatsapp_number)+fld('d-cap','Today cap (1-20)',u.today_cap)+fld('d-sec','Sales employee code',u.sales_employee_code)+fld('d-uid','Viewer ID (only if the page cannot read emails; copy it from the person\'s access screen)',u.uid||'')
-   +'<div class="fld"><label for="d-act">Active</label><select id="d-act"><option value="Y"'+(u.active!==false?' selected':'')+'>Yes</option><option value="N"'+(u.active===false?' selected':'')+'>No</option></select></div></div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="user-save" data-new="'+(n?1:0)+'">Save</button><button class="btn" data-act="dlg-close">Cancel</button></div>');
+   +'<div class="fld"><label for="d-act">Active</label><select id="d-act"><option value="Y"'+(u.active!==false?' selected':'')+'>Yes</option><option value="N"'+(u.active===false?' selected':'')+'>No</option></select></div></div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="user-save" data-new="'+(n?1:0)+'" data-id="'+esc(u._id||'')+'">Save</button><button class="btn" data-act="dlg-close">Cancel</button></div>');
 }
 function fld(id,label,val,extra){return '<div class="fld"><label for="'+id+'">'+label+'</label><input id="'+id+'" class="in" value="'+esc(val==null?'':val)+'" '+(extra||'')+'></div>'}
 function gv(id){var e=document.getElementById(id);return e?e.value.trim():''}
 function dlgErr(m){var e=$('#d-err');if(e)e.innerHTML='<div class="banner err">'+esc(m)+'</div>'}
-function validateUser(u,isNew,ignoreId){
+/* placeholder = a pre-filled, switched-off row whose e-mail can never match a real sign-in (D-placeholder) */
+function isPH(u){return !!u&&u.active===false&&/@placeholder\.invalid$/i.test(u.email||'')}
+function validateUser(u,isNew,selfId){
   var errs=[];
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.email))errs.push('Email is not valid');
-  if(isNew&&S.users.some(function(x){return x.email===u.email}))errs.push('Email already exists');
+  if(S.users.some(function(x){return x.email===u.email&&(isNew||x._id!==selfId)}))errs.push('Email already exists');
+  if(u.user_id){if(!/^\d{4}$/.test(u.user_id))errs.push('User ID must be 4 digits');else if(S.users.some(function(x){return x.user_id===u.user_id&&(isNew||x._id!==selfId)}))errs.push('User ID '+u.user_id+' is already used')}
   if(!u.name)errs.push('Name is required');
+  if(/@placeholder\.invalid$/i.test(u.email||'')&&u.active!==false)errs.push('A placeholder e-mail cannot be switched on. Enter the real e-mail first');
+  if(isPH(u)){if(!u.user_id)errs.push('A placeholder needs a User ID');if(u.reports_to_email)errs.push('A placeholder cannot have a reports-to');return errs}
   if(ROLES.indexOf(u.role)<0)errs.push('Role is not one of the 8 roles');
   if(!u.department)errs.push('Department is required');
   if(u.plant_codes){u.plant_codes.split(';').forEach(function(c){c=c.trim();if(c&&!S.plants.some(function(p){return p.plant_code===c}))errs.push('Plant code '+c+' is not in the plant master')})}
   var cap=Number(u.today_cap);if(!(cap>=1&&cap<=20&&Math.floor(cap)===cap))errs.push('Today cap must be a whole number 1 to 20');
   if(u.whatsapp_number&&!/^91\d{10}$/.test(u.whatsapp_number.replace(/[\s+\-]/g,'')))errs.push('WhatsApp must be 91 and 10 digits');
-  if(u.reports_to_email){if(!S.users.some(function(x){return x.email===u.reports_to_email&&x.active!==false}))errs.push('Reports-to must be an active user');if(u.reports_to_email===u.email)errs.push('A user cannot report to themselves')}
+  if(u.reports_to_email){if(!S.users.some(function(x){return x.email===u.reports_to_email&&x.active!==false}))errs.push('Reports-to must be an active user');if(/@placeholder\.invalid$/i.test(u.reports_to_email)||S.users.some(function(x){return x.email===u.reports_to_email&&x.placeholder}))errs.push('Reports-to cannot be a placeholder');if(u.reports_to_email===u.email)errs.push('A user cannot report to themselves')}
   if(u.role==='Sales executive'&&!u.sales_employee_code)errs.push('Sales executive needs a sales employee code');
   return errs;
 }
 async function saveUser(isNew){
-  var u={email:gv('d-email').toLowerCase(),name:gv('d-name'),role:gv('d-role'),department:gv('d-dept'),plant_codes:gv('d-plants'),reports_to_email:gv('d-rep').toLowerCase(),whatsapp_number:gv('d-wa').replace(/[\s+\-]/g,''),today_cap:Number(gv('d-cap')),active:gv('d-act')!=='N',sales_employee_code:gv('d-sec'),uid:gv('d-uid')};
-  var errs=validateUser(u,isNew);
+  var selfId=(document.querySelector('[data-act="user-save"]')||{getAttribute:function(){return ''}}).getAttribute('data-id')||'',old=selfId?S.users.find(function(x){return x._id===selfId}):null;
+  var u={user_id:gv('d-userid'),email:gv('d-email').toLowerCase(),name:gv('d-name'),role:gv('d-role'),department:gv('d-dept'),plant_codes:gv('d-plants'),reports_to_email:gv('d-rep').toLowerCase(),whatsapp_number:gv('d-wa').replace(/[\s+\-]/g,''),today_cap:Number(gv('d-cap')),active:gv('d-act')!=='N',sales_employee_code:gv('d-sec'),uid:gv('d-uid')};
+  var errs=validateUser(u,isNew,selfId);
+  if(old&&old.user_id&&!u.user_id)errs.push('User ID cannot be removed');
   /* keep at least one active super admin */
-  var after=S.users.filter(function(x){return x.email!==u.email}).concat([u]);
+  var after=S.users.filter(function(x){return x.email!==u.email&&x._id!==selfId}).concat([u]);
   if(!after.some(function(x){return x.role==='Super admin'&&x.active!==false})&&SEED_SUPER.length===0)errs.push('At least one active Super admin is needed');
   if(errs.length){dlgErr(errs.join('. '));return}
-  try{await dset('users/'+slug(u.email),u);await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:isNew?'user added':'user changed',who:u.email,role:u.role});closeDlg();toast('User saved')}catch(e){dlgErr(dbErrText(e))}
+  /* an edit keeps its own document, so a placeholder whose e-mail changes never leaves a second record behind */
+  var rec=Object.assign({},old||{},u);delete rec._id;if(isPH(rec))rec.placeholder=true;else delete rec.placeholder;
+  try{await dset('users/'+(old?old._id:slug(u.email)),rec);await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:isNew?'user added':'user changed',who:u.email,role:u.role});closeDlg();toast('User saved')}catch(e){dlgErr(dbErrText(e))}
+}
+/* Admin › Users: 50 switched-off placeholder rows, User ID 1001-1050. Stable doc id users/u<id>; skips any id already present (local list and a read of the document). */
+async function addPlaceholders(){
+  if(effRole()!=='Super admin'||readOnly()){toast('Only a Super admin can add placeholder users');return}
+  if(!S.loaded.users){toast('Users are still loading. Try again in a moment');return}
+  var added=0,skipped=0,fail=null;
+  try{
+    for(var id=1001;id<=1050;id++){
+      var sid=String(id),em='user'+sid+'@placeholder.invalid',path='users/u'+sid;
+      if(S.users.some(function(x){return x.user_id===sid||x.email===em})){skipped++;continue}
+      var ex=await dget(path);if(ex&&ex.exists){skipped++;continue}
+      await dset(path,{user_id:sid,email:em,name:'User '+(id-1000),role:'',department:'',plant_codes:'',reports_to_email:'',whatsapp_number:'',today_cap:5,active:false,sales_employee_code:'',placeholder:true});added++;
+    }
+    await dset('log/l'+Date.now().toString(36),{at:nowISO(),by:S.viewer.email,event:'placeholder users added',added:added,skipped:skipped})
+  }catch(e){fail=e}
+  var msg=fail?'Stopped after adding '+added+': '+dbErrText(fail):'Added '+added+', skipped '+skipped;
+  S.upMsg='<div class="banner '+(fail?'err':'ok')+'">'+esc(msg)+'</div>';var m=$('#up-msg');if(m)m.innerHTML=S.upMsg;toast(msg);
+  return {added:added,skipped:skipped};
 }
 function plantDlg(p){
   var n=!p;p=p||{plant_code:'',plant_name:'',plant_type:'Depot',zone:'',state:'',b1_bpl_name:'',business:'laminates',active:true};
@@ -1012,85 +1060,49 @@ async function savePlant(isNew){
   if(errs.length){dlgErr(errs.join('. '));return}
   try{var old=S.plants.find(function(x){return x.plant_code===p.plant_code});await dset('plants/'+p.plant_code,Object.assign({},old||{},p,{_id:undefined}));closeDlg();toast('Plant saved')}catch(e){dlgErr(dbErrText(e))}
 }
-function potDlg(x){
-  var n=!x,g=gridQuarters();
-  x=x||{fy_quarter:g.cur,plant_code:'',territory:'',product_group:'Laminate',customer_segment:'',potential_value_inr:'',potential_qty_sheets:'',potential_qty_sqft:'',share_pct:'',source_type:'branch estimate',source_note:'',owner_email:S.viewer.email||'',status:'Draft',rev:0,revisions:[]};
-  var lock=isPlanLocked(x.fy_quarter);
-  var tg=x.share_pct!==''&&x.share_pct!=null?fmtMoney((+x.potential_value_inr||0)*(+x.share_pct)/100):'pending';
-  var revs=(x.revisions||[]).slice().reverse().map(function(r){return '<div class="note"><b>r'+r.n+' &middot; '+esc(r.status)+'</b> &middot; '+esc(r.change||'')+' &middot; &ldquo;'+esc(r.reason||'')+'&rdquo; &middot; discussed '+esc(r.discussion_date||'-')+' &middot; '+esc(r.participants||'-')+' &middot; by '+esc(r.by)+' '+istStr(r.at)+'</div>'}).join('');
-  var ro=lock||x.status==='Locked'?'readonly':'';
-  var ty=['dealer / market survey','branch estimate','industry data'];
-  openDlg('<h3>'+(n?'Add potential figure':'Potential '+qLabel(x.fy_quarter)+' &middot; '+esc(x.plant_code||x.territory)+' &middot; '+esc(x.product_group))+'</h3>'+(lock?'<div class="banner warn">This quarter is locked for plan edits.</div>':'')
-   +'<div class="fgrid">'+fld('d-q','Quarter (FY27-Q3)',x.fy_quarter,n?'':'readonly')+fld('d-plant','Plant code',x.plant_code,n?'':'readonly')+fld('d-terr','or Territory',x.territory,n?'':'readonly')+fld('d-grp','Product group',x.product_group,n?'':'readonly')+fld('d-seg','Customer segment',x.customer_segment,n?'':'readonly')
-   +fld('d-pv','Potential ₹',x.potential_value_inr,ro)+fld('d-ps','Potential sheets',x.potential_qty_sheets,ro)+fld('d-pf','Potential sq ft',x.potential_qty_sqft,ro)+fld('d-sh','Share %',x.share_pct,ro)
-   +'<div class="fld"><label for="d-src">Source</label><select id="d-src">'+ty.map(function(t){return '<option'+(t===x.source_type?' selected':'')+'>'+t+'</option>'}).join('')+'</select></div>'+fld('d-owner','Owner (email)',x.owner_email)+fld('d-note','Source note',x.source_note)+'</div>'
-   +'<div class="note">Target = potential &times; share % = <b>'+tg+'</b>. Status now: '+potStatusPill(x.status)+'</div>'
-   +(lock||x.status==='Locked'?'':'<div class="fgrid">'+fld('d-reason','Reason for this change (required)','')+fld('d-disc','Discussion date (YYYY-MM-DD, required)',new Date(Date.now()+19800000).toISOString().slice(0,10))+fld('d-part','Participants','')+'</div>')
-   +(n?'':senseHtml(x))+'<div id="d-err"></div><div class="row">'+(lock||x.status==='Locked'?'':'<button class="btn pri" data-act="pot-save" data-new="'+(n?1:0)+'" data-id="'+esc(x._id||'')+'">Save revision as '+(n?'Draft':'new draft')+'</button>')
-   +(!n&&!lock&&x.status!=='Locked'?(x.status==='Approved'?'':'<button class="btn" data-act="pot-adv" data-id="'+esc(x._id)+'">Mark '+({Draft:'Discussed',Discussed:'Approved'}[x.status])+'</button>'):'')+'<button class="btn" data-act="dlg-close">Close</button></div>'
-   +(revs?'<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3)">Revision log</h3>'+revs:''));
-}
-async function savePot(isNew,id){
-  var old=isNew?null:S.potential.find(function(x){return x._id===id});
-  var q=isNew?gv('d-q').toUpperCase():old.fy_quarter;
-  var x={fy_quarter:q,plant_code:isNew?gv('d-plant'):old.plant_code,territory:isNew?gv('d-terr'):old.territory,product_group:isNew?gv('d-grp'):old.product_group,customer_segment:isNew?gv('d-seg'):old.customer_segment,
-   potential_value_inr:Number(gv('d-pv')),potential_qty_sheets:Number(gv('d-ps')||0),potential_qty_sqft:Number(gv('d-pf')||0),share_pct:gv('d-sh')===''?'':Number(gv('d-sh')),source_type:gv('d-src'),source_note:gv('d-note'),owner_email:gv('d-owner').toLowerCase()};
-  var reason=gv('d-reason'),disc=gv('d-disc'),part=gv('d-part'),errs=[];
-  if(!/^FY\d\d-Q[1-4]$/.test(q))errs.push('Quarter must look like FY27-Q3');
-  if(!x.plant_code&&!x.territory)errs.push('Plant code or territory is required');
-  if(x.plant_code&&!S.plants.some(function(p){return p.plant_code===x.plant_code}))errs.push('Plant code is not in the plant master');
-  if(!x.product_group)errs.push('Product group is required');if(!x.customer_segment)errs.push('Customer segment is required');
-  if(!(x.potential_value_inr>=0)||isNaN(x.potential_value_inr))errs.push('Potential ₹ must be a number, 0 or more');
-  if(x.share_pct!==''&&!(x.share_pct>=0&&x.share_pct<=100))errs.push('Share % must be 0 to 100');
-  if(!reason)errs.push('Reason is required');if(!/^\d{4}-\d\d-\d\d$/.test(disc))errs.push('Discussion date is required (YYYY-MM-DD)');
-  if(x.owner_email&&!S.users.some(function(u){return u.email===x.owner_email&&u.active!==false}))errs.push('Owner must be an active user');
-  if(isPlanLocked(q))errs.push('That quarter is locked');
-  var pg0=planGuard(x);if(pg0)errs.push(pg0);
-  if(errs.length){dlgErr(errs.join('. '));return}
-  var key=isNew?slug([q,x.plant_code||x.territory,x.product_group,x.customer_segment].join('_')):id;
-  var ex=isNew?S.potential.find(function(p){return p._id===key}):old;
-  var rev=(ex?ex.rev||1:0)+1,chg=ex?('₹ '+fmtMoney(ex.potential_value_inr)+' to '+fmtMoney(x.potential_value_inr)+', share '+(ex.share_pct===''?'-':ex.share_pct)+' to '+(x.share_pct===''?'-':x.share_pct)):'new figure';
-  var revisions=(ex&&ex.revisions||[]).concat([{n:rev,at:nowISO(),by:S.viewer.email,status:'Draft',reason:reason,discussion_date:disc,participants:part,change:chg,old:ex?{potential_value_inr:ex.potential_value_inr,share_pct:ex.share_pct}:null,new:{potential_value_inr:x.potential_value_inr,share_pct:x.share_pct}}]);
-  var doc=Object.assign({},ex||{},x,{status:'Draft',rev:rev,revisions:revisions.slice(-40),_id:undefined});
-  try{await dset('potential/'+key,doc);closeDlg();toast('Saved r'+rev+' as Draft')}catch(e){dlgErr(dbErrText(e))}
-}
 /* ---- master CSV uploads ---- */
 async function masterUpload(what,file,rowsIn){
   var show=function(h){S.upMsg=h;var m=$('#up-msg');if(m)m.innerHTML=h};S.upMsg='';
   try{
     var rows=rowsIn||parseCSV(await file.text());if(rows.length<2){show('<div class="banner err">The file has no data rows.</div>');return}
     var hd=rows[0].map(function(x){return norm(x)}),idx=function(k){return hd.indexOf(k)},get=function(r,k){var i=idx(k);return i<0?'':String(r[i]==null?'':r[i]).trim()};
-    var need=TEMPLATES[what].toLowerCase().split(',');var missingCols=need.filter(function(c){return c!=='sales_employee_code'&&c!=='territory'&&c!=='source_note'&&idx(c)<0&&!(what==='plants'&&(c==='zone'||c==='state'||c==='b1_bpl_name'))});
+    var need=TEMPLATES[what].toLowerCase().split(',');var missingCols=need.filter(function(c){return c!=='sales_employee_code'&&c!=='user_id'&&c!=='territory'&&c!=='source_note'&&idx(c)<0&&!(what==='plants'&&(c==='zone'||c==='state'||c==='b1_bpl_name'))});
     if(missingCols.length){show('<div class="banner err">Missing columns: '+esc(missingCols.join(', '))+'. Download the template.</div>');return}
-    var bad=[],ok=[],seen={},fixN=0;
+    var bad=[],ok=[],seen={},fixN=0,blankN=0,unchN=0;
     rows.slice(1).forEach(function(r,i){
       var rn=i+2;
       if(what==='transfers'){
         var tc0=get(r,'cardcode'),tc=tc0.toUpperCase(),tf=get(r,'tranfser');if(tc!==tc0)fixN++;
         if(!tc)bad.push([rn,'','CardCode is empty']);else if(seen[tc])bad.push([rn,tc,'Duplicate CardCode in file']);else{seen[tc]=1;ok.push({code:tc,name:get(r,'cardname'),flag:!/^(n|no|0|false)$/i.test(tf),raw_flag:tf.slice(0,20)})}
       }else if(what==='users'){
-        var u={email:get(r,'email').toLowerCase(),name:get(r,'name'),role:get(r,'role'),department:get(r,'department'),plant_codes:get(r,'plant_codes'),reports_to_email:get(r,'reports_to_email').toLowerCase(),whatsapp_number:get(r,'whatsapp_number').replace(/[\s+\-]/g,''),today_cap:Number(get(r,'today_cap')||5),active:!/^(n|no|false|0)$/i.test(get(r,'active')),sales_employee_code:get(r,'sales_employee_code')};
-        var e=validateUser(u,false);if(seen[u.email])e.push('Duplicate email in file');seen[u.email]=1;
-        if(e.length)bad.push([rn,u.email,e.join('; ')]);else ok.push(u);
+        var u={user_id:get(r,'user_id').replace(/\.0$/,''),email:get(r,'email').toLowerCase(),name:get(r,'name'),role:get(r,'role'),department:get(r,'department'),plant_codes:get(r,'plant_codes'),reports_to_email:get(r,'reports_to_email').toLowerCase(),whatsapp_number:get(r,'whatsapp_number').replace(/[\s+\-]/g,''),today_cap:Number(get(r,'today_cap')||5),active:!/^(n|no|false|0)$/i.test(get(r,'active')),sales_employee_code:get(r,'sales_employee_code')};
+        var byId=(u.user_id&&S.users.find(function(x){return x.user_id===u.user_id}))||null,byEm=S.users.find(function(x){return x.email===u.email})||null,ex0=byId||byEm,pre=[];
+        if(byId&&byEm&&byId._id!==byEm._id)pre.push('User ID '+u.user_id+' belongs to '+byId.email+' and the email belongs to another record ('+(byEm.user_id||'no User ID')+'). Fix the file');
+        else if(byId&&byId.email!==u.email&&!(byId.placeholder||isPH(byId)))pre.push('User ID '+u.user_id+' belongs to '+byId.email+'; change the email in Admin › Users');
+        if(!byId&&byEm&&u.user_id&&byEm.user_id&&byEm.user_id!==u.user_id)pre.push(u.email+' already has User ID '+byEm.user_id+'; change it in Admin › Users');
+        if(!u.user_id&&ex0&&ex0.user_id)u.user_id=ex0.user_id;/* blank keeps the stored id */
+        var e=pre.concat(validateUser(u,!ex0,ex0&&ex0._id));if(seen[u.email])e.push('Duplicate email in file');seen[u.email]=1;if(u.user_id){if(seen['uid'+u.user_id])e.push('Duplicate User ID in file');seen['uid'+u.user_id]=1}
+        if(e.length)bad.push([rn,u.email,e.join('; ')]);else{u._self=ex0?ex0._id:'';ok.push(u)}
       }else if(what==='plants'){
         var p={plant_code:get(r,'plant_code').replace(/\.0$/,''),plant_name:get(r,'plant_name'),plant_type:get(r,'plant_type')||'Depot',zone:get(r,'zone'),state:get(r,'state'),b1_bpl_name:get(r,'b1_bpl_name')||get(r,'plant_name'),business:+get(r,'plant_code')>=1050?'ACP':'laminates',active:!/^(n|no|false|0)$/i.test(get(r,'active')||'y')};
         var e2=[];if(!/^\d{4}$/.test(p.plant_code))e2.push('Code must be 4 digits');if(!p.plant_name)e2.push('Name is required');if(seen[p.plant_code])e2.push('Duplicate code in file');seen[p.plant_code]=1;
         if(e2.length)bad.push([rn,p.plant_code,e2.join('; ')]);else ok.push(p);
       }else if(what==='phasing'){
         var pq=get(r,'fy_quarter').toUpperCase(),pp=get(r,'plant_code').replace(/\.0$/,''),pg=get(r,'product_group'),ps2=get(r,'customer_segment'),mi=+get(r,'month_in_quarter'),pc2=toNum(get(r,'phasing_pct'));
-        var e4=[];if(!/^FY\d\d-Q[1-4]$/.test(pq))e4.push('Bad quarter');else if(isPlanLocked(pq))e4.push('Quarter is locked');
+        var e4=[];if(!/^FY\d\d-Q[1-4]$/.test(pq))e4.push('Bad quarter');else if(isPlanLocked(pq))e4.push('Quarter is locked');var pgd=planGuard({plant_code:pp});if(pgd)e4.push(pgd);
         if(!(mi>=1&&mi<=3))e4.push('month_in_quarter must be 1, 2 or 3');if(isNaN(pc2)||pc2<0||pc2>100)e4.push('phasing_pct must be 0 to 100');
         if(pp&&!S.plants.some(function(x){return x.plant_code===pp}))e4.push('Unknown plant');
         var pk=slug([pq,pp,pg,ps2].join('_')||'all');var grp=seen['ph'+pk]||(seen['ph'+pk]={pq:pq,pp:pp,pg:pg,ps:ps2,pct:[null,null,null],rows:[],key:pk});
         if(!e4.length){if(grp.pct[mi-1]!=null)e4.push('Duplicate month in file');else{grp.pct[mi-1]=pc2;grp.rows.push(rn)}}
         if(e4.length)bad.push([rn,pq+' '+(pp||'all'),e4.join('; ')]);
       }else if(what==='potential'){
-        var q=get(r,'fy_quarter').toUpperCase(),pc=get(r,'plant_code').replace(/\.0$/,''),tr=get(r,'territory'),gr=get(r,'product_group'),sg=get(r,'customer_segment'),pv=toNum(get(r,'potential_value_inr')),ps=toNum(get(r,'potential_qty_sheets')),pf=toNum(get(r,'potential_qty_sqft')),ow=get(r,'owner_email').toLowerCase();
-        var e3=[];if(!/^FY\d\d-Q[1-4]$/.test(q))e3.push('Bad quarter');else if(isPlanLocked(q))e3.push('Quarter is locked');
+        if(get(r,'potential_value_inr')===''&&get(r,'potential_qty_sheets')===''&&get(r,'potential_qty_sqft')===''){blankN++;return}/* a template row the person left empty is skipped, not rejected */
+        var q=get(r,'fy_quarter').toUpperCase(),pc=get(r,'plant_code').replace(/\.0$/,''),tr=get(r,'territory'),gr=get(r,'product_group'),sg=get(r,'customer_segment'),pv=toNum(get(r,'potential_value_inr')),ps=get(r,'potential_qty_sheets')===''?0:toNum(get(r,'potential_qty_sheets')),pf=get(r,'potential_qty_sqft')===''?0:toNum(get(r,'potential_qty_sqft'))/* sheets and sq ft are optional (blank = 0) */,ow=get(r,'owner_email').toLowerCase();
+        var e3=[];if(!/^FY\d\d-Q[1-4]$/.test(q))e3.push('Bad quarter');else if(isPlanLocked(q))e3.push('Quarter is locked');var pgd3=planGuard({plant_code:pc});if(pgd3)e3.push(pgd3);
         if(!pc&&!tr)e3.push('Plant or territory needed');if(pc&&!S.plants.some(function(x){return x.plant_code===pc}))e3.push('Unknown plant');
         if(!gr)e3.push('Product group needed');if(!sg)e3.push('Segment needed');
         if(isNaN(pv)||pv<0)e3.push('Potential ₹ must be 0 or more');if(isNaN(ps)||ps<0)e3.push('Sheets must be 0 or more');if(isNaN(pf)||pf<0)e3.push('Sq ft must be 0 or more');
-        if(!get(r,'source_type'))e3.push('Source type needed');if(!ow||!S.users.some(function(x){return x.email===ow&&x.active!==false}))e3.push('Owner must be an active user');
+        if(!get(r,'source_type'))e3.push('Source type needed');if(!ow||(ow!==(S.viewer&&S.viewer.email||'').toLowerCase()&&!S.users.some(function(x){return x.email===ow&&x.active!==false})))e3.push('Owner must be an active user');
         var key=slug([q,pc||tr,gr,sg].join('_'));if(seen[key])e3.push('Duplicate key in file');seen[key]=1;
         if(e3.length)bad.push([rn,q+' '+(pc||tr),e3.join('; ')]);else ok.push({fy_quarter:q,plant_code:pc,territory:tr,product_group:gr,customer_segment:sg,potential_value_inr:pv,potential_qty_sheets:ps,potential_qty_sqft:pf,source_type:get(r,'source_type'),source_note:get(r,'source_note'),owner_email:ow,_key:key});
       }
@@ -1101,14 +1113,17 @@ async function masterUpload(what,file,rowsIn){
       var o=ok[i];
       if(what==='phasing'){await dset('phasing/'+o.id,{fy_quarter:o.fy_quarter,plant_code:o.plant_code,product_group:o.product_group,customer_segment:o.customer_segment,pct:o.pct,by:S.viewer.email,at:nowISO()});await dset('log/l'+Date.now().toString(36)+i,{at:nowISO(),by:S.viewer.email,event:'phasing changed',quarter:o.fy_quarter})}
       else if(what==='transfers'){await dset('transfers/'+slug(o.code),o)}
-      else if(what==='users'){await dset('users/'+slug(o.email),Object.assign({},S.users.find(function(x){return x.email===o.email})||{},o,{_id:undefined}))}
+      else if(what==='users'){var old0=o._self?S.users.find(function(x){return x._id===o._self}):null,did=old0?old0._id:slug(o.email),rec0=Object.assign({},old0||{},o);delete rec0._id;delete rec0._self;if(!o.user_id&&old0&&old0.user_id)rec0.user_id=old0.user_id;if(!rec0.user_id)delete rec0.user_id;if(isPH(rec0))rec0.placeholder=true;else delete rec0.placeholder;await dset('users/'+did,rec0)}
       else if(what==='plants'){var oldp=S.plants.find(function(x){return x.plant_code===o.plant_code});await dset('plants/'+o.plant_code,Object.assign({},oldp||{},o,{_id:undefined}))}
       else{var ex=S.potential.find(function(x){return x._id===o._key}),rev=(ex?ex.rev||1:0)+1;var k=o._key;delete o._key;
+        /* an unchanged row (same figures, source, note and owner as the current record) is skipped and keeps its status; a DEMO record is never unchanged: any upload of it becomes a real Draft revision (demo flag removed) */
+        if(ex&&!ex.demo&&(+ex.potential_value_inr||0)===o.potential_value_inr&&(+ex.potential_qty_sheets||0)===o.potential_qty_sheets&&(+ex.potential_qty_sqft||0)===o.potential_qty_sqft&&(ex.source_type||'')===o.source_type&&(ex.source_note||'')===o.source_note&&(ex.owner_email||'')===o.owner_email){unchN++;continue}
         var rv={n:rev,at:nowISO(),by:S.viewer.email,status:'Draft',reason:'Uploaded file '+file.name,discussion_date:'',participants:'',change:ex?'₹ '+fmtMoney(ex.potential_value_inr)+' to '+fmtMoney(o.potential_value_inr):'new figure'};
-        await dset('potential/'+k,Object.assign({share_pct:''},ex||{},o,{status:'Draft',rev:rev,revisions:((ex&&ex.revisions)||[]).concat([rv]).slice(-40),_id:undefined}))}
+        var nd=Object.assign({share_pct:''},ex||{},o,{status:'Draft',rev:rev,revisions:((ex&&ex.revisions)||[]).concat([rv]).slice(-40),_id:undefined});delete nd.demo;/* an uploaded row is real data */await dset('potential/'+k,nd)}
       saved++;
     }
-    var fxp=fixesPanel([{st:'info',t:'Rows read',n:rows.length-1,d:''},{st:fixN?'fixed':'info',t:'Codes and emails tidied (trimmed, case)',n:fixN,d:''},{st:bad.length?'need':'info',t:'Rows rejected',n:bad.length,d:bad.length?'Listed below. Fix them in the source file.':'None.'}],'Fixes applied');
+    var fxp=fixesPanel([{st:'info',t:'Rows read',n:rows.length-1,d:''},{st:fixN?'fixed':'info',t:'Codes and emails tidied (trimmed, case)',n:fixN,d:''},{st:bad.length?'need':'info',t:'Rows rejected',n:bad.length,d:bad.length?'Listed below. Fix them in the source file.':'None.'}].concat(what==='potential'?[{st:'info',t:'Template rows left blank (skipped)',n:blankN,d:''},{st:'info',t:'Rows unchanged (skipped, status kept)',n:unchN,d:''}]:[]),'Fixes applied');
+    toast((what==='potential'?'Upload: ':'Upload: ')+saved+' loaded'+(unchN?', '+unchN+' unchanged (skipped)':'')+(bad.length?', '+bad.length+' rejected':'')+'. Details below the grid.');
     show(fxp+(saved?'<div class="banner ok">Loaded '+saved+' row(s).'+(what==='potential'?' Each is a new revision in Draft.':'')+'</div>':'')+(bad.length?'<div class="banner err" style="display:block"><b>'+bad.length+' row(s) rejected.</b><div class="tw" style="margin-top:6px;max-height:220px;overflow:auto"><table><thead><tr><th class="num">Row</th><th>Key</th><th>Reason</th></tr></thead><tbody>'+bad.slice(0,60).map(function(b){return '<tr><td class="num">'+b[0]+'</td><td class="break">'+esc(b[1])+'</td><td>'+esc(b[2])+'</td></tr>'}).join('')+'</tbody></table></div></div>':''));
   }catch(e){show('<div class="banner err">'+esc(dbErrText(e))+'</div>')}
 }
@@ -1157,6 +1172,7 @@ var handlers={
  },
  'atab':function(t){S.adminTab=t.getAttribute('data-t');S.upMsg='';refreshAdmin()},
  'user-add':function(){userDlg(null)},
+ 'user-ph':addPlaceholders,
  'user-edit':function(t){userDlg(S.users.find(function(u){return u._id===t.getAttribute('data-id')}))},
  'user-save':function(t){return saveUser(t.getAttribute('data-new')==='1')},
  'tr-add':function(){openDlg('<h3>Add internal transfer account</h3><div class="fgrid">'+fld('d-tc','CardCode','')+fld('d-tn','CardName','')+'</div><div id="d-err"></div><div class="row"><button class="btn pri" data-act="tr-save">Save</button><button class="btn" data-act="dlg-close">Cancel</button></div>')},
@@ -1166,10 +1182,6 @@ var handlers={
  'plant-edit':function(t){plantDlg(S.plants.find(function(u){return u._id===t.getAttribute('data-id')}))},
  'plant-save':function(t){return savePlant(t.getAttribute('data-new')==='1')},
  'plant-reset':async function(){var n=0;for(var p of defaultPlants()){if(!S.plants.some(function(x){return x.plant_code===p.plant_code})){await dset('plants/'+p.plant_code,{plant_code:p.plant_code,plant_name:'',plant_type:p.plant_type,zone:'',state:'',b1_bpl_name:'',business:'laminates',active:true});n++}}toast(n?n+' default code(s) added':'All default codes already exist')},
- 'pot-add':function(){potDlg(null)},
- 'pot-edit':function(t){potDlg(S.potential.find(function(u){return u._id===t.getAttribute('data-id')}))},
- 'pot-save':function(t){return savePot(t.getAttribute('data-new')==='1',t.getAttribute('data-id'))},
- 'pot-adv':function(t){return advancePot(t.getAttribute('data-id'))},
  'plan-lock':async function(t){
    if(!guardWrite())return;var q=t.getAttribute('data-q'),u=effUser();
    if(['Super admin','Management / HO'].indexOf(u.role)<0){toast('Only Management / HO or Super admin can lock a quarter');return}
@@ -1197,8 +1209,8 @@ document.addEventListener('change',function(ev){
   else if(c==='closeafter'){U.closeAfter=t.checked}
   else if(c==='keepdocs'){U.keepDocs=t.checked}
   else if(c==='rejf'){U.rejFilter=t.value;renderUpload()}
+  else if(c==='hist-rep'){S.hist.showReplaced=t.checked;S.hist.shown=15;renderHist()}
   else if(c==='hist-f'){S.hist[t.getAttribute('data-k')]=t.value;S.hist.shown=15;renderHist()}
-  else if(c==='potf'){var k=t.getAttribute('data-k');S.potFilter[{'pf-q':'q','pf-plant':'plant','pf-group':'group','pf-seg':'seg'}[k]]=t.value;refreshAdmin()}
 });
 document.addEventListener('input',function(ev){
   var t=ev.target,c=t.getAttribute&&t.getAttribute('data-chg');
@@ -1250,16 +1262,20 @@ async function boot(){
     subscribe('settings',db.collection('settings'),function(d){var m=d.find(function(x){return x._id==='main'});S.settings=m||null;applySettings(m);ingestAliases(d);DS.cache={}});
     subscribe('phasing',db.collection('phasing'),function(d){S.phasing=d;DS.cache={}});
     subscribe('roll',db.collection('roll'),function(d){S.rollDocs={};d.forEach(function(x){S.rollDocs[x._id]=x});S.rollLoaded=true;ingestRoll()});
-    subscribe('receivables',db.collection('receivables'),function(d){S.recv=d});
+    subscribe('receivables',db.collection('receivables'),function(d){S.recvRaw=d;ingestRecv()});
     subscribe('collections',db.collection('collections'),function(d){S.coll=d});
-    subscribe('stock',db.collection('stock'),function(d){S.stock=d});
+    subscribe('jobs',db.collection('jobs'),function(d){S.jobs=d;jobSchedule()});
+    subscribe('backups',db.collection('backups'),function(d){S.backups=d;bkSchedule()});
+    subscribe('customers',db.collection('customers'),function(d){S.custRaw=d;ingestCust()});
+    subscribe('creditnotes',db.collection('creditnotes'),function(d){S.cnRaw=d;ingestCN()});
+    subscribe('stock',db.collection('stock'),function(d){S.stockRaw=d;ingestStock()});
     subscribe('itemmeta',db.collection('itemmeta'),function(d){S.itemMeta=d.find(function(x){return x._id==='main'})||null});
     subscribe('salesmaster',db.collection('salesmaster'),function(d){onSalesMaster(d.find(function(x){return x._id==='main'})||null)});
     setTimeout(function(){if(!S.smReady){S.smReady=true;ingestRoll()}},5000);
     renderAll();
   }catch(e){S.dbState='none';S.err=String(e&&e.message||e);renderAll()}
 }
-window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus};
+window.__desk={S:S,get U(){return U},fyOf:fyOf,qMonths:qMonths,gridQuarters:gridQuarters,ungz:ungz,parseCSV:parseCSV,groupOf:groupOf,parseDateCell:parseDateCell,sqftOf:sqftOf,covStatus:covStatus,quarterSeries:quarterSeries,cnFor:cnFor,figs:figs,viewCtx:viewCtx,curQuarterKey:curQuarterKey,achLower:achLower,bkHas:bkHas,bkNew:bkNew,bkAdd:bkAdd,bkCommit:bkCommit,bkRestore:bkRestore,bkFor:bkFor,bkSetCap:function(n){BK_CAP=n},oxBand:oxBand,runJobs:runJobs,oxBandChip:oxBandChip,dset:dset,ddel:ddel,bkCheck:bkCheck,bkPurge:bkPurge,bkStored:bkStored,gz:gz};
 boot();
 })();
 </script>

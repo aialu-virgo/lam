@@ -46,11 +46,11 @@ var DEPT_PAGES={Sales:['overview','sales','team'],CRR:['sales','team'],Accounts:
 function pagesFor(u){
   var base=['today'];if(!u)return [];
   var r=u.role;
-  if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','intake','admin'];
-  if(r==='Management / HO')return ['overview','sales','receivables','inventory','today','actions','team','intake','admin'];
-  if(r==='HOD'){var p=DEPT_PAGES[u.department]||DEPT_PAGES.Sales;return p.filter(function(x){return x!=='sales'||true}).concat(['today','actions','admin'])}
-  if(r==='Branch / depot manager')return ['overview','sales','receivables','inventory','today','actions','team','admin'];
-  if(r==='Sales executive')return ['sales','today','actions','team'];
+  if(r==='Super admin')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake','admin'];
+  if(r==='Management / HO')return ['overview','sales','receivables','inventory','today','actions','team','targets','intake'];
+  if(r==='HOD'){var p=DEPT_PAGES[u.department]||DEPT_PAGES.Sales;return p.filter(function(x){return x!=='sales'||true}).concat(['today','actions','targets'])}
+  if(r==='Branch / depot manager')return ['overview','sales','receivables','inventory','today','actions','team','targets'];
+  if(r==='Sales executive')return ['sales','today','actions','team','targets'];
   if(r==='Coordinator (sales / CRR)')return ['sales','today','actions','team'];
   if(r==='Accounts')return ['receivables','today','actions','team'];
   if(r==='Plant')return ['inventory','today','actions','team'];
@@ -218,7 +218,7 @@ function leafTgt(pot,share){return r2((+pot||0)*(+share||0)/100)}
 function phasingFor(x){
   var best=null,bs=-1;
   (S.phasing||[]).forEach(function(p){
-    if(p.fy_quarter!==x.fy_quarter)return;var s=0;
+    if(p.fy_quarter!==x.fy_quarter)return;if(p.demo&&realActual(x.plant_code,x.fy_quarter))return;var s=0;
     if(p.plant_code){if(p.plant_code!==x.plant_code)return;s+=4}
     if(p.product_group){if(p.product_group!==x.product_group)return;s+=2}
     if(p.customer_segment){if(p.customer_segment!==x.customer_segment)return;s+=1}
@@ -234,12 +234,19 @@ function leafMatch(x,f){
   return true;
 }
 /* quarter-level plan figures for a filter: potential, approved target (current and original), draft, monthly phasing */
+/* D55: a DEMO plan record (potential, target, phasing) is never used for a plant-quarter that has real sales (cells entry without the demo flag) */
+function realActual(plant,q){
+  var ms=qMonths(q);
+  for(var i=0;i<ms.length;i++){var c=S.cells['INV_'+ms[i]],x=c&&c.plants&&c.plants[plant];if(x&&!x.demo)return true}
+  return false;
+}
 function planQ(f,q){
-  var key='pq'+JSON.stringify([f.plants?Array.from(f.plants):null,f.plant||'',f.group||'',q])+S.potVer;
+  var key='pq'+JSON.stringify([f.plants?Array.from(f.plants):null,f.plant||'',f.group||'',q])+S.potVer+'|'+Object.keys(S.cells).length+'|'+S.uploads.length;
   if(DS.cache[key])return DS.cache[key];
   var R={pot:0,potSqft:0,potSh:0,tgtSh:0,tgtShD:0,tgtSq:0,tgtSqD:0,tgt:0,orig:0,draft:0,nAppr:0,nDraft:0,nLeaf:0,months:[0,0,0],draftMonths:[0,0,0],revs:[],kind:'none'};
   (S.potential||[]).forEach(function(x){
     if(x.fy_quarter!==q||!leafMatch(x,f))return;
+    if(x.demo&&realActual(x.plant_code,q))return;
     R.nLeaf++;var ap=approvedOf(x),pct=phasingFor(x);
     var src=ap||x;R.pot+=+src.potential_value_inr||0;R.potSqft+=+src.potential_qty_sqft||0;R.potSh+=shOfLeaf(src);
     if(ap){var t=leafTgt(ap.potential_value_inr,ap.share_pct);R.tgt+=t;R.nAppr++;R.tgtSq+=(+ap.potential_qty_sqft||0)*(+ap.share_pct||0)/100;R.tgtSh+=shOfLeaf(ap)*(+ap.share_pct||0)/100;monthsOfTarget(t,pct).forEach(function(v,i){R.months[i]+=v});
@@ -283,6 +290,18 @@ function personPlan(sp,w,onlyPlant,onlyGroup){
   });
   return out;
 }
+/* D40: trend steps compare Net with Net only when both quarters have credit notes loaded, otherwise invoiced with invoiced; averages and the line stay on invoiced */
+function trendOfSeries(ser){
+  var inv=ser.map(function(x){return x.isCur?null:x.A});
+  return trendStats(inv,{pairs:function(i){var a=ser[i],p=ser[i-1];return a&&p&&a.net&&p.net&&!a.isCur&&!p.isCur?[a.Anet,p.Anet]:null}});
+}
+/* plants of the scope that have sales loaded in every month of the quarter, out of the plants in scope */
+function quarterCoverage(ms,pset){
+  /* D57: counted in plant-months; when every plant has the same number of months it reads "k of M months" */
+  var pl=pset?Array.from(pset):DS.plants.slice(),per=pl.map(function(p){return ms.filter(function(m){var c=S.cells['INV_'+m];return c&&c.plants&&c.plants[p]}).length}),n=per.reduce(function(a,b){return a+b},0),same=per.length>0&&per.every(function(k){return k===per[0]});
+  return {n:n,N:pl.length*ms.length,plants:pl.length,k:same?per[0]:null,M:ms.length};
+}
+function covLabel(c){return c?(c.k!=null?c.k+' of '+c.M+' months':c.n+' of '+c.N+' plant-months'):''}
 /* series of closed quarters since history start (up to 12) + current: actual, target, ach for a filter */
 function quarterSeries(f,personSp){
   var cur=curQuarterKey(),qs=closedQuarters().concat([cur]),out=[];
@@ -291,11 +310,14 @@ function quarterSeries(f,personSp){
     var loaded=isCur?anyMonthData(ms,f.plants||(f.plant?new Set([f.plant]):null)):monthsLoaded(ms,f.plant?new Set([f.plant]):f.plants);
     var ff=Object.assign({},f);if(personSp!=null)ff.sp=personSp;
     var N=isCur?wdBetween(ms[0]+'-01',TODAY()):Infinity;var w=isCur?walk(ms,N):wins(ms);
-    var A=loaded?sumF(ff,w).n:null;
+    var A=loaded?sumF(ff,w).n:null,Anet=null,net=false,H=A,partial=false,Ap=null,cov=null;
+    /* D55: a quarter with some plants loaded is drawn from what is loaded, hatched and labelled "partial: n of N plants" (its A stays null so averages and stretch never use it) */
+    if(!loaded&&!isCur&&anyMonthData(ms,f.plants||(f.plant?new Set([f.plant]):null))){partial=true;Ap=sumF(ff,w).n;cov=quarterCoverage(ms,f.plants||(f.plant?new Set([f.plant]):null))}
+    if(A!=null&&ff.sp==null){var cn=cnFor(ff,w);if(cn.covered){net=true;Anet=A-cn.value;H=Anet}}
     var P=personSp!=null?personPlan(personSp,qMonths(q),f.plant,f.group):planW(f,qMonths(q));
     var tgt=(personSp!=null?P.any:P.any)?(personSp!=null?P.tgt:P.tgt):null;
     var tgtTo=isCur?(personSp!=null?personPlan(personSp,w,f.plant,f.group).tgt:planW(f,w).tgt):tgt;
-    out.push({q:q,label:qLabel(q),A:A,loaded:loaded,tgt:tgt,tgtTo:tgtTo,kind:P.kind,isCur:isCur,ach:(A!=null&&tgtTo>0)?A/tgtTo*100:null,N:N});
+    out.push({q:q,label:qLabel(q),A:A,H:H,partial:partial,Ap:Ap,cov:cov,Anet:Anet,net:net,loaded:loaded,tgt:tgt,tgtTo:tgtTo,kind:P.kind,isCur:isCur,ach:(H!=null&&tgtTo>0&&!achCap(H/tgtTo*100))?H/tgtTo*100:null,check:(H!=null&&tgtTo>0&&achCap(H/tgtTo*100)),N:N});
   });
   return out;
 }

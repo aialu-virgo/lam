@@ -22,6 +22,18 @@ related:
 | Wed 10:00 | QA + blind second check passed, fixes done | Engineering QA | passed Tue ~20:00 on v0.9 version 11 (demo data, stubbed runtime); open: live sign-in, real-data volume, visual match to reference |
 | Wed 11:30 | Acceptance walk-through | SP Sir | open |
 | Wed 12:00 | desk-v1.0 published, tagged, link sent | Delivery Lead | done Tue night (D22) |
+| Fri 14:00 | Collection intake published (D38) | Full-Stack Engineer | done 13:45 (v31) |
+| Fri 15:00 | Incoming Payment Report Apr 2025–Sep 2026 loaded live and checked | Delivery Lead | done (D43) |
+| Fri 17:30 | Receivables, credit notes, customer master intakes; net-sales basis (D40); auto-replaced history (D41) published | Full-Stack Engineer | done 14:50 (v32); QA FAIL 5 defects (D45), v33 16:55; backup size blocker (D46); v34 17:30; QA FAIL on backup cap (D47), v35 18:40, QA passed (D48); sales uploads released |
+| File + 45 min | Each receivables / credit-note / customer file loaded live after Vijay sends it | Delivery Lead | waiting on files |
+| Wed 4 Nov 12:00 | Infographic Overview mock-up for approval (D50) | Product Designer | v2 approved by Vijay (D52) |
+| Tue 3 Nov 23:30 | Infographic Overview built on real data, published (v36); QA check right after | Full-Stack Engineer | published 21:50 (v36); v37 22:46, QA passed (D54) |
+| Wed 4 Nov 15:00 | v38: no DEMO targets against real sales, 6+ quarters with values, brand in item master (D55) | Full-Stack Engineer | published 13:58; item master reloaded with brand (D56); QA FAIL (D57); v39 15:13, QA: one label defect (D58); v40 16:00, QA passed (D59) |
+| Wed 4 Nov 13:45 | Mock-up v3: thickness, brand, collections, branch rating cards (D55) | Product Designer | published 13:19; awaiting approval |
+| Thu 5 Nov 13:00 | v41: credit-note files blocked in sales intake, CN lock, bulk Undo (D60) | Full-Stack Engineer | published 12:13; QA FAIL on undo integrity (D61); v42 12:37, QA passed (D63); Undo cleared |
+| Sun 8 Nov 13:00 | v43: admin job queue; recovery Undo + Clear demo queued by Delivery Lead (D66) | Full-Stack Engineer | v43 live (version 46); jobs ran 12:21–12:36 IST (D68) |
+| After Vijay opens the Desk | Sales Apr 2025–Sep 2026 restored; credit notes written and locked | Delivery Lead | done 12:40 IST (D68) |
+| Sun 8 Nov 18:00 | v44: thickness, brand, collections, branch-rating cards; zones from sales (D64, D65) | Full-Stack Engineer | in build |
 
 ## Milestones
 **M0 Discovery**
@@ -42,6 +54,6 @@ related:
 
 **M5 v1.0** — [x] QA fixes (acceptance fixes after 11:30 if any) · [x] published and tagged (D22)
 
-**M6 QA pass + acceptance** — [ ] all 12 checks pass ([Brief Part B — design inputs](design/brief-part-b.md) §8) · [ ] SP Sir accepts · [ ] first real B1 upload by Virgo users
+**M6 QA pass + acceptance** — [ ] all 12 checks pass ([Brief Part B — design inputs](design/brief-part-b.md) §8) · [x] SP Sir accepts (D67, relayed by Vijay 8 Nov) · [ ] first real B1 upload by Virgo users
 
 **M7 Handover** — [x] role guides + admin guide (drafts) · [ ] walkthrough in [handover/](handover/_index.md) · [x] S/4HANA switch notes

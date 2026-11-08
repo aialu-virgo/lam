@@ -4,9 +4,9 @@ S.acF={status:'',owner:'',rule:'',q:''};S.logF={kind:'',by:'',q:'',from:''};S.ac
 S.actions=[];S.followups=[];S.phasing=[];S.rollDocs={};S.rollLoaded=false;S.orders=[];S.deliv=[];S.recv=[];S.coll=[];S.stock=[];S.potVer=0;S.viewAs=null;S.demoMode=false;
 var PAGES=[
  ['overview','Overview','Overview'],['sales','Sales','Overview'],['receivables','Receivables','Overview'],['inventory','Inventory','Overview'],
- ['today','Today','Team'],['actions','Action Center','Team'],['team','Team & Scorecard','Team'],['intake','Data Intake','Data'],['admin','Admin','Data']];
+ ['today','Today','Team'],['actions','Action Center','Team'],['team','Team & Scorecard','Team'],['targets','Targets & Potential','Plan'],['intake','Data Intake','Data'],['admin','Admin','Data']];
 var TITLES={
- overview:['Overview','Net sales and growth against market potential. Comparison is always the previous quarter.'],
+ overview:['Overview','Sheets sold, collections and stock against market potential. Growth is always against the previous quarter.'],
  sales:['Sales','Branch → salesperson → customer → SAP document · A/B/C customer tiles'],
  receivables:['Receivables','Ageing buckets and collection plan against actual'],
  inventory:['Inventory','Stock against plan, stock days and ageing'],
@@ -14,7 +14,8 @@ var TITLES={
  actions:['Action Center','Actions, raise action, Follow-ups to send, Action log'],
  team:['Team & Scorecard','KRA / KPI plan against actual per person and role'],
  intake:['Data Intake','SAP B1 now, S/4HANA ready. CSV or XLSX. Every row keeps its SAP reference.'],
- admin:['Admin','Users, plants, market potential with revisions, rules and settings.']};
+ targets:['Targets & Potential','Fill the quarter\'s market potential and sales target in one place'],
+ admin:['Admin','Users, plants, rules and settings.']};
 var PERIOD_PAGES=['overview','sales','team'],FILTER_PAGES=['overview','sales','team','receivables','inventory'];
 
 function route(){
@@ -33,7 +34,7 @@ function dataChip(){
 }
 /* line icons, 24x24, stroke 2, drawn at 17px like the reference (no icon library) */
 var NAV_ICON={overview:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
- sales:'<path d="M3 20h18M6 16l4-5 4 3 5-7"/>',orders:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',receivables:'<path d="M7 4h10M7 9h10M7 4c5 0 5 5 0 5l7 11"/>',inventory:'<path d="M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4"/>',
+ sales:'<path d="M3 20h18M6 16l4-5 4 3 5-7"/>',targets:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',orders:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',receivables:'<path d="M7 4h10M7 9h10M7 4c5 0 5 5 0 5l7 11"/>',inventory:'<path d="M4 8l8-4 8 4v8l-8 4-8-4z M4 8l8 4 8-4"/>',
  today:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>',actions:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
  team:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c2 .6 3.2 2.4 3.5 5.5"/>',
  intake:'<path d="M12 16V4M7 9l5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',admin:'<path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/>'};
@@ -45,7 +46,7 @@ function navTags(u,open){
   if(open)t.today=mk(open,'cnt');
   var oa=openActionCount(u);if(oa)t.actions=mk(oa,'red','Open actions in your scope');
   t.team=mk('TEAM','teal');
-  if(sa){t.intake=mk('LIVE','ind');t.admin=mk('RULES','vio','Rules, settings and plans')}else t.intake=mk('VIEW','ind');
+  if(sa){t.intake=mk('LIVE','ind');t.admin=mk('RULES','vio','Rules and settings')}else t.intake=mk('VIEW','ind');
   if(!S.recv.length&&!S.coll.length)t.receivables=mk('DATA','','Receivable and collection exports not loaded');
   if(!S.stock.length)t.inventory=mk('DATA','','Stock export not loaded');
   return t;
@@ -57,9 +58,9 @@ function brandLogo(){return '<span class="brandmark">'+(LOGO_SRC?'<img class="br
 function navHtml(u){
   var pages=pagesFor(u),open=0;try{open=todayCandidates(u).length}catch(e){}
   var groups={};PAGES.forEach(function(p){(groups[p[2]]=groups[p[2]]||[]).push(p)});
-  return ['Overview','Team','Data'].map(function(g){
+  return ['Overview','Team','Plan','Data'].map(function(g){
     var items=groups[g].filter(function(p){return pages.indexOf(p[0])>=0});if(!items.length)return '';
-    var label=function(p){return p[0]==='admin'&&u.role!=='Super admin'?'Plans':p[1]};
+    var label=function(p){return p[1]};
     var tg=navTags(u,open);
     return '<nav class="navg"><h4>'+g+'</h4>'+items.map(function(p){var t=tg[p[0]]||'';
       return '<a class="nav" href="#/'+p[0]+'" '+(S.tab===p[0]?'aria-current="page"':'')+'>'+navIcon(p[0])+'<span class="nl">'+esc(label(p))+'</span>'+t+'</a>'}).join('')+'</nav>';
@@ -73,7 +74,7 @@ function shellHtml(u){
 }
 function topHtml(){
   var t=TITLES[S.tab]||TITLES.today;var demo=S.uploads.some(function(x){return x.demo})||S.actions.some(function(a){return a.demo});
-  var label=S.tab==='admin'&&effRole()!=='Super admin'?['Plans','Propose, discuss and approve targets. Settings stay with the Super admin.']:t;
+  var label=S.tab==='targets'?[t[0],t[1]+' · '+qLabel(tpQ())+' ('+tpQRange(tpQ())+')']:t;
   return '<div><h1>'+esc(label[0])+'</h1><p>'+esc(label[1])+'</p></div><div class="chips">'+(demo?'<span class="chip demo">DEMO data loaded</span>':'')+dataChip()+(S.engStatus?'<span class="chip">'+esc(S.engStatus)+'</span>':'')+'<button class="btn sm" data-act="share">Share link</button><button class="btn sm" data-act="theme" aria-label="Switch light or dark theme">Theme</button></div>';
 }
 function bannersHtml(){
@@ -82,6 +83,7 @@ function bannersHtml(){
   if(lsGet('desk-today'))h+='<div class="banner info"><span>Test clock: today is set to <b>'+esc(fmtDate(TODAY()))+'</b> for this browser only (Admin › Settings).</span><button class="btn sm" data-act="clock-reset">Use the real date</button></div>';
   if(DS.custJobs>0)h+='<div class="banner info">Reading customer detail '+DS.custDone+' of '+DS.custJobs+'...</div>';
   if(DS.status&&DS.status!=='ready'&&DS.status!=='idle')h+='<div class="banner info">'+esc(DS.status)+'</div>';
+  if(S.jobBanner)h+='<div class="banner '+(S.jobBannerOk?'ok':'err')+'"><span>'+esc(S.jobBanner)+'</span><button class="btn sm" data-act="job-dismiss">Dismiss</button></div>';
   if(S.err)h+='<div class="banner err">Database message: '+esc(S.err)+'</div>';
   return h;
 }
@@ -114,6 +116,7 @@ function ctrlBar(pg){
 function pageHtml(u){
   var pg=S.tab;
   if(pg==='today')return pageToday();
+  if(pg==='targets')return pageTargets();
   if(pg==='actions')return S.threadId?pageThread(S.threadId):pageActions();
   var body='';
   if(pg==='overview')body=pageOverview();else if(pg==='sales')body=pageSales();else if(pg==='team')body=pageTeam();
