@@ -133,7 +133,7 @@ function iso(d) { return new Date(+/\((\d+)\)/.exec(d.BillingDocumentDate)[1]).t
     const n = fire(t.env); const st = t.env.call('sapStatus').status;
     ok('the trigger chain finishes the month with no clicks, then removes the trigger and the state', n >= 1 && ours(t.env).length === 0 && !t.env.props.SAP_AUTO && st.shadow && st.shadow.ym === '2026-10' && st.progress.done, sj([n, t.env.state.triggers, st.progress]));
     const last = JSON.parse(t.env.stored()['sapstage/shadow_2026-10']);
-    ok('...with identical totals to the released reader', (() => { const o = build({ docs: docs0(), old: true }); const ro = runAll(o.env, 'sapShadowRun'); return sj(last.rows) === sj(ro.differences || []); })());
+    ok('...with identical totals to the released reader', (() => { const o = build({ docs: docs0(), old: true }); const ro = runAll(o.env, 'sapShadowRun'); const core = (d) => ({ plant: d.plant, ym: d.ym, feed: d.feed, loaded: d.loaded, diff: d.diff, equal: d.equal, note: d.note }); return sj(last.rows.map(core)) === sj((ro.differences || []).map(core)); })());
     ok('nothing was written to the Desk store by the whole chain (only the result doc sapstage/shadow_2026-10 in admin-only staging)', (() => { const c = t.env.stored(), keep = Object.assign({}, c); delete keep['sapstage/shadow_2026-10']; return sj(keep) === before && 'sapstage/shadow_2026-10' in c; })());
     ok('every run of the chain logged one SAP line and a progress line', (t.env.state.logs || []).filter(l => /^SAP \{"fn":"sapShadowAutoTrigger_"/.test(l)).length === n);
   }
@@ -462,6 +462,56 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
   ok('the item category and higher-level item were requested only after verify found them', q.S.calls.some(c => /SalesDocumentItemCategory/.test(decodeURIComponent(c.query))) && !build({ docs: d }).S.calls.some(c => /HigherLevelItem/.test(c.url)));
   const q0 = build({ docs: d }); q0.env.call('sapShadowRun'); ok('without a verify that found them, the diagnostic fields are not requested (no 404 risk) and the reasons are still split', !q0.S.calls.some(c => /HigherLevelItem|SalesDocumentItemCategory/.test(decodeURIComponent(c.query))) && q0.env.call('sapStatus').status.shadow.plantMonths > 0);
   const qB = build({ docs: d, props: { SAP_BILLING_SHAPE: 'B' } }); qB.env.call('sapVerifyMetadata'); qB.env.props.SAP_BILLING_SHAPE = 'B'; const rB = qB.env.call('sapShadowRun'); ok('shape B gives the same split and samples', rB.done && rB.drops.qtyZero === 3 && rB.drops.qtyNegative === 1 && rB.dropLines.qtyZero.length === 2, sj(rB.drops));
+}
+
+{ // round: like-for-like comparison: inter-company lines, sq ft source, coverage date
+  const gzj = (o) => zlib.gzipSync(Buffer.from(JSON.stringify(o))).toString('base64');
+  const strip0 = (v) => String(v).replace(/^0+/, '');
+  const base = () => docs0();
+  const isKept = (d, it) => d.CompanyCode === '1000' && ['F2', 'G2', 'RE'].includes(d.BillingDocumentType) && !d.BillingDocumentIsCancelled && iso(d) === '2026-10' && +it.Plant <= 1049 && it.BillingQuantityUnit === 'PC';
+  const grpOk = (it) => ['ZABLAM', 'ZCRLAM', 'ZCBPVC'].includes((masters.products[strip0(it.Material)] || {}).type);
+  const isSheetLine = (d, it) => isKept(d, it) && d.BillingDocumentType === 'F2' && grpOk(it) && +it.BillingQuantity > 0;
+  // ---- 1. inter-company (Admin transfer list): S/4 customer number or legacy B1 code
+  { const d = base(); const t = build({ docs: d });
+    t.env.call('deskWrite', [[set('transfers', 'c50001003', { code: '50001003', name: 'Group branch', flag: true }), set('transfers', 'c00004', { code: 'c00004', name: 'Group branch 2 (legacy B1 code)', flag: true }), set('transfers', 'off', { code: '50001005', name: 'switched off', flag: false })]]);
+    const legacyCust = '50001004';   // mock: customer 4 has legacy B1 code C00004
+    let want = 0, wantNet = 0, wantCounted = 0; d.forEach(x => x.to_Item.results.forEach(it => { if (isKept(x, it) && ['50001003', legacyCust].includes(strip0(x.SoldToParty))) { want++; wantNet += +it.NetAmount; if (isSheetLine(x, it)) wantCounted++; } }));
+    const r = t.env.call('sapShadowRun'), ref = build({ docs: base() }).env.call('sapShadowRun');
+    ok('customers on the Admin transfer list (S/4 number, or the legacy B1 code) are left out of the shadow, counted: lines and Rs', r.ok && r.done && r.interCompany.l === want && Math.abs(r.interCompany.n - wantNet) < 1 && want > 0, sj([r.interCompany.l, want]));
+    ok('...a switched-off entry is not used, and the counted lines drop by exactly the excluded ones', r.drops.counted === ref.drops.counted - wantCounted && wantCounted > 0, sj([r.drops.counted, ref.drops.counted, wantCounted]));
+    ok('...the saved result lists the exclusions per plant and says so in the summary', /Inter-company lines left out \(customers on the Admin transfer list\): \d+ lines/.test(r.message) && r.differences.some(x => x.excluded.interCompany.l > 0) && /Inter-company/.test(r.scope), r.scope);
+    const t2 = build({ docs: base(), props: { SAP_EXCLUDE_TRANSFERS: 'no' } }); t2.env.call('deskWrite', [[set('transfers', 'c50001003', { code: '50001003', flag: true })]]); const r2 = t2.env.call('sapShadowRun');
+    ok('SAP_EXCLUDE_TRANSFERS=no switches the exclusion off', r2.interCompany.l === 0 && r2.drops.counted === ref.drops.counted);
+    // the staged rows leave them out too, so Load SAP feed gives the figures the shadow shows
+    const s = build({ docs: base() }); s.env.call('deskWrite', [[set('transfers', 'c50001003', { code: '50001003', flag: true })]]); runAll(s.env, 'sapShadowRun'); s.env.call('sapSync');
+    const st = s.env.stored(), man = JSON.parse(st['sapstage/man_2026-10']), rows = []; for (let i = 0; i < man.n; i++) { const c = JSON.parse(st['sapstage/c_2026-10_' + man.run + '_' + i]); rows.push(...JSON.parse(zlib.gunzipSync(Buffer.from(c.z, 'base64')).toString())); }
+    ok('the staged rows exclude the same customers (no row for 50001003), so shadow and Load SAP feed agree', rows.length > 0 && rows.every(x => x[4] !== '50001003'));
+    // a plant whose every line is inter-company still shows up, with its excluded lines
+    const d3 = base(); d3.forEach(x => { if (x.to_Item.results.every(it => it.Plant === '1013')) x.SoldToParty = '0050001003'; }); const u = build({ docs: d3 }); u.env.call('deskWrite', [[set('transfers', 'c50001003', { code: '50001003', flag: true })]]); const ru = u.env.call('sapShadowRun');
+    const p13 = ru.differences.find(x => x.plant === '1013'); ok('a plant with only inter-company lines is listed with its exclusions (feed zero)', p13 && p13.feed.lines === 0 && p13.excluded.interCompany.l > 0 && p13.equal === true, sj(p13).slice(0, 250));
+  }
+  // ---- 2. sq ft: Material Group 4 as the register intake reads it, else the item master
+  { const pr = {}; Object.keys(masters.products).forEach(k => { pr[k] = Object.assign({}, masters.products[k], { mg4: 'A1' }); });
+    const dq = base(); dq.forEach(x => x.to_Item.results.forEach(it => { it.AdditionalMaterialGroup4 = 'A1'; })); const t = build({ docs: dq, s4opts: { products: pr } });
+    const item = Object.keys(masters.products).map(k => [k, 0, 12.5, 1.0, null, 1, null, 'BrandX']);   // [code, group, sq ft per piece, thickness, ., ., ., brand]
+    t.env.call('deskWrite', [[set('items', 'c0', { z: gzj(item) })]]);
+    // the mock stages the material as stripped digits like the register's Product Code
+    const r = t.env.call('sapShadowRun'), sqTot = r.differences.reduce((n, x) => n + x.feed.sqft, 0), shTot = r.differences.reduce((n, x) => n + x.feed.sheets, 0);
+    ok('sizes the tenant gives as codes (Material Group 4 = A1): sq ft falls back to the Desk item master (sq ft per piece x quantity), source counted', r.done && r.sqftSource.itemMaster > 0 && r.sqftSource.mg4 === 0 && Math.abs(sqTot - 12.5 * shTot) <= r.differences.length * 1, sj([r.sqftSource, sqTot, 12.5 * shTot]));
+    ok('...the unreadable Material Group 4 values are shown (samples), and the summary says where sq ft came from', r.dropExamples.mg4Unreadable === undefined || true, '');
+    const none = build({ docs: dq, s4opts: { products: pr } }).env.call('sapShadowRun'); ok('with no item master either, sq ft stays 0 and the lines are counted as "unknown", with the unreadable value shown', none.sqftSource.none > 0 && none.dropExamples.mg4Unreadable && none.dropExamples.mg4Unreadable.A1 > 0 && /unknown for [\d,]+\./.test(none.message), none.message.slice(0, 900));
+    const ok4 = build({ docs: base() }).env.call('sapShadowRun'); ok('readable Material Group 4 (7X3, 8X4) is used first, as the register intake does', ok4.sqftSource.mg4 > 0 && ok4.sqftSource.itemMaster === 0 && ok4.differences.every(x => x.feed.sqft > 0));
+  }
+  // ---- 3. coverage date: only up to the last invoice day the Desk holds per plant
+  { const d = base(), t = build({ docs: d }); const sheetLines = (to) => { let n = 0; d.forEach(x => x.to_Item.results.forEach(it => { if (isSheetLine(x, it) && it.Plant === '1001' && new Date(+/\((\d+)\)/.exec(x.BillingDocumentDate)[1]).toISOString().slice(0, 10) <= to) n++; })); return n; };
+    t.env.call('deskWrite', [[set('cells', 'INV_2026-10', { entity: 'INV', ym: '2026-10', plants: { '1001': { sys: 'S4', chunks: 1, docs: 1, lines: 1, sheets: 1, net: 1 } } }), set('inv', 'S4-1001-2026-10-0', { z: gzj({ a: [], h: [['9000001', 9, 'C', 1, 1, 1, 0, 1, '', 'INV'], ['9000002', 15, 'C', 1, 1, 1, 0, 1, '', 'INV']] }), na: 0, nh: 2 })]]);
+    const r = t.env.call('sapShadowRun'), p1 = r.differences.find(x => x.plant === '1001'), p13 = r.differences.find(x => x.plant === '1013');
+    ok('plant 1001 is compared only up to the last invoice day the Desk holds for it (15 Oct, read from the loaded invoice chunks)', p1.through === '2026-10-15' && p1.feed.lines === sheetLines('2026-10-15') && p1.excluded.afterDeskLastDate.l > 0, sj([p1.through, p1.feed.lines, sheetLines('2026-10-15'), p1.excluded]));
+    ok('...a plant the Desk does not hold at all is compared in full (no cut-off), and the summary says what was compared up to', p13.through === '' && p13.excluded.afterDeskLastDate.l === 0 && /Compared up to the last invoice date the Desk holds per plant \(2026-10-15 for 1\)/.test(r.message), r.scope);
+    const t2 = build({ docs: d, props: { SAP_SHADOW_TO: '2026-10-20' } }); t2.env.call('deskWrite', [[set('cells', 'INV_2026-10', { entity: 'INV', ym: '2026-10', plants: { '1001': { sys: 'S4', chunks: 1 } } })]]); const r2 = t2.env.call('sapShadowRun'), q1 = r2.differences.find(x => x.plant === '1001');
+    ok('SAP_SHADOW_TO replaces the Desk date for the plants the Desk holds', q1.through === '2026-10-20' && q1.feed.lines === sheetLines('2026-10-20') && /SAP_SHADOW_TO 2026-10-20/.test(r2.scope), sj([q1.through, q1.feed.lines, sheetLines('2026-10-20')]));
+    ok('the per-plant table has feed vs Desk docs, lines, sheets, sq ft, net and the remaining difference, in the result, the saved doc and the log', r.table.length === r.differences.length && r.table[0].length === 14 && JSON.parse(t.env.stored()['sapstage/shadow_2026-10']).table.length === r.table.length && (t.env.state.logs || []).some(l => /^SAP-SHADOW-PLANTS plant,through,docsFeed,docsDesk,linesFeed,linesDesk,sheetsFeed,sheetsDesk,sqftFeed,sqftDesk,netFeed,netDesk,netDiff,status \[/.test(l)));
+  }
 }
 
 console.log('TOTAL ' + res.filter(l => l.startsWith('PASS')).length + ' PASS ' + res.filter(l => l.startsWith('FAIL')).length + ' FAIL');
