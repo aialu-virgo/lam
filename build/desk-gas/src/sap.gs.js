@@ -38,6 +38,9 @@ var SAP_STAGE_COLS = ['Invoice Document Number', 'Invoice Document item', 'Invoi
 /* Billing read shape (mapping 1.1): A = header A_BillingDocument with $expand=to_Item; B = item set A_BillingDocumentItem carrying the header fields (how the group's existing connector reads).
  * SAP_BILLING_SHAPE (Script Property) forces one; otherwise sapVerifyMetadata picks B only when A is incomplete and B is complete (saved as SAP_SHAPE); default A. */
 var SAP_ITEM_FIELDS = ['BillingDocument', 'BillingDocumentItem', 'Plant', 'Material', 'BillingQuantity', 'BillingQuantityUnit', 'NetAmount', 'TransactionCurrency', 'AdditionalMaterialGroup3', 'AdditionalMaterialGroup4', 'ReferenceSDDocument'];
+/* diagnostic item fields (item category, higher-level item): read ONLY when the last sapVerifyMetadata found them on the tenant (verify.diagOk), and used only to explain why a line is left out; no figure depends on them */
+var SAP_DIAG_FIELDS = ['SalesDocumentItemCategory', 'HigherLevelItem'];
+var SAP_TYPE_TARGETS_ = { 'LAM': 'ZABLAM', 'LAMINATE': 'ZABLAM', 'LAMINATES': 'ZABLAM', 'PVC': 'ZCBPVC', 'PVC SHEET': 'ZCBPVC', 'ZABLAM': 'ZABLAM', 'ZCRLAM': 'ZCRLAM', 'ZCBPVC': 'ZCBPVC' };
 var SAP_HDR_FIELDS = ['BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate'];
 /* OPTIONAL marks (opt): a property that net sales, sheets and sq ft do not need. If sapVerifyMetadata finds an optional property missing on the tenant (GAP) it is left out of every later read
  * (list kept in the Script Property SAP_OPT_SKIP) and the run goes on with a warning. A required property that is a GAP blocks the shadow run and the sync, with a message naming it.
@@ -79,8 +82,23 @@ function sapCfg_() {
   if (cancel !== 'exclude' && cancel !== 'mirror') fail_('sap_not_configured', 'CANCEL_MODE must be exclude or mirror. Nothing was read.');
   var user = String(p.getProperty('SAP_USER')), pass = String(p.getProperty('SAP_PASSWORD'));
   var shape = String(p.getProperty('SAP_BILLING_SHAPE') || p.getProperty('SAP_SHAPE') || 'A').trim().toUpperCase() === 'B' ? 'B' : 'A';
-  return { base: base, company: company, cancel: cancel, shape: shape, auth: 'Basic ' + Utilities.base64Encode(user + ':' + pass), skip: sapGetJson_('SAP_OPT_SKIP', []), secrets: [user, pass, p.getProperty('SAP_BASE_URL')] };
+  var typeMap = { Z3LM: 'ZABLAM', Z3PC: 'ZCBPVC' }, tmRaw =   /* confirmed by Vijay 9 Nov 2026: Z3LM is laminates, doors and compact boards (Material Group 3 decides which, as for ZABLAM/ZCRLAM); Z3PC is PVC sheet (as ZCBPVC). The register codes stay; the Script Property SAP_TYPE_MAP adds to or overrides these. */  String(p.getProperty('SAP_TYPE_MAP') || '').trim();
+  if (tmRaw) {   // SAP_TYPE_MAP: {"<tenant ProductType>": "LAM" | "PVC"}; applied to the shadow tally and to the staged rows alike (column Product Type becomes ZABLAM or ZCBPVC, which the page's register intake already understands)
+    var tm = null; try { tm = JSON.parse(tmRaw); } catch (e) { tm = null; }
+    if (!tm || typeof tm !== 'object' || Array.isArray(tm)) fail_('sap_not_configured', 'SAP_TYPE_MAP must be JSON like {"ZNEW":"LAM","ZNEW2":"PVC"} (it adds to the built-in Z3LM and Z3PC). Nothing was read.');
+    Object.keys(tm).forEach(function (k) {
+      var key = String(k).trim().toUpperCase(), tg = SAP_TYPE_TARGETS_[String(tm[k]).trim().toUpperCase()];
+      if (!key || key.length > 18) fail_('sap_not_configured', 'SAP_TYPE_MAP has an empty or too long product type. Nothing was read.');
+      if (!tg) fail_('sap_not_configured', 'SAP_TYPE_MAP maps ' + key + ' to "' + String(tm[k]).slice(0, 20) + '", which is not one of LAM, PVC (or ZABLAM, ZCRLAM, ZCBPVC). Nothing was read.');
+      typeMap[key] = tg;
+    });
+  }
+  var vv = sapStatusGet_().verify, diag = (vv && vv.diagOk) || [];
+  return { base: base, company: company, cancel: cancel, shape: shape, auth: 'Basic ' + Utilities.base64Encode(user + ':' + pass), skip: sapGetJson_('SAP_OPT_SKIP', []), typeMap: typeMap, diag: diag, secrets: [user, pass, p.getProperty('SAP_BASE_URL')] };
 }
+/* the staged / compared Product Type: the tenant's ProductType, or the register code it stands for (built-in Z3LM and Z3PC, plus SAP_TYPE_MAP). Shadow tally and staged rows both use this value, so the page's register intake, which reads ZABLAM, ZCRLAM and ZCBPVC, classifies every line exactly as the shadow does. */
+function sapMapType_(cfg, t) { var k = String(t == null ? '' : t).trim().toUpperCase(); return cfg && cfg.typeMap && cfg.typeMap[k] ? cfg.typeMap[k] : t; }
+function sapDiagFields_(cfg) { return SAP_DIAG_FIELDS.filter(function (f) { return (cfg.diag || []).indexOf(f) >= 0 && !sapSkipped_(cfg, 'A_BillingDocumentItem', f); }); }
 function sapSkipped_(cfg, set, prop) { return !!(cfg && cfg.skip && (cfg.skip.indexOf(set + '.' + prop) >= 0 || cfg.skip.indexOf(set + '.(entity set)') >= 0)); }
 function sapRedact_(cfg, s) {
   s = String(s == null ? '' : s);
@@ -369,7 +387,7 @@ function sapDocRows_(cfg, h, cnt) {
     var unit = String(it.BillingQuantityUnit || '').trim().toUpperCase(), cur = String(it.TransactionCurrency || h.TransactionCurrency || 'INR').trim().toUpperCase();
     if ((unit && SAP_SHEET_UNITS.indexOf(unit) < 0) || cur !== 'INR') { cnt.flagged++; cnt.flaggedValue += isNaN(net) ? 0 : net; return; }
     var qty = sapNum_(it.BillingQuantity);
-    out.push({ rawMat: String(it.Material == null ? '' : it.Material).trim(), rawCust: String(h.SoldToParty == null ? '' : h.SoldToParty).trim(), kind: kind,
+    out.push({ rawMat: String(it.Material == null ? '' : it.Material).trim(), rawCust: String(h.SoldToParty == null ? '' : h.SoldToParty).trim(), kind: kind, u: unit, ic: String(it.SalesDocumentItemCategory == null ? '' : it.SalesDocumentItemCategory).trim(), hl: String(it.HigherLevelItem == null ? '' : it.HigherLevelItem).trim().replace(/^0+/, ''), hasDiag: it.SalesDocumentItemCategory !== undefined || it.HigherLevelItem !== undefined,
       row: [doc, sapTrim0_(it.BillingDocumentItem), date, plant, cust, '', sapTrim0_(it.Material), isNaN(qty) ? String(it.BillingQuantity == null ? '' : it.BillingQuantity) : qty, isNaN(net) ? String(it.NetAmount == null ? '' : it.NetAmount) : net,
         type, '', String(it.AdditionalMaterialGroup3 == null ? '' : it.AdditionalMaterialGroup3).trim(), String(it.AdditionalMaterialGroup4 == null ? '' : it.AdditionalMaterialGroup4).trim(), '', sapTrim0_(it.ReferenceSDDocument), ''] });   // column 14 (Sales District) stays blank
   });
@@ -431,18 +449,18 @@ function sapLookups_(cfg, ctx, entries, pg, stop) {
   entries.forEach(function (e) { if (!seenM[e.rawMat]) { seenM[e.rawMat] = 1; mats.push(e.rawMat); } if (!seenC[e.rawCust]) { seenC[e.rawCust] = 1; custs.push(e.rawCust); } });
   fetchSet(SAP_SVC.product, 'A_Product', 'Product', 'ProductType', ctx.prod, 'sapp_', need(ctx.prod, 'sapp_', mats));
   if (!sapSkipped_(cfg, 'A_Customer', 'CustomerName')) fetchSet(SAP_SVC.partner, 'A_Customer', 'Customer', 'CustomerName', ctx.cust, 'sapc_', need(ctx.cust, 'sapc_', custs));
-  entries.forEach(function (e) { e.row[10] = ctx.prod[e.rawMat] || ''; e.row[5] = String(ctx.cust[e.rawCust] || '').slice(0, 60); });
+  entries.forEach(function (e) { e.row[10] = sapMapType_(cfg, ctx.prod[e.rawMat] || ''); e.row[5] = String(ctx.cust[e.rawCust] || '').slice(0, 60); });
 }
 
 /* ---------- reading one month of headers (with items), page by page ---------- */
 var SAP_HDR_SEL_ = ['BillingDocument', 'BillingDocumentType', 'BillingDocumentDate', 'CompanyCode', 'SoldToParty', 'BillingDocumentIsCancelled', 'CancelledBillingDocument', 'LastChangeDate', 'TransactionCurrency'];
 function sapHdrSelect_(cfg) {
-  return SAP_HDR_SEL_.concat(SAP_ITEM_FIELDS.filter(function (f) { return f !== 'BillingDocument' && !sapSkipped_(cfg, 'A_BillingDocumentItem', f); }).map(function (f) { return 'to_Item/' + f; })).join(',');
+  return SAP_HDR_SEL_.concat(SAP_ITEM_FIELDS.filter(function (f) { return f !== 'BillingDocument' && !sapSkipped_(cfg, 'A_BillingDocumentItem', f); }).concat(sapDiagFields_(cfg)).map(function (f) { return 'to_Item/' + f; })).join(',');
 }
 function sapMonthFilter_(cfg, ym, extra) {
   return 'CompanyCode eq ' + sapQ_(cfg.company) + ' and BillingDocumentDate ge ' + sapDtLit_(ym + '-01') + ' and BillingDocumentDate lt ' + sapDtLit_(sapNextYm_(ym) + '-01') + (extra ? ' and ' + extra : '');
 }
-function sapItemSelect_(cfg) { return SAP_ITEM_FIELDS.filter(function (f) { return !sapSkipped_(cfg, 'A_BillingDocumentItem', f); }).concat(SAP_HDR_FIELDS).join(','); }
+function sapItemSelect_(cfg) { return SAP_ITEM_FIELDS.filter(function (f) { return !sapSkipped_(cfg, 'A_BillingDocumentItem', f); }).concat(sapDiagFields_(cfg)).concat(SAP_HDR_FIELDS).join(','); }
 /* shape B: group a page of items into documents; unless this is the last page the trailing document is handed back (drop = its item count) and read again from its first item on the next page */
 function sapItemsToHeaders_(items, last) {
   var out = [], cur = null;
@@ -802,7 +820,13 @@ function sapShadowRun_(ymArg) {
         }
         entries.forEach(function (e) {
           if (e.kind !== 'sales') { drop('notSales'); return; }
-          var r = e.row, qty = sapNum_(r[7]), net = sapNum_(r[8]); if (isNaN(qty) || isNaN(net) || qty <= 0 || net < 0) { drop('badQtyOrNet'); return; }
+          var r = e.row, qty = sapNum_(r[7]), net = sapNum_(r[8]);
+          var why = isNaN(qty) || isNaN(net) ? 'notANumber' : qty === 0 ? 'qtyZero' : qty < 0 ? 'qtyNegative' : net < 0 ? 'netNegative' : '';
+          if (why) {   // why a line is left out, with proof: the first lines seen (document, item, qty, unit, net, item category, higher-level item) and how the reason splits by item category and higher-level item
+            var DL = j.dropLines || (j.dropLines = {}), arr = DL[why] || (DL[why] = []);
+            if (arr.length < 2) arr.push(r[0] + '/' + r[1] + ' qty=' + r[7] + ' ' + (e.u || '') + ' net=' + r[8] + (e.hasDiag ? ' cat=' + (e.ic || '-') + ' higher=' + (e.hl || '-') : ''));
+            drop(why, e.hasDiag ? 'cat=' + (e.ic || '-') + ' higher=' + (e.hl ? 'yes' : 'no') : (why === 'qtyZero' ? 'net=' + (net === 0 ? '0' : 'not 0') : undefined)); return;
+          }
           if (!r[0] || !r[1]) { drop('noDocOrItem'); return; }
           if (r[2] > today) { drop('futureDate', r[2]); return; }
           var pl = plants[/^\d{1,4}$/.test(r[3]) ? ('0000' + r[3]).slice(-4) : r[3]]; if (!pl) { drop('plantNotInStore', r[3]); return; } if (pl.active === false) { drop('plantInactive', r[3]); return; }
@@ -826,10 +850,10 @@ function sapShadowRun_(ymArg) {
     var top5 = bad.slice().sort(function (a, b) { return Math.abs(b.diff.net) - Math.abs(a.diff.net) || Math.abs(b.diff.lines) - Math.abs(a.diff.lines); }).slice(0, 5).map(function (d) { return { plant: d.plant, docs: d.diff.docs, lines: d.diff.lines, sheets: d.diff.sheets, sqft: d.diff.sqft, net: d.diff.net, note: d.note }; });
     var lbTxt = sapLineText_(lb), cmpTxt = diffs.length + ' plant-months compared, ' + bad.length + ' differ';
     // 1. the result is written to the execution log FIRST, before any state write, so a failed write can never lose it
-    try { Logger.log('SAP-SHADOW ' + JSON.stringify({ ym: ym, plantMonths: diffs.length, differ: bad.length, top5: top5, lines: lb, drops: job.drops || {}, dropEx: job.dropEx || {} })); } catch (e0) {}
+    try { Logger.log('SAP-SHADOW ' + JSON.stringify({ ym: ym, plantMonths: diffs.length, differ: bad.length, top5: top5, lines: lb, drops: job.drops || {}, dropEx: job.dropEx || {}, dropLines: job.dropLines || {} })); } catch (e0) {}
     // 2. the full comparison goes to the admin-only collection sapstage (doc shadow_<ym>); a short summary to SAP_SHADOW. The saved read position is cleared only after the full result is stored.
     var saveErr = [], savedDoc = false;
-    try { sapStageWrite_([{ op: 'set', col: 'sapstage', id: 'shadow_' + ym, json: JSON.stringify({ ym: ym, at: now, run: job.run, plantMonths: diffs.length, differ: bad.length, rows: diffs, lineBreakdown: lb, drops: job.drops || {}, dropEx: job.dropEx || {} }) }]); savedDoc = true; }
+    try { sapStageWrite_([{ op: 'set', col: 'sapstage', id: 'shadow_' + ym, json: JSON.stringify({ ym: ym, at: now, run: job.run, plantMonths: diffs.length, differ: bad.length, rows: diffs, lineBreakdown: lb, drops: job.drops || {}, dropEx: job.dropEx || {}, dropLines: job.dropLines || {} }) }]); savedDoc = true; }
     catch (e1) { saveErr.push('full result (sapstage/shadow_' + ym + '): ' + sapRedact_(cfg, e1 && e1.message || e1)); }
     try { sapSetJson_('SAP_SHADOW', { at: now, ym: ym, plantMonths: diffs.length, differ: bad.length, top: top5, doc: savedDoc ? 'shadow_' + ym : '' }); }
     catch (e2) { saveErr.push('summary (SAP_SHADOW): ' + sapRedact_(cfg, e2 && e2.message || e2)); }
@@ -840,7 +864,7 @@ function sapShadowRun_(ymArg) {
     try { sapStatusPatch_({ lastAt: now, lastKind: 'shadow', lastOk: true, message: msg.slice(0, 1500), conn: { ok: true, at: now },
       shadow: { at: now, ym: ym, plantMonths: diffs.length, differ: bad.length, clean: bad.length === 0, saved: savedDoc, top: top5.slice(0, 3) }, read: { headers: job.hdrs0 || 0, lines: job.lines0 || 0 } }); }
     catch (e4) { saveErr.push('card state: ' + sapRedact_(cfg, e4 && e4.message || e4)); }
-    return { ok: true, done: true, saved: savedDoc, saveErrors: saveErr, resume: info, drops: job.drops || {}, dropExamples: job.dropEx || {}, lineBreakdown: lb, top5: top5, ym: ym, resumed: resumed, progress: (function () { try { return sapStatusGet_().progress || null; } catch (e5) { return null; } })(), plantMonths: diffs.length, differ: bad.length, clean: bad.length === 0, differences: diffs, message: msg };
+    return { ok: true, done: true, saved: savedDoc, saveErrors: saveErr, resume: info, drops: job.drops || {}, dropExamples: job.dropEx || {}, dropLines: job.dropLines || {}, lineBreakdown: lb, top5: top5, ym: ym, resumed: resumed, progress: (function () { try { return sapStatusGet_().progress || null; } catch (e5) { return null; } })(), plantMonths: diffs.length, differ: bad.length, clean: bad.length === 0, differences: diffs, message: msg };
   } catch (e) {
     var conn = /^sap_/.test(e.deskCode || '');
     sapErrPush_(cfg, e.message || e);
@@ -932,6 +956,7 @@ function sapVerifyRun_() {
     throw e;
   }
   var now = new Date(Date.now()).toISOString(), okAll = gaps === 0;
+  var itemT = seen.billing && seen.billing['A_BillingDocumentItem'], diagOk = itemT ? SAP_DIAG_FIELDS.filter(function (f) { return !!itemT.props[f]; }) : [];
   var reqGap = rows.filter(function (r) { return r.status === 'GAP' && !r.optional; }), nm = function (r) { return r.entitySet + '.' + r.property; };
   var blocking = reqGap.map(nm), blockingCust = reqGap.filter(function (r) { return r.scope === 'cust'; }).map(nm), blockingSales = reqGap.filter(function (r) { return r.scope !== 'cust'; }).map(nm);
   var skip = rows.filter(function (r) { return r.status === 'GAP' && r.optional; }).map(function (r) { return r.entitySet + '.' + r.property; });
@@ -940,7 +965,7 @@ function sapVerifyRun_() {
   if (!okAll) msg += ' Blocking (required, missing on SAP): ' + blocking.slice(0, 8).join(', ') + '.' + (blockingSales.length ? ' The shadow run and sync are blocked until this is fixed.' : '') + (blockingCust.length ? ' The customer read is blocked until this is fixed' + (blockingSales.length ? '.' : '; billing reads are not affected.') : '');
   else if (ogaps) msg += ' Warning: optional ' + skip.join(', ') + ' not on this tenant; left out of the reads, its column stays blank. Nothing else is affected.';
   var warning = okAll && ogaps ? msg : '';
-  sapStatusPatch_({ lastAt: now, lastKind: 'verify', lastOk: okAll, message: msg, conn: { ok: true, at: now }, verify: { at: now, ok: okAll, failed: false, gaps: gaps, optionalGaps: ogaps, checked: rows.length, shape: shape, blocking: blocking.slice(0, 10), blockingSales: blockingSales.slice(0, 10), blockingCust: blockingCust.slice(0, 10), optionalSkipped: skip } });
+  sapStatusPatch_({ lastAt: now, lastKind: 'verify', lastOk: okAll, message: msg, conn: { ok: true, at: now }, verify: { at: now, ok: okAll, failed: false, gaps: gaps, optionalGaps: ogaps, checked: rows.length, shape: shape, blocking: blocking.slice(0, 10), blockingSales: blockingSales.slice(0, 10), blockingCust: blockingCust.slice(0, 10), optionalSkipped: skip, diagOk: diagOk } });
   var out = { ok: okAll, allOk: gaps + ogaps === 0, gaps: gaps, optionalGaps: ogaps, optionalSkipped: skip, shape: shape, checked: rows.length, rows: rows, message: msg };
   if (warning) out.warning = warning;
   if (!okAll) { out.code = 'sap_verify_gap'; out.blocking = blocking; out.blockingSales = blockingSales; out.blockingCust = blockingCust; }
@@ -1047,6 +1072,7 @@ function sapLogLine_(fn, r, ms) {
     if (r && r.top5) { line.compared = r.plantMonths; line.top5 = r.top5; }
     if (r && r.lineBreakdown) { var q = r.lineBreakdown; line.lines = { sent: q.lines, docs: q.headers, kept: q.kept, acp: q.acpPlants1050Up, other: q.otherDocumentTypes, cancelled: q.cancelledInvoices + q.cancellationDocuments, flagged: q.notSheetUnitOrNotINR, unexplained: q.unexplained, perDoc: q.perDocument }; }
     if (r && r.saved === false) line.saved = false;
+    if (r && r.dropLines && Object.keys(r.dropLines).length) line.dropLines = r.dropLines;
     if (r && r.drops) line.drops = r.drops; if (r && r.dropExamples) line.dropEx = r.dropExamples;
     if (r && r.auto) line.auto = String(r.auto.state || '').slice(0, 40);
     line.ms = ms;

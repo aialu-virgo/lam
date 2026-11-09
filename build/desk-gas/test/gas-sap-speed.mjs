@@ -430,4 +430,38 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
   ok('a card state over 9,000 characters is trimmed (older run log, warnings) instead of failing', !thrown && h.env.props.SAP_STATUS.length <= 9000, thrown && thrown.message);
 }
 
+{ // product-type mapping (built-in Z3LM / Z3PC, SAP_TYPE_MAP) and the quantity-drop split with proof samples
+  const retype = (map) => { const pr = {}; Object.keys(masters.products).forEach(k => { pr[k] = Object.assign({}, masters.products[k], { type: map[masters.products[k].type] || masters.products[k].type }); }); return pr; };
+  const baseR = (() => { const t = build({ docs: docs0() }); return t.env.call('sapShadowRun'); })();
+  const z = build({ docs: docs0(), s4opts: { products: retype({ ZABLAM: 'Z3LM', ZCRLAM: 'Z3LM', ZCBPVC: 'Z3PC' }) } }); const rz = z.env.call('sapShadowRun');
+  ok('tenant codes Z3LM (laminate, door, compact) and Z3PC (PVC sheet) give the same shadow totals as ZABLAM/ZCRLAM and ZCBPVC, with no setting needed', rz.ok && rz.done && feedOf(rz) === feedOf(baseR) && !rz.drops.noProductGroup === !baseR.drops.noProductGroup && rz.drops.counted === baseR.drops.counted, sj([rz.drops, baseR.drops]));
+  const z2 = build({ docs: docs0(), s4opts: { products: retype({ ZABLAM: 'Z3LM', ZCRLAM: 'Z3LM', ZCBPVC: 'Z3PC' }) } }); runAll(z2.env, 'sapShadowRun'); z2.env.call('sapSync'); const man = JSON.parse(z2.env.stored()['sapstage/man_2026-10']);
+  const rowsZ = (() => { const st = z2.env.stored(), out = []; for (let i = 0; i < man.n; i++) { const c = JSON.parse(st['sapstage/c_2026-10_' + man.run + '_' + i]); out.push(...JSON.parse(zlib.gunzipSync(Buffer.from(c.z, 'base64')).toString())); } return out; })();
+  const types = [...new Set(rowsZ.map(r => r[10]))].sort();
+  ok('the staged rows carry the register codes the page intake understands (Product Type column ZABLAM / ZCBPVC), never Z3LM or Z3PC, so Load SAP feed classifies exactly as the shadow', types.every(t => ['ZABLAM', 'ZCBPVC', 'ZOTHER', ''].includes(t)) && types.includes('ZABLAM') && types.includes('ZCBPVC') && !types.includes('Z3LM') && !types.includes('Z3PC'), sj(types));
+  const r2 = build({ docs: docs0(), s4opts: { products: retype({ ZABLAM: 'ROH', ZCRLAM: 'ZSCR' }) } }).env.call('sapShadowRun'); ok('ROH and ZSCR stay out (raw material, scrap): counted as noProductGroup with the type shown', r2.dropExamples.noProductGroup && (r2.dropExamples.noProductGroup.ROH > 0 || r2.dropExamples.noProductGroup.ZSCR > 0), sj(r2.dropExamples));
+  const n = build({ docs: docs0(), s4opts: { products: retype({ ZABLAM: 'ZNEW', ZCBPVC: 'ZNEWP' }) }, props: { SAP_TYPE_MAP: '{"znew":"LAM","ZNEWP":"pvc"}' } }); const rn = n.env.call('sapShadowRun');
+  ok('SAP_TYPE_MAP adds codes (case-insensitive; LAM or PVC) and the built-in ones stay', rn.done && rn.drops.counted > 0 && rn.drops.noProductGroup === undefined || (rn.drops.counted === baseR.drops.counted - (baseR.drops.counted - rn.drops.counted) && rn.drops.counted > 0), sj([rn.drops, rn.dropExamples]));
+  for (const [bad, re] of [['{broken', /must be JSON/], ['[1,2]', /must be JSON/], ['{"X":"DOOR"}', /not one of LAM, PVC/]]) { const t = build({ docs: docs0(), props: { SAP_TYPE_MAP: bad } }); const c0 = t.S.calls.length; const r = t.env.call('sapShadowRun'); ok('a bad SAP_TYPE_MAP (' + bad + ') is refused before anything is read', r.ok === false && re.test(r.message) && t.S.calls.length === c0, sj(r).slice(0, 200)); }
+  // quantity / net drops, split by reason, with sample lines and the item category / higher-level item as proof
+  const d = docs0(); const picks = d.filter(x => x.CompanyCode === '1000' && x.BillingDocumentType === 'F2' && !x.BillingDocumentIsCancelled && iso(x) === '2026-10' && x.to_Item.results.every(it => +it.Plant <= 1049 && it.BillingQuantityUnit === 'PC')).slice(0, 12);
+  const mod = (doc, f) => { const it = doc.to_Item.results[0]; f(it); };
+  mod(picks[0], it => { it.BillingQuantity = '0.000'; it.NetAmount = '0.00'; it.SalesDocumentItemCategory = 'TAN'; it.HigherLevelItem = '000010'; });
+  mod(picks[1], it => { it.BillingQuantity = '0.000'; it.NetAmount = '0.00'; it.SalesDocumentItemCategory = 'TAN'; it.HigherLevelItem = '000010'; });
+  mod(picks[2], it => { it.BillingQuantity = '0.000'; it.NetAmount = '55.00'; it.SalesDocumentItemCategory = 'TAD'; it.HigherLevelItem = ''; });
+  mod(picks[3], it => { it.BillingQuantity = '-2.000'; it.NetAmount = '-100.00'; it.SalesDocumentItemCategory = 'TAN'; it.HigherLevelItem = ''; });
+  mod(picks[4], it => { it.BillingQuantity = '5.000'; it.NetAmount = '-30.00'; it.SalesDocumentItemCategory = 'TAN'; it.HigherLevelItem = ''; });
+  mod(picks[5], it => { it.BillingQuantity = 'abc'; it.NetAmount = '10.00'; it.SalesDocumentItemCategory = 'TAN'; it.HigherLevelItem = ''; });
+  const q = build({ docs: d }); q.env.props.SAP_STATUS = JSON.stringify({}); q.env.call('sapVerifyMetadata'); const vq = q.env.call('sapStatus').status.verify;
+  ok('sapVerifyMetadata records which diagnostic item fields exist on the tenant (item category, higher-level item)', sj(vq.diagOk || []) === sj(['SalesDocumentItemCategory', 'HigherLevelItem']), sj(vq));
+  const rq = q.env.call('sapShadowRun');
+  ok('badQtyOrNet is split: qty = 0, qty < 0, net < 0, not a number', rq.done && rq.drops.qtyZero === 3 && rq.drops.qtyNegative === 1 && rq.drops.netNegative === 1 && rq.drops.notANumber === 1 && rq.drops.badQtyOrNet === undefined, sj(rq.drops));
+  ok('...each reason keeps up to two sample lines (document/item, qty, unit, net, item category, higher-level item)', rq.dropLines.qtyZero.length === 2 && /^\d+\/\d+ qty=0 PC net=0 cat=TAN higher=10$/.test(rq.dropLines.qtyZero[0]) && /qty=-2 PC net=-100 cat=TAN higher=-$/.test(rq.dropLines.qtyNegative[0]) && /qty=abc PC/.test(rq.dropLines.notANumber[0]), sj(rq.dropLines));
+  ok('...and qty = 0 is split by item category and higher-level item, which is the proof of what they are', rq.dropExamples.qtyZero['cat=TAN higher=yes'] === 2 && rq.dropExamples.qtyZero['cat=TAD higher=no'] === 1, sj(rq.dropExamples.qtyZero));
+  ok('the saved result and the log line carry the samples', JSON.parse(q.env.stored()['sapstage/shadow_2026-10']).dropLines.qtyZero.length === 2 && (q.env.state.logs || []).some(l => /^SAP \{"fn":"sapShadowRun".*"dropLines":\{/.test(l)) && (q.env.state.logs || []).some(l => /^SAP-SHADOW \{.*"dropLines"/.test(l)));
+  ok('the item category and higher-level item were requested only after verify found them', q.S.calls.some(c => /SalesDocumentItemCategory/.test(decodeURIComponent(c.query))) && !build({ docs: d }).S.calls.some(c => /HigherLevelItem/.test(c.url)));
+  const q0 = build({ docs: d }); q0.env.call('sapShadowRun'); ok('without a verify that found them, the diagnostic fields are not requested (no 404 risk) and the reasons are still split', !q0.S.calls.some(c => /HigherLevelItem|SalesDocumentItemCategory/.test(decodeURIComponent(c.query))) && q0.env.call('sapStatus').status.shadow.plantMonths > 0);
+  const qB = build({ docs: d, props: { SAP_BILLING_SHAPE: 'B' } }); qB.env.call('sapVerifyMetadata'); qB.env.props.SAP_BILLING_SHAPE = 'B'; const rB = qB.env.call('sapShadowRun'); ok('shape B gives the same split and samples', rB.done && rB.drops.qtyZero === 3 && rB.drops.qtyNegative === 1 && rB.dropLines.qtyZero.length === 2, sj(rB.drops));
+}
+
 console.log('TOTAL ' + res.filter(l => l.startsWith('PASS')).length + ' PASS ' + res.filter(l => l.startsWith('FAIL')).length + ' FAIL');
