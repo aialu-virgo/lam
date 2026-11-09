@@ -412,10 +412,10 @@ function sapLookups_(cfg, ctx, entries, pg, stop) {
     ids.forEach(function (id) { if (id === '' || id in map) return; var c = hit[id]; if (c !== null && c !== undefined) { map[id] = c; return; } if (/^[A-Za-z0-9_\-\/ ]{1,40}$/.test(id)) { if (miss.indexOf(id) < 0) miss.push(id); } else map[id] = ''; });
     return miss;
   }
-  function fetchSet(svc, set, key, field, map, prefix, miss) {
-    var queue = miss.slice();
+  function fetchSet(svc, set, key, field, map, prefix, miss, valFn, selFields) {
+    var queue = miss.slice(); valFn = valFn || function (o) { return String(o[field] == null ? '' : o[field]); };
     function params(part, skip) {
-      var p = { '$filter': part.map(function (x) { return key + ' eq ' + sapQ_(x); }).join(' or '), '$select': key + ',' + field, '$top': String(part.length * 2), '$orderby': key + ' asc' };
+      var p = { '$filter': part.map(function (x) { return key + ' eq ' + sapQ_(x); }).join(' or '), '$select': key + ',' + (selFields || field), '$top': String(part.length * 2), '$orderby': key + ' asc' };
       p['$skip'] = String(skip); if (skip === 0) p['$inlinecount'] = 'allpages'; return p;
     }
     while (queue.length) {
@@ -430,7 +430,7 @@ function sapLookups_(cfg, ctx, entries, pg, stop) {
           if (!r) r = sapJson_(cfg, sapHttp_(cfg, svc, set, params(part, 0), null, pg.lb > 5 ? 1 : SAP_RETRIES));   // a single call: retries and the same messages
           var got = 0, total = r.count;
           for (;;) {   // a server may cap the page size: keep reading until the count is reached or a page is empty
-            r.results.forEach(function (o) { map[String(o[key])] = String(o[field] == null ? '' : o[field]); });
+            r.results.forEach(function (o) { map[String(o[key])] = valFn(o); });
             got += r.results.length;
             if (!r.results.length || (total !== null && got >= total)) break;
             r = sapJson_(cfg, sapHttp_(cfg, svc, set, params(part, got)));
@@ -448,8 +448,9 @@ function sapLookups_(cfg, ctx, entries, pg, stop) {
   var mats = [], custs = [], seenM = Object.create(null), seenC = Object.create(null);
   entries.forEach(function (e) { if (!seenM[e.rawMat]) { seenM[e.rawMat] = 1; mats.push(e.rawMat); } if (!seenC[e.rawCust]) { seenC[e.rawCust] = 1; custs.push(e.rawCust); } });
   fetchSet(SAP_SVC.product, 'A_Product', 'Product', 'ProductType', ctx.prod, 'sapp_', need(ctx.prod, 'sapp_', mats));
-  if (!sapSkipped_(cfg, 'A_Customer', 'CustomerName')) fetchSet(SAP_SVC.partner, 'A_Customer', 'Customer', 'CustomerName', ctx.cust, 'sapc_', need(ctx.cust, 'sapc_', custs));
-  entries.forEach(function (e) { e.row[10] = sapMapType_(cfg, ctx.prod[e.rawMat] || ''); e.row[5] = String(ctx.cust[e.rawCust] || '').slice(0, 60); });
+  var legOk = !sapSkipped_(cfg, 'A_Customer', 'LegacyB1Code');   // name and legacy B1 code travel together as name + \u0001 + code (cache prefix sapc2_)
+  if (!sapSkipped_(cfg, 'A_Customer', 'CustomerName')) fetchSet(SAP_SVC.partner, 'A_Customer', 'Customer', 'CustomerName', ctx.cust, 'sapc2_', need(ctx.cust, 'sapc2_', custs), function (o) { return String(o.CustomerName == null ? '' : o.CustomerName) + '\u0001' + (legOk ? String(o.LegacyB1Code == null ? '' : o.LegacyB1Code).trim() : ''); }, 'CustomerName' + (legOk ? ',LegacyB1Code' : ''));
+  entries.forEach(function (e) { var cv = String(ctx.cust[e.rawCust] || ''), ix = cv.indexOf('\u0001'); e.row[10] = sapMapType_(cfg, ctx.prod[e.rawMat] || ''); e.row[5] = (ix < 0 ? cv : cv.slice(0, ix)).slice(0, 60); e.leg = ix < 0 ? '' : cv.slice(ix + 1); });
 }
 
 /* ---------- reading one month of headers (with items), page by page ---------- */
@@ -606,7 +607,7 @@ function sapCursorKey_(kind) { return kind === 'shadow' ? 'SAP_CURSOR_SHADOW' : 
 function sapSaveCursor_(job) { sapSetJson_(sapCursorKey_(job.job), job); }
 /* runs until every month is done or the time budget is used. Returns {done}. Staged chunks are written before the cursor moves past them. */
 function sapRunJob_(cfg, job, t0, budget, handlers) {
-  var ctx = { prod: Object.create(null), cust: Object.create(null) }, buf = [], pg = sapPager_(), spec = null, specYm = '', slowest = 0;
+  var ctx = { prod: Object.create(null), cust: Object.create(null) }, buf = [], pg = sapPager_(), spec = null, specYm = '', slowest = 0, txs = sapTransfers_();
   job.runs = (job.runs || 0) + 1; job.lines0 = job.lines0 || 0; job.units0 = job.units0 || 0;
   var u0 = job.units0 + job.skip;
   function flush() {
@@ -655,6 +656,10 @@ function sapRunJob_(cfg, job, t0, budget, handlers) {
           var b0 = JSON.parse(bak); job.sl = b0.sl; job.cnt = b0.cnt; job.maxChange = b0.mc;   // put the round back; what the lookups fetched is already in the cache for the next run
           flush(); sapSaveCursor_(job); sapProgress_(job, t0, budget, u0, false, pg); return { done: false };
         }
+      }
+      if (txs && entries.length) {   // inter-company lines are left out of the shadow and of the staged rows alike, and counted by plant
+        var XT = job.xt || (job.xt = { l: 0, n: 0, byPlant: {} });
+        entries = entries.filter(function (e) { var c = String(e.row[4]).toUpperCase(); if (!(txs[c] || (e.leg && txs[String(e.leg).toUpperCase()]))) return true; var v = sapNum_(e.row[8]) || 0, B = XT.byPlant[e.row[3]] || (XT.byPlant[e.row[3]] = { l: 0, n: 0 }); XT.l++; XT.n += v; B.l++; B.n += v; return false; });
       }
       handlers.rows(job, ym, entries);
       entries.forEach(function (e) { if (handlers.stage) buf.push(e.row); });
@@ -795,6 +800,34 @@ function sapRequirePlants_(ss, what) {
   var n = 0; readAll_(ss, 'plants').docs.forEach(function (d) { try { var o = JSON.parse(d.json); if (o && o.plant_code && o.active !== false) n++; } catch (e) {} });
   if (!n) fail_('unavailable', 'The Desk has no active plants in its plants list (Admin > Plants), so SAP lines for every plant would be left out and ' + what + '. Nothing was read from SAP and nothing was changed. If this Desk was just restored, finish the restore first (a stale page may have refused it), then run this again.');
 }
+/* customers the Desk treats as inter-company / stock transfers (Admin > Internal transfer customers, collection "transfers"): the Desk's loaded sales exclude them, so the feed does too, for the shadow and for the staged rows alike. SAP_EXCLUDE_TRANSFERS = no switches it off. A line is excluded when the S/4 customer number or its legacy B1 code is on the list. */
+function sapTransfers_() {
+  if (/^no$/i.test(String(sapProps_().getProperty('SAP_EXCLUDE_TRANSFERS') || '').trim())) return null;
+  var out = Object.create(null), n = 0;
+  try { readAll_(book_(false), 'transfers').docs.forEach(function (d) { try { var o = JSON.parse(d.json); if (o && o.code && o.flag !== false) { out[String(o.code).trim().toUpperCase()] = 1; n++; } } catch (e) {} }); } catch (e2) {}
+  return n ? out : null;
+}
+/* sq ft per sheet from the Desk's item master (collection items, chunks c0, c1 ...; element [0] item code, [2] sq ft per piece): the same source the Desk uses for stock. Used when Material Group 4 gives no size. */
+function sapItemSq_(ss) {
+  var out = Object.create(null);
+  try { readAll_(ss, 'items').docs.forEach(function (d) { if (!/^c\d+$/.test(d.id)) return; try { JSON.parse(sapUngz_(JSON.parse(d.json).z)).forEach(function (a) { if (+a[2] > 0) out[String(a[0]).trim().toUpperCase()] = +a[2]; }); } catch (e) {} }); } catch (e2) {}
+  return out;
+}
+/* the last invoice day the Desk holds for each plant of the month (from the loaded invoice chunks), so the comparison stops there; SAP_SHADOW_TO (YYYY-MM-DD) replaces it for every plant */
+function sapShadowCuts_(ss, ym) {
+  var to = String(sapProps_().getProperty('SAP_SHADOW_TO') || '').trim(), cut = {};
+  try {
+    var raw = docsRaw_(colSheet_(ss, 'cells', false), ['INV_' + ym]), cell = raw['INV_' + ym] ? JSON.parse(raw['INV_' + ym]) : null, held = (cell && cell.plants) || {};
+    Object.keys(held).forEach(function (p) {
+      if (/^\d{4}-\d\d-\d\d$/.test(to)) { cut[p] = to; return; }
+      var ids = [], h = held[p], i; for (i = 0; i < (h.chunks || 0); i++) ids.push((h.sys || 'S4') + '-' + p + '-' + ym + '-' + i);
+      var docs = docsRaw_(colSheet_(ss, 'inv', false), ids), mx = 0;
+      Object.keys(docs).forEach(function (id) { try { (JSON.parse(sapUngz_(JSON.parse(docs[id]).z)).h || []).forEach(function (r) { if (+r[1] > mx) mx = +r[1]; }); } catch (e) {} });
+      if (mx) cut[p] = ym + '-' + (mx < 10 ? '0' : '') + mx;
+    });
+  } catch (e2) {}
+  return cut;
+}
 function sapDropText_(job) {
   var D = job.drops || {}, ex = job.dropEx || {}, parts = Object.keys(D).filter(function (k) { return k !== 'counted'; }).map(function (k) {
     var e = ex[k] ? ' (' + Object.keys(ex[k]).map(function (v) { return v + ' x' + ex[k][v]; }).join(', ') + ')' : ''; return k + ' ' + D[k] + e; });
@@ -807,10 +840,10 @@ function sapShadowRun_(ymArg) {
   try {
     var cur = sapCursorGet_('SAP_CURSOR_SHADOW'); job = cur.job;
     if (job && job.job === 'shadow' && (!ymArg || job.months[0] === ym)) { ym = job.months[0]; resumed = true; info = sapResumeInfo_(job, 'shadow'); }
-    else { info = sapResumeInfo_(null, 'shadow', job ? 'a different month was asked for (' + ym + '; the saved position was for ' + (job.months && job.months[0]) + ')' : cur.why); job = sapNewJob_('shadow', [ym], { tally: {}, seen: 0 }); }
+    else { info = sapResumeInfo_(null, 'shadow', job ? 'a different month was asked for (' + ym + '; the saved position was for ' + (job.months && job.months[0]) + ')' : cur.why); job = sapNewJob_('shadow', [ym], { tally: {}, seen: 0, cut: sapShadowCuts_(ss, ym) }); }
     if (!info.resumed) resumed = false; job.resumeInfo = info;
     var plants = Object.create(null); readAll_(ss, 'plants').docs.forEach(function (d) { try { var o = JSON.parse(d.json); if (o && o.plant_code) plants[String(o.plant_code)] = o; } catch (e) {} });
-    var today = sapIstToday_(), seenKeys = {};
+    var today = sapIstToday_(), seenKeys = {}, itemSq = sapItemSq_(ss);
     var handlers = { stage: false, month: function () {},
       rows: function (j, m, entries) {
         var docsPage = {}, D = j.drops || (j.drops = {}), S = j.dropEx || (j.dropEx = {});
@@ -830,11 +863,15 @@ function sapShadowRun_(ymArg) {
           if (!r[0] || !r[1]) { drop('noDocOrItem'); return; }
           if (r[2] > today) { drop('futureDate', r[2]); return; }
           var pl = plants[/^\d{1,4}$/.test(r[3]) ? ('0000' + r[3]).slice(-4) : r[3]]; if (!pl) { drop('plantNotInStore', r[3]); return; } if (pl.active === false) { drop('plantInactive', r[3]); return; }
+          var cut = j.cut && j.cut[pl.plant_code];
+          if (cut && r[2] > cut) { var AF = j.after || (j.after = {}), A2 = AF[pl.plant_code] || (AF[pl.plant_code] = { l: 0, n: 0 }); A2.l++; A2.n += net; drop('afterDeskLastDate'); return; }   // the Desk's data for this plant ends earlier than SAP's
           var key = r[0] + '|' + r[1]; if (seenKeys[key]) { drop('duplicateLine'); return; } seenKeys[key] = 1;
           var grp = sapGroupOf_(r[10], r[11]); if (!grp) { drop('noProductGroup', r[10] === '' ? '(no product type)' : r[10]); return; }
           var pk = pl.plant_code, T = j.tally[pk] || (j.tally[pk] = [0, 0, 0, 0, 0]);
           D.counted = (D.counted || 0) + 1;
-          T[1]++; T[2] += qty; T[3] += sapSize_(r[12], qty); T[4] += net; (docsPage[pk] = docsPage[pk] || {})[r[0]] = 1;
+          T[1]++; T[2] += qty; var sq = sapSize_(r[12], qty), SQ = j.sq || (j.sq = { mg4: 0, itemMaster: 0, none: 0 });   // size: Material Group 4 as the Desk's register intake reads it, else the item master
+          if (sq > 0) SQ.mg4++; else if (itemSq[String(r[6]).trim().toUpperCase()]) { sq = qty * itemSq[String(r[6]).trim().toUpperCase()]; SQ.itemMaster++; } else { SQ.none++; var m3 = S.mg4Unreadable || (S.mg4Unreadable = {}), sv = String(r[12]).slice(0, 18) || '(blank)'; if (sv in m3) m3[sv]++; else if (Object.keys(m3).length < 6) m3[sv] = 1; }
+          T[3] += sq; T[4] += net; (docsPage[pk] = docsPage[pk] || {})[r[0]] = 1;
         });
         Object.keys(docsPage).forEach(function (pk) { j.tally[pk][0] += Object.keys(docsPage[pk]).length; });
       } };
@@ -845,15 +882,24 @@ function sapShadowRun_(ymArg) {
     }
     try { Logger.log('SAP-SHADOW-FEED ' + JSON.stringify({ ym: ym, tally: job.tally, drops: job.drops || {} })); } catch (e00) {}   // the raw feed totals, in case the comparison below cannot be made
     var diffs = sapCompare_(ss, ym, job.tally), dropTxt = sapDropText_(job), noneCounted = job.lines0 > 0 && ((job.drops && job.drops.counted) || 0) * 4 < job.lines0;
+    var XT = job.xt || { l: 0, n: 0, byPlant: {} }, AF = job.after || {}, cuts = job.cut || {};
+    diffs.forEach(function (d) { d.through = cuts[d.plant] || ''; d.excluded = { interCompany: XT.byPlant[d.plant] || { l: 0, n: 0 }, afterDeskLastDate: AF[d.plant] || { l: 0, n: 0 } }; });
+    Object.keys(XT.byPlant).forEach(function (pc) { if (!diffs.some(function (d) { return d.plant === pc; })) diffs.push({ plant: pc, ym: ym, feed: { docs: 0, lines: 0, sheets: 0, sqft: 0, net: 0 }, loaded: { docs: 0, lines: 0, sheets: 0, sqft: 0, net: 0 }, diff: { docs: 0, lines: 0, sheets: 0, sqft: 0, net: 0 }, equal: true, note: 'every line is inter-company (transfer list)', through: '', excluded: { interCompany: XT.byPlant[pc], afterDeskLastDate: { l: 0, n: 0 } } }); });
+    diffs.sort(function (a, b) { return a.plant < b.plant ? -1 : 1; });
     var bad = diffs.filter(function (d) { return !d.equal; }), now = new Date(Date.now()).toISOString();
     var lb = sapLineBreakdown_(sapCntAdd_(JSON.parse(JSON.stringify(job.cntSum || {})), job.cnt));
     var top5 = bad.slice().sort(function (a, b) { return Math.abs(b.diff.net) - Math.abs(a.diff.net) || Math.abs(b.diff.lines) - Math.abs(a.diff.lines); }).slice(0, 5).map(function (d) { return { plant: d.plant, docs: d.diff.docs, lines: d.diff.lines, sheets: d.diff.sheets, sqft: d.diff.sqft, net: d.diff.net, note: d.note }; });
-    var lbTxt = sapLineText_(lb), cmpTxt = diffs.length + ' plant-months compared, ' + bad.length + ' differ';
+    var cutN = {}; Object.keys(cuts).forEach(function (pc) { cutN[cuts[pc]] = (cutN[cuts[pc]] || 0) + 1; });
+    var afTot = 0; Object.keys(AF).forEach(function (pc) { afTot += AF[pc].l; });
+    var scope = 'Compared up to ' + (/^\d{4}-\d\d-\d\d$/.test(String(sapProps_().getProperty('SAP_SHADOW_TO') || '').trim()) ? 'SAP_SHADOW_TO ' + String(sapProps_().getProperty('SAP_SHADOW_TO')).trim() : 'the last invoice date the Desk holds per plant (' + (Object.keys(cutN).sort().slice(-3).map(function (k) { return k + ' for ' + cutN[k]; }).join(', ') || 'no plant loaded') + ')') + '; ' + sapFmt_(afTot) + ' later SAP lines left out. Inter-company lines left out (customers on the Admin transfer list): ' + sapFmt_(XT.l) + ' lines, Rs ' + sapFmt_(XT.n) + '.' + (job.sq ? ' Sq ft from Material Group 4 for ' + sapFmt_(job.sq.mg4) + ' lines, from the item master for ' + sapFmt_(job.sq.itemMaster) + ', unknown for ' + sapFmt_(job.sq.none) + '.' : '');
+    var lbTxt = scope + ' ' + sapLineText_(lb), cmpTxt = diffs.length + ' plant-months compared, ' + bad.length + ' differ';
+    var table = diffs.map(function (d) { return [d.plant, d.through, d.feed.docs, d.loaded.docs, d.feed.lines, d.loaded.lines, d.feed.sheets, d.loaded.sheets, d.feed.sqft, d.loaded.sqft, d.feed.net, d.loaded.net, d.diff.net, d.equal ? 'ok' : 'differs']; });   // plant, through, docs feed/Desk, lines feed/Desk, sheets feed/Desk, sq ft feed/Desk, net feed/Desk, net difference
     // 1. the result is written to the execution log FIRST, before any state write, so a failed write can never lose it
-    try { Logger.log('SAP-SHADOW ' + JSON.stringify({ ym: ym, plantMonths: diffs.length, differ: bad.length, top5: top5, lines: lb, drops: job.drops || {}, dropEx: job.dropEx || {}, dropLines: job.dropLines || {} })); } catch (e0) {}
+    try { Logger.log('SAP-SHADOW-PLANTS plant,through,docsFeed,docsDesk,linesFeed,linesDesk,sheetsFeed,sheetsDesk,sqftFeed,sqftDesk,netFeed,netDesk,netDiff,status ' + JSON.stringify(table)); } catch (e01) {}
+    try { Logger.log('SAP-SHADOW ' + JSON.stringify({ ym: ym, scope: scope, plantMonths: diffs.length, differ: bad.length, top5: top5, lines: lb, drops: job.drops || {}, dropEx: job.dropEx || {}, dropLines: job.dropLines || {} })); } catch (e0) {}
     // 2. the full comparison goes to the admin-only collection sapstage (doc shadow_<ym>); a short summary to SAP_SHADOW. The saved read position is cleared only after the full result is stored.
     var saveErr = [], savedDoc = false;
-    try { sapStageWrite_([{ op: 'set', col: 'sapstage', id: 'shadow_' + ym, json: JSON.stringify({ ym: ym, at: now, run: job.run, plantMonths: diffs.length, differ: bad.length, rows: diffs, lineBreakdown: lb, drops: job.drops || {}, dropEx: job.dropEx || {}, dropLines: job.dropLines || {} }) }]); savedDoc = true; }
+    try { sapStageWrite_([{ op: 'set', col: 'sapstage', id: 'shadow_' + ym, json: JSON.stringify({ ym: ym, at: now, run: job.run, plantMonths: diffs.length, differ: bad.length, rows: diffs, table: table, scope: scope, lineBreakdown: lb, drops: job.drops || {}, dropEx: job.dropEx || {}, dropLines: job.dropLines || {} }) }]); savedDoc = true; }
     catch (e1) { saveErr.push('full result (sapstage/shadow_' + ym + '): ' + sapRedact_(cfg, e1 && e1.message || e1)); }
     try { sapSetJson_('SAP_SHADOW', { at: now, ym: ym, plantMonths: diffs.length, differ: bad.length, top: top5, doc: savedDoc ? 'shadow_' + ym : '' }); }
     catch (e2) { saveErr.push('summary (SAP_SHADOW): ' + sapRedact_(cfg, e2 && e2.message || e2)); }
@@ -864,7 +910,7 @@ function sapShadowRun_(ymArg) {
     try { sapStatusPatch_({ lastAt: now, lastKind: 'shadow', lastOk: true, message: msg.slice(0, 1500), conn: { ok: true, at: now },
       shadow: { at: now, ym: ym, plantMonths: diffs.length, differ: bad.length, clean: bad.length === 0, saved: savedDoc, top: top5.slice(0, 3) }, read: { headers: job.hdrs0 || 0, lines: job.lines0 || 0 } }); }
     catch (e4) { saveErr.push('card state: ' + sapRedact_(cfg, e4 && e4.message || e4)); }
-    return { ok: true, done: true, saved: savedDoc, saveErrors: saveErr, resume: info, drops: job.drops || {}, dropExamples: job.dropEx || {}, dropLines: job.dropLines || {}, lineBreakdown: lb, top5: top5, ym: ym, resumed: resumed, progress: (function () { try { return sapStatusGet_().progress || null; } catch (e5) { return null; } })(), plantMonths: diffs.length, differ: bad.length, clean: bad.length === 0, differences: diffs, message: msg };
+    return { ok: true, done: true, scope: scope, table: table, interCompany: XT, sqftSource: job.sq || null, saved: savedDoc, saveErrors: saveErr, resume: info, drops: job.drops || {}, dropExamples: job.dropEx || {}, dropLines: job.dropLines || {}, lineBreakdown: lb, top5: top5, ym: ym, resumed: resumed, progress: (function () { try { return sapStatusGet_().progress || null; } catch (e5) { return null; } })(), plantMonths: diffs.length, differ: bad.length, clean: bad.length === 0, differences: diffs, message: msg };
   } catch (e) {
     var conn = /^sap_/.test(e.deskCode || '');
     sapErrPush_(cfg, e.message || e);
