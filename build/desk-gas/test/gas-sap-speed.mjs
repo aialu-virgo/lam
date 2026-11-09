@@ -132,9 +132,9 @@ function iso(d) { return new Date(+/\((\d+)\)/.exec(d.BillingDocumentDate)[1]).t
     ok('...the message tells Vijay he need not click again', /by itself in about a minute/.test(r.message));
     const n = fire(t.env); const st = t.env.call('sapStatus').status;
     ok('the trigger chain finishes the month with no clicks, then removes the trigger and the state', n >= 1 && ours(t.env).length === 0 && !t.env.props.SAP_AUTO && st.shadow && st.shadow.ym === '2026-10' && st.progress.done, sj([n, t.env.state.triggers, st.progress]));
-    const last = JSON.parse(t.env.props.SAP_SHADOW);
-    ok('...with identical totals to the released reader', (() => { const o = build({ docs: docs0(), old: true }); const ro = runAll(o.env, 'sapShadowRun'); return sj(last.rows) === sj((ro.differences || []).filter(d => !d.equal).slice(0, 40)); })());
-    ok('nothing was written to the Desk store by the whole chain', sj(t.env.stored()) === before);
+    const last = JSON.parse(t.env.stored()['sapstage/shadow_2026-10']);
+    ok('...with identical totals to the released reader', (() => { const o = build({ docs: docs0(), old: true }); const ro = runAll(o.env, 'sapShadowRun'); return sj(last.rows) === sj(ro.differences || []); })());
+    ok('nothing was written to the Desk store by the whole chain (only the result doc sapstage/shadow_2026-10 in admin-only staging)', (() => { const c = t.env.stored(), keep = Object.assign({}, c); delete keep['sapstage/shadow_2026-10']; return sj(keep) === before && 'sapstage/shadow_2026-10' in c; })());
     ok('every run of the chain logged one SAP line and a progress line', (t.env.state.logs || []).filter(l => /^SAP \{"fn":"sapShadowAutoTrigger_"/.test(l)).length === n);
   }
   { const t = mk(); t.env.call('sapShadowRunAuto'); t.S.failNext(/BillingDocument/, 500, 99999);
@@ -402,6 +402,32 @@ function zl(z) { return zlib.gunzipSync(Buffer.from(z, 'base64')).toString(); }
     const a = t.env.call('sapStatus').status.next; t.env.ctx.SAP_FEED_FROM = '2027-01-01'; const b = t.env.call('sapStatus').status.next; t.env.ctx.SAP_FEED_FROM = '2026-10-01';
     ok('sapStatus names the month from the feed start (October 2026 now, January 2027 if the start moves)', /\(October 2026,/.test(a) && /\(January 2027,/.test(b), a.slice(0, 120) + ' | ' + b.slice(0, 120));
   }
+}
+
+{ // the comparison is never lost: full result in sapstage, small summary in SAP_SHADOW, log line before any state write; the position is cleared only after the full result is stored
+  const logsOf = (env) => env.state.logs || [];
+  const t = build({ docs: docs0() }); const r = t.env.call('sapShadowRun'); const doc = JSON.parse(t.env.stored()['sapstage/shadow_2026-10'] || 'null');
+  ok('the full comparison (every plant-month) is stored in sapstage as shadow_<ym>, and SAP_SHADOW holds a small summary', r.ok && r.saved === true && doc && doc.rows.length === r.plantMonths && doc.lineBreakdown && t.env.props.SAP_SHADOW.length < 9000 && JSON.parse(t.env.props.SAP_SHADOW).doc === 'shadow_2026-10', sj(r).slice(0, 200));
+  const li = logsOf(t.env).findIndex(l => /^SAP-SHADOW \{/.test(l)), lj = logsOf(t.env).findIndex(l => /^SAP \{"fn":"sapShadowRun"/.test(l));
+  ok('the summary line SAP-SHADOW (plant-months, differing, top 5, line counts, drops) is logged before the usual SAP line', li >= 0 && lj > li && (() => { const o = JSON.parse(logsOf(t.env)[li].slice(11)); return o.plantMonths === r.plantMonths && Array.isArray(o.top5) && o.lines.lines > 0 && 'unexplained' in o.lines; })());
+  const line = JSON.parse(logsOf(t.env)[lj].slice(4)); ok('the usual log line shows compared, differing and the top 5 differences, and the line counts', line.compared === r.plantMonths && line.differ === r.differ && Array.isArray(line.top5) && line.top5.length <= 5 && line.lines && line.lines.sent > 0, sj(line).slice(0, 300));
+  const lb = r.lineBreakdown, expLines = docs0().reduce((n, d) => n + (iso(d) === '2026-10' && d.CompanyCode === '1000' ? d.to_Item.results.length : 0), 0);
+  ok('line counts reconcile: lines sent = made into rows + each left-out reason, unexplained 0, and equal to what the mock SAP holds', lb.unexplained === 0 && lb.lines === expLines && lb.kept > 0 && lb.acpPlants1050Up > 0 && lb.otherDocumentTypes >= 0 && lb.perDocument > 1 && /Where they went/.test(r.message), sj(lb).slice(0, 400));
+  const m = synthMasters(7), codes = Array.from({ length: 120 }, (_, i) => String(i + 1).padStart(4, '0')), dm = synthDocs({ masters: m, from: '2026-10-01', to: '2026-10-31', plants: codes, perDayPerPlant: 1, extras: false });
+  const big = build({ docs: dm, plants: codes }); const rb = big.env.call('sapShadowRun');
+  ok('120 plants that all differ: the result is saved in full and SAP_SHADOW stays under 9,000 characters (the old 40-row copy did not)', rb.ok && rb.saved === true && rb.differ === 120 && JSON.parse(big.env.stored()['sapstage/shadow_2026-10']).rows.length === 120 && big.env.props.SAP_SHADOW.length < 9000 && rb.top5.length === 5, sj([rb.ok, rb.saved, rb.differ, big.env.props.SAP_SHADOW.length]));
+  // the full-result write fails: the result is still logged and returned, the position is kept finished, and the next run saves it without reading SAP again
+  const f = build({ docs: docs0() }); const origW = f.env.ctx.sapStageWrite_; f.env.ctx.sapStageWrite_ = (ops) => { if (ops.some(o => /^shadow_/.test(o.id))) throw new Error('Staging write refused: injected'); return origW(ops); };
+  const rf = f.env.call('sapShadowRun');
+  ok('a failed save never discards a finished comparison: ok, not saved, WARNING, the result in the reply and in the log, the position kept', rf.ok && rf.done && rf.saved === false && /WARNING: the comparison was finished but could not be saved/.test(rf.message) && rf.differences.length === rf.plantMonths && !!f.env.props.SAP_CURSOR_SHADOW && logsOf(f.env).some(l => /^SAP-SHADOW \{/.test(l)), sj(rf).slice(0, 250));
+  f.env.ctx.sapStageWrite_ = origW; const n0 = f.S.calls.length, rf2 = f.env.call('sapShadowRun');
+  ok('...the next run saves it from the finished position without a single SAP page call, and then clears the position', rf2.ok && rf2.saved === true && !f.env.props.SAP_CURSOR_SHADOW && 'sapstage/shadow_2026-10' in f.env.stored() && f.S.calls.slice(n0).filter(c => /A_BillingDocument/.test(c.path)).length === 0 && rf2.lineBreakdown.lines === rf.lineBreakdown.lines && feedOf(rf2) === feedOf(rf), sj(rf2).slice(0, 200));
+  // the small summary cannot be written: the full result is still stored and the run still reports it
+  const g = build({ docs: docs0() }); const origS = g.env.ctx.sapSetJson_; g.env.ctx.sapSetJson_ = (k, o) => { if (k === 'SAP_SHADOW') throw new Error('Feed state too large (SAP_SHADOW).'); return origS(k, o); };
+  const rg = g.env.call('sapShadowRun'); ok('a failed summary write does not lose anything: full result stored, position cleared, reply complete', rg.ok && rg.saved === true && 'sapstage/shadow_2026-10' in g.env.stored() && !g.env.props.SAP_CURSOR_SHADOW && rg.differences.length === rg.plantMonths);
+  // the card state is trimmed rather than refused
+  const h = build({ docs: docs0() }); let thrown = null; try { h.env.ctx.sapStatusPatch_({ warnings: [1, 2, 3].map(i => ({ at: 'x', msg: 'w'.repeat(4000) })), runLog: Array.from({ length: 6 }, () => ({ a: 'x'.repeat(600) })) }); } catch (e) { thrown = e; }
+  ok('a card state over 9,000 characters is trimmed (older run log, warnings) instead of failing', !thrown && h.env.props.SAP_STATUS.length <= 9000, thrown && thrown.message);
 }
 
 console.log('TOTAL ' + res.filter(l => l.startsWith('PASS')).length + ' PASS ' + res.filter(l => l.startsWith('FAIL')).length + ' FAIL');

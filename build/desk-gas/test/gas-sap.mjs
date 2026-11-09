@@ -73,7 +73,7 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
 
 {
   const { S, env } = build(); delete env.props.SAP_SYNC_ENABLED; env.call('sapShadowRun'); const n0 = S.calls.length;
-  let r = env.call('sapSync'); ok('sapSync refuses unless SAP_SYNC_ENABLED is "yes": no SAP call, no write', r.code === 'sap_sync_disabled' && S.calls.length === n0 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/')), sj(r));
+  let r = env.call('sapSync'); ok('sapSync refuses unless SAP_SYNC_ENABLED is "yes": no SAP call, no write', r.code === 'sap_sync_disabled' && S.calls.length === n0 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/') && !k.startsWith('sapstage/shadow_')), sj(r));
   env.props.SAP_SYNC_ENABLED = 'no'; ok('"no" also refuses', env.call('sapSync').code === 'sap_sync_disabled');
   env.setEmail(''); env.ctx.sapSyncTrigger_(); ok('the time trigger path is refused too', S.calls.length === n0);
   ok('the build never sets the property (not in the source or the settings file)', !/setProperty\('SAP_SYNC_ENABLED/.test(env.ctx.sapSyncRun_.toString()));
@@ -116,10 +116,10 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   r = env.call('sapShadowRun'); ok('shadow run completes with the right password', r.ok && r.done, sj(r).slice(0, 200));
   const stored0 = sj(env.stored());
   const nBefore403 = S.calls.length; S.failNext(/A_BillingDocument\?/, 403, 5); r = env.call('sapSync');
-  ok('403 on the first page: code sap_forbidden, nothing staged, nothing written', r.code === 'sap_forbidden' && sj(env.stored()) === stored0 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/')), sj(r));
+  ok('403 on the first page: code sap_forbidden, nothing staged, nothing written', r.code === 'sap_forbidden' && sj(env.stored()) === stored0 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/') && !k.startsWith('sapstage/shadow_')), sj(r));
   ok('403 is not retried (only the two planning calls went out)', S.calls.slice(nBefore403).filter(c => /A_BillingDocument\?/.test(c.path + c.query)).length <= 2);
   S.fails = []; const n0 = S.calls.length; S.failNext(/A_BillingDocument\?/, 500, 99); r = env.call('sapSync');
-  ok('500: retried 3 times (after the parallel try), then code sap_error, nothing staged', r.code === 'sap_error' && /HTTP 500/.test(r.message) && S.calls.length - n0 === 6 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/')), sj(r) + (S.calls.length - n0));   // the two one-row planning calls go out together, then the first one is retried 3 times alone
+  ok('500: retried 3 times (after the parallel try), then code sap_error, nothing staged', r.code === 'sap_error' && /HTTP 500/.test(r.message) && S.calls.length - n0 === 6 && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/') && !k.startsWith('sapstage/shadow_')), sj(r) + (S.calls.length - n0));   // the two one-row planning calls go out together, then the first one is retried 3 times alone
   ok('500: the run flag is released (the next run is not "busy")', !/in progress/.test(r.message) && env.call('sapSync').code === 'sap_error');
   S.fails = []; S.failNext(/A_BillingDocument\?/, 404, 1); r = env.call('sapSync'); ok('404: code sap_not_found, tells to run sapVerifyMetadata', r.code === 'sap_not_found' && /sapVerifyMetadata/.test(r.message), sj(r));
   S.fails = []; S.failNext(/./, 0, 99, { throw: true }); r = env.call('sapSync');
@@ -293,7 +293,7 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   ok('a non-Super user cannot read, overwrite or mark the staged customer master', rd.code === 'permission_denied' && wr.code === 'permission_denied' && mk.ok === false && mk.code === 'permission_denied');
   env.setEmail(SUPER);
   // staging
-  ({ S, env } = build({ docs })); const before = sj(Object.keys(env.stored()).filter(k => !k.startsWith('sapstage/'))); r = env.call('sapCustomerSync'); const g = stagedCust(env);
+  ({ S, env } = build({ docs })); const before = sj(Object.keys(env.stored()).filter(k => !k.startsWith('sapstage/') && !k.startsWith('sapstage/shadow_'))); r = env.call('sapCustomerSync'); const g = stagedCust(env);
   ok('staging: the read completes and stages one row per in-scope customer', r.ok === true && r.customers === N && g && g.rows.length === N && g.man.status === 'staged' && g.man.complete === true && g.man.rows === N, sj(r).slice(0, 300));
   ok('staging: customers of another company are dropped and counted (30 customers read, 5 outside), and a non-customer partner address is ignored', g.man.counts.read === N + 5 && g.man.counts.outOfScope === 5 && g.rows.every(x => !/^6000000/.test(x[0])) && g.man.counts.inScope === N, sj(g.man.counts));
   ok('staging: columns are the page\'s intake names plus Postal Code, District, GSTIN', sj(g.man.cols) === sj(['Customer', 'Name', 'Customer Group', 'City', 'Region', 'Postal Code', 'District', 'GSTIN', 'Sales Executive', 'Payment Terms', 'Sales District', 'Blocked', 'Legacy Code', 'Address Count']) && g.rows.every(x => x.length === 14));
@@ -305,8 +305,8 @@ const near = (a, b) => Math.abs(a - b) < 0.01;
   ok('staging: GSTIN is the IN3 tax number only (an IN4 row is ignored); a 14-character one is kept and counted', by[code(2)][7] === '24AAAAA0002A1Z5' && by[code(1)][7] === '24AAAAA0001A1Z5' && by[code(6)][7].length === 14 && g.man.counts.gstinNot15 === 1 && by[code(0)][7] === '', sj([by[code(2)][7], by[code(6)][7]]));
   ok('staging: district text, city, group, sales group, terms, sales district and legacy code are carried; a blocked customer is flagged', by[code(1)][6] === 'District 1' && by[code(0)][6] === '' && by[code(1)][3] === 'City 1' && by[code(1)][2] === 'C2' && by[code(1)][8] === 'SG1' && by[code(1)][9] === 'Z030' && by[code(1)][10] === 'ZONE02' && by[code(0)][12] === 'C00000' && by[code(10)][11] === 'Y' && by[code(0)][11] === '', sj([by[code(1)], by[code(10)]]));
   ok('staging: with two sales areas the first is kept and the customer is counted', by[code(4)][2] === 'C1' && by[code(4)][8] === 'SG1' && g.man.counts.severalSalesAreas === 1, sj(by[code(4)]));
-  ok('staging: chunk and manifest ids never start with c_ or man_ (the page\'s billing loader reads those)', Object.keys(env.stored()).filter(k => k.startsWith('sapstage/')).every(k => !/^sapstage\/(c_|man_)/.test(k) || /^sapstage\/(c_2|man_2)/.test(k)) && Object.keys(env.stored()).some(k => /^sapstage\/cust_c_/.test(k)));
-  ok('staging: only the admin-only sapstage collection was written, plus the status', sj(Object.keys(env.stored()).filter(k => !k.startsWith('sapstage/'))) === before && !!sapJsonOf(env, 'SAP_STATUS').cust);
+  ok('staging: chunk and manifest ids never start with c_ or man_ (the page\'s billing loader reads those)', Object.keys(env.stored()).filter(k => k.startsWith('sapstage/') && !k.startsWith('sapstage/shadow_')).every(k => !/^sapstage\/(c_|man_)/.test(k) || /^sapstage\/(c_2|man_2)/.test(k)) && Object.keys(env.stored()).some(k => /^sapstage\/cust_c_/.test(k)));
+  ok('staging: only the admin-only sapstage collection was written, plus the status', sj(Object.keys(env.stored()).filter(k => !k.startsWith('sapstage/') && !k.startsWith('sapstage/shadow_'))) === before && !!sapJsonOf(env, 'SAP_STATUS').cust);
   ok('staging: no request wrote to SAP, none carried the password, no property outside the customer set was invented', S.calls.every(c => c.method === 'get' && !c.url.includes(S.password)));
   const st = env.call('sapStatus').status;
   ok('status: the card data shows the staged customers and the next step mentions them', st.cust && st.cust.rows === N && st.cust.status === 'staged' && /Customer master: 25 customers are staged/.test(st.next) && st.lastKind === 'customers');
@@ -424,7 +424,8 @@ function sapJsonOf(env, k) { try { return JSON.parse(env.props[k] || '{}'); } ca
   env.call('sapVerifyMetadata'); const before = sj(env.stored()), sheetsBefore = sj(Object.keys(env.sheets).map(n => [n, env.sheets[n].rows.length])), revBefore = env.props.DESK_REVS, lockBefore = env.state.locks;
   r = env.call('sapShadowRun');
   ok('the shadow run returns the per plant-month difference (feed vs loaded)', r.ok && r.done && r.ym === '2026-10' && r.differences.length === PLANTS.length && r.differences.every(d => d.diff.lines === d.feed.lines && d.note === 'not loaded in the Desk' && d.equal === false), sj(r).slice(0, 300));
-  ok('the shadow run wrote nothing: every collection and sheet unchanged, no revision moved, no staging, no lock taken', sj(env.stored()) === before && sj(Object.keys(env.sheets).map(n => [n, env.sheets[n].rows.length])) === sheetsBefore && env.props.DESK_REVS === revBefore && env.state.locks - lockBefore === 1 /* only the run flag */ && !Object.keys(env.stored()).some(k => k.startsWith('sapstage/')));
+  { const st = env.stored(), only = Object.keys(st).filter(k => k.startsWith('sapstage/')), strip = (o) => { const c = Object.assign({}, o); delete c['sapstage/shadow_2026-10']; return c; }, sh = (o) => JSON.stringify(Object.keys(o).filter(n => n !== 'c_sapstage').map(n => [n, o[n].rows.length])), rv = (v) => { const m = JSON.parse(v || '{}').revs || {}; delete m.sapstage; return JSON.stringify(m); };
+    ok('the shadow run wrote nothing to the Desk: every Desk collection and sheet unchanged, no Desk revision moved; the ONLY write is its own result doc sapstage/shadow_2026-10 (admin-only staging)', sj(strip(st)) === before && sh(env.sheets) === JSON.stringify(JSON.parse(sheetsBefore).filter(e => e[0] !== 'c_sapstage')) && rv(env.props.DESK_REVS) === rv(revBefore) && env.state.locks - lockBefore <= 4 && sj(only) === sj(['sapstage/shadow_2026-10'])); }
   ok('the shadow run sent only GET requests', S.calls.length > 0 && S.calls.every(c => c.method === 'get'));
   ok('the card shows the shadow result and the sapSync step', env.call('sapStatus').status.shadow.plantMonths === 3 && /sapSync/.test(env.call('sapStatus').status.next));
   r = env.call('sapSync'); ok('after the shadow run sapSync is allowed', r.ok && r.done);
