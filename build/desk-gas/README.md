@@ -66,7 +66,7 @@ Super admin or project owner only. Functions are run from the editor toolbar (pi
 5. `sapSync`: the real run. **Switched off until the Script Property `SAP_SYNC_ENABLED` is `yes`** (set it only when the Delivery Lead says so; the daily trigger obeys it too). Reads SAP, checks the count, and parks the rows (admin-only collection `sapstage`). Stops at 5 minutes and resumes from a saved cursor on the next call. Refused until a shadow run has been done.
 6. Data Intake > **SAP S/4HANA live feed** > **Load SAP feed** (Super admin): the page's own register intake turns the parked rows into cells and replaces whole plant-months; credit memos go through the credit-note intake. A thinner replacement is held until a person ticks the confirmation. Closed quarters and locked credit-note months are skipped.
 7. `sapCustomerSync` (D78): reads the customer master (company scope, state, PIN, city, district, GSTIN, group, sales group) from the business-partner service and stages it, read only. Needs a passing `sapVerifyMetadata` (a missing customer name blocks this read only). Loading the staged customers into the Desk waits for the page hook (customer intake keyed by source system).
-8. `sapInstallDailyTrigger` (one daily run, about 02:30 IST; off until called), `sapRemoveDailyTrigger`.
+8. `sapInstallDailyTrigger` (one daily run at about 06:00 IST, within 15 minutes; off until called), `sapRemoveDailyTrigger`.
 ### Reading October fast, without re-running by hand (m8-sap-speed)
 Steps for Vijay (re-paste `Desk-Code.gs.txt` into `Code.gs` and make a New version; the page files `Desk-Index*.txt` do not change for this):
 1. Run **sapVerifyMetadata** once if its last result is older than the paste (the reads refuse to start without a passing verify).

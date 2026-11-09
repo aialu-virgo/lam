@@ -1200,8 +1200,8 @@ function sapStatus() { return sapPub_('sapStatus', function () { return { ok: tr
 function sapInstallDailyTrigger() {
   return sapPub_('sapInstallDailyTrigger', function () {
     ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'sapSyncTrigger_') ScriptApp.deleteTrigger(t); });
-    ScriptApp.newTrigger('sapSyncTrigger_').timeBased().everyDays(1).atHour(2).nearMinute(30).create();
-    return { ok: true, message: 'One daily run is on (about 02:30 IST). Run sapRemoveDailyTrigger to switch it off.' };
+    ScriptApp.newTrigger('sapSyncTrigger_').timeBased().everyDays(1).atHour(6).nearMinute(0).create();
+    return { ok: true, message: 'One daily run is on (about 06:00 IST, within 15 minutes). Run sapRemoveDailyTrigger to switch it off.' };
   });
 }
 function sapRemoveDailyTrigger() {
